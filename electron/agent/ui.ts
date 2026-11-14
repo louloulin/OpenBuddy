@@ -91,6 +91,10 @@ export class ExtensionUiBridge {
       throw Error("select必须返回已提供的选项");
     pending.finish(p.value as string | boolean, "resolved");
   }
+  hasPending(sessionId: string) {
+    for (const item of this.pending.values()) if (item.sessionId === sessionId) return true;
+    return false;
+  }
   cancel(sessionId?: string, reason: Reason = "cancelled") {
     if (sessionId) this.epochs.delete(sessionId);
     else this.epochs.clear();

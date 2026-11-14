@@ -4,6 +4,7 @@
  * config (when present), and a "配置连接" button that opens the MCP 管理 modal.
  */
 import { useEffect, useRef, useState } from "react";
+import { copyText } from "@/lib/clipboard";
 import type { ConnectorItem } from "@/lib/types";
 import { connectorsReadMcpConfig } from "@/lib/agent-client";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
@@ -109,7 +110,7 @@ export function ConnectorDetailModal({
                   key={i}
                   className="ec-modal-qp-btn"
                   onClick={() => {
-                    navigator.clipboard?.writeText(qp).then(
+                    copyText(qp).then(
                       () => onToast?.("已复制到剪贴板"),
                       () => { /* clipboard blocked — ignore */ },
                     );

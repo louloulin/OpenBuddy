@@ -111,10 +111,9 @@ export function createMarkdownHostConfig(
     code,
   ) => {
     const pure = code.replace(/#L\d+(?:-L\d+)?$/, "");
-    // Heuristic symbol-only tokens: leave as symbol without FS check.
-    if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(pure)) {
-      return "symbol";
-    }
+    // There is no symbol index: a bare identifier (`useEffect`, `true`) stays
+    // plain code unless it names a real file or folder in the workspace.
+    if (!pure.trim() || /\s/.test(pure.trim()) || pure.length > 260) return "unknown";
     try {
       const stat = await invoke<PathStat>("path_stat", {
         path: pure,

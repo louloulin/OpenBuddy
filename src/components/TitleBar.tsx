@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { editCommand } from "@/lib/clipboard";
 import { win as windowControls } from "@/lib/ipc";
 import { XCloseIcon } from "@/foundation/components/Icon/icons";
 import logoMarkUrl from "@/assets/openbuddy-logo.svg";
@@ -65,26 +66,6 @@ async function win(action: "minimize" | "maximize" | "close") {
 /** Insert text at the cursor position of the currently focused editable
  *  element (textarea/input). Used by the Edit → Paste menu item. Falls back
  *  to execCommand('insertText') when available so undo history is preserved. */
-function insertTextAtFocus(text: string) {
-  const el = document.activeElement as HTMLTextAreaElement | HTMLInputElement | null;
-  if (!el || (el.tagName !== "TEXTAREA" && el.tagName !== "INPUT")) {
-    // No text target focused — try execCommand as a generic fallback.
-    try {
-      document.execCommand("insertText", false, text);
-    } catch {
-      /* ignore */
-    }
-    return;
-  }
-  const start = el.selectionStart ?? el.value.length;
-  const end = el.selectionEnd ?? el.value.length;
-  const next = el.value.slice(0, start) + text + el.value.slice(end);
-  el.value = next;
-  const caret = start + text.length;
-  el.selectionStart = el.selectionEnd = caret;
-  // React-controlled inputs need a native input event to update state.
-  el.dispatchEvent(new Event("input", { bubbles: true }));
-}
 
 
 export function TitleBar({
@@ -117,24 +98,11 @@ export function TitleBar({
       return;
     }
     if (item.edit) {
-      // Editing commands operate on the focused editable element (textarea,
-      // input). execCommand is deprecated but still the only API that works
-      // webview. For paste, prefer the async Clipboard API (execCommand paste
-      // is blocked in non-secure contexts).
-      if (item.edit === "paste") {
-        navigator.clipboard
-          ?.readText()
-          .then((text) => insertTextAtFocus(text))
-          .catch(() => {
-            /* clipboard permission denied — silent */
-          });
-      } else {
-        try {
-          document.execCommand(item.edit);
-        } catch {
-          /* no editable focus — silent */
-        }
-      }
+      // Native webContents edit commands act on the focused editable element
+      // and are not subject to the renderer's clipboard permission.
+      void editCommand(item.edit).catch(() => {
+        /* no editable focus — silent */
+      });
       return;
     }
     if (item.about) {

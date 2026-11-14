@@ -26,8 +26,8 @@ import {
   agentInit,
   agentNewSession,
   agentSend,
+  agentCompact,
   agentCancel,
-  agentResolveUi,
   agentLoadSession,
   agentListSessions,
   agentListWorkspaces,
@@ -54,28 +54,26 @@ import {
   registerTelemetryProvider,
   createConsoleTelemetryProvider,
   reportEvent,
-  type TelemetryProvider,
 } from "./lib/telemetry-contract";
-import { exportEventsBatch, type OtlpConfig } from "./lib/otlp-exporter";
 import { IS_MACOS } from "./lib/platform";
 import { friendlyError } from "./lib/error-format";
+import { AppDialogHost } from "./components/AppDialog";
+import { parseUserText, baseName, EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END } from "./lib/user-text";
 
 
-export const EXPERT_PERSONA_BEGIN = "<!--EXPERT_PERSONA_BEGIN-->";
-export const EXPERT_PERSONA_END = "<!--EXPERT_PERSONA_END-->";
+export { EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END };
 
 
+/** Optimistic sidebar title; the engine persists the authoritative one after the first turn. */
 function deriveTitle(text: string): string {
-  // Strip <system-reminder>…</system-reminder> blocks (system-injected context).
-  let clean = text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "").trim();
-  // Strip skill XML markup (<command-name>…</command-name> etc.).
-  clean = clean.replace(/<\/?command-(?:name|message|args)>/g, "").trim();
-  if (!clean) clean = text.trim();
-  // Take first 10 whitespace-delimited words.
-  const words = clean.split(/\s+/).slice(0, 10).join(" ");
-  if (!words) return "新会话";
-  return words.length > 40 ? words.slice(0, 40) + "…" : words;
+  const display = parseUserText(text);
+  const clean = display.text.replace(/^【[^】]{1,12}】/, "").replace(/\s+/g, " ").trim();
+  if (!clean) return display.skill ? `技能：${display.skill}` : display.attachments[0] ? `查看 ${baseName(display.attachments[0])}` : "新任务";
+  return clean.length > 30 ? clean.slice(0, 30) + "…" : clean;
 }
+/** `/compact [instructions]` typed as the whole message. */
+const COMPACT_COMMAND = /^\/compact(?:\s+([\s\S]*))?$/;
+const sessionStatusOf = (status: "running" | "idle" | "failed") => status === "running" ? "working" as const : status === "failed" ? "failed" as const : "completed" as const;
 
 /**
  * Strip YAML frontmatter (`---\n...\n---`) from a markdown agent file and
@@ -92,16 +90,6 @@ function extractMarkdownBody(raw: string): string {
   return rest.slice(closeIdx + 1).replace(/^\n---\s*/, "").trim();
 }
 
-function clearPendingRequests(sessionId: string, clearExtensionState = false) {
-  const permissions = usePermissionStore.getState();
-  for (const request of permissions.queues[sessionId] ?? []) permissions.dismiss(request.requestId, sessionId);
-  const questions = useQuestionStore.getState();
-  for (const request of questions.queues[sessionId] ?? []) {
-    void agentResolveUi({ sessionId, requestId: request.requestId, cancelled: true }).catch(() => {});
-    questions.dismiss(request.requestId, sessionId, "cancelled");
-  }
-  if (clearExtensionState) useExtensionUiStore.getState().clear(sessionId);
-}
 
 export default function App() {
   return (
@@ -115,6 +103,7 @@ function Shell() {
   const [init, setInit] = useState<InitResult | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<string | undefined>(undefined);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [trustRequest, setTrustRequest] = useState<{ cwd?: string; reason?: string } | null>(null);
   const [placeholderView, setPlaceholderView] = useState<string | null>(null);
@@ -131,6 +120,7 @@ function Shell() {
   const [models, setModels] = useState<ModelOption[]>([]);
   const [workspaces, setWorkspaces] = useState<WorkspaceInfo[]>([]);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToastRef = useRef<(message: string) => void>(() => {});
   const cwdRef = useRef<string>("");
   const resourceSessionRef = useRef<string | undefined>(undefined);
 
@@ -164,6 +154,16 @@ function Shell() {
     }
   }, []);
 
+  // Deep links into 设置 from inline cards (error card, approval card "查看拦截规则").
+  useEffect(() => {
+    const open = (event: Event) => {
+      setSettingsSection((event as CustomEvent<{ section?: string }>).detail?.section);
+      setSettingsOpen(true);
+    };
+    window.addEventListener("openbuddy:open-settings", open);
+    return () => window.removeEventListener("openbuddy:open-settings", open);
+  }, []);
+
   useEffect(() => {
     let unlisten: (() => void) | null = null;
     let disposed = false;
@@ -174,29 +174,7 @@ function Shell() {
         sink: (e) => console.debug(`[telemetry] ${e.level.toUpperCase()} ${e.name}`, e.props ?? ""),
       }),
     );
-    // 若用户配置了 OTLP endpoint,额外注册 OTLP 导出 provider(自托管监控)。
-    const otlpEndpoint = typeof localStorage !== "undefined" ? localStorage.getItem("openbuddy.otlp.endpoint") : null;
-    if (otlpEndpoint) {
-      const otlpConfig: OtlpConfig = { endpoint: otlpEndpoint, serviceName: "openbuddy" };
-      const otlpProvider: TelemetryProvider = {
-        id: "otlp",
-        isEnabled: () => true,
-        reportEvent: (e) => { void exportEventsBatch([e], otlpConfig, { post: async () => ({ ok: true, status: 200 }) }); },
-        reportMetric: () => {},
-      };
-      registerTelemetryProvider(otlpProvider);
-    }
     reportEvent("app_started", "info");
-
-    // 尝试自动激活 @anthropic-ai/sandbox-runtime(装好包后零改动生效)。
-    // 非阻塞:失败(包未安装)静默降级为纯逻辑守卫。
-    void import("@/lib/sandbox-init")
-      .then((m) => m.tryActivateSandbox())
-      .then((status) => {
-        if (status.activated) {
-        }
-      })
-      .catch(() => {/* 静默 */});
 
     (async () => {
       try {
@@ -220,30 +198,26 @@ function Shell() {
             }
           },
           onPermission: (p) => {
-            if (p.sessionId !== sessionStore.getState().sessionId) return;
+            // Requests stay queued per session; background sessions show a badge in the sidebar.
             reportEvent("permission_request", "warn", { sessionId: p.sessionId });
             permissionStore.getState().request(p);
-            void notificationAppend(
-              "permission",
-              p.options?.[0]?.title ?? "工具执行权限请求",
-              undefined,
-              p.sessionId,
-              "warn",
-            );
+            if (p.sessionId !== sessionStore.getState().sessionId) {
+              void notificationAppend("permission", "后台任务等待确认", sessionsStore.getState().titleOf?.(p.sessionId), p.sessionId, "warn");
+            }
+          },
+          onPermissionDismiss: (event) => permissionStore.getState().dismiss(event.requestId, event.sessionId),
+          onSessionStatus: (event) => {
+            sessionsStore.getState().upsert({ sessionId: event.sessionId, status: sessionStatusOf(event.status) });
           },
           onComplete: (p) => {
             reportEvent("session_complete", "info", { sessionId: p.sessionId, stopReason: p.stopReason });
             // Ignore completes for side-channel sessions (inspiration generation)
             // — they're handled by their own listeners, not the main transcript.
             sessionStore.getState().markComplete(p);
-            clearPendingRequests(p.sessionId);
-            const currentSessionId = sessionStore.getState().sessionId;
-            if (currentSessionId && p.sessionId && p.sessionId !== currentSessionId) {
-              return;
-            }
-            // Update sidebar status so the task filter reflects the completion.
-            sessionsStore.getState().upsert({ sessionId: p.sessionId, status: "completed" });
-            p.usage = sessionStore.getState().transcripts[p.sessionId]?.usage;
+            const transcript = sessionStore.getState().transcripts[p.sessionId];
+            const failed = !!transcript?.error;
+            sessionsStore.getState().upsert({ sessionId: p.sessionId, status: failed ? "failed" : "completed", updatedAt: new Date().toISOString() });
+            p.usage = transcript?.usage;
             // Record token usage for the quota dashboard (weixinpay alternative).
             if (p.usage && (p.usage.promptTokens || p.usage.completionTokens)) {
               const currentModel = useAgentModelStore.getState().states[p.sessionId]?.modelKey;
@@ -253,23 +227,17 @@ function Shell() {
                 completionTokens: p.usage.completionTokens ?? 0,
               }, loadQuotaConfig() ?? undefined);
             }
-            // Refresh the composer context-usage pill after each turn.
-            void notificationAppend(
-              "session_complete",
-              `会话完成（${p.stopReason ?? "end_turn"}）`,
-              undefined,
-              p.sessionId,
-              "info",
-            );
-            // Dispatch to external notification channels (IM alternative: Slack/Discord/webhook/email).
-            void dispatchNotification({
-              title: "OpenBuddy 会话完成",
-              body: `会话 ${p.sessionId.slice(0, 8)} 已完成（${p.stopReason ?? "end_turn"}）`,
-              level: "info",
-              sessionId: p.sessionId,
-            }).catch(() => { /* notification dispatch failure is non-fatal */ });
-            // 消息队列自动续发(对齐 WorkBuddy message-queue):该会话若有 active
-            // 队列项,取下一条继续发送,实现「回完一条自动发下一条」。
+            // Only background completions are worth a notification; the focused one is on screen.
+            if (p.sessionId !== sessionStore.getState().sessionId && p.stopReason !== "cancelled") {
+              const title = sessionsStore.getState().titleOf?.(p.sessionId) ?? "任务";
+              void notificationAppend("session_complete", failed ? `任务失败：${title}` : `任务完成：${title}`, undefined, p.sessionId, failed ? "error" : "info");
+              void dispatchNotification({
+                title: failed ? "OpenBuddy 任务失败" : "OpenBuddy 任务完成",
+                body: title,
+                level: failed ? "error" : "info",
+                sessionId: p.sessionId,
+              }).catch(() => { /* notification dispatch failure is non-fatal */ });
+            }
 
           },
           onSummary: ({ sessionId, title }) => {
@@ -289,13 +257,6 @@ function Shell() {
                 break;
               }
             }
-            void notificationAppend(
-              "summary",
-              `生成会话标题：${title}`,
-              undefined,
-              sessionId,
-              "info",
-            );
           },
           onFolderTrust: (p) => {
             const req = (p ?? {}) as { cwd?: string; reason?: string };
@@ -319,50 +280,23 @@ function Shell() {
           },
           onModelsUpdate: () => {
             void refreshModels();
-            void notificationAppend(
-              "models_update",
-              "模型列表已更新",
-              undefined,
-              undefined,
-              "info",
-            );
           },
           onQuestion: request => {
-            if (request.sessionId !== sessionStore.getState().sessionId) {
-              void agentResolveUi({ requestId: request.requestId, sessionId: request.sessionId, cancelled: true }).catch(() => {});
-              return;
-            }
+            // Queued per session like permissions; answered when the user returns.
             questionStore.getState().request(request);
           },
           onUiDismiss: event => questionStore.getState().dismiss(event.requestId, event.sessionId, event.reason),
           onUiState: event => useExtensionUiStore.getState().apply(event),
           onUiNotification: event => {
-            if (event.sessionId === sessionStore.getState().sessionId) setToast(event.message);
-          },
-          onAgentDied: ({ reason }) => {
-            console.error('[OpenBuddy] Agent thread died:', reason);
-            setToast(`⚠️ AI 引擎异常退出：${reason}。请重启应用。`);
-            sessionStore.getState().setError(`AI 引擎异常退出：${reason}`);
-            reportEvent("agent_died", "error", { reason });
+            if (event.sessionId === sessionStore.getState().sessionId) showToastRef.current(event.message);
           },
           onTurnError: (e) => {
             // connection reset, …) via prompt_complete with stopReason
             // "rate_limit"/"error". Surface a friendly message instead of
             // silently marking the turn complete.
             console.warn('[OpenBuddy] Turn ended abnormally:', e);
-            // Only surface for the focused session — background sessions
-            // finalizing after a switch shouldn't hijack the error banner.
-            const currentSessionId = sessionStore.getState().sessionId;
-            if (currentSessionId && e.sessionId && e.sessionId !== currentSessionId) {
-              return;
-            }
-            const msg =
-              e.kind === "rate_limit"
-                ? "⚠️ API 速率限制已触发（执行工具期间）。请等待 1-2 分钟后重试，或缩短对话上下文（新建会话）。"
-                : e.detail
-                  ? `⚠️ 本轮执行出错：${e.detail}`
-                  : "⚠️ 本轮执行出错，请重试。";
-            sessionStore.getState().setError(msg);
+            // Errors belong to their own session's transcript (shown inline in that turn).
+            sessionStore.getState().setError(e.detail || "本轮执行出错，请重试。", e.sessionId);
             reportEvent("turn_error", "error", { sessionId: e.sessionId, kind: e.kind });
           },
         });
@@ -426,8 +360,9 @@ function Shell() {
   const showToast = (message: string) => {
     setToast(message);
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 2000);
+    toastTimer.current = setTimeout(() => setToast(null), message.length > 30 ? 4000 : 2400);
   };
+  showToastRef.current = showToast;
   const handlePlaceholder = (label: string) => {
     // Route a few sidebar shortcut buttons to real panels instead of toasts.
     if (label === "用户中心") {
@@ -442,8 +377,6 @@ function Shell() {
     showToast(`${label} 即将上线`);
   };
   const handleNavigate = (label: string) => {
-    const previous = sessionStore.getState().sessionId;
-    if (previous) clearPendingRequests(previous, true);
     if (sessionStore.getState().sessionId) resourceSessionRef.current = sessionStore.getState().sessionId ?? undefined;
     if (["助理", "专家·技能·连接器", "自动化", "资料库", "灵感", "云存储"].includes(label)) { showToast(`${label} 暂未在 Electron MVP 开放`); return; }
     setPlaceholderView(label);
@@ -466,19 +399,24 @@ function Shell() {
   };
 
   const handleSendNew = async (text: string, attachments?: { path: string }[]) => {
+    if (!attachments?.length && COMPACT_COMMAND.test(text.trim())) {
+      showToastRef.current?.("新任务还没有可以压缩的上下文");
+      return;
+    }
+    let sessionId: string | undefined;
     try {
       const cwd = cwdRef.current;
-      const sessionId = await createSession(cwd, currentModelId);
+      sessionId = await createSession(cwd, currentModelId);
       sessionsStore.getState().setCurrent(sessionId);
       setPlaceholderView(null);
-      sessionsStore.getState().upsert({ sessionId, title: deriveTitle(text), cwd, status: "working" });
+      sessionsStore.getState().upsert({ sessionId, title: deriveTitle(text), cwd, status: "working", updatedAt: new Date().toISOString() });
       sessionStore.getState().setSession(sessionId);
 
       // Check for pending expert — inject persona invisibly.
       const pending = usePendingExpertStore.getState().expert;
       let textForAgent = text;
       if (pending && pending.prompt) {
-        // MessageItem strips it from display on history replay.
+        // parseUserText strips it from display on history replay.
         textForAgent = `${EXPERT_PERSONA_BEGIN}\n${pending.prompt}\n${EXPERT_PERSONA_END}\n\n${text}`;
         // Bind expert to session for persistence + UI badge.
 
@@ -487,16 +425,27 @@ function Shell() {
       }
 
       // UI shows only the user's visible text.
-      sessionStore.getState().pushUser(text);
-      sessionStore.getState().startStreaming();
+      sessionStore.getState().pushUser(text, attachments?.map(a => a.path), sessionId);
+      sessionStore.getState().startStreaming(sessionId);
       await agentSend(sessionId, textForAgent, attachments);
+      refreshWorkspaces(cwd);
     } catch (e) {
       console.error('[OpenBuddy] handleSendNew error:', e);
-      sessionStore.getState().setError(friendlyError(e));
-      const sid = sessionStore.getState().sessionId;
-      if (sid) sessionsStore.getState().upsert({ sessionId: sid, status: "failed" });
+      if (sessionId) {
+        sessionStore.getState().dropPending(sessionId);
+        sessionStore.getState().setError(friendlyError(e), sessionId);
+        sessionsStore.getState().upsert({ sessionId, status: "failed" });
+      } else {
+        showToast(friendlyError(e));
+      }
       throw e;
     }
+  };
+
+  /** A first session in a new folder creates its 空间 node. */
+  const refreshWorkspaces = (cwd: string) => {
+    if (!cwd || cwd === sessionsStore.getState().homeCwd) return;
+    void agentListWorkspaces().then(ws => { sessionsStore.getState().setWorkspaces(ws); setWorkspaces(ws); }).catch(() => {});
   };
 
   const handleSendCurrent = async (text: string, attachments?: { path: string }[]) => {
@@ -505,32 +454,47 @@ function Shell() {
     // via its `streaming` prop, but that value can be stale within the same
     // render tick; the store flag is the source of truth. A second pushUser +
     // startStreaming would orphan an empty placeholder that never completes.
-    if (sessionStore.getState().streaming || modelPending.current) return;
+    const sessionId = currentSessionId;
+    if (sessionStore.getState().transcripts[sessionId]?.busy || modelPending.current) return;
+    const compact = attachments?.length ? null : text.trim().match(COMPACT_COMMAND);
+    if (compact) {
+      // Built-in /compact: summarise older history in place instead of sending a prompt.
+      try {
+        const result = await agentCompact(sessionId, compact[1]?.trim() || undefined);
+        const k = (n: number) => `${Math.round(n / 100) / 10}K`;
+        // Only quote numbers that show a saving (usage-based "before" vs estimated "after" can disagree).
+        const shrank = result.tokensAfter !== undefined && result.tokensBefore > 0 && result.tokensAfter < result.tokensBefore;
+        showToastRef.current?.(shrank ? `上下文已压缩（${k(result.tokensBefore)} → 约 ${k(result.tokensAfter!)} tokens）` : "上下文已压缩");
+      } catch (e) {
+        const reason = friendlyError(e);
+        showToastRef.current?.(/Nothing to compact/i.test(reason) ? "对话还很短，暂时不需要压缩" : /Already compacted/i.test(reason) ? "刚刚已经压缩过了" : `压缩失败：${reason}`);
+      }
+      return;
+    }
     try {
-      sessionsStore.getState().upsert({ sessionId: currentSessionId, status: "working" });
-      sessionStore.getState().pushUser(text);
-      sessionStore.getState().startStreaming();
-      await agentSend(currentSessionId, text, attachments);
+      sessionsStore.getState().upsert({ sessionId, status: "working", updatedAt: new Date().toISOString() });
+      sessionStore.getState().pushUser(text, attachments?.map(a => a.path), sessionId);
+      sessionStore.getState().startStreaming(sessionId);
+      await agentSend(sessionId, text, attachments);
     } catch (e) {
-      sessionStore.getState().setError(friendlyError(e));
-      sessionsStore.getState().upsert({ sessionId: currentSessionId, status: "failed" });
+      sessionStore.getState().dropPending(sessionId);
+      sessionStore.getState().setError(friendlyError(e), sessionId);
+      sessionsStore.getState().upsert({ sessionId, status: "failed" });
       throw e;
     }
   };
 
   const handleCancel = async () => {
-    if (!currentSessionId) return;
+    const sessionId = currentSessionId;
+    if (!sessionId) return;
     try {
-      await agentCancel(currentSessionId);
+      await agentCancel(sessionId);
     } catch (e) {
-      sessionStore.getState().setError(friendlyError(e));
+      showToast(friendlyError(e));
     } finally {
-      // Don't rely on the backend emitting a `complete` for the cancel (it may
-      // be dropped by routing after a fast switch). Finalize locally so the
-      // Composer's stop button and the loading row don't hang. Already-streamed
-      // text is kept; only the in-flight flag is cleared.
-      sessionStore.getState().stopStreaming();
-      clearPendingRequests(currentSessionId, true);
+      // The engine settles the turn and dismisses its pending requests; finalize
+      // locally too so the stop button never hangs. Streamed text is kept.
+      sessionStore.getState().stopStreaming(sessionId);
     }
   };
 
@@ -617,8 +581,6 @@ function Shell() {
   };
 
   const handleNewSession = () => {
-    const previous = sessionStore.getState().sessionId;
-    if (previous) clearPendingRequests(previous, true);
     ++modelOperation.current; modelPending.current = false; setModelBusy(false);
     setPlaceholderView(null);
     sessionsStore.getState().setCurrent(null);
@@ -644,53 +606,55 @@ function Shell() {
     }
   };
 
+  /** Focus a session: live sessions are only focused, others are opened from disk and hydrated. */
+  const openSession = async (sessionId: string, sessionCwd: string | undefined, force = false) => {
+    const snapshot = await agentLoadSession(sessionId, sessionCwd ?? "");
+    useAgentModelStore.getState().apply(snapshot);
+    sessionStore.getState().hydrate(sessionId, snapshot.messages, snapshot.busy, force);
+    usePiQueueStore.getState().apply(sessionId, snapshot.queue);
+    sessionsStore.getState().upsert({ sessionId, status: sessionStatusOf(snapshot.status) });
+    return snapshot;
+  };
+
   const handleSelectSession = async (sessionId: string, sessionCwd?: string) => {
-    const previous = sessionStore.getState().sessionId;
-    if (previous && previous !== sessionId) clearPendingRequests(previous, true);
-    const operation = ++modelOperation.current; modelPending.current = true; setModelBusy(true);
     setPlaceholderView(null);
+    // Re-selecting the focused session is a no-op (it used to restart the engine session).
+    if (sessionsStore.getState().currentSessionId === sessionId && sessionStore.getState().sessionId === sessionId && sessionStore.getState().messages.length) return;
+    const operation = ++modelOperation.current; modelPending.current = true; setModelBusy(true);
     sessionsStore.getState().setCurrent(sessionId);
-    // setSession no longer wipes the transcript — it just moves focus. If we
-    // already have a cached transcript for this session it arms replay
-    // don't (first open / post-restart) the upcoming replay fills the empty
-    // transcript. Either way the focused mirror is refreshed in one step.
     sessionStore.getState().setSession(sessionId);
     try {
-      // Load with the session's OWN cwd (independent sessions have cwd="").
-      // Viewing a 空间 child must NOT re-aim the new-session target directory.
-      useAgentModelStore.getState().apply(await agentLoadSession(sessionId, sessionCwd ?? ""));
-      // Populate the context-usage pill for the freshly loaded session.
+      await openSession(sessionId, sessionCwd);
     } catch (e) {
-      sessionStore.getState().setError(friendlyError(e));
+      sessionStore.getState().setError(friendlyError(e), sessionId);
     } finally {
-      // Replay window is over: a *new* turn's updates for this session must be
-      // ingested again. (No-op when there was no cached transcript to suppress.)
-      sessionStore.getState().clearReplaySuppression(sessionId);
       if (operation === modelOperation.current) { modelPending.current = false; setModelBusy(false); }
     }
   };
 
-  // Rewind rewrites the backend history, so our cached transcript is stale —
-  const handleRewound = () => {
+  // Rewind rewrites the backend history, so the cached transcript is rebuilt from the engine.
+  const handleRewound = async () => {
     const id = sessionStore.getState().sessionId;
     if (!id) return;
-    sessionStore.getState().dropSessionCache(id);
-    sessionStore.getState().setSession(id); // empty cache → replay refills
-    void agentLoadSession(id, cwdRef.current).catch((e) =>
-      sessionStore.getState().setError(friendlyError(e))
+    await openSession(id, currentEntry?.cwd, true).catch((e) =>
+      sessionStore.getState().setError(friendlyError(e), id)
     );
   };
 
-  // Fork copies the session to a new id — jump to it so the user sees the
-  // branch they just created (and it appears in the sidebar).
+  // Fork copies the session to a new id (the engine already opened it) — jump to it.
   const handleForked = async (newId: string) => {
-    const cwd = cwdRef.current;
+    const cwd = currentEntry?.cwd ?? cwdRef.current;
+    const title = currentEntry?.title ? `${currentEntry.title}（分叉）` : "分叉任务";
     setPlaceholderView(null);
     sessionsStore.getState().setCurrent(newId);
-    sessionsStore.getState().upsert({ sessionId: newId, title: "分叉会话", cwd });
+    sessionsStore.getState().upsert({ sessionId: newId, title, cwd, updatedAt: new Date().toISOString() });
     sessionStore.getState().setSession(newId);
-    try { useAgentModelStore.getState().apply(await agentLoadSession(newId, cwd)); }
-    finally { sessionStore.getState().clearReplaySuppression(newId); }
+    try {
+      await openSession(newId, cwd, true);
+      await agentRenameSession(newId, title, cwd).catch(() => {});
+    } catch (e) {
+      sessionStore.getState().setError(friendlyError(e), newId);
+    }
   };
 
   // Select an expert from the + menu (chat or home composer). Instead of
@@ -904,6 +868,7 @@ function Shell() {
                   />
                 )}
               </div>
+              <div className="main-topbar__right" id="chat-topbar-slot" />
             </header>
           ) : (
             sidebarCollapsed && (
@@ -929,12 +894,12 @@ function Shell() {
           )}
           {initError ? (
             <div className="app__notice app__notice--err">
-              初始化失败:{initError}
+              初始化失败：{initError}
               <br />
-              请在「设置 → 账户管理」设置 xAI API Key，或在「设置 → 模型」配置 BYOK provider 后重试。
+              请在「设置 → 模型」添加模型服务商后重试。
             </div>
           ) : !init ? (
-            <div className="app__notice">正在本地初始化 agent…</div>
+            <div className="app__notice">正在启动…</div>
           ) : placeholderView ? (
             <PlaceholderPage
               label={placeholderView}
@@ -964,7 +929,7 @@ function Shell() {
               modelId={currentModelId}
               models={models}
               onModelChange={handleModelChange}
-              cwd={cwdRef.current}
+              cwd={currentEntry?.cwd || cwdRef.current}
               workspaces={workspaces}
               onSelectWorkspace={handleSelectWorkspace}
               onRewound={handleRewound}
@@ -993,7 +958,8 @@ function Shell() {
         </main>
       </div>
       <Toast message={toast} />
-      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} onModelsChanged={refreshModels} />
+      <AppDialogHost />
+      <SettingsPanel open={settingsOpen} initialSection={settingsSection} onClose={() => { setSettingsOpen(false); setSettingsSection(undefined); }} onModelsChanged={refreshModels} />
       <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} init={init} />
       <FolderTrustDialog
         request={trustRequest}

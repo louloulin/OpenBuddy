@@ -53,3 +53,6 @@ scripts/test-*.js
 scripts/compare-dom-structure.js
 scripts/cdp-audit.py
 screenshot.png
+
+# moon task-runner cache
+.moon/cache/

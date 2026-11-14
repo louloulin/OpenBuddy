@@ -8,6 +8,7 @@
  *  - 内部 openId 切换 列表 / ProjectDetailView（无需改 App 路由）
  */
 import { useEffect, useRef, useState } from "react";
+import { appConfirm, appPrompt } from "./AppDialog";
 import { AddIcon, SearchIcon, MoreDotsIcon, ChevronDownIcon } from "@/foundation/components/Icon/icons";
 import heroImg from "@/assets/landing-hero.png";
 import { useProjectsStore, type ProjectMeta, type RefItem } from "@/stores/projects-store";
@@ -66,12 +67,12 @@ export function ProjectsPanel({ onToast, onStartProjectConversation }: ProjectsP
     );
   }
 
-  const handleRename = (p: ProjectMeta) => {
-    const next = window.prompt("重命名项目", p.name);
-    if (next && next.trim() && next.trim() !== p.name) rename(p.id, next.trim());
+  const handleRename = async (p: ProjectMeta) => {
+    const next = await appPrompt({ title: "重命名项目", defaultValue: p.name, confirmLabel: "保存" });
+    if (next && next !== p.name) rename(p.id, next);
   };
-  const handleDelete = (p: ProjectMeta) => {
-    if (window.confirm(`确定删除项目「${p.name}」？`)) {
+  const handleDelete = async (p: ProjectMeta) => {
+    if (await appConfirm({ title: `删除项目「${p.name}」？`, message: "项目内的计划、任务和资料都会被删除，且无法恢复。", confirmLabel: "删除", danger: true })) {
       remove(p.id);
       onToast?.("已删除项目");
     }

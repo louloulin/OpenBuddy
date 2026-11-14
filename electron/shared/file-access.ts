@@ -1,13 +1,35 @@
 import { constants, type Stats } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { open, realpath, stat } from 'node:fs/promises';
 import { basename, isAbsolute } from 'node:path';
 import type { AttachmentReference } from './contract.js';
 
 export interface AuthorizedImage { type: 'image'; data: string; mimeType: string }
-interface Grant { canonical: string; dev: number; ino: number; size: number; mtimeMs: number; ctimeMs: number; expires: number; directory: boolean }
+/**
+ * `digest` pins the selected bytes: inode numbers are reused immediately and file
+ * timestamps come from a coarse clock, so a same-size replacement can produce an
+ * identical stat. Only files small enough to be attached are hashed.
+ */
+interface Grant { canonical: string; dev: number; ino: number; size: number; mtimeMs: number; ctimeMs: number; expires: number; directory: boolean; digest?: string }
 const IMAGE_LIMIT = 10 * 1024 * 1024, TEXT_LIMIT = 256 * 1024, TOTAL_LIMIT = 20 * 1024 * 1024;
 function identity(s: Stats, grant: Grant): boolean {
   return s.dev === grant.dev && s.ino === grant.ino && s.size === grant.size && s.mtimeMs === grant.mtimeMs && s.ctimeMs === grant.ctimeMs;
+}
+const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
+async function digestOf(path: string, size: number): Promise<string | undefined> {
+  if (size > IMAGE_LIMIT) return undefined;
+  const fd = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const hash = createHash('sha256'), chunk = Buffer.alloc(Math.min(Math.max(size, 1), 1024 * 1024));
+    let position = 0;
+    for (;;) {
+      const { bytesRead } = await fd.read(chunk, 0, chunk.length, position);
+      if (!bytesRead) break;
+      hash.update(chunk.subarray(0, bytesRead));
+      position += bytesRead;
+    }
+    return hash.digest('hex');
+  } finally { await fd.close(); }
 }
 function imageMime(bytes: Buffer): string | undefined {
   if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return 'image/png';
@@ -23,8 +45,9 @@ export class FileAccess {
     if (!isAbsolute(path) || path.length > 4096 || path.includes('\0')) throw new Error('invalid_native_file_path');
     const canonical = await realpath(path), s = await stat(canonical);
     if (!s.isFile() && !s.isDirectory()) throw new Error('unsupported_native_file');
+    const digest = s.isFile() ? await digestOf(canonical, s.size) : undefined;
     if (this.grants.size >= 256) this.grants.delete(this.grants.keys().next().value!);
-    this.grants.set(path, { canonical, dev: s.dev, ino: s.ino, size: s.size, mtimeMs: s.mtimeMs, ctimeMs: s.ctimeMs, expires: Date.now() + 30 * 60 * 1000, directory: s.isDirectory() });
+    this.grants.set(path, { canonical, dev: s.dev, ino: s.ino, size: s.size, mtimeMs: s.mtimeMs, ctimeMs: s.ctimeMs, expires: Date.now() + 30 * 60 * 1000, directory: s.isDirectory(), digest });
   }
   async allowsNativePath(path: string): Promise<boolean> {
     const grant = this.grants.get(path);
@@ -54,7 +77,9 @@ export class FileAccess {
           length += read.bytesRead;
         }
         if (length !== before.size || !identity(await fd.stat(), grant)) throw new Error('file_changed: select the file again');
-        const bytes = buffer.subarray(0, length), mimeType = imageMime(bytes);
+        const bytes = buffer.subarray(0, length);
+        if (grant.digest && sha256(bytes) !== grant.digest) throw new Error('file_changed: select the file again');
+        const mimeType = imageMime(bytes);
         if (mimeType) {
           if (!this.decodableImage(bytes)) throw new Error('invalid_image: file cannot be decoded or exceeds pixel limits');
           images.push({ type: 'image', data: bytes.toString('base64'), mimeType });

@@ -1,8 +1,8 @@
-import { forwardRef } from "react";
+import { forwardRef, type SVGProps } from "react";
 import { createIcon } from "../Icon";
 
-const CheckIconRaw = forwardRef<SVGSVGElement>((_props, ref) => (
-  <svg ref={ref} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12" /></svg>
+const CheckIconRaw = forwardRef<SVGSVGElement, SVGProps<SVGSVGElement>>((props, ref) => (
+  <svg ref={ref} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}><polyline points="20 6 9 17 4 12" /></svg>
 ));
 CheckIconRaw.displayName = "CheckIconRaw";
 

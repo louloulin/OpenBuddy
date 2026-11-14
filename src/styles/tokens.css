@@ -235,7 +235,7 @@ body.dark,
   --wb-color-bg-primary-default: var(--wb-palette-gray-3);
   --wb-color-bg-primary-hover: var(--wb-palette-gray-4);
   --wb-color-bg-primary-active: var(--wb-palette-gray-5);
-  --wb-color-bg-secondary-default: var(--wb-palette-white-100);
+  --wb-color-bg-secondary-default: var(--wb-palette-gray-2);
   --wb-color-bg-secondary-hover-active: var(--wb-palette-gray-2);
   --wb-color-border-primary: #262626;
   --wb-color-border-secondary: var(--wb-palette-gray-5);
@@ -282,8 +282,8 @@ body.dark,
   --wb-bg-hover: color-mix(in srgb, var(--wb-palette-white-100) 6%, transparent);
   --wb-bg-active: var(--wb-palette-white-10);
   --wb-bg-overlay: var(--wb-palette-black-60);
-  --wb-border-default: color-mix(in srgb, var(--wb-palette-black-100) 8%, transparent);
-  --wb-border-weak: color-mix(in srgb, var(--wb-palette-black-100) 4%, transparent);
+  --wb-border-default: color-mix(in srgb, var(--wb-palette-white-100) 10%, transparent);
+  --wb-border-weak: color-mix(in srgb, var(--wb-palette-white-100) 6%, transparent);
   --wb-border-subtle: color-mix(in srgb, var(--wb-palette-white-100) 6%, transparent);
   --wb-border-strong: var(--wb-color-border-primary);
   --wb-border-focus: var(--wb-color-border-focus);

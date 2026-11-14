@@ -14,11 +14,12 @@ export const COMMANDS = [
   'skills_remove', 'skills_toggle', 'commands_list', 'notification_list', 'notification_append',
   'notification_mark_read', 'notification_mark_all_read', 'notification_clear',
   'agents_defaults_get', 'agents_defaults_save', 'dialog_open', 'dialog_save', 'dialog_ask',
-  'window_minimize', 'window_toggle_maximize', 'window_close', 'window_is_maximized',
+  'window_minimize', 'window_toggle_maximize', 'window_close', 'window_is_maximized', 'window_edit', 'clipboard_write_text',
   'agent_get_model_state', 'agent_set_thinking_level', 'agent_resolve_ui',
   'agent_steer', 'agent_follow_up', 'agent_get_queue', 'agent_clear_queue',
   'agent_fork_session', 'agent_extensions_list', 'agent_extensions_add',
-  'agent_extensions_remove', 'agent_extensions_set_enabled',
+  'agent_extensions_remove', 'agent_extensions_set_enabled', 'tasks_list', 'task_kill',
+  'rewind_points', 'rewind_execute', 'agent_regenerate', 'agent_compact',
 ] as const;
 export const EVENTS = [
   'agent://update', 'agent://tool', 'agent://complete', 'agent://queue', 'agent://compaction',
@@ -26,6 +27,7 @@ export const EVENTS = [
   'agent://event', 'agent://summary', 'agent://turn-error', 'agent://folder-trust',
   'agent://permission-mode', 'agent://models-update', 'agent://mcp-status', 'window://resized',
   'agent://model-state', 'agent://ui-request', 'agent://ui-dismiss', 'agent://ui-notification', 'agent://ui-state',
+  'agent://session-status', 'agent://permission-dismiss',
 ] as const;
 export type CommandName = typeof COMMANDS[number];
 export type EventName = typeof EVENTS[number];
@@ -72,7 +74,8 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
     if (optional && (value === undefined || value === null)) return;
     if (!['off', 'minimal', 'low', 'medium', 'high', 'xhigh'].includes(String(value))) throw new Error(`invalid_payload: ${key}`);
   };
-  if (['agent_get_model_state', 'agent_set_model', 'agent_set_thinking_level', 'agent_resolve_ui', 'agent_resolve_question', 'agent_steer', 'agent_follow_up', 'agent_get_queue', 'agent_clear_queue', 'agent_fork_session'].includes(command)) string('sessionId', 256);
+  if (command === 'agent_compact') string('instructions', 4000, true);
+  if (['rewind_points', 'rewind_execute', 'agent_regenerate', 'agent_compact', 'agent_get_model_state', 'agent_set_model', 'agent_set_thinking_level', 'agent_resolve_ui', 'agent_resolve_question', 'agent_steer', 'agent_follow_up', 'agent_get_queue', 'agent_clear_queue', 'agent_fork_session'].includes(command)) string('sessionId', 256);
   if (command === 'agent_set_model' || command === 'agent_new_session') {
     string('modelId', 4096, command === 'agent_new_session');
     string('providerId', 512, true);
@@ -98,6 +101,9 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
     }
   }
   if (command === 'agent_extensions_add' || command === 'agent_extensions_remove') string('path');
+  if (command === 'task_kill') string('taskId', 256);
+  if (command === 'rewind_execute') string('entryId', 256);
+  if (command === 'agent_list_sessions' && payload.includeArchived !== undefined && typeof payload.includeArchived !== 'boolean') throw new Error('invalid_payload: includeArchived');
   if (command === 'agent_extensions_set_enabled' && typeof payload.enabled !== 'boolean') throw new Error('invalid_payload: enabled');
   return payload;
 }

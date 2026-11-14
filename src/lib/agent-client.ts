@@ -1,4 +1,4 @@
-import type { ModelState } from "./types";
+import type { ModelState, PiMessage } from "./types";
 export type { ModelState } from "./types";
 
 import { invoke } from "@/lib/ipc";
@@ -92,12 +92,20 @@ export async function agentNewSession(cwd: string, modelId?: string): Promise<st
 // session store. So this command returns nothing — callers just need to
 // clear the local transcript first, then await this to confirm the agent
 // accepted the load.
-export async function agentLoadSession(sessionId: string, cwd: string): Promise<ModelState> {
-  return invoke<ModelState>("agent_load_session", { sessionId, cwd });
+/** Live snapshot of a pooled session: model state plus full history (no event replay). */
+export interface SessionSnapshot extends ModelState {
+  cwd: string;
+  messages: PiMessage[];
+  busy: boolean;
+  status: "running" | "idle" | "failed";
+  queue: AgentQueue;
+}
+export async function agentLoadSession(sessionId: string, cwd: string): Promise<SessionSnapshot> {
+  return invoke<SessionSnapshot>("agent_load_session", { sessionId, cwd });
 }
 
-export async function agentListSessions(cwd: string): Promise<SessionSummary[]> {
-  return invoke<SessionSummary[]>("agent_list_sessions", { cwd });
+export async function agentListSessions(cwd: string, includeArchived = false): Promise<SessionSummary[]> {
+  return invoke<SessionSummary[]>("agent_list_sessions", { cwd, ...(includeArchived ? { includeArchived } : {}) });
 }
 
 
@@ -749,19 +757,19 @@ export async function rewindPoints(sessionId: string): Promise<RewindPoint[]> {
   return invoke<RewindPoint[]>("rewind_points", { sessionId });
 }
 
-/** Rewind a session to a specific prompt index. */
-export async function rewindExecute(
-  sessionId: string,
-  targetPromptIndex: number,
-  mode?: string,
-  force?: boolean,
-): Promise<void> {
-  await invoke<void>("rewind_execute", {
-    sessionId,
-    targetPromptIndex,
-    mode: mode ?? null,
-    force: force ?? null,
-  });
+/** 从这里编辑: drop a prompt and everything after it (conversation only; files are untouched). */
+export async function rewindExecute(sessionId: string, entryId: string): Promise<{ editorText: string }> {
+  return invoke<{ editorText: string }>("rewind_execute", { sessionId, entryId });
+}
+
+/** 重新生成: branch before the last prompt and send it again. */
+export async function agentRegenerate(sessionId: string): Promise<void> {
+  await invoke<void>("agent_regenerate", { sessionId });
+}
+
+/** `/compact [instructions]`: summarise older history to free context. */
+export async function agentCompact(sessionId: string, instructions?: string): Promise<{ tokensBefore: number; tokensAfter?: number }> {
+  return invoke("agent_compact", { sessionId, ...(instructions ? { instructions } : {}) });
 }
 
 // ---------- session fork ----------
@@ -1065,6 +1073,8 @@ export async function subscribeAgentEvents(handlers: {
   onUiNotification?: (event: { sessionId: string; message: string; severity: "info" | "warning" | "error" }) => void;
   onAgentDied?: (payload: { reason: string }) => void;
   onTurnError?: (error: TurnErrorEvent) => void;
+  onSessionStatus?: (event: { sessionId: string; status: "running" | "idle" | "failed" }) => void;
+  onPermissionDismiss?: (event: { requestId: string; sessionId: string; reason: string; allowed: boolean }) => void;
 }): Promise<UnlistenFn> {
   const unlisteners: UnlistenFn[] = [];
   const wire = async <T>(event: string, callback: ((payload: T) => void) | undefined) => {
@@ -1088,6 +1098,8 @@ export async function subscribeAgentEvents(handlers: {
     await wire("agent://models-update", handlers.onModelsUpdate);
     await wire("agent://model-state", handlers.onModelState);
     await wire("agent://turn-error", handlers.onTurnError);
+    await wire("agent://session-status", handlers.onSessionStatus);
+    await wire("agent://permission-dismiss", handlers.onPermissionDismiss);
     await wire<{ sessionId: string; message: string }>("agent://error", handlers.onTurnError
       ? ({ sessionId, message }) => handlers.onTurnError!({ sessionId, kind: "error", detail: message })
       : undefined);

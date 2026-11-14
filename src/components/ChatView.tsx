@@ -1,46 +1,47 @@
 import { useExtensionUiStore } from "@/stores/extension-ui-store";
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { PauseIcon } from "@/foundation/components/Icon/icons";
+import { useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { useSessionStore, type ToolCallView } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { createMarkdownHostConfig } from "@/lib/markdown-host";
-import { rewindExecute, rewindPoints } from "@/lib/agent-client";
-import {
-  collectSessionArtifacts,
-  findToolCall,
-  type SessionArtifact,
-} from "@/lib/session-artifacts";
-import { MessageItem } from "./MessageItem";
+import { agentForkSession, agentRegenerate, rewindExecute, rewindPoints, agentSteer, agentFollowUp } from "@/lib/agent-client";
+import { collectSessionArtifacts, findToolCall, type SessionArtifact } from "@/lib/session-artifacts";
+import { friendlyError } from "@/lib/error-format";
+import { invoke } from "@/lib/ipc";
+import { parseUserText, baseName } from "@/lib/user-text";
 import { Composer } from "./Composer";
-import { PlanPanel } from "./PlanPanel";
 import { PermissionInlineCard } from "./PermissionDialog";
 import { QuestionInlineCard } from "./QuestionInlineCard";
 import { ToolSidePanel, type ToolSidePanelMode } from "./ToolSidePanel";
 import { FindBar, isFindHit } from "./FindBar";
-import { FileChangesPanel } from "./FileChangesPanel";
-import { SubagentPanel } from "./SubagentPanel";
-import { TeamStatusView } from "./TeamStatusView";
 import { ShareMenu } from "./ShareMenu";
 import { QueuePanel } from "./QueuePanel";
-import { WorkspacePicker } from "./WorkspacePicker";
 import { usePiQueueStore } from "@/stores/pi-queue-store";
-import { agentSteer, agentFollowUp } from "@/lib/agent-client";
-import { buildTimeline } from "@/lib/timeline-utils";
-import { formatAgentError } from "@/lib/error-format";
-import { useSubagentStore } from "@/stores/subagent-store";
-import {
-  requestYield,
-  confirmYielded,
-  clearYield,
-  isYielded,
-  createYieldStore,
-} from "@/lib/yield-state";
+import { buildNodes } from "./chat/turns";
+import { TurnView } from "./chat/TurnView";
+import { UserBubble } from "./chat/UserBubble";
+import { ErrorCard } from "./chat/ErrorCard";
+import { PromptHistory } from "./chat/PromptHistory";
+import { ArrowDown } from "lucide-react";
+import { FolderIcon, PanelIcon, SearchIcon } from "@/foundation/components/Icon/icons";
 import type { ModelOption } from "./ModelSelector";
 import type { HomeModeId } from "./home-scenes";
 import type { AgentEntry } from "@/lib/types";
 import type { WorkspaceInfo } from "@/lib/agent-client";
 
-/** Center chat column: scrollable message list + composer pinned at bottom. */
+/** Pixels from the bottom within which the transcript keeps following new content. */
+const STICK_THRESHOLD = 80;
+/** Space kept above a just-sent prompt once it is scrolled to the top. */
+const ANCHOR_GAP = 16;
+
+/** Find the App top bar's right slot (rendered by App before ChatView mounts). */
+function useTopbarSlot(): HTMLElement | null {
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => { setSlot(document.getElementById("chat-topbar-slot")); }, []);
+  return slot;
+}
+
+/** Center chat column: grouped turns + composer; tools for the conversation live in the top bar. */
 export function ChatView({
   onSend,
   onCancel,
@@ -51,6 +52,7 @@ export function ChatView({
   workspaces,
   onSelectWorkspace,
   onRewound,
+  onForked,
   onToast,
   onSelectMode,
   onSelectExpert,
@@ -64,11 +66,10 @@ export function ChatView({
   cwd?: string;
   workspaces?: WorkspaceInfo[];
   onSelectWorkspace?: (cwd: string) => void;
-  /** Rewind rewrote backend history — reload the transcript. */
-  onRewound?: () => void;
+  /** History was rewritten by the engine — rebuild the transcript. */
+  onRewound?: () => void | Promise<void>;
   /** Fork created a new session id — navigate to it. */
   onForked?: (newSessionId: string) => void;
-  /** Surface transient feedback from the rewind/fork toolbar. */
   onToast?: (msg: string) => void;
   onSelectMode?: (modeId: HomeModeId) => void;
   onSelectExpert?: (agent: AgentEntry) => void;
@@ -76,193 +77,218 @@ export function ChatView({
 }) {
   const messages = useSessionStore((s) => s.messages);
   const streaming = useSessionStore((s) => s.streaming);
-  const streamingMessageId = useSessionStore((s) => s.streamingMessageId);
   const error = useSessionStore((s) => s.error);
-  const plan = useSessionStore((s) => s.plan);
+  const retry = useSessionStore((s) => s.retry);
+  const compacting = useSessionStore((s) => s.compacting);
+  const turnStartedAt = useSessionStore((s) => s.turnStartedAt);
   const sessionId = useSessionStore((s) => s.sessionId);
+  const homeCwd = useSessionsStore((s) => s.homeCwd);
   const extensionUi = useExtensionUiStore(state => sessionId ? state.sessions[sessionId] : undefined);
-  // 会话内查找(对齐 WorkBuddy chat-search)。
+  const nodes = useMemo(() => buildNodes(messages), [messages]);
+  const lastTurnIndex = useMemo(() => nodes.map((n) => n.kind).lastIndexOf("turn"), [nodes]);
+  const lastNodeIsTurn = nodes.at(-1)?.kind === "turn";
+  const toolbarSlot = useTopbarSlot();
+
   const [findOpen, setFindOpen] = useState(false);
   const [findHits, setFindHits] = useState<string[]>([]);
   const [findCurrent, setFindCurrent] = useState<string | null>(null);
-  // 文件变更聚合面板(对齐 WorkBuddy file-changes-panel)。
-  const [fileChangesOpen, setFileChangesOpen] = useState(false);
-  // 子代理运行时面板(对齐 WorkBuddy team-runtime)。
-  const [subagentsOpen, setSubagentsOpen] = useState(false);
-  const [teamsOpen] = useState(false);
-  // pause/yield(对齐 WorkBuddy session:requestYield):软暂停,保留会话上下文。
-  const [yieldStore, setYieldStore] = useState<Record<string, ReturnType<typeof createYieldStore>>["k"]>(() => createYieldStore());
-  const yielded = sessionId ? isYielded(yieldStore, sessionId) : false;
-  const handlePause = useCallback(() => {
-    if (!sessionId || !streaming) return;
-    setYieldStore((s) => requestYield(s, sessionId));
-    onCancel();
-  }, [sessionId, streaming, onCancel]);
-  const handleResume = useCallback(() => {
-    if (!sessionId) return;
-    setYieldStore((s) => clearYield(s, sessionId));
-    onToast?.("已恢复(可继续发送消息)");
-  }, [sessionId, onToast]);
-  /** 恢复并重新触发 agent:清除 yield 状态 + 发送「请继续」让 agent 接着生成。
-   *  形成完整闭环(暂停 → 显式恢复并续跑),区别于仅清状态的「恢复」。 */
-  const handleResumeAndContinue = useCallback(() => {
-    if (!sessionId) return;
-    setYieldStore((s) => clearYield(s, sessionId));
-    onSend("请继续。");
-    onToast?.("已恢复并继续生成");
-  }, [sessionId, onSend, onToast]);
-  // 按会话持久化的输入草稿:切到本会话时回填,每次输入回写 store。
-  // 选 setDraft 的稳定引用做回调,避免 sessionId 变化时让 Composer 收到新函数。
-  const setDraft = useSessionsStore((s) => s.setDraft);
-  const draft = useSessionsStore((s) =>
-    sessionId ? s.drafts[sessionId] ?? "" : ""
-  );
-  // Read the expert name + avatar bound to the current session (for the composer badge).
-  const activeExpertName = useSessionsStore((s) => {
-    if (!sessionId) return undefined;
-    const entry = s.independent.find((x) => x.sessionId === sessionId)
-      ?? Object.values(s.workspaceSessions).flat().find((x) => x.sessionId === sessionId);
-    return entry?.expertName;
-  });
-  const activeExpertAvatar = useSessionsStore((s) => {
-    if (!sessionId) return undefined;
-    const entry = s.independent.find((x) => x.sessionId === sessionId)
-      ?? Object.values(s.workspaceSessions).flat().find((x) => x.sessionId === sessionId);
-    return entry?.expertAvatar;
-  });
-  const [planOpen, setPlanOpen] = useState(false);
 
-  // ---- 消息"编辑重发":把消息文本回填到输入框 ----
+  const setDraft = useSessionsStore((s) => s.setDraft);
+  const draft = useSessionsStore((s) => (sessionId ? s.drafts[sessionId] ?? "" : ""));
+  const activeEntry = useSessionsStore((s) => {
+    if (!sessionId) return undefined;
+    return s.independent.find((x) => x.sessionId === sessionId)
+      ?? Object.values(s.workspaceSessions).flat().find((x) => x.sessionId === sessionId);
+  });
+
+  // Text pushed into the composer (编辑重发 / extension setEditorText).
   const [resendText, setResendText] = useState<string | undefined>(undefined);
   const [resendNonce, setResendNonce] = useState(0);
-  const handleEditResend = useCallback((text: string) => {
-    if (!text.trim()) return;
+  const putInComposer = useCallback((text: string) => {
     setResendText(text);
     setResendNonce((n) => n + 1);
   }, []);
-
   useEffect(() => {
     if (!extensionUi?.editor || !sessionId) return;
     const editor = extensionUi.editor;
-    const draft = useSessionsStore.getState().drafts[sessionId] ?? "";
-    setResendText(editor.action === "paste" ? draft + editor.text : editor.text);
-    setResendNonce(value => value + 1);
-  }, [extensionUi?.editor, sessionId]);
+    const current = useSessionsStore.getState().drafts[sessionId] ?? "";
+    putInComposer(editor.action === "paste" ? current + editor.text : editor.text);
+  }, [extensionUi?.editor, sessionId, putInComposer]);
 
-  // ---- 消息级"重试":回溯到最后一条用户 prompt 并重新发送（重新生成回复） ----
-  const [retrying, setRetrying] = useState(false);
+  // 重新生成: the engine branches before the last prompt and sends it again.
   const handleRetry = useCallback(async () => {
-    if (!sessionId || streaming || retrying) return;
-    // Find the last user message text.
-    const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
-    if (!lastUserMsg) {
-      onToast?.("没有可重试的消息");
-      return;
-    }
-    const userText = lastUserMsg.parts
-      .filter((p) => p.kind === "text")
-      .map((p) => p.text)
-      .join("\n");
-    if (!userText.trim()) return;
-
-    setRetrying(true);
+    if (!sessionId || streaming) return;
     try {
-      // Rewind the conversation to the last user prompt (conversation only —
-      // don't touch files), which drops the assistant turn we're regenerating.
-      const points = await rewindPoints(sessionId);
-      if (points.length === 0) {
-        // Nothing to rewind — bailing here is important: without a rewind we
-        // would just append a duplicate user turn on top of the old one.
-        onToast?.("没有可回退的点，无法重试");
-        return;
-      }
-      // Pick the latest point explicitly by promptIndex — don't rely on the
-      // points array being sorted ascending (the order isn't documented).
-      const lastPoint = points.reduce((a, b) =>
-        b.promptIndex > a.promptIndex ? b : a,
-      );
-      await rewindExecute(sessionId, lastPoint.promptIndex, "conversation", true);
-      onRewound?.();
-      onSend(userText);
+      await agentRegenerate(sessionId);
     } catch (e) {
-      onToast?.(`重试失败：${String(e).replace(/^Error:\s*/, "")}`);
-    } finally {
-      setRetrying(false);
+      onToast?.(`重新生成失败：${friendlyError(e)}`);
     }
-  }, [sessionId, streaming, retrying, messages, onSend, onRewound, onToast]);
+  }, [sessionId, streaming, onToast]);
 
-  // ---- Phase 2/3: tool detail + artifacts side panel ----
+  // 编辑提问 (in place): drop that prompt and everything after it, then resend the
+  // edited text — or put it back in the composer when files must be re-attached.
+  const handleEditFrom = useCallback(async (messageId: string, text: string, resend: boolean) => {
+    if (!sessionId || streaming) return;
+    const ordinal = messages.filter((m) => m.role === "user" && !m.meta?.pending).findIndex((m) => m.id === messageId);
+    try {
+      const points = await rewindPoints(sessionId);
+      const point = ordinal >= 0 ? points[ordinal] : undefined;
+      if (!point) { putInComposer(text); onToast?.("无法从这条消息重新开始，已放回输入框"); return; }
+      const { editorText } = await rewindExecute(sessionId, point.entryId);
+      await onRewound?.();
+      if (resend) await onSend(text);
+      else putInComposer(text || parseUserText(editorText).text);
+    } catch (e) {
+      onToast?.(`编辑失败：${friendlyError(e)}`);
+    }
+  }, [sessionId, streaming, messages, putInComposer, onRewound, onSend, onToast]);
+
+  const handleFork = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      onForked?.(await agentForkSession(sessionId));
+      onToast?.("已分叉为新任务");
+    } catch (e) {
+      onToast?.(`分叉失败：${friendlyError(e)}`);
+    }
+  }, [sessionId, onForked, onToast]);
+
+  // ---- right panel (tool detail / artifacts / files / changes) ----
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelMode, setPanelMode] = useState<ToolSidePanelMode>("tool");
   const [activeTool, setActiveTool] = useState<ToolCallView | null>(null);
   const [previewPath, setPreviewPath] = useState<string | null>(null);
-
   const artifacts = useMemo(() => collectSessionArtifacts(messages), [messages]);
-
-  // Keep active tool fresh when streaming updates status/content.
   useEffect(() => {
     if (!activeTool) return;
     const fresh = findToolCall(messages, activeTool.toolCallId);
     if (fresh && fresh !== activeTool) setActiveTool(fresh);
   }, [messages, activeTool]);
-
-  // Close panel when switching sessions.
   useEffect(() => {
     setPanelOpen(false);
     setActiveTool(null);
     setPreviewPath(null);
+    setFindOpen(false);
   }, [sessionId]);
-
-  // Auto-open subagent panel when a subagent starts running.
-  const liveSubagentCount = useSubagentStore((s) =>
-    sessionId ? s.getForSession(sessionId).filter((a) => a.status === "running").length : 0,
-  );
-  useEffect(() => {
-    if (liveSubagentCount > 0) setSubagentsOpen(true);
-  }, [liveSubagentCount]);
-
   const handleOpenTool = useCallback((tc: ToolCallView) => {
     setActiveTool(tc);
     setPreviewPath(null);
     setPanelMode("tool");
     setPanelOpen(true);
   }, []);
-
   const handleSelectArtifact = useCallback((a: SessionArtifact) => {
     setPreviewPath(a.path);
     setPanelMode("preview");
     setPanelOpen(true);
   }, []);
-
   const handleOpenArtifacts = useCallback(() => {
     setPanelMode("artifacts");
     setPanelOpen(true);
   }, []);
 
-  const markdownConfig = useMemo(
-    () =>
-      createMarkdownHostConfig({
-        cwd,
-        sessionId,
-        onToast,
-      }),
-    [cwd, sessionId, onToast],
-  );
+  const markdownConfig = useMemo(() => createMarkdownHostConfig({ cwd, sessionId, onToast }), [cwd, sessionId, onToast]);
 
+  // ---- scrolling: follow new content only while the reader is at the bottom ----
   const scrollRef = useRef<HTMLDivElement>(null);
+  const spacerRef = useRef<HTMLDivElement>(null);
+  const stickRef = useRef(true);
+  /** A prompt was just sent: keep it at the top while its reply fills the view. */
+  const anchorRef = useRef(false);
+  /** Ignore scroll events caused by our own smooth scroll. */
+  const autoScrollUntil = useRef(0);
+  const [showJump, setShowJump] = useState(false);
+  const onScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || performance.now() < autoScrollUntil.current) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_THRESHOLD;
+    stickRef.current = atBottom;
+    setShowJump(!atBottom);
+  }, []);
+  /**
+   * Grok-style anchoring: pad the end of the transcript so that "scrolled to the
+   * bottom" puts the newest prompt at the top of the view. The reply grows into
+   * the padding (nothing moves); once it outgrows the view the usual
+   * follow-the-bottom behaviour takes over.
+   */
+  const fitSpacer = useCallback(() => {
+    const el = scrollRef.current;
+    const spacer = spacerRef.current;
+    if (!el || !spacer) return;
+    let height = 0;
+    const prompts = el.querySelectorAll<HTMLElement>('[data-role="user"]');
+    const prompt = prompts[prompts.length - 1];
+    if (anchorRef.current && prompt) {
+      const box = el.getBoundingClientRect();
+      const promptTop = prompt.getBoundingClientRect().top - box.top + el.scrollTop;
+      const contentEnd = spacer.getBoundingClientRect().top - box.top + el.scrollTop;
+      const tail = el.scrollHeight - contentEnd - spacer.offsetHeight;
+      height = Math.max(0, Math.round(el.clientHeight - (contentEnd - promptTop) - tail - ANCHOR_GAP));
+    }
+    if (spacer.style.height !== `${height}px`) spacer.style.height = `${height}px`;
+  }, []);
+  /** 提问历史: bring one prompt into view and flash it. */
+  const jumpToMessage = useCallback((messageId: string) => {
+    const root = scrollRef.current;
+    if (!root) return;
+    const target = [...root.querySelectorAll<HTMLElement>("[data-msg-ids]")].find((el) => (el.dataset.msgIds ?? "").split(" ").includes(messageId));
+    if (!target) return;
+    stickRef.current = false;
+    target.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    target.classList.remove("msg-wrap--flash");
+    void target.offsetWidth;
+    target.classList.add("msg-wrap--flash");
+    window.setTimeout(() => target.classList.remove("msg-wrap--flash"), 1600);
+  }, []);
+  const jumpToBottom = useCallback((smooth = false) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (smooth && typeof el.scrollTo === "function") el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    else el.scrollTop = el.scrollHeight;
+    stickRef.current = true;
+    setShowJump(false);
+  }, []);
+  // A new prompt from the user glides to the top of the view; its reply streams in below.
+  const pendingCount = messages.filter((m) => m.meta?.pending).length;
+  const lastPending = useRef(0);
+  useLayoutEffect(() => {
+    const grew = pendingCount > lastPending.current;
+    lastPending.current = pendingCount;
+    if (!grew) return;
+    anchorRef.current = true;
+    fitSpacer();
+    autoScrollUntil.current = performance.now() + 450;
+    jumpToBottom(true);
+  }, [pendingCount, fitSpacer, jumpToBottom]);
+  useEffect(() => {
+    anchorRef.current = false;
+    fitSpacer();
+    stickRef.current = true;
+    jumpToBottom();
+  }, [sessionId, fitSpacer, jumpToBottom]);
+  useLayoutEffect(() => {
+    fitSpacer();
+    if (stickRef.current && performance.now() >= autoScrollUntil.current) jumpToBottom();
+  }, [messages, error, retry, compacting, fitSpacer, jumpToBottom]);
+  // Content can grow after render (markdown, images): refit and keep following while stuck.
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+    const inner = el?.firstElementChild;
+    if (!el || !inner || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      fitSpacer();
+      if (stickRef.current && performance.now() >= autoScrollUntil.current) el.scrollTop = el.scrollHeight;
+    });
+    observer.observe(inner);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fitSpacer]);
 
-  // 会话内查找:Ctrl/Cmd+F 打开;当前命中滚入视野。
+  // ---- in-conversation search (Ctrl/Cmd+F) ----
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
-        if (messages.length > 0) {
-          e.preventDefault();
-          setFindOpen(true);
-        }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f" && messages.length > 0) {
+        e.preventDefault();
+        setFindOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -270,299 +296,138 @@ export function ChatView({
   }, [messages.length]);
   useEffect(() => {
     if (!findCurrent) return;
-    const node = scrollRef.current?.querySelector(
-      `[data-msg-id="${findCurrent}"]`,
-    );
+    const node = scrollRef.current?.querySelector(`[data-msg-ids~="${findCurrent}"]`);
     node?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [findCurrent]);
-  // 流式结束后确认 yield(yielding → yielded,显示「已暂停」横幅)。
-  useEffect(() => {
-    if (!sessionId) return;
-    if (!streaming) {
-      setYieldStore((s) => confirmYielded(s, sessionId));
-    }
-  }, [sessionId, streaming]);
+
+  const findClass = (ids: string[]) => {
+    if (!findOpen || !ids.some((id) => isFindHit(findHits, id))) return "";
+    return ids.includes(findCurrent ?? "") ? " msg-wrap--find-current" : " msg-wrap--find-hit";
+  };
+  // Tool rows that render their own approval card; the footer shows the rest.
+  const inlineToolIds = useMemo(() => new Set(messages.flatMap((m) => m.parts.flatMap((p) => (p.kind === "tool_call" ? [p.toolCall.toolCallId] : [])))), [messages]);
+  const workspaceLabel = !cwd ? "" : cwd === homeCwd ? "默认空间" : baseName(cwd);
+  const panelActive = panelOpen && panelMode !== "tool";
+
+  const toolbar = (
+    <div className="chat-toolbar">
+      {workspaceLabel && (
+        <button
+          type="button"
+          className="chat-toolbar__workspace"
+          onClick={() => { if (cwd) void invoke("reveal_in_folder", { path: cwd, cwd }).catch(() => onToast?.("无法打开文件夹")); }}
+          data-tip={cwd}
+          aria-label={`工作空间：${workspaceLabel}（在文件夹中显示）`}
+        >
+          <FolderIcon size={14} />
+          <span>{workspaceLabel}</span>
+        </button>
+      )}
+      <button type="button" className={"main-topbar__btn" + (findOpen ? " main-topbar__btn--active" : "")} onClick={() => setFindOpen((v) => !v)} aria-label="在对话中搜索" data-tip="搜索 (Ctrl/Cmd+F)" disabled={!messages.length}>
+        <SearchIcon size="md" />
+      </button>
+      <PromptHistory messages={messages} onJump={jumpToMessage} />
+      {messages.length > 0 && <ShareMenu messages={messages} title={activeEntry?.title} onDone={onToast} />}
+      <button
+        type="button"
+        className={"main-topbar__btn" + (panelActive ? " main-topbar__btn--active" : "")}
+        onClick={() => (panelActive ? setPanelOpen(false) : handleOpenArtifacts())}
+        aria-label={panelActive ? "收起右侧栏" : "展开右侧栏"}
+        data-tip={panelActive ? "收起右侧栏" : `产物与文件${artifacts.length ? `（${artifacts.length}）` : ""}`}
+      >
+        <PanelIcon size="md" />
+      </button>
+    </div>
+  );
 
   return (
     <div className={"chatview" + (panelOpen ? " chatview--with-panel" : "")}>
+      {toolbarSlot && createPortal(toolbar, toolbarSlot)}
       <div className="chatview__main">
-        {error && (
-          <div className="chatview__error-banner" role="alert">
-            <span className="chatview__error-text" style={{ whiteSpace: "pre-wrap" }}>
-              {formatAgentError(error) ?? error}
-            </span>
-            <button
-              className="chatview__error-close"
-              onClick={() => useSessionStore.getState().setError(null)}
-              aria-label="dismiss"
-            >
-              ×
-            </button>
-          </div>
-        )}
-        {/* Workspace indicator / switcher (对齐 WorkBuddy 顶栏工作目录切换)。 */}
-        {cwd && workspaces && onSelectWorkspace && (
-          <div className="chatview__workspace-bar">
-            <WorkspacePicker
-              cwd={cwd}
-              workspaces={workspaces}
-              onSelectWorkspace={onSelectWorkspace}
-            />
-          </div>
-        )}
-        {/* Plan toggle: floating button on the right when there's a plan. */}
-        {plan && plan.entries.length > 0 && (
-          <>
-            <button
-              className={`chatview__plan-toggle ${planOpen ? "chatview__plan-toggle--active" : ""}`}
-              onClick={() => setPlanOpen((v) => !v)}
-              title="执行计划"
-            >
-              计划 {plan.entries.filter((e) => e.status === "completed").length}/
-              {plan.entries.length}
-            </button>
-            {planOpen && (
-              <div className="chatview__plan-panel">
-                <PlanPanel
-                  sessionId={sessionId ?? undefined}
-                  onSend={onSend}
-                  onToast={onToast}
-                />
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Artifacts entry — always available when there are outputs. */}
-        {artifacts.length > 0 && (
-          <button
-            type="button"
-            className={
-              "chatview__artifacts-toggle" +
-              (panelOpen && panelMode === "artifacts"
-                ? " chatview__artifacts-toggle--active"
-                : "")
-            }
-            onClick={() => {
-              if (panelOpen && panelMode === "artifacts") {
-                setPanelOpen(false);
-              } else {
-                handleOpenArtifacts();
-              }
-            }}
-            title="本会话产物"
-          >
-            产物 {artifacts.length}
-          </button>
-        )}
-
-        {/* 会话内查找入口 + 查找条(对齐 WorkBuddy chat-search)。 */}
-        {messages.length > 0 && (
-          <button
-            type="button"
-            className={
-              "chatview__artifacts-toggle" +
-              (findOpen ? " chatview__artifacts-toggle--active" : "")
-            }
-            onClick={() => setFindOpen((v) => !v)}
-            title="在当前对话中查找 (Ctrl/Cmd+F)"
-          >
-            查找
-          </button>
-        )}
         <FindBar
           messages={messages}
           open={findOpen}
-          onClose={() => {
-            setFindOpen(false);
-            setFindHits([]);
-            setFindCurrent(null);
-          }}
+          onClose={() => { setFindOpen(false); setFindHits([]); setFindCurrent(null); }}
           onHitsChange={setFindHits}
           onActiveChange={setFindCurrent}
         />
-
-        {/* 文件变更聚合入口(对齐 WorkBuddy file-changes-panel)。 */}
-        {messages.length > 0 && (
-          <button
-            type="button"
-            className={
-              "chatview__artifacts-toggle" +
-              (fileChangesOpen ? " chatview__artifacts-toggle--active" : "")
-            }
-            onClick={() => setFileChangesOpen((v) => !v)}
-            title="本会话文件变更"
-          >
-            变更
-          </button>
-        )}
-        {/* 文件树入口(对齐 WorkBuddy fileTree 视图)：打开工作区面板的文件树视图。 */}
-        {cwd && (
-          <button
-            type="button"
-            className={
-              "chatview__artifacts-toggle" +
-              (panelOpen && panelMode === "fileTree"
-                ? " chatview__artifacts-toggle--active"
-                : "")
-            }
-            onClick={() => {
-              if (panelOpen && panelMode === "fileTree") {
-                setPanelOpen(false);
-              } else {
-                setPanelMode("fileTree");
-                setPanelOpen(true);
-              }
-            }}
-            title="工作区文件树"
-          >
-            文件树
-          </button>
-        )}
-        {/* 浏览器预览入口(对齐 WorkBuddy preview 视图)：打开工作区面板的浏览器视图。 */}
-        <button
-          type="button"
-          className={
-            "chatview__artifacts-toggle" +
-            (panelOpen && panelMode === "browser"
-              ? " chatview__artifacts-toggle--active"
-              : "")
-          }
-          onClick={() => {
-            if (panelOpen && panelMode === "browser") {
-              setPanelOpen(false);
-            } else {
-              setPanelMode("browser");
-              setPanelOpen(true);
-            }
-          }}
-          title="网页预览"
-        >
-          浏览器
-        </button>
-        {/* 分享 / 导出本会话(对齐 WorkBuddy share:*)。 */}
-        {messages.length > 0 && (
-          <ShareMenu messages={messages} onDone={onToast} />
-        )}
-
-        <div className="chatview__scroll" ref={scrollRef}>
+        <div className="chatview__scroll" ref={scrollRef} onScroll={onScroll}>
           <div className="chatview__inner">
-            {fileChangesOpen && (
-              <FileChangesPanel messages={messages} />
-            )}
-            {subagentsOpen && (
-              <SubagentPanel messages={messages} />
-            )}
-            {teamsOpen && (
-              <TeamStatusView messages={messages} />
-            )}
-            {buildTimeline(messages).map((node) => {
-              // 时间线分隔符(对齐 WorkBuddy message-timeline):日期/模型切换分隔。
-              // 当前 ChatMessage 无 modelId/createdAt,无分隔符时仅渲染消息节点。
-              if (node.kind === "date-divider") {
+            {nodes.map((node, index) => {
+              if (node.kind === "notice") {
+                const label = node.message.meta?.notice === "compaction" ? "上下文已压缩" : node.message.meta?.notice === "branch" ? "已切换到其他分支" : node.message.meta?.notice === "bash" ? "命令" : "提示";
                 return (
-                  <div key={node.key} className="timeline-divider timeline-divider--date">
-                    {node.label}
+                  <div key={node.key} className="chat-notice" data-msg-ids={node.message.id}>
+                    <span className="chat-notice__label">{label}</span>
+                    {node.message.meta?.notice === "bash" && node.message.parts[0]?.kind === "text" && <pre className="chat-notice__body">{node.message.parts[0].text}</pre>}
                   </div>
                 );
               }
-              if (node.kind === "model-divider") {
+              if (node.kind === "user") {
                 return (
-                  <div key={node.key} className="timeline-divider timeline-divider--model">
-                    {node.label}
+                  <div key={node.key} className={"msg-wrap" + findClass([node.message.id])} data-msg-ids={node.message.id} data-role="user">
+                    <UserBubble message={node.message} onToast={onToast} onEdit={streaming ? undefined : (text, resend) => handleEditFrom(node.message.id, text, resend)} />
                   </div>
                 );
               }
-              const m = node.message;
-              const idx = node.index;
-              // 重试只对最后一条 assistant 消息开放（重试中间消息没有语义）。
-              const isLastAssistant =
-                m.role === "assistant" && idx === messages.length - 1;
-              // 会话内查找:命中容器高亮(当前命中更深一层)。
-              const findCls = findOpen && isFindHit(findHits, m.id)
-                ? m.id === findCurrent
-                  ? " msg-wrap--find-current"
-                  : " msg-wrap--find-hit"
-                : "";
+              const ids = node.messages.map((m) => m.id);
+              const isLast = index === lastTurnIndex && lastNodeIsTurn;
               return (
-                <div key={m.id} className={"msg-wrap" + findCls} data-msg-id={m.id}>
-                  <MessageItem
-                    message={m}
-                    streaming={streaming && m.id === streamingMessageId}
-                    markdownConfig={markdownConfig}
+                <div key={node.key} className={"msg-wrap" + findClass(ids)} data-msg-ids={ids.join(" ")}>
+                  <TurnView
+                    messages={node.messages}
+                    user={node.user}
+                    running={streaming && isLast}
+                    isLast={isLast}
+                    sessionId={sessionId ?? ""}
                     cwd={cwd}
-                    sessionId={sessionId ?? undefined}
-                    onToast={onToast}
+                    markdownConfig={markdownConfig}
+                    retry={isLast ? retry : null}
+                    compacting={isLast ? compacting : null}
+                    turnStartedAt={isLast ? turnStartedAt : null}
+                    error={isLast ? error : null}
                     onOpenTool={handleOpenTool}
-                    onEditResend={handleEditResend}
-                    onRetry={
-                      false && isLastAssistant && !streaming && m.complete
-                        ? handleRetry
-                        : undefined
-                    }
+                    onRetry={isLast && !streaming ? handleRetry : undefined}
+                    onFork={!streaming ? handleFork : undefined}
+                    onToast={onToast}
                   />
                 </div>
               );
             })}
+            {/* Manual /compact runs outside a turn. */}
+            {compacting && !streaming && (
+              <div className="chat-compacting" role="status"><span className="ob-shining-text">正在压缩上下文…</span></div>
+            )}
+            {/* Errors before any reply exists (send rejected, load failed). */}
+            {error && !streaming && !lastNodeIsTurn && (
+              <div className="msg-wrap"><ErrorCard error={error} onToast={onToast} onRetry={nodes.some((n) => n.kind === "user") ? handleRetry : undefined} /></div>
+            )}
+            <div ref={spacerRef} className="chatview__spacer" aria-hidden="true" />
           </div>
         </div>
+        {showJump && (
+          <button type="button" className={"chatview__jump" + (streaming ? " chatview__jump--live" : "")} onClick={() => jumpToBottom(true)} aria-label="回到最新" data-tip={streaming ? "有新内容" : "回到底部"}>
+            <ArrowDown size={16} strokeWidth={2} />
+          </button>
+        )}
         <div className="chatview__footer">
-          {/* Inline permission / question cards: session-scoped, never block sidebar. */}
-          <PermissionInlineCard sessionId={sessionId} />
+          <PermissionInlineCard sessionId={sessionId} cwd={cwd} exclude={inlineToolIds} />
           <QuestionInlineCard sessionId={sessionId} />
-          {extensionUi && <aside className="extension-status" aria-label="扩展状态">
-            {extensionUi.title && <strong>{extensionUi.title}</strong>}
-            {extensionUi.working && <p role="status">{extensionUi.working}</p>}
-            {Object.entries(extensionUi.status).map(([key, text]) => <p key={key} role="status">{text}</p>)}
-            {Object.entries(extensionUi.widgets).map(([key, lines]) => <pre key={key}>{lines.join("\n")}</pre>)}
-          </aside>}
-          {/* pause/yield:已暂停横幅 + 恢复按钮(对齐 WorkBuddy session:requestYield)。 */}
-          {yielded && (
-            <div className="yield-banner" role="status">
-              <span>已暂停(会话上下文已保留)</span>
-              <div className="yield-banner__actions">
-                <button
-                  type="button"
-                  className="yield-banner__resume"
-                  onClick={handleResume}
-                  title="仅恢复,不触发新回复(可继续输入)"
-                >
-                  恢复
-                </button>
-                <button
-                  type="button"
-                  className="yield-banner__resume yield-banner__resume--primary"
-                  onClick={handleResumeAndContinue}
-                  title="恢复并发送「请继续」让 agent 接着生成"
-                >
-                  恢复并继续
-                </button>
-              </div>
-            </div>
+          {extensionUi && (extensionUi.title || extensionUi.working || Object.keys(extensionUi.status).length > 0 || Object.keys(extensionUi.widgets).length > 0) && (
+            <aside className="extension-status" aria-label="扩展状态">
+              {extensionUi.title && <strong>{extensionUi.title}</strong>}
+              {extensionUi.working && <p role="status">{extensionUi.working}</p>}
+              {Object.entries(extensionUi.status).map(([key, text]) => <p key={key} role="status">{text}</p>)}
+              {Object.entries(extensionUi.widgets).map(([key, lines]) => <pre key={key}>{lines.join("\n")}</pre>)}
+            </aside>
           )}
-          {/* 流式时提供「暂停」按钮(软停止,区别于停止按钮的硬取消)。 */}
-          {sessionId && streaming && !yielded && (
-            <button
-              type="button"
-              className="chatview__pause-btn"
-              onClick={handlePause}
-              title="暂停生成(保留会话,可继续)"
-            >
-              <PauseIcon size="sm" style={{ verticalAlign: "text-bottom" }} /> 暂停
-            </button>
-          )}
-          {/* 消息队列(对齐 WorkBuddy message-queue):流式时可继续排队 prompt。
-              非流式时面板为空(QueuePanel 内部 queue.length===0 直接 return null)。 */}
-          {sessionId && (
-            <QueuePanel key={sessionId} sessionId={sessionId} />
-          )}
+          {sessionId && <QueuePanel key={sessionId} sessionId={sessionId} />}
           <Composer
             streaming={streaming}
             onSend={onSend}
             onEnqueue={sessionId ? async (text, attachments, mode) => {
               const actual = await (mode === "steer" ? agentSteer : agentFollowUp)(sessionId, text, attachments);
               usePiQueueStore.getState().apply(sessionId, actual);
-              onToast?.("Pi 已接收此输入");
             } : undefined}
             onCancel={onCancel}
             modelId={modelId}
@@ -576,18 +441,16 @@ export function ChatView({
             onToast={onToast}
             draft={draft}
             draftKey={sessionId ?? undefined}
-            onDraftChange={
-              sessionId ? (t) => setDraft(sessionId, t) : undefined
-            }
+            onDraftChange={sessionId ? (t) => setDraft(sessionId, t) : undefined}
             externalText={resendText}
             externalTextNonce={resendNonce}
             onSelectMode={onSelectMode}
             onSelectExpert={onSelectExpert}
             onNavigateConnectors={onNavigateConnectors}
-            activeExpertName={activeExpertName}
-            activeExpertAvatar={activeExpertAvatar}
+            activeExpertName={activeEntry?.expertName}
+            activeExpertAvatar={activeEntry?.expertAvatar}
             usageSessionId={sessionId ?? undefined}
-            usageMsgCount={messages.length}
+            usageMsgCount={streaming ? undefined : messages.length}
           />
         </div>
       </div>
@@ -603,12 +466,7 @@ export function ChatView({
         sessionId={sessionId ?? undefined}
         onToast={onToast}
         onClose={() => setPanelOpen(false)}
-        onSelectTool={(tc) => {
-          setActiveTool(tc);
-          setPreviewPath(null);
-          setPanelMode("tool");
-          setPanelOpen(true);
-        }}
+        onSelectTool={(tc) => { setActiveTool(tc); setPreviewPath(null); setPanelMode("tool"); setPanelOpen(true); }}
         onSelectArtifact={handleSelectArtifact}
         onOpenArtifacts={handleOpenArtifacts}
         findToolCall={(id) => findToolCall(messages, id)}

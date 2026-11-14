@@ -3,10 +3,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
-const { minimize, toggleMaximize, close, resizedCleanup } = vi.hoisted(() => ({ minimize: vi.fn(), toggleMaximize: vi.fn(), close: vi.fn(), resizedCleanup: vi.fn() }));
+const { minimize, toggleMaximize, close, resizedCleanup, editCommand } = vi.hoisted(() => ({ minimize: vi.fn(), toggleMaximize: vi.fn(), close: vi.fn(), resizedCleanup: vi.fn(), editCommand: vi.fn(() => Promise.resolve()) }));
 vi.mock("@/lib/ipc", () => ({
   win: { minimize, toggleMaximize, close, isMaximized: () => Promise.resolve(false), onResized: () => resizedCleanup },
 }));
+vi.mock("@/lib/clipboard", () => ({ editCommand }));
 
 import { TitleBar } from "../TitleBar";
 
@@ -27,16 +28,13 @@ describe("TitleBar", () => {
     expect(screen.getByRole("button", { name: "帮助" })).toBeInTheDocument();
   });
 
-  it("编辑菜单展开后点击复制调用 execCommand 并收起", () => {
-    // 编辑菜单项现在接 document.execCommand（不再是 onPlaceholder）。
-    // jsdom 没有 execCommand 实现，用 stub 替换。
+  it("编辑菜单展开后点击复制走主进程原生编辑命令并收起", () => {
+    // Renderer clipboard permission is denied; edit items run webContents commands in main.
     const onPlaceholder = vi.fn();
-    const execMock = vi.fn().mockReturnValue(true);
-    document.execCommand = execMock as unknown as typeof document.execCommand;
     render(<TitleBar onPlaceholder={onPlaceholder} />);
     fireEvent.click(screen.getByRole("button", { name: "编辑" }));
     fireEvent.click(screen.getByText("复制"));
-    expect(execMock).toHaveBeenCalledWith("copy");
+    expect(editCommand).toHaveBeenCalledWith("copy");
     expect(onPlaceholder).not.toHaveBeenCalled();
     expect(screen.queryByText("粘贴")).not.toBeInTheDocument();
   });

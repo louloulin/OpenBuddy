@@ -59,7 +59,13 @@ describe("friendlyError", () => {
       data: { message: "401 Unauthorized" },
     });
     const result = friendlyError(raw);
-    expect(result).toContain("认证失败");
+    expect(result).toContain("API Key 无效或已过期");
+  });
+
+  it("maps rate limits, context overflow and IPC wrappers to plain words", () => {
+    expect(friendlyError("Error invoking remote method 'agent_prompt': Error: 429 Too Many Requests")).toContain("已达到模型用量上限");
+    expect(friendlyError("prompt is too long: context length exceeded")).toContain("超出了模型的上下文");
+    expect(friendlyError("Error invoking remote method 'agent_prompt': Error: 会话未加载")).toContain("任务已关闭或不存在");
   });
 
   it("falls back to raw string for unparseable errors", () => {
@@ -70,6 +76,6 @@ describe("friendlyError", () => {
   it("handles Error objects", () => {
     const err = new Error("connection timeout");
     const result = friendlyError(err);
-    expect(result).toContain("网络连接失败");
+    expect(result).toContain("无法连接到模型服务");
   });
 });

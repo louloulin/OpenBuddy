@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { appConfirm } from "./AppDialog";
+import { friendlyError, rawErrorText } from "@/lib/error-format";
 import {
   User,
   Mail,
@@ -161,19 +163,22 @@ export function SettingsPanel({
   open,
   onClose,
   onModelsChanged,
+  initialSection,
 }: {
   open: boolean;
   onClose: () => void;
+  /** Section to show when opened (defaults to 模型). */
+  initialSection?: string;
   /** Called after a provider is saved/deleted so the app can refresh its
    *  model picker without a restart. */
   onModelsChanged?: () => void;
 }) {
   const [active, setActive] = useState<SectionId>("model");
 
-  // Default to the 模型 section every time the dialog opens.
+  // Open at the requested section (deep link), defaulting to 模型.
   useEffect(() => {
-    if (open) setActive("model");
-  }, [open]);
+    if (open) setActive(NAV.some((item) => item.id === initialSection) ? (initialSection as SectionId) : "model");
+  }, [open, initialSection]);
 
   // Esc closes the dialog.
   useEffect(() => {
@@ -339,10 +344,10 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
 
   const handleSaveProvider = async (draft: ProviderDraft, original?: ModelProviderEntry) => {
     setMsg(null);
+    // id: stable, derived from providerKind. Keep an existing provider's id
+    // unless the user changed the kind (then it's effectively a new entry).
+    const id = original?.id ?? draft.providerKind;
     try {
-      // id: stable, derived from providerKind. Keep an existing provider's id
-      // unless the user changed the kind (then it's effectively a new entry).
-      const id = original?.id ?? draft.providerKind;
       await providersSaveProvider({
         id,
         providerKind: draft.providerKind,
@@ -352,14 +357,15 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
         authScheme: draft.authScheme,
         contextWindow: draft.contextWindow ? Number(draft.contextWindow) : undefined,
       });
-      onModelsChanged?.();
-      setEditingProvider(null);
-      setSelectedProviderId(id);
-      await reload();
-      setMsg({ kind: "ok", text: "厂商配置已保存。" });
     } catch (e) {
-      setMsg({ kind: "err", text: `保存失败：${String(e)}` });
+      // Keep the dialog open with the error inside it.
+      throw new Error(saveErrorText(e));
     }
+    onModelsChanged?.();
+    setEditingProvider(null);
+    setSelectedProviderId(id);
+    await reload();
+    setMsg({ kind: "ok", text: "厂商配置已保存。" });
   };
 
   const handleDeleteProvider = async (p: ModelProviderEntry) => {
@@ -368,7 +374,7 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
       count > 0
         ? `删除厂商「${p.label || p.providerKind}」及其 ${count} 个模型？`
         : `删除厂商「${p.label || p.providerKind}」？`;
-    if (!confirm(confirmText)) return;
+    if (!(await appConfirm({ title: confirmText }))) return;
     setMsg(null);
     try {
       await providersDeleteProvider(p.id);
@@ -383,30 +389,33 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
 
   const handleSaveModel = async (
     providerId: string,
-    name: string,
-    contextWindow: string,
+    draft: { modelId: string; name: string; contextWindow: string },
     original?: ModelEntry,
   ) => {
     setMsg(null);
+    const modelId = draft.modelId.trim();
+    if (!original && modelsOf(providerId).some((m) => m.modelId === modelId)) {
+      throw new Error(`模型「${modelId}」已存在。`);
+    }
     try {
       await providersSaveModel({
         ...original,
-        modelId: original!.modelId,
+        modelId,
         providerId,
-        name: name.trim() || undefined,
-        contextWindow: contextWindow ? Number(contextWindow) : undefined,
+        name: draft.name.trim() || undefined,
+        contextWindow: draft.contextWindow ? Number(draft.contextWindow) : undefined,
       });
-      onModelsChanged?.();
-      setEditingModel(null);
-      await reload();
-      setMsg({ kind: "ok", text: "模型已保存。" });
     } catch (e) {
-      setMsg({ kind: "err", text: `保存失败：${String(e)}` });
+      throw new Error(saveErrorText(e));
     }
+    onModelsChanged?.();
+    setEditingModel(null);
+    await reload();
+    setMsg({ kind: "ok", text: original ? "模型已保存。" : `已添加模型「${draft.name.trim() || modelId}」。` });
   };
 
   const handleDeleteModel = async (m: ModelEntry) => {
-    if (!confirm(`删除模型「${m.name || m.modelId}」？`)) return;
+    if (!(await appConfirm({ title: `删除模型「${m.name || m.modelId}」？`, confirmLabel: "删除", danger: true }))) return;
     setMsg(null);
     try {
       await providersDeleteModel(m.modelId, m.providerId);
@@ -697,9 +706,7 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
           initialName={editingModel.name}
           initialContextWindow={editingModel.contextWindow}
           onCancel={() => setEditingModel(null)}
-          onSave={(name, cw, original) =>
-            handleSaveModel(editingModel.providerId, name, cw, original)
-          }
+          onSave={(draft) => handleSaveModel(editingModel.providerId, draft, editingModel.original)}
         />
       )}
     </div>
@@ -728,9 +735,10 @@ function ProviderEditor({
   draft: ProviderDraft;
   original?: ModelProviderEntry;
   onCancel: () => void;
-  onSave: (draft: ProviderDraft, original?: ModelProviderEntry) => void;
+  onSave: (draft: ProviderDraft, original?: ModelProviderEntry) => Promise<void>;
 }) {
   const [form, setForm] = useState<ProviderDraft>({ ...draft });
+  const [saving, setSaving] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(draft.providerKind === "custom");
   const [error, setError] = useState<string | null>(null);
@@ -767,7 +775,10 @@ function ProviderEditor({
       setError(needsBaseUrl && !form.baseUrl.trim() ? "请填写 Base URL。" : "请填写 API Key。");
       return;
     }
-    onSave(form, original);
+    setSaving(true);
+    onSave(form, original)
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setSaving(false));
   };
 
   return (
@@ -942,9 +953,9 @@ function ProviderEditor({
           <button
             className="cb-button cb-button--primary cb-button--medium models-settings-panel__editor-save"
             onClick={handleSaveClick}
-            disabled={!canSave}
+            disabled={!canSave || saving}
           >
-            <span className="cb-button__content">保存</span>
+            <span className="cb-button__content">{saving ? "保存中…" : "保存"}</span>
           </button>
         </footer>
       </div>
@@ -969,9 +980,10 @@ function ModelEditor({
   initialName: string;
   initialContextWindow: string;
   onCancel: () => void;
-  onSave: (name: string, contextWindow: string, original?: ModelEntry) => void;
+  onSave: (draft: { modelId: string; name: string; contextWindow: string }) => Promise<void>;
 }) {
   const [modelId, setModelId] = useState(original?.modelId ?? "");
+  const [saving, setSaving] = useState(false);
   const [name, setName] = useState(initialName);
   const [contextWindow, setContextWindow] = useState(initialContextWindow);
   const [error, setError] = useState<string | null>(null);
@@ -984,10 +996,14 @@ function ModelEditor({
       setError("请填写模型 ID。");
       return;
     }
-    // modelId is the [model.<id>] key — if changed from the original, that's a
-    // new entry; the caller saves under the new id. We pass the (possibly new)
-    // id through onSave via the original's slot so the parent can delete+create.
-    onSave(name, contextWindow, original ? { ...original, modelId: modelId.trim() } : undefined);
+    if (contextWindow && !(Number(contextWindow) > 0)) {
+      setError("上下文窗口需为正整数。");
+      return;
+    }
+    setSaving(true);
+    onSave({ modelId: modelId.trim(), name, contextWindow })
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setSaving(false));
   };
 
   return (
@@ -1061,9 +1077,9 @@ function ModelEditor({
           <button
             className="cb-button cb-button--primary cb-button--medium models-settings-panel__editor-save"
             onClick={handleSaveClick}
-            disabled={!canSave}
+            disabled={!canSave || saving}
           >
-            <span className="cb-button__content">保存</span>
+            <span className="cb-button__content">{saving ? "保存中…" : "保存"}</span>
           </button>
         </footer>
       </div>
@@ -1216,4 +1232,12 @@ function ImportModelsInline({
       )}
     </div>
   );
+}
+
+/** Error text for a failed settings save: host validation messages verbatim. */
+function saveErrorText(e: unknown): string {
+  const raw = rawErrorText(e);
+  if (raw.includes("安全密钥存储不可用")) return friendlyError(e);
+  if (/invalid url/i.test(raw)) return "保存失败：Base URL 格式不正确，需以 http:// 或 https:// 开头";
+  return `保存失败：${raw || "未知错误"}`;
 }

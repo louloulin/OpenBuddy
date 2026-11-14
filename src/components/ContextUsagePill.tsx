@@ -57,15 +57,24 @@ export function ContextUsagePill({ sessionId, onRefreshSignal }: { sessionId: st
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  // One request at a time; a refresh asked for mid-flight runs once afterwards.
+  const inflight = useRef<Promise<void> | null>(null);
+  const again = useRef(false);
   const refresh = useCallback(async () => {
-    try {
-      const info = await agentSessionInfo(sessionId);
-      if (info?.context?.total) {
-        let usage: SessionUsage | undefined;
-        try { usage = await agentSessionUsage(sessionId); } catch { /* nice-to-have */ }
-        setSnap({ ctx: info.context, usage });
-      }
-    } catch { /* session not live in agent — pill stays hidden */ }
+    if (inflight.current) { again.current = true; return; }
+    const run = async () => {
+      try {
+        const [info, usage] = await Promise.all([
+          agentSessionInfo(sessionId),
+          agentSessionUsage(sessionId).catch(() => undefined as SessionUsage | undefined),
+        ]);
+        if (info?.context?.total) setSnap({ ctx: info.context, usage });
+      } catch { /* session not live in agent — pill stays hidden */ }
+    };
+    inflight.current = run();
+    await inflight.current;
+    inflight.current = null;
+    if (again.current) { again.current = false; void refresh(); }
   }, [sessionId]);
 
   // Fetch on mount + session change.
@@ -100,6 +109,8 @@ export function ContextUsagePill({ sessionId, onRefreshSignal }: { sessionId: st
   if (!ctx || !ctx.total) return null;
 
   const pct = ctx.usagePct;
+  const pctLabel = `${Math.round(pct)}%`;
+  const level = pct >= 95 ? "danger" : pct >= 80 ? "warn" : "normal";
   const useWan = ctx.total >= 1_000_000;
   const rows = buildRows(ctx);
   const cacheHit =
@@ -116,9 +127,10 @@ export function ContextUsagePill({ sessionId, onRefreshSignal }: { sessionId: st
     <div className="context-usage" ref={ref}>
       <button
         type="button"
-        className={"context-usage__pill" + (open ? " context-usage__pill--open" : "")}
+        className={"context-usage__pill context-usage__pill--" + level + (open ? " context-usage__pill--open" : "")}
         onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
-        title={`${pct}% · ${fmtToken(ctx.used, useWan)} / ${fmtToken(ctx.total, useWan)} 上下文已使用`}
+        title={`${pctLabel} · ${fmtToken(ctx.used, useWan)} / ${fmtToken(ctx.total, useWan)} 上下文已使用`}
+        aria-label={`上下文已使用 ${pctLabel}`}
       >
         <svg width="18" height="18" viewBox="0 0 18 18" className="context-usage__ring">
           <circle cx="9" cy="9" r={r} fill="none" className="context-usage__ring-track" />
@@ -129,16 +141,14 @@ export function ContextUsagePill({ sessionId, onRefreshSignal }: { sessionId: st
             strokeDashoffset={offset}
           />
         </svg>
-        <span className="context-usage__pill-text">
-          {pct}%
-        </span>
+        <span className="context-usage__pill-text">{pctLabel}</span>
       </button>
       {open && (
         <div className="context-usage__popover" onClick={(e) => e.stopPropagation()}>
           <div className="context-usage__popover-header">
             <span className="context-usage__popover-title">上下文容量</span>
             <span className="context-usage__popover-summary">
-              {fmtToken(ctx.used, useWan)}/{fmtToken(ctx.total, useWan)}（{pct}%）
+              {fmtToken(ctx.used, useWan)}/{fmtToken(ctx.total, useWan)}（{pct.toFixed(pct < 10 ? 1 : 0)}%）
             </span>
           </div>
           <div className="context-usage__bar">

@@ -1,4 +1,4 @@
-import { dialog, ipcMain, nativeImage, type BrowserWindow, type OpenDialogOptions, type SaveDialogOptions } from 'electron';
+import { clipboard, dialog, ipcMain, nativeImage, type BrowserWindow, type OpenDialogOptions, type SaveDialogOptions } from 'electron';
 import { writeFile } from 'node:fs/promises';
 import { isCommand, validateCommandPayload, type CommandHandlers, type Payload, type AttachmentReference } from '../shared/contract.js';
 import { FileAccess } from '../shared/file-access.js';
@@ -40,6 +40,15 @@ export function registerIpc(window: BrowserWindow, handlers: CommandHandlers, tr
       if (typeof payload.path !== 'string' || typeof payload.content !== 'string' || !exportGrants.delete(payload.path)) throw new Error('export_path_not_authorized');
       await writeFile(payload.path, payload.content, 'utf8');
       return payload.path;
+    },
+    clipboard_write_text: payload => {
+      if (typeof payload.text !== 'string' || payload.text.length > 8 * 1024 * 1024) throw new Error('invalid_payload: text');
+      clipboard.writeText(payload.text);
+    },
+    window_edit: payload => {
+      const action = String(payload.action);
+      if (!['undo', 'redo', 'cut', 'copy', 'paste', 'selectAll'].includes(action)) throw new Error('invalid_payload: action');
+      window.webContents[action as 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'selectAll']();
     },
     window_minimize: () => window.minimize(),
     window_toggle_maximize: () => window.isMaximized() ? window.unmaximize() : window.maximize(),

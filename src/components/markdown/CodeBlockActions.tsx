@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useState, type ReactNode } from "react";
+import { copyText } from "@/lib/clipboard";
 import { Check, Copy } from "lucide-react";
 import type { CodeBlockAction } from "./types";
 
@@ -40,24 +41,9 @@ export const CodeBlockActions = memo(function CodeBlockActions({
       setCopied(true);
       onAction?.("copy", code, language, requestId);
     };
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(code).then(done).catch(() => {
-        // Fallback for restricted contexts
-        try {
-          const ta = document.createElement("textarea");
-          ta.value = code;
-          ta.style.position = "fixed";
-          ta.style.left = "-9999px";
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand("copy");
-          document.body.removeChild(ta);
-          done();
-        } catch {
-          /* ignore */
-        }
-      });
-    }
+    copyText(code).then(done).catch(() => {
+      /* Clipboard unavailable — the button simply does not flip to "已复制". */
+    });
   }, [code, language, onAction, requestId]);
 
   const visibleActions = actions.filter((action) => {

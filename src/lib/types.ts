@@ -122,6 +122,20 @@ export interface PiMessage {
   toolName?: string;
   isError?: boolean;
   usage?: { input?: number; output?: number; totalTokens?: number; cacheRead?: number; cacheWrite?: number };
+  timestamp?: number;
+  model?: string;
+  provider?: string;
+  stopReason?: string;
+  errorMessage?: string;
+  /** Tool result details (edit diff/patch, bash truncation). */
+  details?: unknown;
+  /** compactionSummary / branchSummary text. */
+  summary?: string;
+  /** custom message visibility. */
+  display?: boolean;
+  /** bashExecution entries. */
+  command?: string;
+  output?: string;
 }
 export interface PiMessageDelta {
   type: string;
@@ -141,8 +155,9 @@ export interface SessionUpdate {
   toolName?: string;
   args?: unknown;
   partialResult?: { content?: PiContent[] };
-  result?: { content?: PiContent[] };
+  result?: { content?: PiContent[]; details?: unknown };
   isError?: boolean;
+  durationMs?: number;
   [key: string]: unknown;
 }
 
@@ -438,17 +453,10 @@ export interface SearchHit {
 // ---------- rewind ----------
 
 export interface RewindPoint {
-  promptIndex: number;
-  promptPreview?: string;
-  timestamp?: string;
-  /** First assistant response snippet (for timeline display). */
-  messagePreview?: string;
-  /** Whether this prompt produced file changes. */
-  hasFileChanges?: boolean;
-  /** Whether this prompt produced memory writes. */
-  hasMemoryChanges?: boolean;
-  /** Tool calls made during this turn. */
-  toolNames?: string[];
+  /** Engine entry id of the user prompt. */
+  entryId: string;
+  index: number;
+  preview: string;
 }
 
 // ---------- slash commands + prompt history ----------

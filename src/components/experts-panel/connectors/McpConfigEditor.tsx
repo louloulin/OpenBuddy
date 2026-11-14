@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { appConfirm } from "../../AppDialog";
 import { ChevronLeftIcon } from "@/foundation/components/Icon/icons";
 import { mcpConfigPath, mcpConfigRead, mcpConfigSave } from "@/lib/agent-client";
 import { useSessionStore } from "@/stores/session-store";
@@ -9,7 +10,8 @@ const EMPTY = "{\n  \"mcpServers\": {}\n}";
 export function McpConfigEditor({
   onBack, onSaved, onToast,
 }: {
-  onBack: () => void;
+  /** Omitted when embedded as a tab: no back link, and 取消 reverts unsaved edits. */
+  onBack?: () => void;
   onSaved?: () => void;
   onToast?: (m: string) => void;
 }) {
@@ -46,9 +48,10 @@ export function McpConfigEditor({
     if (gutterRef.current && taRef.current) gutterRef.current.scrollTop = taRef.current.scrollTop;
   };
 
-  const doBack = () => {
-    if (hasChanges && !confirm("有未保存的修改，确定放弃？")) return;
-    onBack();
+  const doBack = async () => {
+    if (hasChanges && !(await appConfirm({ title: "放弃未保存的修改？", confirmLabel: "放弃", danger: true }))) return;
+    if (onBack) onBack();
+    else { setContent(original); setError(""); }
   };
 
   const doSave = async () => {
@@ -75,11 +78,13 @@ export function McpConfigEditor({
   return (
     <div className="mcp-editor">
       <div className="mcp-editor-head">
-        <button type="button" className="mcp-editor-back" onClick={doBack}>
-          <ChevronLeftIcon size="sm" /><span>返回 MCP 列表</span>
-        </button>
+        {onBack ? (
+          <button type="button" className="mcp-editor-back" onClick={() => { void doBack(); }}>
+            <ChevronLeftIcon size="sm" /><span>返回 MCP 列表</span>
+          </button>
+        ) : <span className="mcp-editor-title">MCP 服务配置</span>}
         <div className="mcp-editor-actions">
-          <button type="button" className="um-btn um-btn--grey" onClick={doBack}>取消</button>
+          <button type="button" className="um-btn um-btn--grey" onClick={() => { void doBack(); }} disabled={!onBack && !hasChanges}>{onBack ? "取消" : "撤销修改"}</button>
           <button type="button" className="um-btn um-btn--primary"
             disabled={!hasChanges || saving} onClick={doSave}>
             {saving ? "保存中…" : "保存"}

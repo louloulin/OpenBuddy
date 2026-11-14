@@ -75,6 +75,9 @@ const FULL_LATEX_DOC = [
   /\\bibliography\b/,
 ];
 
+/** Blocks longer than this open folded. */
+const COLLAPSE_LINES = 18;
+
 function isFullLatexDocument(latex: string) {
   return FULL_LATEX_DOC.some((p) => p.test(latex));
 }
@@ -189,6 +192,11 @@ export const MarkdownPre = memo(function MarkdownPre({
   }, [shouldRenderAsLatex, code]);
 
   const showHeader = !!(language || codeBlockActions?.length || onApplyCode || code);
+  // Long blocks open folded to a screenful; the header and the footer toggle them.
+  const lineCount = useMemo(() => (code ? code.replace(/\n$/, "").split("\n").length : 0), [code]);
+  const foldable = !shouldRenderAsLatex && lineCount > COLLAPSE_LINES;
+  const [expanded, setExpanded] = useState(false);
+  const folded = foldable && !expanded;
 
   const applyButton = onApplyCode ? (
     <button
@@ -272,12 +280,24 @@ export const MarkdownPre = memo(function MarkdownPre({
             />
           )
         ) : (
-          <pre
-            className={["md-code-pre", className].filter(Boolean).join(" ")}
-            {...preProps}
+          <div className={"md-code-body" + (folded ? " md-code-body--folded" : "")}>
+            <pre
+              className={["md-code-pre", className].filter(Boolean).join(" ")}
+              {...preProps}
+            >
+              {children}
+            </pre>
+          </div>
+        )}
+        {foldable && (
+          <button
+            type="button"
+            className="md-code-fold"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
           >
-            {children}
-          </pre>
+            {expanded ? "收起" : `展开全部 · ${lineCount} 行`}
+          </button>
         )}
       </div>
     </div>

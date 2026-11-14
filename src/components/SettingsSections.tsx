@@ -1,4 +1,5 @@
 import { useAgentModelStore } from "@/stores/agent-model-store";
+import { appConfirm } from "./AppDialog";
 /**
  * Settings 面板的各个真实分区。
  *
@@ -29,8 +30,10 @@ import {
   Mail,
   CheckCheck,
   Filter,
+  Rows3,
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
+import { useUiPrefs } from "@/stores/ui-prefs-store";
 import {
   accountGetApiKey,
   accountSetApiKey,
@@ -104,6 +107,8 @@ function SectionShell({
 
 export function PersonalizeSettingsPanel() {
   const { theme, setTheme } = useTheme();
+  const conciseMode = useUiPrefs((s) => s.conciseMode);
+  const setPrefs = useUiPrefs((s) => s.setPrefs);
   const [fontSize, setFontSize] = useState<number>(() => {
     const saved = localStorage.getItem(FONT_KEY);
     return saved ? Number(saved) : 13;
@@ -160,6 +165,26 @@ export function PersonalizeSettingsPanel() {
           </button>
         </div>
       </div>
+
+      <div className="settings-row">
+        <div className="settings-row__label">
+          <Rows3 size={16} />
+          <span>简洁模式</span>
+          <span className="settings-row__hint">回复完成后把思考与工具步骤折叠成一行「已完成 · 用时」，只留最终答案</span>
+        </div>
+        <div className="settings-row__control">
+          <label className="ob-switch">
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label="简洁模式"
+              checked={conciseMode}
+              onChange={(e) => setPrefs({ conciseMode: e.target.checked })}
+            />
+            <span className="ob-switch__track" aria-hidden="true"><span className="ob-switch__thumb" /></span>
+          </label>
+        </div>
+      </div>
     </SectionShell>
   );
 }
@@ -211,7 +236,7 @@ export function MemorySettingsPanel() {
   const [msg, setMsg] = useState<string | null>(null);
 
   const handleRewrite = async () => {
-    if (!confirm("让 agent 用 LLM 重写所有记忆？")) return;
+    if (!(await appConfirm({ title: "让 agent 用 LLM 重写所有记忆？" }))) return;
     setBusy(true);
     try {
       await memoryRewrite();
@@ -356,11 +381,14 @@ export function DataSettingsPanel() {
     setAgentHome("应用数据目录/pi");
   }, []);
 
-  const handleClearSessions = () => {
+  const handleClearSessions = async () => {
     if (
-      !confirm(
-        "确定清理本地会话缓存？这只影响侧栏列表的显示，agent 的 应用数据目录/pi/sessions/ 历史不会被删除。",
-      )
+      !(await appConfirm({
+        title: "清理本地会话缓存？",
+        message: "这只影响侧栏列表的显示，应用数据目录 pi/sessions/ 中的历史不会被删除。",
+        confirmLabel: "清理",
+        danger: true,
+      }))
     ) {
       return;
     }
@@ -480,7 +508,7 @@ export function AccountSettingsPanel() {
   };
 
   const handleClearKey = async () => {
-    if (!confirm("确定清除 xAI API Key？")) return;
+    if (!(await appConfirm({ title: "确定清除 xAI API Key？", confirmLabel: "清除", danger: true }))) return;
     setBusy(true);
     try {
       await accountSetApiKey(null);
@@ -1186,7 +1214,7 @@ export function AgentMailSettingsPanel() {
   }, [reload]);
 
   const handleClear = useCallback(async () => {
-    if (!confirm("确定清空所有通知？")) return;
+    if (!(await appConfirm({ title: "确定清空所有通知？", confirmLabel: "清空", danger: true }))) return;
     await notificationClear();
     reload();
   }, [reload]);

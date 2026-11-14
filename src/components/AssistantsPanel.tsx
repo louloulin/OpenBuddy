@@ -9,6 +9,7 @@
  *  - 点击卡片 → 助理个人资料页(profile)
  */
 import { useCallback, useEffect, useState } from "react";
+import { appConfirm } from "./AppDialog";
 import {
   AssistantIcon,
   AddCircleIcon,
@@ -182,7 +183,7 @@ export function AssistantsPanel({ onUseAssistant, onToast }: AssistantsPanelProp
   }, [onToast, reload]);
 
   const handleDelete = useCallback(async (agent: AgentEntry) => {
-    if (!confirm(`确定删除助理「${agent.name}」？`)) return;
+    if (!(await appConfirm({ title: `确定删除助理「${agent.name}」？`, confirmLabel: "删除", danger: true }))) return;
     try {
       await agentsDelete(agent.path);
       onToast?.("已删除");

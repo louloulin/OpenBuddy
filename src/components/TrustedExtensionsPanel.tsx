@@ -23,17 +23,27 @@ export function TrustedExtensionsPanel() {
       if (typeof path === "string") await update(() => agentExtensionsAdd(path));
     } catch (error) { setError(friendlyError(error)); }
   };
-  return <section className="settings-section" aria-label="可信扩展设置">
-    <h3>可信 Pi 扩展</h3><p>扩展在本机执行代码，请仅加载信任的来源。项目扩展的发现遵循 Pi 工作区信任状态。</p>
-    {error && <p role="alert">{error}</p>}
-    {!config ? <button disabled={busy} onClick={() => { void update(agentExtensionsList); }}>重新读取扩展配置</button> : <>
-      <label><input type="checkbox" checked={config.enabled} disabled={busy} onChange={event => { void update(() => agentExtensionsSetEnabled(event.target.checked)); }} />启用可信扩展</label>
-      <p>Pi 当前加载工作区：{config.projectTrusted ? "已信任" : "尚未信任，项目扩展不会自动加载"}</p>
-      <button disabled={busy} onClick={() => { void add(false); }}>添加扩展文件</button>
-      <button disabled={busy} onClick={() => { void add(true); }}>添加扩展目录</button>
-      {config.paths.length === 0 && <p>没有显式添加的扩展路径。</p>}
-      <ul>{config.paths.map(path => <li key={path}><code>{path}</code> <button disabled={busy} onClick={() => { void update(() => agentExtensionsRemove(path)); }}>移除扩展</button></li>)}</ul>
-      <p>扩展变更会在会话空闲时由 Pi 重新加载。需要终端专用界面的扩展不受桌面输入桥支持。</p>
+  return <section className="res-panel__body" aria-label="可信扩展设置">
+    <div className="res-panel__card">
+      <h3 className="res-panel__card-title">可信扩展</h3>
+      <p className="res-panel__muted">扩展会在本机执行代码，请只加载你信任的来源。项目内的扩展只在工作空间被信任后才会加载。</p>
+      {error && <p className="res-panel__error" role="alert">{error}</p>}
+      {!config ? <div className="res-panel__toolbar"><button type="button" className="res-panel__btn" disabled={busy} onClick={() => { void update(agentExtensionsList); }}>重新读取扩展配置</button></div> : <>
+        <label className="res-panel__switch"><input type="checkbox" checked={config.enabled} disabled={busy} onChange={event => { void update(() => agentExtensionsSetEnabled(event.target.checked)); }} />启用可信扩展</label>
+        <p className="res-panel__muted">当前工作空间：{config.projectTrusted ? "已信任" : "尚未信任，项目扩展不会自动加载"}</p>
+      </>}
+    </div>
+    {config && <>
+      <div className="res-panel__toolbar">
+        <button type="button" className="res-panel__btn" disabled={busy} onClick={() => { void add(false); }}>添加扩展文件</button>
+        <button type="button" className="res-panel__btn" disabled={busy} onClick={() => { void add(true); }}>添加扩展目录</button>
+      </div>
+      {config.paths.length === 0 && <div className="res-panel__empty">还没有添加扩展。</div>}
+      {config.paths.map(path => <div key={path} className="res-panel__item">
+        <code className="res-panel__item-name res-panel__path" title={path}>{path}</code>
+        <button type="button" className="res-panel__btn res-panel__btn--danger" disabled={busy} onClick={() => { void update(() => agentExtensionsRemove(path)); }}>移除扩展</button>
+      </div>)}
+      <p className="res-panel__muted">扩展变更会在任务空闲时自动生效；依赖终端专用界面的扩展暂不支持。</p>
     </>}
   </section>;
 }

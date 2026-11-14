@@ -5,6 +5,7 @@
  * 由 ChatView 顶栏「分享」按钮触发。
  */
 import { useEffect, useRef, useState } from "react";
+import { Share } from "lucide-react";
 import {
   buildSharePayload,
   buildMailtoUrl,
@@ -53,17 +54,16 @@ export function ShareMenu({ messages, title, openUrl, onDone }: ShareMenuProps) 
     <div className="share-menu" ref={ref}>
       <button
         type="button"
-        className={
-          "chatview__artifacts-toggle" +
-          (open ? " chatview__artifacts-toggle--active" : "")
-        }
+        className={"main-topbar__btn" + (open ? " main-topbar__btn--active" : "")}
         onClick={(e) => {
           e.stopPropagation();
           setOpen((v) => !v);
         }}
-        title="导出 / 分享本会话"
+        aria-label="分享"
+        aria-expanded={open}
+        data-tip="导出 / 分享本会话"
       >
-        分享
+        <Share size={16} strokeWidth={1.75} />
       </button>
       {open && (
         <div className="share-menu__popover" onClick={(e) => e.stopPropagation()}>

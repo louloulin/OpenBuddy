@@ -130,7 +130,7 @@ describe("Composer", () => {
     let reject!: (error: Error) => void;
     const enqueue = vi.fn(() => new Promise<void>((_resolve, fail) => { reject = fail; }));
     render(<Composer {...base} streaming onEnqueue={enqueue} draft="引导输入" draftKey="steer-test" />);
-    fireEvent.change(screen.getByRole("combobox", { name: "排队模式" }), { target: { value: "steer" } });
+    fireEvent.click(screen.getByRole("radio", { name: "立即插话" }));
     const button = screen.getByRole("button", { name: "加入待发送队列" });
     fireEvent.click(button);
     expect(enqueue).toHaveBeenCalledWith("引导输入", [], "steer");

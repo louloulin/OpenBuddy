@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { LOADING_TIPS } from "@/lib/loading-tips";
 
 /**
- * 助手消息的「等待中」行：头像/名字由 MessageItem 的 header 渲染，本组件
+ * 助手消息的「等待中」行：头像/名字由 TurnView 的 header 渲染，本组件
  * 只负责 body 里的 loading 行，视觉对齐 WorkBuddy：
  *
  *   [扫光主文案]  ·  [轮播小贴士]

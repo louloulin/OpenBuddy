@@ -53,15 +53,39 @@ describe("Pi transcript events", () => {
     expect(text()).toBe("");
   });
 
-  it("replays distinct user and assistant messages and suppresses cached replay", () => {
-    emit({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "question" }] } });
-    emit({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "answer" }] } });
-    emit({ type: "agent_settled" });
+  it("hydrates a loaded session from its snapshot without duplicating cached live state", () => {
+    const history = [
+      { role: "user", content: [{ type: "text", text: "question" }], timestamp: 1 },
+      { role: "assistant", content: [{ type: "text", text: "answer" }], usage: { input: 10, output: 5, totalTokens: 15 }, timestamp: 2 },
+    ];
+    useSessionStore.getState().hydrate("A", history as never, false);
     expect(useSessionStore.getState().messages.map(m => m.role)).toEqual(["user", "assistant"]);
+    // History usage is not a turn's usage.
+    expect(useSessionStore.getState().usage).toEqual({});
     useSessionStore.getState().setSession("B");
     useSessionStore.getState().setSession("A");
-    emit({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "answer" }] } });
+    useSessionStore.getState().hydrate("A", history as never, false);
     expect(useSessionStore.getState().messages).toHaveLength(2);
+    // A forced hydrate (history branch moved) replaces the transcript.
+    useSessionStore.getState().hydrate("A", history.slice(0, 1) as never, false, true);
+    expect(useSessionStore.getState().messages.map(m => m.role)).toEqual(["user"]);
+  });
+
+  it("rebuilds the transcript from session_rewound", () => {
+    emit({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "q1" }] } });
+    emit({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "a1" }] } });
+    emit({ type: "session_rewound", messages: [{ role: "user", content: [{ type: "text", text: "q1" }] }] });
+    expect(useSessionStore.getState().messages.map(m => m.role)).toEqual(["user"]);
+  });
+
+  it("starts each turn with fresh usage so stats are recorded once per turn", () => {
+    useSessionStore.getState().startStreaming();
+    emit({ type: "message_end", message: { role: "assistant", content: "one", usage: { input: 2, output: 1, totalTokens: 3 } } });
+    emit({ type: "agent_settled" });
+    useSessionStore.getState().startStreaming();
+    emit({ type: "agent_start" });
+    emit({ type: "message_end", message: { role: "assistant", content: "two", usage: { input: 4, output: 2, totalTokens: 6 } } });
+    expect(useSessionStore.getState().usage).toEqual({ promptTokens: 4, completionTokens: 2, totalTokens: 6 });
   });
 
   it("overwrites thinking and toolcall end snapshots at their content indices", () => {

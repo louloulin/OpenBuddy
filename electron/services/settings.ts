@@ -50,6 +50,7 @@ export class SecretStore {
     return this.safe.decryptString(Buffer.from(encoded, "base64"));
   }
   set(id: string, value: string | undefined) {
+    this.secretsCache = undefined;
     const data = this.store.read();
     if (value) {
       this.check();
@@ -60,7 +61,10 @@ export class SecretStore {
   has(id: string) {
     return !!this.store.read()[id];
   }
-  redact(value: unknown): unknown {
+  /** Decrypted secret values, cached until the next write (redact runs per streamed event). */
+  private secretsCache?: string[];
+  private secretValues(): string[] {
+    if (this.secretsCache) return this.secretsCache;
     const secrets = Object.keys(this.store.read())
       .map((id) => this.get(id))
       .filter((s): s is string => !!s);
@@ -80,6 +84,12 @@ export class SecretStore {
         /* Scalar credentials are already included. */
       }
     }
+    this.secretsCache = [...new Set(secrets)].filter(Boolean);
+    return this.secretsCache;
+  }
+  redact(value: unknown): unknown {
+    const secrets = this.secretValues();
+    if (!secrets.length) return value;
     const visit = (v: unknown): unknown => {
       if (typeof v === "string") {
         let text = v;

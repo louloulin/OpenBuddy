@@ -73,14 +73,16 @@ describe("App model runtime flow", () => {
     backend.emit("agent://event", { sessionId: "two", event: { type: "agent_settled" } });
     expect(loadUsage()[0]).toMatchObject({ modelId: keyB, promptTokens: 3, completionTokens: 2 });
   });
-  it("cancels an extension input when navigating away without saving its draft to history", async () => {
+  it("keeps an extension input pending for its session when navigating away, without saving the draft", async () => {
+    // Sessions keep running in the background pool, so leaving a task must not cancel its pending input.
     const backend = fixture(); render(<App />); fireEvent.click(await screen.findByText("Session One"));
     await waitFor(() => expect(picker()).toHaveAccessibleName(/Provider A/));
     backend.emit("agent://ui-request", { requestId: "secret", sessionId: "one", kind: "input", title: "API Key" });
     fireEvent.change(screen.getByLabelText("API Key", { selector: "input" }), { target: { value: "private-key" } });
     fireEvent.click(screen.getByRole("button", { name: "新建任务" }));
-    await waitFor(() => expect(backend.invoke).toHaveBeenCalledWith("agent_resolve_ui", { requestId: "secret", sessionId: "one", cancelled: true }));
+    await waitFor(() => expect(screen.queryByLabelText("API Key", { selector: "input" })).toBeNull());
+    expect(backend.invoke).not.toHaveBeenCalledWith("agent_resolve_ui", expect.anything());
+    expect(useQuestionStore.getState().queues.one?.map(request => request.requestId)).toEqual(["secret"]);
     expect(JSON.stringify(useSessionStore.getState().transcripts)).not.toContain("private-key");
-    expect(screen.queryByLabelText("API Key", { selector: "input" })).toBeNull();
   });
 });

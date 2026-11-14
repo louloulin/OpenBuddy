@@ -1,115 +1,150 @@
-
-import { useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { commandsList } from "@/lib/agent-client";
 import type { SlashCommand } from "@/lib/types";
+
+/**
+ * The "/xxx" token being typed at the cursor, or null. A slash only opens the
+ * menu at the start of a token (start of text or after whitespace), so paths
+ * like "src/app" or URLs never trigger it.
+ */
+/** Where a command comes from, in the UI's words. */
+const SOURCE_LABELS: Record<string, string> = { builtin: "内置", extension: "扩展", skill: "技能", prompt: "模板" };
+
+export function slashToken(text: string, cursor: number): { start: number; query: string } | null {
+  const before = text.slice(0, cursor);
+  const match = before.match(/(^|\s)\/([^\s/]*)$/);
+  if (!match) return null;
+  const start = before.length - match[2].length - 1;
+  return { start, query: match[2] };
+}
+
+export interface SlashCommandsHandle {
+  /** Route a key to the menu; true when the menu consumed it. */
+  handleKey: (e: { key: string; preventDefault: () => void }) => boolean;
+}
 
 interface SlashCommandsProps {
   /** 当前的输入文本（Composer 的 value）。 */
   text: string;
   /** 光标位置。 */
   cursor: number;
+  /** Menu is suppressed (streaming, not ready). */
+  disabled?: boolean;
   /** 选中某命令时的回调，参数是完整命令文本（如 "/commit"）。 */
   onPick: (command: string) => void;
 }
 
-export function SlashCommands({ text, cursor, onPick }: SlashCommandsProps) {
+const MAX_ITEMS = 12;
+
+export const SlashCommands = forwardRef<SlashCommandsHandle, SlashCommandsProps>(function SlashCommands(
+  { text, cursor, disabled, onPick },
+  ref,
+) {
   const [commands, setCommands] = useState<SlashCommand[]>([]);
   const [activeIdx, setActiveIdx] = useState(0);
+  // Escape hides the menu for the current token until it changes.
+  const [dismissedAt, setDismissedAt] = useState<number | null>(null);
   const loadedRef = useRef(false);
+  const listRef = useRef<HTMLUListElement>(null);
 
-  // Load commands once on mount.
+  const token = useMemo(() => slashToken(text, cursor), [text, cursor]);
+
+  // Load lazily the first time a slash token appears so new extensions show up.
   useEffect(() => {
-    if (loadedRef.current) return;
+    if (!token || loadedRef.current) return;
     loadedRef.current = true;
     commandsList()
       .then(setCommands)
-      .catch(() => setCommands([]));
-  }, []);
+      .catch(() => {
+        loadedRef.current = false;
+        setCommands([]);
+      });
+  }, [token]);
 
-  // Detect if the user just typed "/xxx" at the start of a token.
-  const { visible, query, matches } = useMemo(() => {
-    // Find the start of the current "word" (back to whitespace or start).
-    const before = text.slice(0, cursor);
-    const wordStart = before.search(/[/\S]*$/);
-    if (wordStart === -1) {
-      return { visible: false, query: "", matches: [] as SlashCommand[] };
-    }
-    const word = before.slice(wordStart);
-    if (!word.startsWith("/") || word.includes(" ") || word.length < 1) {
-      return { visible: false, query: "", matches: [] as SlashCommand[] };
-    }
-    const q = word.slice(1).toLowerCase();
-    const m = commands.filter(
+  const matches = useMemo(() => {
+    if (!token) return [] as SlashCommand[];
+    const q = token.query.toLowerCase();
+    if (!q) return commands.slice(0, MAX_ITEMS);
+    const prefix = commands.filter((c) => c.name.toLowerCase().startsWith(q));
+    const rest = commands.filter(
       (c) =>
-        !q ||
-        c.name.toLowerCase().includes(q) ||
-        (c.description ?? "").toLowerCase().includes(q),
+        !c.name.toLowerCase().startsWith(q) &&
+        (c.name.toLowerCase().includes(q) || (c.description ?? "").toLowerCase().includes(q)),
     );
-    return { visible: m.length > 0, query: q, matches: m };
-  }, [text, cursor, commands]);
+    return [...prefix, ...rest].slice(0, MAX_ITEMS);
+  }, [token, commands]);
+
+  const visible = !disabled && !!token && matches.length > 0 && dismissedAt !== token.start;
 
   useEffect(() => {
     setActiveIdx(0);
-  }, [query]);
+  }, [token?.query]);
 
-  // Keyboard nav is handled by the parent Composer via onPick — we only
-  // render; the Composer calls our handlers through refs below if needed.
-  // Simpler approach: expose up/down/enter via window event the Composer can
-  // dispatch. For now, click-only.
+  useEffect(() => {
+    if (dismissedAt !== null && token?.start !== dismissedAt) setDismissedAt(null);
+  }, [token?.start, dismissedAt]);
+
+  useEffect(() => {
+    listRef.current?.querySelector<HTMLElement>(".slash-commands__item--active")?.scrollIntoView?.({ block: "nearest" });
+  }, [activeIdx]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      handleKey: (e) => {
+        if (!visible) return false;
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setActiveIdx((i) => (i + 1) % matches.length);
+          return true;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setActiveIdx((i) => (i - 1 + matches.length) % matches.length);
+          return true;
+        }
+        if (e.key === "Enter" || e.key === "Tab") {
+          e.preventDefault();
+          const cmd = matches[Math.min(activeIdx, matches.length - 1)];
+          if (cmd) onPick(`/${cmd.name}`);
+          return true;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setDismissedAt(token!.start);
+          return true;
+        }
+        return false;
+      },
+    }),
+    [visible, matches, activeIdx, onPick, token],
+  );
 
   if (!visible) return null;
 
   return (
-    <div className="slash-commands" role="listbox">
-      <div className="slash-commands__header">可用命令（技能与已加载扩展）</div>
-      <ul className="slash-commands__list">
-        {matches.slice(0, 12).map((cmd, idx) => (
+    <div className="slash-commands" role="listbox" aria-label="可用命令">
+      <div className="slash-commands__header">可用命令 · ↑↓ 选择 · Enter 确认 · Esc 关闭</div>
+      <ul className="slash-commands__list" ref={listRef}>
+        {matches.map((cmd, idx) => (
           <li key={cmd.name}>
             <button
               type="button"
+              role="option"
+              aria-selected={idx === activeIdx}
               className={`slash-commands__item ${idx === activeIdx ? "slash-commands__item--active" : ""}`}
+              // Keep focus in the textarea so the caret position survives the click.
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => onPick(`/${cmd.name}`)}
               onMouseEnter={() => setActiveIdx(idx)}
             >
               <span className="slash-commands__name">/{cmd.name}</span>
-              {cmd.description && (
-                <span className="slash-commands__desc">{cmd.description}</span>
-              )}
-              {cmd.source && (
-                <span className="slash-commands__source">{cmd.source}</span>
-              )}
+              {cmd.description && <span className="slash-commands__desc">{cmd.description}</span>}
+              {cmd.source && <span className="slash-commands__source">{SOURCE_LABELS[cmd.source] ?? cmd.source}</span>}
             </button>
           </li>
         ))}
       </ul>
     </div>
   );
-}
-
-/** Expose a keyboard handler so the Composer can route ↑↓Enter to the menu.
- *  Returns true if the key was consumed. */
-export function slashCommandsKeyHandler(
-  e: KeyboardEvent,
-  matchCount: number,
-  activeIdx: number,
-  setActiveIdx: (n: number) => void,
-  onPickActive: () => void,
-): boolean {
-  if (matchCount === 0) return false;
-  if (e.key === "ArrowDown") {
-    e.preventDefault();
-    setActiveIdx((activeIdx + 1) % matchCount);
-    return true;
-  }
-  if (e.key === "ArrowUp") {
-    e.preventDefault();
-    setActiveIdx((activeIdx - 1 + matchCount) % matchCount);
-    return true;
-  }
-  if (e.key === "Enter" || e.key === "Tab") {
-    e.preventDefault();
-    onPickActive();
-    return true;
-  }
-  return false;
-}
+});

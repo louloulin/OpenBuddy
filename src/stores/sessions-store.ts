@@ -78,6 +78,8 @@ interface SessionsState {
    *  it lives, so a cwd-less `{ sessionId, title }` (e.g. agent://summary)
    *  updates the right group without needing the cwd. */
   upsert: (s: Partial<SessionSummary> & { sessionId: string }) => void;
+  /** Sidebar title of a session in any group. */
+  titleOf: (sessionId: string) => string | undefined;
   /** Remove a session from every group and decrement its workspace node count. */
   remove: (id: string) => void;
 }
@@ -87,7 +89,7 @@ export function selectHasFilter(s: { filterStatus: SessionStatus | null; filterD
   return s.filterStatus !== null || s.filterDate !== null;
 }
 
-export const useSessionsStore = create<SessionsState>((set) => ({
+export const useSessionsStore = create<SessionsState>((set, get) => ({
   independent: [],
   workspaces: [],
   workspaceSessions: {},
@@ -117,6 +119,11 @@ export const useSessionsStore = create<SessionsState>((set) => ({
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
   setCurrent: (id) => set({ currentSessionId: id }),
+  titleOf: (sessionId) => {
+    const state = get();
+    return (state.independent.find((x) => x.sessionId === sessionId)
+      ?? Object.values(state.workspaceSessions).flat().find((x) => x.sessionId === sessionId))?.title;
+  },
   setQuery: (query) => set({ query }),
   setFilterStatus: (filterStatus) => set({ filterStatus }),
   setFilterDate: (filterDate) => set({ filterDate }),

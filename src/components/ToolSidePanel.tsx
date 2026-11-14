@@ -175,7 +175,11 @@ export function ToolSidePanel({
   });
   const [maximized, setMaximized] = useState(false);
   const [pinned, setPinned] = useState(false);
-  const [navCollapsed, setNavCollapsed] = useState(false);
+  const [navCollapsed, setNavCollapsed] = useState(mode === "tool");
+  // A tool's detail uses the whole panel; workspace views bring the file column back.
+  useEffect(() => {
+    setNavCollapsed(mode === "tool");
+  }, [mode]);
 
   // 切换会话时重置 selection（避免跨会话残留）。
   useEffect(() => {

@@ -1,5 +1,6 @@
 
 import { useCallback, useEffect, useState } from "react";
+import { appConfirm } from "./AppDialog";
 import {
   BookIcon,
   SearchIcon,
@@ -73,7 +74,7 @@ export function ResourcesPanel({ cwd, onToast }: ResourcesPanelProps) {
 
   const handleDelete = useCallback(
     async (entry: MemoryEntry) => {
-      if (!confirm(`确定删除「${entry.path}」？`)) return;
+      if (!(await appConfirm({ title: `确定删除「${entry.path}」？`, confirmLabel: "删除", danger: true }))) return;
       try {
         await memoryDelete(entry.scope, entry.path, cwd);
         onToast?.("已删除");
@@ -86,7 +87,7 @@ export function ResourcesPanel({ cwd, onToast }: ResourcesPanelProps) {
   );
 
   const handleRewrite = useCallback(async () => {
-    if (!confirm("让 agent 用 LLM 重写所有记忆？这会重新组织资料库内容。")) return;
+    if (!(await appConfirm({ title: "让 agent 用 LLM 重写所有记忆？这会重新组织资料库内容。" }))) return;
     setBusy(true);
     try {
       await memoryRewrite();

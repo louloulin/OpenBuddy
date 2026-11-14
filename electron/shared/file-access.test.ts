@@ -16,10 +16,21 @@ it('requires native grants, checks file identity and allows a genuine file to be
   const first = await access.attach([{ path }]);
   expect(first.images).toEqual([{ type: 'image', data: png.toString('base64'), mimeType: 'image/png' }]);
   expect((await access.attach([{ path }])).images).toHaveLength(1);
-  await unlink(path); await writeFile(path, png);
+  // Same-size replacement with different bytes: caught even when the new file reuses the inode and timestamps.
+  const tampered = Buffer.from(png); tampered[tampered.length - 5] ^= 0xff;
+  await unlink(path); await writeFile(path, tampered);
   await expect(access.attach([{ path }])).rejects.toThrow('file_changed');
   access.clear();
   await expect(access.attach([{ path }])).rejects.toThrow('file_not_authorized');
+});
+it('pins the selected bytes: an in-place rewrite with restored timestamps is still rejected', async () => {
+  const { FileAccess } = await import('./file-access.js');
+  const { utimes, stat: statFile } = await import('node:fs/promises');
+  const access = new FileAccess(() => true), dir = await fixture(), path = join(dir, 'note.txt');
+  await writeFile(path, 'hello workspace'); await access.grant(path);
+  const before = await statFile(path);
+  await writeFile(path, 'HELLO workspace'); await utimes(path, before.atime, before.mtime);
+  await expect(access.attach([{ path }])).rejects.toThrow('file_changed');
 });
 it('rejects magic-valid image bytes when the actual image decoder fails', async () => {
   const { FileAccess } = await import('./file-access.js');

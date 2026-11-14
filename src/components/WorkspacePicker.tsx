@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Check, Folder, FolderOpen } from "lucide-react";
 import { open as openDialog } from "@/lib/ipc";
 import type { WorkspaceInfo } from "@/lib/agent-client";
+import { useSessionsStore } from "@/stores/sessions-store";
 
 
 export function WorkspacePicker({
@@ -26,8 +27,10 @@ export function WorkspacePicker({
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
 
-  // Shorten a cwd for display: show last 2 path segments.
+  const homeCwd = useSessionsStore((s) => s.homeCwd);
+  // The built-in inbox reads as 默认空间 (as in the top bar); others show their last 2 path segments.
   const shortName = (p: string) => {
+    if (homeCwd && p === homeCwd) return "默认空间";
     const parts = p.replace(/\\/g, "/").split("/").filter(Boolean);
     return parts.slice(-2).join("/") || p;
   };

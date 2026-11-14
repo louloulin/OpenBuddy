@@ -7,6 +7,7 @@
  *  - 资产: 工具栏 + 配额(本地估算) + 文件表格 + 新建文件夹/上传(本地) + 删除
  */
 import { useMemo, useState } from "react";
+import { appPrompt } from "./AppDialog";
 import { useProjectsStore, PLAN_COLUMNS, type PlanStatus, type AssetItem } from "@/stores/projects-store";
 import { ChevronDownIcon, SearchIcon } from "@/foundation/components/Icon/icons";
 
@@ -44,9 +45,9 @@ export function PlanTab({ projectId }: { projectId: string }) {
   const movePlan = useProjectsStore((s) => s.movePlan);
   const removePlan = useProjectsStore((s) => s.removePlan);
 
-  const newTodo = () => {
-    const title = window.prompt("新建待办标题");
-    if (title && title.trim()) addPlan(projectId, title.trim(), "pending");
+  const newTodo = async () => {
+    const title = await appPrompt({ title: "新建待办", placeholder: "待办标题", confirmLabel: "创建" });
+    if (title) addPlan(projectId, title, "pending");
   };
 
   return (
@@ -76,9 +77,9 @@ export function PlanTab({ projectId }: { projectId: string }) {
                 <button
                   className="pd-board-col__add"
                   aria-label={`在${col.label}新建`}
-                  onClick={() => {
-                    const title = window.prompt(`在「${col.label}」新建待办`);
-                    if (title && title.trim()) addPlan(projectId, title.trim(), col.status);
+                  onClick={async () => {
+                    const title = await appPrompt({ title: `在「${col.label}」新建待办`, placeholder: "待办标题", confirmLabel: "创建" });
+                    if (title) addPlan(projectId, title, col.status);
                   }}
                 >
                   +
@@ -130,9 +131,9 @@ export function TaskTab({ projectId }: { projectId: string }) {
 
   const filtered = tasks.filter((t) => t.title.toLowerCase().includes(q.toLowerCase()));
 
-  const newTask = () => {
-    const title = window.prompt("新建任务标题");
-    if (title && title.trim()) addTask(projectId, title.trim());
+  const newTask = async () => {
+    const title = await appPrompt({ title: "新建任务", placeholder: "任务标题", confirmLabel: "创建" });
+    if (title) addTask(projectId, title);
   };
 
   return (
@@ -182,9 +183,9 @@ export function AssetsTab({ projectId }: { projectId: string }) {
 
   const used = useMemo(() => estimateUsed(assets), [assets]);
 
-  const newFolder = () => {
-    const name = window.prompt("文件夹名称");
-    if (name && name.trim()) addAsset(projectId, { name: name.trim(), kind: "folder" });
+  const newFolder = async () => {
+    const name = await appPrompt({ title: "新建本地分类", placeholder: "分类名称", confirmLabel: "创建" });
+    if (name) addAsset(projectId, { name, kind: "folder" });
   };
   const rows = assets.filter((a) => a.name.toLowerCase().includes(q.toLowerCase()));
 

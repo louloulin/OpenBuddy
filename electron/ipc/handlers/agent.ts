@@ -93,7 +93,7 @@ export async function createEngineHandlers(options: EngineOptions) {
         text(p.sessionId),
         typeof p.cwd === "string" ? p.cwd : undefined,
       ),
-    agent_list_sessions: (p) => engine.list(text(p.cwd)),
+    agent_list_sessions: (p) => engine.list(text(p.cwd), p.includeArchived === true),
     agent_list_workspaces: async () => {
       const map = new Map<
         string,
@@ -138,19 +138,29 @@ export async function createEngineHandlers(options: EngineOptions) {
       engine.configureExtensions("enabled", bool(p.enabled)),
     agent_cancel: (p) => engine.cancel(text(p.sessionId)),
     agent_shutdown: () => engine.shutdown(),
-    agent_delete_session: (p) => engine.delete(text(p.sessionId)),
+    agent_delete_session: async (p) => {
+      const id = text(p.sessionId);
+      await engine.delete(id);
+      engine.permissions.forget(id);
+    },
+    tasks_list: () => engine.running(),
+    rewind_points: (p) => engine.rewindPoints(text(p.sessionId)),
+    rewind_execute: (p) => engine.rewind(text(p.sessionId), text(p.entryId)),
+    agent_regenerate: (p) => engine.regenerate(text(p.sessionId)),
+    agent_compact: (p) => engine.compact(text(p.sessionId), typeof p.instructions === "string" ? p.instructions : undefined),
+    task_kill: (p) => engine.cancel(text(p.taskId)),
     agent_rename_session: (p) =>
       engine.rename(text(p.sessionId), text(p.title)),
     agent_set_session_pinned: async (p) => {
       const id = text(p.sessionId);
-      if (engine.currentSessionId !== id) await engine.resolve(id);
+      if (!engine.has(id)) await engine.resolve(id);
       const pinned = bool(p.pinned);
       engine.metadata(id, { pinned });
       return pinned;
     },
     agent_set_session_archived: async (p) => {
       const id = text(p.sessionId);
-      if (engine.currentSessionId !== id) await engine.resolve(id);
+      if (!engine.has(id)) await engine.resolve(id);
       const archived = bool(p.archived);
       engine.metadata(id, { archived });
       return archived;
@@ -302,15 +312,13 @@ export async function createEngineHandlers(options: EngineOptions) {
     },
     mcp_auth_trigger: async (p) => {
       const id = text(p.sessionId);
-      if (engine.currentSessionId !== id) throw Error("会话未加载");
+      if (!engine.has(id)) throw Error("会话未加载");
       const result = await engine.mcp.signIn(id, text(p.serverName));
-      if (result.status === "authenticated" && engine.currentSessionId === id)
-        await engine.reload();
+      if (result.status === "authenticated") await engine.reload();
       return result;
     },
     mcp_auth_status: (p) => {
-      if (engine.currentSessionId !== text(p.sessionId))
-        throw Error("会话未加载");
+      if (!engine.has(text(p.sessionId))) throw Error("会话未加载");
       return engine.mcp.authStatus();
     },
     notification_list: () =>

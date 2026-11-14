@@ -49,34 +49,45 @@ export function AgentResourcesPanel({ cwd, sessionId, onToast }: { cwd?: string;
     const path = await dialog.open({ title: "添加 Pi 技能目录", directory: true });
     if (typeof path === "string") await skillsAdd(path, cwd);
   });
-  return <section className="placeholder-page placeholder-page--panel">
-    <header className="settings-section-head"><h2>技能与 MCP</h2></header>
-    <nav aria-label="资源类型">
-      <button onClick={() => setTab("skills")} aria-pressed={tab === "skills"}>已安装技能</button>
-      <button onClick={() => setTab("mcp")} aria-pressed={tab === "mcp"}>MCP 配置</button>
-      <button onClick={() => setTab("extensions")} aria-pressed={tab === "extensions"}>可信扩展</button>
+  const tabBtn = (id: typeof tab, label: string) => (
+    <button type="button" className={"res-panel__tab" + (tab === id ? " res-panel__tab--on" : "")} onClick={() => setTab(id)} aria-pressed={tab === id}>{label}</button>
+  );
+  return <section className="res-panel">
+    <header className="res-panel__head">
+      <h2 className="res-panel__title">技能与 MCP</h2>
+      <p className="res-panel__subtitle">管理已安装的技能、MCP 服务和可信扩展</p>
+    </header>
+    <nav className="res-panel__tabs" aria-label="资源类型">
+      {tabBtn("skills", "已安装技能")}
+      {tabBtn("mcp", "MCP 配置")}
+      {tabBtn("extensions", "可信扩展")}
     </nav>
-    {error && <p role="alert">{error}</p>}
-    {tab === "extensions" ? <TrustedExtensionsPanel /> : tab === "mcp" ? <div>
-      <section aria-label="MCP 授权">
-        <h3>远程服务授权</h3>
-        {!sessionId && <div><p>授权 MCP 需要已加载的 Pi 会话。</p><button disabled={authBusy} onClick={() => { setAuthBusy(true); void ensureSession().catch(error => setAuthMessage(String(error))).finally(() => setAuthBusy(false)); }}>使用当前默认模型创建会话</button></div>}
-        {sessionId && <button disabled={authBusy} onClick={() => { void refreshAuth().catch(error => setAuthMessage(`读取授权状态失败：${String(error)}`)); }}>刷新授权状态</button>}
-        {authMessage && <p role="alert">{authMessage}</p>}
-        {auth.map(entry => <div key={entry.serverName} className="settings-row">
-          <span>{entry.serverName}</span><span>{entry.status === "authenticated" ? "已授权" : "需要授权"}</span>
-          <button disabled={authBusy} aria-label={`授权 ${entry.serverName}`} onClick={() => { void authorize(entry.serverName); }}>{authBusy ? "授权中…" : entry.status === "authenticated" ? "重新授权" : "授权"}</button>
+    {error && <p className="res-panel__error" role="alert">{error}</p>}
+    {tab === "extensions" ? <div className="res-panel__body"><TrustedExtensionsPanel /></div> : tab === "mcp" ? <div className="res-panel__body">
+      <section className="res-panel__card" aria-label="MCP 授权">
+        <h3 className="res-panel__card-title">远程服务授权</h3>
+        {!sessionId && <div className="res-panel__row"><p className="res-panel__muted">授权 MCP 需要先打开一个任务。</p><button type="button" className="res-panel__btn" disabled={authBusy} onClick={() => { setAuthBusy(true); void ensureSession().catch(error => setAuthMessage(String(error))).finally(() => setAuthBusy(false)); }}>使用当前默认模型创建会话</button></div>}
+        {sessionId && <button type="button" className="res-panel__btn" disabled={authBusy} onClick={() => { void refreshAuth().catch(error => setAuthMessage(`读取授权状态失败：${String(error)}`)); }}>刷新授权状态</button>}
+        {authMessage && <p className="res-panel__error" role="alert">{authMessage}</p>}
+        {auth.map(entry => <div key={entry.serverName} className="res-panel__item">
+          <span className="res-panel__item-name">{entry.serverName}</span><span className={"res-panel__badge" + (entry.status === "authenticated" ? " res-panel__badge--ok" : "")}>{entry.status === "authenticated" ? "已授权" : "需要授权"}</span>
+          <button type="button" className="res-panel__btn" disabled={authBusy} aria-label={`授权 ${entry.serverName}`} onClick={() => { void authorize(entry.serverName); }}>{authBusy ? "授权中…" : entry.status === "authenticated" ? "重新授权" : "授权"}</button>
         </div>)}
       </section>
-      <McpConfigEditor onBack={() => setTab("skills")} onToast={onToast} onSaved={() => { void refreshAuth().catch(error => setAuthMessage(String(error))); }} />
-    </div> : <div>
-      <button disabled={busy} onClick={() => { void add(); }}>添加技能</button>
-      <button disabled={busy} onClick={() => { void load(); }}>刷新</button>
-      {skills.length === 0 && <p>尚未安装技能。选择包含 SKILL.md 的目录以添加。</p>}
-      {skills.map(skill => <div key={skill.path ?? skill.name} className="settings-row">
-        <span>{skill.displayName || skill.name}</span><span>{skill.description}</span>
-        <button disabled={busy} onClick={() => { void run(() => skillsToggle(skill.name, !skill.enabled)); }}>{skill.enabled ? "禁用" : "启用"}</button>
-        <button disabled={busy || !skill.path} onClick={() => { void run(() => skillsRemove(skill.path!, cwd)); }}>移除</button>
+      <McpConfigEditor onToast={onToast} onSaved={() => { void refreshAuth().catch(error => setAuthMessage(String(error))); }} />
+    </div> : <div className="res-panel__body">
+      <div className="res-panel__toolbar">
+        <button type="button" className="res-panel__btn res-panel__btn--primary" disabled={busy} onClick={() => { void add(); }}>添加技能</button>
+        <button type="button" className="res-panel__btn" disabled={busy} onClick={() => { void load(); }}>刷新</button>
+      </div>
+      {skills.length === 0 && <div className="res-panel__empty">尚未安装技能。点击「添加技能」，选择包含 SKILL.md 的目录。</div>}
+      {skills.map(skill => <div key={skill.path ?? skill.name} className={"res-panel__item" + (skill.enabled ? "" : " res-panel__item--off")}>
+        <div className="res-panel__item-main">
+          <span className="res-panel__item-name">{skill.displayName || skill.name}</span>
+          {skill.description && <span className="res-panel__item-desc">{skill.description}</span>}
+        </div>
+        <button type="button" className="res-panel__btn" disabled={busy} onClick={() => { void run(() => skillsToggle(skill.name, !skill.enabled)); }}>{skill.enabled ? "禁用" : "启用"}</button>
+        <button type="button" className="res-panel__btn res-panel__btn--danger" disabled={busy || !skill.path} onClick={() => { void run(() => skillsRemove(skill.path!, cwd)); }}>移除</button>
       </div>)}
     </div>}
   </section>;

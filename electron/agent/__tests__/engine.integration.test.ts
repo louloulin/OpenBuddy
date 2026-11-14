@@ -218,10 +218,11 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
     });
     await f.call("agent_shutdown");
     f.events.length = 0;
-    await f.call("agent_load_session", { sessionId: f.sid, cwd: f.root });
-    expect(
-      f.events.some((e) => e.payload.event?.message?.role === "assistant"),
-    ).toBe(true);
+    // Loading returns a snapshot of the history instead of replaying events.
+    const snapshot = (await f.call("agent_load_session", { sessionId: f.sid, cwd: f.root })) as any;
+    expect(snapshot.messages.some((m: any) => m.role === "assistant")).toBe(true);
+    expect(snapshot.messages.some((m: any) => m.role === "user")).toBe(true);
+    expect(f.events.some((e) => e.name === "agent://event" && e.payload.event?.type === "message_end")).toBe(false);
     const files = await readdir(join(f.root, "pi"));
     expect(files).not.toContain("auth.json");
     for (const name of files.filter((n) => n.endsWith(".json")))
@@ -434,7 +435,7 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
       }),
     ).rejects.toThrow("model_not_found");
   });
-  it("bridges real SDK extension dialogs and cancels pending input on cancel, session switch and shutdown", async () => {
+  it("bridges real SDK extension dialogs, keeps pending input across session switches and cancels it on cancel, delete and shutdown", async () => {
     const answers: unknown[] = [];
     const extension: ExtensionFactory = (pi) => {
       pi.registerCommand("fixture-ui", {
@@ -487,7 +488,7 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
           e.payload.message === "Finished",
       ),
     ).toBe(true);
-    for (const mode of ["cancel", "switch", "shutdown"]) {
+    for (const mode of ["cancel", "switch-then-delete", "shutdown"]) {
       const sid =
         mode === "cancel"
           ? f.sid
@@ -503,9 +504,18 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
       await until(() => f.events.some((e) => e.name === "agent://ui-request"));
       const p = f.events.find((e) => e.name === "agent://ui-request")!.payload;
       if (mode === "cancel") await f.call("agent_cancel", { sessionId: sid });
-      else if (mode === "switch")
+      else if (mode === "switch-then-delete") {
+        // Opening another task leaves this one running in the pool with its input pending.
         await f.call("agent_new_session", { cwd: f.root, modelId: "fixture" });
-      else await f.call("agent_shutdown");
+        await new Promise((r) => setTimeout(r, 50));
+        expect(
+          f.events.some((e) => e.name === "agent://ui-dismiss" && e.payload.requestId === p.requestId),
+        ).toBe(false);
+        expect((await f.call("tasks_list")) as any[]).toEqual(
+          expect.arrayContaining([expect.objectContaining({ sessionId: sid })]),
+        );
+        await f.call("agent_delete_session", { sessionId: sid });
+      } else await f.call("agent_shutdown");
       await pending;
       expect(answers.at(-1)).toBeUndefined();
       await expect(
@@ -516,6 +526,79 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
         }),
       ).rejects.toThrow();
     }
+  });
+  it("runs several tasks at once: opening or loading another task never aborts a running one", async () => {
+    const f = await fixture({ holdFirst: true });
+    const first = f.call("agent_send", { sessionId: f.sid, text: "long task" });
+    await until(() => !!f.releaseFirst);
+    expect(
+      f.events.some((e) => e.name === "agent://session-status" && e.payload.sessionId === f.sid && e.payload.status === "running"),
+    ).toBe(true);
+    // Open a second task and finish a whole turn there while the first is still streaming.
+    const second = (await f.call("agent_new_session", { cwd: f.root, modelId: "fixture" })) as string;
+    await f.call("agent_send", { sessionId: second, text: "quick task" });
+    expect((await f.call("tasks_list")) as any[]).toEqual([
+      expect.objectContaining({ sessionId: f.sid, status: "running" }),
+    ]);
+    // Re-focusing the running task returns its live snapshot instead of restarting it.
+    const live = (await f.call("agent_load_session", { sessionId: f.sid, cwd: f.root })) as any;
+    expect(live).toMatchObject({ busy: true, status: "running" });
+    f.releaseFirst!();
+    await first;
+    const done = (await f.call("agent_load_session", { sessionId: f.sid, cwd: f.root })) as any;
+    expect(done).toMatchObject({ busy: false });
+    expect(JSON.stringify(done.messages)).toContain("Held response complete");
+    const other = (await f.call("agent_load_session", { sessionId: second, cwd: f.root })) as any;
+    expect(JSON.stringify(other.messages)).toContain("Hello world");
+    expect(
+      f.events.some((e) => e.name === "agent://session-status" && e.payload.sessionId === f.sid && e.payload.status === "idle"),
+    ).toBe(true);
+    expect(await f.call("tasks_list")).toEqual([]);
+  });
+  it("regenerates the last answer and edits from an earlier prompt on the same branch", async () => {
+    const f = await fixture();
+    await f.call("agent_send", { sessionId: f.sid, text: "first question" });
+    await f.call("agent_send", { sessionId: f.sid, text: "second question" });
+    const points = (await f.call("rewind_points", { sessionId: f.sid })) as any[];
+    expect(points.map((p) => p.preview)).toEqual(["first question", "second question"]);
+    const before = f.requests.length;
+    f.events.length = 0;
+    await f.call("agent_regenerate", { sessionId: f.sid });
+    expect(f.requests.length).toBe(before + 1);
+    // The renderer rebuilds from session_rewound; the old answer is no longer on the branch.
+    expect(f.events.some((e) => e.payload.event?.type === "session_rewound")).toBe(true);
+    let snapshot = (await f.call("agent_load_session", { sessionId: f.sid, cwd: f.root })) as any;
+    expect(snapshot.messages.filter((m: any) => m.role === "user")).toHaveLength(2);
+    expect(snapshot.messages.filter((m: any) => m.role === "assistant")).toHaveLength(2);
+    // 从这里编辑: drop the second prompt and return its text for the composer.
+    const second = ((await f.call("rewind_points", { sessionId: f.sid })) as any[])[1];
+    expect(await f.call("rewind_execute", { sessionId: f.sid, entryId: second.entryId })).toEqual({ editorText: "second question" });
+    snapshot = (await f.call("agent_load_session", { sessionId: f.sid, cwd: f.root })) as any;
+    expect(snapshot.messages.filter((m: any) => m.role === "user")).toHaveLength(1);
+    await expect(
+      f.call("rewind_execute", { sessionId: f.sid, entryId: "missing" }),
+    ).rejects.toThrow("rewind_point_not_found");
+  });
+  it("compacts a session on /compact, lists it as a built-in command and refuses while busy", async () => {
+    const f = await fixture({ holdFirst: true });
+    expect(await f.call("commands_list")).toContainEqual(expect.objectContaining({ name: "compact", source: "builtin" }));
+    // Large enough that older history falls outside the recent window kept by compaction.
+    const held = f.call("agent_send", { sessionId: f.sid, text: "first question " + "A".repeat(90000) });
+    await until(() => !!f.releaseFirst);
+    await expect(f.call("agent_compact", { sessionId: f.sid })).rejects.toThrow("忙碌");
+    f.releaseFirst!();
+    await held;
+    await f.call("agent_send", { sessionId: f.sid, text: "second question " + "B".repeat(90000) });
+    f.events.length = 0;
+    const result = (await f.call("agent_compact", { sessionId: f.sid, instructions: "keep decisions" })) as any;
+    expect(result.tokensBefore).toBeGreaterThan(0);
+    const types = f.events.filter((e) => e.name === "agent://event").map((e) => e.payload.event.type);
+    expect(types).toEqual(expect.arrayContaining(["compaction_start", "compaction_end"]));
+    expect(f.events.filter((e) => e.name === "agent://session-status").map((e) => e.payload.status)).toEqual(["running", "idle"]);
+    expect(JSON.stringify(f.requests.at(-1))).toContain("keep decisions");
+    // A second /compact right after has nothing new to summarise.
+    await expect(f.call("agent_compact", { sessionId: f.sid })).rejects.toThrow("Already compacted");
+    expect((await f.call("agent_session_info", { sessionId: f.sid })) as any).toMatchObject({ context: { compactionCount: 1 } });
   });
   it("delivers real SDK steering/follow-up queues, clears removed inputs and settles after all queued work", async () => {
     const f = await fixture({ holdFirst: true });
@@ -659,11 +742,23 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
           e.name === "agent://ui-request" && e.payload.title === "Disk input",
       ),
     );
-    await expect(
-      f.call("agent_extensions_set_enabled", { enabled: false }),
-    ).rejects.toThrow("忙碌");
+    // A busy session is not interrupted: the change is saved and applied once it settles.
+    expect(
+      await f.call("agent_extensions_set_enabled", { enabled: false }),
+    ).toMatchObject({ enabled: false });
+    expect(
+      f.events.some((e) => e.name === "agent://ui-dismiss"),
+    ).toBe(false);
     await f.call("agent_cancel", { sessionId: f.sid });
     await pending;
+    let names: string[] = [];
+    const end = Date.now() + 10000;
+    do {
+      await new Promise((r) => setTimeout(r, 20));
+      names = ((await f.call("commands_list").catch(() => [])) as any[]).map((c) => c.name);
+    } while (names.includes("disk-fixture") && Date.now() < end);
+    expect(names).not.toContain("disk-fixture");
+    await f.call("agent_extensions_set_enabled", { enabled: true });
     const bad = join(f.root, "broken-extension.mjs");
     await writeFile(bad, 'throw new Error("broken extension");');
     await expect(f.call("agent_extensions_add", { path: bad })).rejects.toThrow(
@@ -724,7 +819,11 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
     await expect(
       f.call("agent_send", { sessionId: f.sid, text: "/unsupported-ui" }),
     ).rejects.toThrow("not_implemented");
-    expect(f.events.some((e) => e.name === "agent://turn-error")).toBe(true);
+    // One error path: the rejected send carries the error; the task is marked failed, not completed.
+    expect(f.events.some((e) => e.name === "agent://turn-error")).toBe(false);
+    expect(
+      f.events.some((e) => e.name === "agent://session-status" && e.payload.status === "failed"),
+    ).toBe(true);
     expect(
       f.events.some(
         (e) =>
@@ -830,8 +929,13 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
       },
     });
     cleanups.push(restarted.dispose);
+    // Archived tasks are hidden from the default list and shown on request.
+    expect(
+      await restarted.handlers.agent_list_sessions({ cwd: f.root }),
+    ).toEqual([]);
     const listed = (await restarted.handlers.agent_list_sessions({
       cwd: f.root,
+      includeArchived: true,
     })) as any[];
     expect(listed[0]).toMatchObject({
       sessionId: f.sid,
@@ -849,7 +953,7 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
     ).toMatchObject({ usage: { numTurns: 1 } });
     await restarted.handlers.agent_delete_session({ sessionId: f.sid });
     expect(
-      await restarted.handlers.agent_list_sessions({ cwd: f.root }),
+      await restarted.handlers.agent_list_sessions({ cwd: f.root, includeArchived: true }),
     ).toEqual([]);
   });
   it("sends with a switched model and restores that model for requests after an engine restart", async () => {

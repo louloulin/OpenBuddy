@@ -211,9 +211,54 @@ export function formatAgentError(raw: string): string | null {
  * Falls back to String(e) if the error can't be parsed.
  */
 export function friendlyError(e: unknown): string {
-  const raw = String(e).replace(/^(?:Error:\s*)?Error invoking remote method '[^']+':\s*(?:Error:\s*)?/, "").replace(/^Error:\s*/, "");
-  if (raw.includes("model_auth_missing")) return "该提供商尚未配置 API Key，请先在设置中配置";
-  if (raw.includes("model_ambiguous")) return "存在同名模型，请明确选择提供商后重试";
-  if (raw.includes("model_not_found")) return "该模型已不可用，请在设置中检查配置或重新选择";
-  return formatAgentError(raw) ?? raw;
+  const description = describeError(e);
+  return description.hint ? `${description.title}：${description.hint}` : description.title;
+}
+
+export interface ErrorDescription {
+  /** One sentence for people. */
+  title: string;
+  /** Suggested next step. */
+  hint?: string;
+  /** Primary recovery action the UI can offer. */
+  action?: "retry" | "settings" | "model" | "wait";
+  /** Original message for the expandable detail. */
+  raw: string;
+}
+
+/** Strip IPC wrappers ("Error invoking remote method …: Error: …"). */
+export function rawErrorText(e: unknown): string {
+  return String(e instanceof Error ? e.message : e)
+    .replace(/^(?:Error:\s*)?Error invoking remote method '[^']+':\s*(?:Error:\s*)?/, "")
+    .replace(/^Error:\s*/, "")
+    .trim();
+}
+
+/** Map engine, provider and host error codes to a friendly description. */
+export function describeError(e: unknown): ErrorDescription {
+  const raw = rawErrorText(e);
+  const lower = raw.toLowerCase();
+  const d = (title: string, hint?: string, action?: ErrorDescription["action"]): ErrorDescription => ({ title, hint, action, raw });
+  if (/too_many_running/.test(raw)) return d("同时运行的任务已达上限", "等其中一个任务完成后再发送", "wait");
+  if (raw.includes("会话忙碌") || lower.includes("already processing")) return d("上一条消息还在处理中", "等待回复完成，或点停止后再发送", "wait");
+  if (raw.includes("queue_unavailable")) return d("当前没有正在运行的回复，无法插入消息", "直接发送即可", "retry");
+  if (raw.includes("model_does_not_support_images")) return d("当前模型不支持图片", "换一个支持图片输入的模型，或移除图片附件", "model");
+  if (raw.includes("model_auth_missing") || lower.includes("no api key") || lower.includes("api key")) return d("模型服务商还没有配置 API Key", "在设置 → 模型中填写 API Key", "settings");
+  if (raw.includes("model_not_found")) return d("当前模型已不可用", "重新选择一个模型", "model");
+  if (raw.includes("model_ambiguous")) return d("存在同名模型", "在模型列表中明确选择服务商", "model");
+  if (raw.includes("file_not_authorized") || raw.includes("native_file") || raw.includes("file_changed")) return d("附件需要重新选择", "文件在选择后被修改或未授权，请重新添加", "retry");
+  if (raw.includes("attachment_too_large") || raw.includes("images_too_large")) return d("附件太大", "图片单个 10 MB、文本单个 256 KB 以内，总计 20 MB", "retry");
+  if (raw.includes("unsupported_attachment")) return d("不支持该附件类型", "目前支持图片和 UTF-8 文本文件", "retry");
+  if (raw.includes("invalid_image")) return d("图片无法解析", "换一张图片再试", "retry");
+  if (raw.includes("extension_load_failed")) return d("扩展加载失败", "在 技能·连接器 → 扩展 中检查或停用该扩展", "settings");
+  if (raw.includes("workspace_not_authorized")) return d("工作空间未授权", "通过「选择工作空间 → 打开本地文件夹」重新选择", "retry");
+  if (raw.includes("会话未加载") || raw.includes("会话不存在")) return d("任务已关闭或不存在", "从侧栏重新打开该任务", "retry");
+  if (raw.includes("安全密钥存储不可用")) return d("系统钥匙串不可用，无法安全保存 API Key", "Linux 请安装并解锁 gnome-keyring 或 KWallet 后重启应用", "settings");
+  if (/\b429\b/.test(raw) || lower.includes("rate limit") || lower.includes("too many requests")) return d("已达到模型用量上限", "稍等片刻再重试，或换一个模型", "retry");
+  if (/\b(401|403)\b/.test(raw) || lower.includes("unauthorized") || lower.includes("invalid api key") || lower.includes("authentication")) return d("API Key 无效或已过期", "在设置 → 模型中检查 API Key", "settings");
+  if (lower.includes("context") && (lower.includes("length") || lower.includes("too long") || lower.includes("overflow"))) return d("对话太长，超出了模型的上下文", "输入 /compact 压缩上下文，或新建任务", "retry");
+  if (/\b(500|502|503|504)\b/.test(raw) || lower.includes("overloaded") || lower.includes("internal server error")) return d("模型服务暂时不可用", "稍后重试，或换一个模型", "retry");
+  if (lower.includes("econnrefused") || lower.includes("enotfound") || lower.includes("network") || lower.includes("fetch failed") || lower.includes("timeout") || lower.includes("connection")) return d("无法连接到模型服务", "检查网络或代理，以及服务商的接口地址", "retry");
+  if (lower.includes("aborted")) return d("已停止", undefined, undefined);
+  return d(raw.length > 80 ? "本轮执行出错" : raw || "本轮执行出错", raw.length > 80 ? "展开查看原始错误" : undefined, "retry");
 }

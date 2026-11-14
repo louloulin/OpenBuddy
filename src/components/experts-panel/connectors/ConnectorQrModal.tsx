@@ -7,6 +7,7 @@
  * in-flight auth process.
  */
 import { useEffect, useRef, useState } from "react";
+import { copyText } from "@/lib/clipboard";
 import QRCode from "qrcode";
 import { Copy as CopyIcon } from "lucide-react";
 import type { ConnectorItem } from "@/lib/types";
@@ -48,7 +49,7 @@ export function ConnectorQrModal({ connector, url, showQr, logs, onCancel, onToa
 
   const copyUrl = () => {
     if (!url) return;
-    navigator.clipboard?.writeText(url).then(
+    copyText(url).then(
       () => onToast?.("已复制授权链接"),
       () => { /* clipboard blocked — ignore */ },
     );

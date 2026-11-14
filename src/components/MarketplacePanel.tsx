@@ -1,5 +1,6 @@
 
 import { useCallback, useEffect, useState } from "react";
+import { appConfirm } from "./AppDialog";
 import {
   Store,
   RefreshCw,
@@ -80,7 +81,7 @@ export function MarketplacePanel({ sessionId, onToast }: MarketplacePanelProps) 
     async (source: MarketplaceScanResult, plugin: MarketplacePluginEntry) => {
       const sid = requireSession();
       if (!sid) return;
-      if (!confirm(`确定卸载「${plugin.name}」？`)) return;
+      if (!(await appConfirm({ title: `确定卸载「${plugin.name}」？`, confirmLabel: "卸载", danger: true }))) return;
       const key = `${source.sourceName}/${plugin.name}`;
       setBusy(key);
       try {
@@ -148,7 +149,7 @@ export function MarketplacePanel({ sessionId, onToast }: MarketplacePanelProps) 
     async (source: MarketplaceScanResult) => {
       const sid = requireSession();
       if (!sid) return;
-      if (!confirm(`确定移除市场源「${source.sourceName}」？已安装的插件不会被删除。`)) return;
+      if (!(await appConfirm({ title: `确定移除市场源「${source.sourceName}」？已安装的插件不会被删除。`, confirmLabel: "删除", danger: true }))) return;
       setBusy(`remove:${source.sourceName}`);
       try {
         await marketplaceAction(sid, {

@@ -5,46 +5,47 @@ import type { ToolCallView } from "@/stores/session-store";
 
 const base: ToolCallView = {
   toolCallId: "tc1",
-  title: "Write C:\\Users\\chenr\\hello.txt",
+  title: "edit",
   kind: "edit",
   status: "completed",
   content: [],
+  rawInput: { path: "/work/proj/src/hello.txt" },
+  details: { patch: "@@ -1,2 +1,2 @@\n-old line\n+new line\n context" },
+  durationMs: 1500,
 };
 
 describe("ToolCallCard", () => {
-  it("renders compact row and opens detail on click", () => {
+  it("renders one row: plain label, workspace-relative path, diff stats and time; opens detail on click", () => {
     const onOpen = vi.fn();
-    render(<ToolCallCard tc={base} onOpen={onOpen} />);
-    // edit 属专用渲染器,kind 标签显示为「✏️ 文件编辑」。
-    expect(screen.getByText("✏️ 文件编辑")).toBeInTheDocument();
-    expect(screen.getByText(/hello\.txt/)).toBeInTheDocument();
+    render(<ToolCallCard tc={base} cwd="/work/proj" onOpen={onOpen} />);
+    expect(screen.getByText("编辑文件")).toBeInTheDocument();
+    expect(screen.getByText("src/hello.txt")).toBeInTheDocument();
+    expect(screen.getByText("+1")).toBeInTheDocument();
+    expect(screen.getByText("−1")).toBeInTheDocument();
+    expect(screen.getByText("2s")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button"));
     expect(onOpen).toHaveBeenCalledWith(base);
   });
 
-  it("专用渲染器(send-message)显示图标 + 标签 + 摘要", () => {
-    render(
-      <ToolCallCard
-        tc={{
-          ...base,
-          kind: "send_message",
-          title: "通知",
-          rawInput: { message: "你好,这是一条通知" },
-        }}
-        onOpen={() => {}}
-      />,
-    );
-    expect(screen.getByText("💬 发送消息")).toBeInTheDocument();
-    expect(screen.getByText("你好,这是一条通知")).toBeInTheDocument();
+  it("summarises a command by its first line", () => {
+    render(<ToolCallCard tc={{ ...base, kind: "bash", title: "bash", details: undefined, rawInput: { command: "npm test\necho done" } }} />);
+    expect(screen.getByText("执行命令")).toBeInTheDocument();
+    expect(screen.getByText("npm test")).toBeInTheDocument();
   });
 
-  it("shows running status mark while in progress", () => {
-    render(
-      <ToolCallCard
-        tc={{ ...base, status: "in_progress", title: "Execute notepad" }}
-        onOpen={() => {}}
-      />,
+  it("names MCP tools by server and tool, and falls back to the first string argument", () => {
+    render(<ToolCallCard tc={{ ...base, kind: "mcp__github__create_issue", title: "mcp__github__create_issue", details: undefined, rawInput: { title: "Bug: crash" } }} />);
+    expect(screen.getByText("github · create_issue")).toBeInTheDocument();
+    expect(screen.getByText("Bug: crash")).toBeInTheDocument();
+  });
+
+  it("shows a spinner and the last output line while running, and a failure mark when failed", () => {
+    const { rerender, container } = render(
+      <ToolCallCard tc={{ ...base, kind: "bash", status: "in_progress", details: undefined, rawInput: { command: "make" }, content: [{ type: "text", text: "step 1\nstep 2" }] }} />,
     );
-    expect(screen.getByText("…")).toBeInTheDocument();
+    expect(container.querySelector(".toolrow__spinner")).not.toBeNull();
+    expect(screen.getByText("step 2")).toBeInTheDocument();
+    rerender(<ToolCallCard tc={{ ...base, kind: "bash", status: "failed", details: undefined, rawInput: { command: "make" } }} />);
+    expect(screen.getByRole("button")).toHaveAccessibleName(/失败/);
   });
 });

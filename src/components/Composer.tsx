@@ -1,12 +1,11 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Mic, X, type LucideIcon } from "lucide-react";
+import { ArrowUp, X, type LucideIcon } from "lucide-react";
 import { open as openDialog } from "@/lib/ipc";
 import { getPathForFile } from "@/lib/ipc";
-import { ChevronDownIcon, SendPlaneIcon } from "@/foundation/components/Icon/icons";
+import { ChevronDownIcon } from "@/foundation/components/Icon/icons";
 import { ModelRuntimeContext, ModelSelector, type ModelOption } from "./ModelSelector";
 import { ThumbImg } from "./experts-panel/shared/ThumbImg";
 import { ContextUsagePill } from "./ContextUsagePill";
-import { estimateSendCost } from "@/lib/token-estimate";
 import {
   blocks,
   assemblePrompt,
@@ -20,16 +19,11 @@ import {
 } from "@/lib/input-history";
 import { WorkspacePicker } from "./WorkspacePicker";
 import { PermissionPicker } from "./PermissionPicker";
-import { SlashCommands } from "./SlashCommands";
+import { SlashCommands, slashToken, type SlashCommandsHandle } from "./SlashCommands";
 import { InputAddMenu } from "./InputAddMenu";
 import {
   collectDroppedPaths,
 } from "@/lib/drop-utils";
-import {
-  registerAsrProvider,
-  getActiveAsr,
-  createWebSpeechAsrProvider,
-} from "@/lib/voice-contract";
 import type { HomeModeId } from "./home-scenes";
 import type { AgentEntry } from "@/lib/types";
 import type { WorkspaceInfo } from "@/lib/agent-client";
@@ -173,7 +167,6 @@ export function Composer({
   // 发送前成本预估(对齐 WorkBuddy credit-estimate):纯本地 token 估算。
   // ctxUsed/ctxTotal 由 ContextUsagePill 异步获取,这里不耦合;徽章在占比未知时
   // 仍显示 +N(新增 token),有占比信息时叠加(此处保守不取,避免与 pill 抢请求)。
-  const cost = useMemo(() => estimateSendCost(text), [text]);
   // 输入历史(arrow-key recall,对齐 WorkBuddy use-input-history):内存中按发送追加,
   // ↑/↓ 在输入框回溯。draftRef 暂存「回到输入框」时恢复的草稿。
   const histRef = useRef<InputHistory>(createInputHistory(50));
@@ -190,8 +183,6 @@ export function Composer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeExpertName, sceneTag, attachments]);
   const hasRefs = blockList.length > 0;
-  const [listening, setListening] = useState(false);
-  const recognitionRef = useRef<VoiceRecognition | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
 
   // 统一更新入口:每次写入输入框内容时同步把草稿推给父组件(若启用持久化)。
@@ -252,102 +243,11 @@ export function Composer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
 
-  // WKWebView support it on most systems). On languages where the API isn't
-  // exposed (older webviews, no microphone permission), we surface a toast.
-  // lightest path that works today.
-  const toggleVoice = () => {
-    if (listening) {
-      recognitionRef.current?.stop();
-      return;
-    }
-    // 优先走 provider-agnostic 注册表(对齐 WorkBuddy asr:* 契约):外部 provider
-    // 注册后优先级更高,否则回落到内建 Web Speech。
-    ensureWebSpeechAsrRegistered();
-    const provider = getActiveAsr();
-    if (provider) {
-      let finalText = "";
-      const stop = provider.listen("zh-CN", {
-        onInterim: (interim) => {
-          updateText((prev) => {
-            const base = finalText || prev;
-            return interim ? base + interim : base;
-          });
-        },
-        onFinal: (text) => {
-          finalText += text;
-          updateText((prev) => (finalText ? finalText : prev));
-        },
-        onError: (reason) => {
-          setListening(false);
-          const msg = reason === "not-allowed"
-            ? "未授予麦克风权限"
-            : `语音识别错误：${reason}`;
-          onToast?.(msg);
-        },
-        onEnd: () => setListening(false),
-      });
-      // 用 recognitionRef 持有 stop 句柄,与既有「再次点击停止」逻辑兼容。
-      recognitionRef.current = {
-        lang: "zh-CN",
-        interimResults: true,
-        continuous: false,
-        start: () => {},
-        stop,
-      } as VoiceRecognition;
-      setListening(true);
-      return;
-    }
-    const Ctor = getSpeechRecognitionCtor();
-    if (!Ctor) {
-      onToast?.("当前环境不支持语音输入（需要 WebView2/WKWebView）");
-      onPlaceholder?.("语音输入");
-      return;
-    }
-    const rec = new Ctor();
-    rec.lang = "zh-CN";
-    rec.interimResults = true;
-    rec.continuous = false;
-    let finalText = "";
-    rec.onresult = (event: SpeechRecognitionEventLike) => {
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const r = event.results[i];
-        if (r.isFinal) finalText += r[0].transcript;
-        else interim += r[0].transcript;
-      }
-      updateText((prev) => {
-        // Replace the trailing interim segment each time so the user sees
-        // live transcription without duplicating finalized text.
-        const base = finalText || prev;
-        return interim ? base + interim : base;
-      });
-    };
-    rec.onerror = (e: SpeechRecognitionErrorEventLike) => {
-      setListening(false);
-      const msg = e.error === "not-allowed"
-        ? "未授予麦克风权限"
-        : `语音识别错误：${e.error}`;
-      onToast?.(msg);
-    };
-    rec.onend = () => setListening(false);
-    recognitionRef.current = rec;
-    try {
-      rec.start();
-      setListening(true);
-    } catch {
-      onToast?.("无法启动语音识别");
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      recognitionRef.current?.abort?.();
-    };
-  }, []);
 
   const send = () => {
     const t = text.trim();
-    // 允许空消息发送，或者需要有附件
+    // Nothing to send: no text, no attachments (a bare scene tag is not a prompt).
+    if (!t && attachments.length === 0) return;
     if (streaming || disabled || !apiReady || modelControls.busy || modelControls.canSend === false) {
       return;
     }
@@ -366,7 +266,7 @@ export function Composer({
     }
     const sentScope = draftKey;
     try {
-      const result = attachments.length ? onSend(body || "你好", attachments.map(path => ({ path }))) : onSend(body || "你好");
+      const result = attachments.length ? onSend(body, attachments.map(path => ({ path }))) : onSend(body);
       void Promise.resolve(result).catch(() => {
         if (scopeRef.current !== sentScope) return;
         updateText(previous => previous || t);
@@ -385,13 +285,13 @@ export function Composer({
     onClearSceneTag?.();
   };
 
-  const enqueue = async () => {
+  const enqueue = async (modeOverride?: "steer" | "followUp") => {
     const textToQueue = text.trim();
     if ((!textToQueue && attachments.length === 0) || disabled || !apiReady || queueBusy || !onEnqueue || !validateAttachments()) return;
     setQueueBusy(true); setSendError("");
     const body = sceneTag ? `【${sceneTag.label}】${textToQueue}` : textToQueue;
     try {
-      await onEnqueue(body || "请查看附件", attachments.map(path => ({ path })), queueMode);
+      await onEnqueue(body || "请查看附件", attachments.map(path => ({ path })), modeOverride ?? queueMode);
       updateText(""); setAttachments([]); onClearSceneTag?.();
     } catch { setSendError("入队失败，输入和附件已保留，可重试。"); }
     finally { setQueueBusy(false); }
@@ -429,20 +329,15 @@ export function Composer({
 
   // Cursor tracking for slash-command autocomplete.
   const [cursorPos, setCursorPos] = useState(0);
-  // Is the user currently typing a "/xxx" command? Drives SlashCommands menu.
-  const wordBeforeCursor = (() => {
-    const before = text.slice(0, cursorPos);
-    const m = before.match(/\/[\w-]*$/);
-    return m ? m[0] : "";
-  })();
-  const slashVisible = wordBeforeCursor.length > 0 && apiReady && !streaming;
+  const slashRef = useRef<SlashCommandsHandle>(null);
 
   const handleSlashPick = (command: string) => {
-    // Replace the "/xxx" fragment (up to cursor) with the picked command + " ".
-    const before = text.slice(0, cursorPos);
-    const after = text.slice(cursorPos);
-    const newBefore = before.replace(/\/[\w-]*$/, command + " ");
-    const next = newBefore + after;
+    // Replace the "/xxx" token (up to cursor) with the picked command + " ".
+    const token = slashToken(text, cursorPos);
+    if (!token) return;
+    const after = text.slice(cursorPos).replace(/^\S*/, "");
+    const newBefore = text.slice(0, token.start) + command + " ";
+    const next = newBefore + after.replace(/^ /, "");
     updateText(next);
     const newPos = newBefore.length;
     setCursorPos(newPos);
@@ -493,8 +388,6 @@ export function Composer({
             <span className="wb-composer__dropzone-text">松开以添加文件到对话</span>
           </div>
         )}
-
-        {streaming && onEnqueue && <label className="composer-queue-mode">排队模式 <select aria-label="排队模式" value={queueMode} disabled={queueBusy} onChange={event => setQueueMode(event.target.value as "steer" | "followUp")}><option value="followUp">回复完成后继续</option><option value="steer">下一工具边界引导</option></select></label>}
 
         {/* 多块提示预览(对齐 WorkBuddy content-blocks):引用块 chip 行 */}
         {hasRefs && (
@@ -581,17 +474,19 @@ export function Composer({
             setCursorPos((e.target as HTMLTextAreaElement).selectionStart ?? cursorPos)
           }
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              if (slashVisible) {
-                return;
-              }
+            if (e.nativeEvent.isComposing) return;
+            // The slash menu (when open) owns ↑↓/Enter/Tab/Esc.
+            if (!e.shiftKey && slashRef.current?.handleKey(e)) return;
+            if (e.key === "Enter" && !e.shiftKey && !(e.altKey && !streaming)) {
               e.preventDefault();
-              send();
+              // While a reply is running, Enter queues the message instead of doing nothing;
+              // Alt/⌥+Enter steers the running reply at its next tool step.
+              if (streaming && onEnqueue) void enqueue(e.altKey ? "steer" : undefined);
+              else send();
               return;
             }
             // 输入历史 arrow-key recall(对齐 WorkBuddy use-input-history)。
-            // 仅在未组合输入(中文输入法)且非 slash 菜单可见时响应。
-            if (!slashVisible && !e.nativeEvent.isComposing) {
+            {
               const el = e.target as HTMLTextAreaElement;
               const atFirstLine = el.selectionStart === 0 || text.length === 0;
               const atLastLine = el.selectionStart === text.length;
@@ -632,8 +527,10 @@ export function Composer({
         />
         {/* Slash-command autocomplete */}
         <SlashCommands
+          ref={slashRef}
           text={text}
           cursor={cursorPos}
+          disabled={!apiReady || streaming}
           onPick={handleSlashPick}
         />
         <div className="wb-composer__footer">
@@ -663,18 +560,6 @@ export function Composer({
             <PermissionPicker onToast={onToast} />
           )}
           <div className="wb-composer__spacer" />
-          {/* 发送前成本预估徽章(对齐 WorkBuddy credit-estimate):纯本地 token 估算,
-              仅在文本非空时显示。不依赖计费后端(BYOK 无计费通道)。 */}
-          {text.trim() && (
-            <span
-              className={"wb-composer__cost wb-composer__cost--" + cost.severity}
-              title={`预计新增约 ${cost.newTokens} token${
-                cost.projectedPct > 0 ? ` · 占上下文 ${cost.projectedPct}%` : ""
-              }`}
-            >
-              {cost.label}
-            </span>
-          )}
           {usageSessionId && <ContextUsagePill sessionId={usageSessionId} onRefreshSignal={usageMsgCount} />}
           {showModelPicker ? (
             <ModelSelector
@@ -694,22 +579,27 @@ export function Composer({
               Auto <ChevronDownIcon size="sm" />
             </button>
           )}
-          <button
-            className={
-              "wb-composer__tool" + (listening ? " wb-composer__tool--active" : "")
-            }
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleVoice();
-            }}
-            aria-label="语音输入"
-            title={listening ? "正在聆听…点击停止" : "语音输入"}
-          >
-            <Mic size={16} />
-          </button>
           {streaming ? (
             <>
               {/* 流式时可加入待发送队列(对齐 WorkBuddy message-queue)。 */}
+              {onEnqueue && (text.trim() !== "" || attachments.length > 0) && (
+                <div className="composer-queue-mode" role="radiogroup" aria-label="排队模式">
+                  {([["followUp", "完成后发送", "当前回复完成后再发送"], ["steer", "立即插话", "在下一个工具步骤插入，引导当前回复"]] as const).map(([mode, label, tip]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      role="radio"
+                      aria-checked={queueMode === mode}
+                      className={"composer-queue-mode__opt" + (queueMode === mode ? " composer-queue-mode__opt--on" : "")}
+                      disabled={queueBusy}
+                      onClick={(e) => { e.stopPropagation(); setQueueMode(mode); }}
+                      data-tip={tip}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
               {onEnqueue && (text.trim() !== "" || attachments.length > 0) && (
                 <button
                   className="wb-composer__send wb-composer__send--enqueue"
@@ -747,11 +637,11 @@ export function Composer({
                 e.stopPropagation();
                 send();
               }}
-              disabled={disabled || !apiReady || modelControls.busy || modelControls.canSend === false}
+              disabled={disabled || !apiReady || modelControls.busy || modelControls.canSend === false || (text.trim() === "" && attachments.length === 0)}
               aria-label="发送"
               title={!apiReady ? "请先配置 API Key" : "发送消息"}
             >
-              <SendPlaneIcon size="md" />
+              <ArrowUp size={18} strokeWidth={2.25} />
             </button>
           )}
         </div>
@@ -779,67 +669,5 @@ export function Composer({
         </div>
       )}
     </div>
-  );
-}
-
-// ---------- SpeechRecognition minimal typing ----------
-// The browser SpeechRecognition API isn't in the TS DOM lib by default, and
-// vendor prefixes vary. We type only the surface we use and resolve the ctor
-// defensively at runtime.
-interface SpeechRecognitionResultLike {
-  isFinal: boolean;
-  0: { transcript: string };
-}
-interface SpeechRecognitionEventLike {
-  resultIndex: number;
-  results: ArrayLike<SpeechRecognitionResultLike>;
-}
-interface SpeechRecognitionErrorEventLike {
-  error: string;
-}
-interface VoiceRecognition {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  start: () => void;
-  stop: () => void;
-  abort?: () => void;
-  onresult: (e: SpeechRecognitionEventLike) => void;
-  onerror: (e: SpeechRecognitionErrorEventLike) => void;
-  onend: () => void;
-}
-type VoiceRecognitionCtor = new () => VoiceRecognition;
-
-function getSpeechRecognitionCtor(): VoiceRecognitionCtor | null {
-  if (typeof window === "undefined") return null;
-  const w = window as unknown as {
-    SpeechRecognition?: VoiceRecognitionCtor;
-    webkitSpeechRecognition?: VoiceRecognitionCtor;
-  };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
-}
-
-/**
- * 注册内建 Web Speech ASR provider 到 voice-contract 注册表(provider-agnostic,
- * 对齐 WorkBuddy `asr:*` 契约)。外部 provider(如云端 STT)注册后会因其更高
- * 优先级而被优先使用。仅在首次调用时注册一次。
- */
-let webSpeechAsrRegistered = false;
-function ensureWebSpeechAsrRegistered(): void {
-  if (webSpeechAsrRegistered) return;
-  webSpeechAsrRegistered = true;
-  const Ctor = getSpeechRecognitionCtor();
-  if (!Ctor) return;
-  registerAsrProvider(
-    createWebSpeechAsrProvider({
-      isAvailable: () => getSpeechRecognitionCtor() !== null,
-      createRecognition: (lang) => {
-        const rec = new Ctor();
-        rec.lang = lang;
-        rec.interimResults = true;
-        rec.continuous = false;
-        return rec as never;
-      },
-    }),
   );
 }

@@ -1,5 +1,8 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { appConfirm } from "./AppDialog";
 import { useSessionsStore, selectHasFilter } from "@/stores/sessions-store";
+import { usePermissionStore } from "@/stores/permission-store";
+import { useQuestionStore } from "@/stores/question-store";
 import { useProjectsStore } from "@/stores/projects-store";
 import { IS_MACOS } from "@/lib/platform";
 import {
@@ -568,6 +571,8 @@ export function Sidebar({
   const spacesOpen = useSessionsStore((s) => s.spacesOpen);
   const expanded = useSessionsStore((s) => s.expanded);
   const currentSessionId = useSessionsStore((s) => s.currentSessionId);
+  const permissionQueues = usePermissionStore((s) => s.queues);
+  const questionQueues = useQuestionStore((s) => s.queues);
   const upsertSession = useSessionsStore((s) => s.upsert);
   const removeSession = useSessionsStore((s) => s.remove);
   const setTasksOpen = useSessionsStore((s) => s.setTasksOpen);
@@ -645,6 +650,14 @@ export function Sidebar({
   const handleDelete = useCallback(async (sessionId: string) => {
     const session = allSessions.find(s => s.sessionId === sessionId);
     const cwd = session?.cwd;
+    const name = session?.title?.trim() || "未命名任务";
+    const ok = await appConfirm({
+      title: `删除任务「${name.length > 24 ? name.slice(0, 24) + "…" : name}」？`,
+      message: "对话记录会从本机删除且无法恢复。如只是不想在列表中看到，可以选择归档。",
+      confirmLabel: "删除",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await agentDeleteSession(sessionId, cwd);
       removeSession(sessionId);
@@ -686,21 +699,39 @@ export function Sidebar({
   // One session row, shared by the 任务 group and 空间 node children.
   // No leading icon (WorkBuddy parity); hover reveals 更多/归档/置顶 actions
   // in place of the relative-time tail.
-  const renderConv = (s: SessionSummary) => (
+  const renderConv = (s: SessionSummary) => {
+    const awaiting = (permissionQueues[s.sessionId]?.length ?? 0) + (questionQueues[s.sessionId]?.length ?? 0) > 0;
+    const working = s.status === "working";
+    const failed = s.status === "failed";
+    return (
     <button
       key={s.sessionId}
       className={
         "sidebar__conv" +
         (s.sessionId === currentSessionId ? " sidebar__conv--active" : "") +
-        (s.pinned ? " sidebar__conv--pinned" : "")
+        (s.pinned ? " sidebar__conv--pinned" : "") +
+        (working || awaiting ? " sidebar__conv--live" : "")
       }
       onClick={() => onSelect(s.sessionId, s.cwd)}
       onContextMenu={(e) => handleContextMenu(e, s.sessionId, s.title || "未命名会话", s.pinned || false)}
       title={s.title}
     >
+      {awaiting ? (
+        <span className="sidebar__conv-state sidebar__conv-state--awaiting" aria-label="待确认" />
+      ) : working ? (
+        <span className="sidebar__conv-state sidebar__conv-state--working" aria-label="执行中" />
+      ) : failed ? (
+        <span className="sidebar__conv-state sidebar__conv-state--failed" aria-label="执行出错" />
+      ) : null}
       <span className="sidebar__conv-title">{s.title || "未命名会话"}</span>
       {s.pinned && <PinFilledIcon size="sm" className="sidebar__conv-pin" />}
-      {s.updatedAt && <span className="sidebar__conv-time">{relativeTime(s.updatedAt)}</span>}
+      {awaiting ? (
+        <span className="sidebar__conv-badge">待确认</span>
+      ) : working ? (
+        <span className="sidebar__conv-time">执行中</span>
+      ) : (
+        s.updatedAt && <span className="sidebar__conv-time">{relativeTime(s.updatedAt)}</span>
+      )}
       <span className="sidebar__conv-actions" onClick={(e) => e.stopPropagation()}>
         <span
           role="button"
@@ -731,7 +762,8 @@ export function Sidebar({
         </span>
       </span>
     </button>
-  );
+    );
+  };
 
   // 空间 nodes = every workspace except the inbox (homeCwd), whose sessions
   // already appear in the 任务 group.

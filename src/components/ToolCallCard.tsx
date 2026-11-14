@@ -1,105 +1,91 @@
+import { useEffect, useState } from "react";
 import type { ToolCallView } from "@/stores/session-store";
 import type { DiffContent, CommandOutputContent, ImageToolContent } from "@/lib/types";
 import { checkCommandRisk, riskLabel } from "@/lib/command-risk";
-import { precheckCommand } from "@/lib/sandbox-guard";
 import { computeUnifiedDiff, hunksToUnifiedLines, summarizeDiff, type DiffLine } from "@/lib/unified-diff";
-import { CheckIcon } from "@/foundation/components/Icon/icons";
 import {
-  detectToolRenderer,
-  rendererLabel,
-  rendererIcon,
-  summarizeTool,
-} from "@/lib/tool-renderers";
+  CheckIcon,
+  EditToolIcon,
+  FolderToolIcon,
+  McpIcon,
+  SearchToolIcon,
+  TerminalToolIcon,
+  ToolDefaultIcon,
+  ViewedToolIcon,
+} from "@/foundation/components/Icon/icons";
+import { diffStats, formatDuration, toolDiff, toolLabel, toolOutput, toolSubject } from "@/lib/tool-summary";
+import { ChevronGlyph } from "./chat/icons";
 
 type ToolCallCardProps = {
   tc: ToolCallView;
-  /** Open the right-side detail drawer (Phase 2). */
+  /** Workspace used to shorten paths. */
+  cwd?: string;
+  /** Open the right-side detail drawer. */
   onOpen?: (tc: ToolCallView) => void;
 };
 
+function ToolIcon({ name }: { name: string }) {
+  if (name === "bash" || name === "powershell") return <TerminalToolIcon size={14} />;
+  if (name === "edit" || name === "write") return <EditToolIcon size={14} />;
+  if (name === "read") return <ViewedToolIcon size={14} />;
+  if (name === "ls") return <FolderToolIcon size={14} />;
+  if (name === "grep" || name === "find") return <SearchToolIcon size={14} />;
+  if (name.startsWith("mcp__")) return <McpIcon size={14} />;
+  return <ToolDefaultIcon size={14} />;
+}
+
+/** Ticks once a second while a tool is running so the elapsed time stays live. */
+function useElapsed(startedAt: number | undefined, running: boolean): number | undefined {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!running || !startedAt) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [running, startedAt]);
+  return running && startedAt ? now - startedAt : undefined;
+}
+
 /**
- * Compact inline tool-call row (Phase 1 — WorkBuddy `unknown-tool-compact`).
- *
- * Always one line in the transcript: kind + short title + status.
- * Details (command/diff/output) open in the side drawer via `onOpen`.
+ * One tool call as a single transcript row: icon · what · object · time · status.
+ * Details (command output, diff) open in the side drawer.
  */
-export function ToolCallCard({ tc, onOpen }: ToolCallCardProps) {
-  const statusCls =
-    tc.status === "completed"
-      ? "toolcall--ok"
-      : tc.status === "failed"
-        ? "toolcall--err"
-        : "toolcall--run";
-
-  const statusLabel =
-    tc.status === "completed" ? "完成" : tc.status === "failed" ? "失败" : "运行中";
-
-  // 状态符号：完成态用 SVG 对勾（文本 "✓" U+2713 在 macOS WKWebView 下依赖
-  // 字体回退，可能渲染成 tofu/emoji 样式）；"!" / "…" 是 ASCII/通用字符，安全。
-  const statusMark =
-    tc.status === "completed" ? (
-      <CheckIcon size={10} strokeWidth={3} />
-    ) : tc.status === "failed" ? (
-      "!"
-    ) : (
-      "…"
-    );
-
-  const shortTitle = shortenTitle(tc.title, tc.kind);
-
-  // 专用渲染器(对齐 WorkBuddy tools/renderers):非 default/unknown 时用图标 +
-  // 渲染器标签 + 摘要替代通用 kind 文案。
-  const renderer = detectToolRenderer(tc.kind);
-  const specialized =
-    renderer !== "default" && renderer !== "unknown";
-  const kindLabel = specialized
-    ? `${rendererIcon(renderer)} ${rendererLabel(renderer)}`
-    : prettyKind(tc.kind);
-  const summary = specialized ? summarizeTool(tc, renderer) : shortTitle;
-
+export function ToolCallCard({ tc, cwd, onOpen }: ToolCallCardProps) {
+  const running = tc.status === "in_progress";
+  const elapsed = useElapsed(tc.startedAt, running);
+  const label = toolLabel(tc.kind);
+  const subject = toolSubject(tc.kind, tc.rawInput, cwd);
+  const diff = !running ? toolDiff(tc) : undefined;
+  const stats = diff ? diffStats(diff.lines) : undefined;
+  const time = running ? (elapsed !== undefined && elapsed >= 1000 ? formatDuration(elapsed) : "") : formatDuration(tc.durationMs);
+  const statusLabel = tc.status === "completed" ? "完成" : tc.status === "failed" ? "失败" : "运行中";
+  const lastLine = running ? toolOutput(tc).trimEnd().split("\n").at(-1) : undefined;
   return (
-    <button
-      type="button"
-      className={"toolcall toolcall--compact " + statusCls}
-      onClick={() => onOpen?.(tc)}
-      title={`${tc.kind}: ${tc.title}（${statusLabel}，点击查看详情）`}
-      aria-label={`${tc.kind} ${summary} ${statusLabel}`}
-    >
-      <span className="toolcall__kind">{kindLabel}</span>
-      <span className="toolcall__title">{summary}</span>
-      <span className={"toolcall__status-mark toolcall__status-mark--" + tc.status}>
-        {statusMark}
-      </span>
-    </button>
+    <div className={"toolrow toolrow--" + tc.status}>
+      <button
+        type="button"
+        className="toolrow__main"
+        onClick={() => onOpen?.(tc)}
+        title={`${label}${subject ? `：${subject}` : ""}（${statusLabel}，点击查看详情）`}
+        aria-label={`${label} ${subject} ${statusLabel}`}
+      >
+        <span className="toolrow__icon"><ToolIcon name={tc.kind} /></span>
+        <span className="toolrow__label">{label}</span>
+        {subject && <span className="toolrow__subject">{subject}</span>}
+        {stats && (stats.added > 0 || stats.removed > 0) && (
+          <span className="toolrow__stats">
+            {stats.added > 0 && <span className="toolrow__add">+{stats.added}</span>}
+            {stats.removed > 0 && <span className="toolrow__del">−{stats.removed}</span>}
+          </span>
+        )}
+        {time && <span className="toolrow__time">{time}</span>}
+        <span className={"toolrow__mark toolrow__mark--" + tc.status} aria-hidden>
+          {tc.status === "completed" ? <CheckIcon size={12} strokeWidth={2.5} /> : tc.status === "failed" ? "!" : <span className="toolrow__spinner" />}
+        </span>
+        {onOpen && <span className="toolrow__go" aria-hidden><ChevronGlyph /></span>}
+      </button>
+      {lastLine && <div className="toolrow__live">{lastLine}</div>}
+    </div>
   );
-}
-
-function prettyKind(kind: string): string {
-  const k = (kind || "tool").toLowerCase();
-  if (k.includes("edit") || k === "write" || k === "write_file") return "edit";
-  if (k.includes("read")) return "read";
-  if (k.includes("shell") || k.includes("terminal") || k.includes("execute") || k === "bash")
-    return "shell";
-  if (k.includes("search") || k.includes("grep") || k.includes("glob")) return "search";
-  if (k.includes("list")) return "list";
-  if (k.includes("ask") || k.includes("question") || k === "other") return "ask";
-  return k.length > 12 ? k.slice(0, 12) : k;
-}
-
-/** Prefer a path / command snippet over the full verbose title. */
-function shortenTitle(title: string, kind: string): string {
-  const t = (title || "").trim();
-  if (!t) return kind || "tool";
-  // "Write `path`" / Write "path" / Write path
-  const write = t.match(/Write\s+[`'"]?(.+?)[`'"]?\s*$/i);
-  if (write?.[1]) return write[1];
-  // Execute 'cmd' / Run …
-  const exec = t.match(/^(?:Execute|Run)\s+[`'"]?(.+?)[`'"]?\s*$/i);
-  if (exec?.[1]) {
-    const cmd = exec[1];
-    return cmd.length > 64 ? cmd.slice(0, 64) + "…" : cmd;
-  }
-  return t.length > 72 ? t.slice(0, 72) + "…" : t;
 }
 
 // ---------- shared detail body (drawer / artifacts) ----------
@@ -107,10 +93,14 @@ function shortenTitle(title: string, kind: string): string {
 export function ToolCallDetailBody({
   tc,
   onOpenPath,
+  cwd,
 }: {
   tc: ToolCallView;
   onOpenPath?: (path: string) => void;
+  cwd?: string;
 }) {
+  const piDiff = toolDiff(tc);
+  const command = (tc.kind === "bash" || tc.kind === "powershell") && tc.rawInput && typeof tc.rawInput === "object" ? (tc.rawInput as { command?: unknown }).command : undefined;
   const diff = tc.content.find((c) => c.type === "diff") as DiffContent | undefined;
   const cmd = tc.content.find((c) => c.type === "command_output") as
     | CommandOutputContent
@@ -124,7 +114,7 @@ export function ToolCallDetailBody({
   return (
     <div className="tool-detail">
       <div className="tool-detail__meta">
-        <span className="toolcall__kind">{prettyKind(tc.kind)}</span>
+        <span className="toolcall__kind">{toolLabel(tc.kind)}</span>
         <span className={"tool-detail__status tool-detail__status--" + tc.status}>
           {tc.status === "completed"
             ? "已完成"
@@ -132,8 +122,16 @@ export function ToolCallDetailBody({
               ? "失败"
               : "运行中"}
         </span>
+        {tc.durationMs !== undefined && <span className="tool-detail__time">{formatDuration(tc.durationMs)}</span>}
       </div>
-      <h3 className="tool-detail__title">{tc.title}</h3>
+      <h3 className="tool-detail__title">{toolSubject(tc.kind, tc.rawInput, cwd) || toolLabel(tc.kind)}</h3>
+      {typeof command === "string" && (
+        <div className="toolcall__cmd">
+          <CommandRiskBadge command={command} />
+          <pre className="toolcall__cmd-line"><span className="toolcall__prompt">$</span>{command}</pre>
+        </div>
+      )}
+      {piDiff && piDiff.lines.length > 0 && <LinesDiffView path={piDiff.path} lines={piDiff.lines} onOpenPath={onOpenPath} />}
 
       {diff && (
         <DiffView
@@ -171,14 +169,14 @@ export function ToolCallDetailBody({
           {t.text}
         </pre>
       ))}
-      {!diff && !cmd && images.length === 0 && texts.length === 0 && tc.rawInput != null && (
+      {!diff && !cmd && !piDiff && typeof command !== "string" && images.length === 0 && texts.length === 0 && tc.rawInput != null && (
         <pre className="toolcall__text toolcall__raw-input">
           {typeof tc.rawInput === "string"
             ? tc.rawInput
             : JSON.stringify(tc.rawInput, null, 2)}
         </pre>
       )}
-      {!diff && !cmd && images.length === 0 && texts.length === 0 && tc.rawInput == null && (
+      {!diff && !cmd && !piDiff && typeof command !== "string" && images.length === 0 && texts.length === 0 && tc.rawInput == null && (
         <p className="tool-detail__empty">暂无详细输出</p>
       )}
     </div>
@@ -193,28 +191,16 @@ export function ToolCallDetailBody({
  */
 function CommandRiskBadge({ command }: { command: string }) {
   const risk = checkCommandRisk(command);
-  // Sandbox path guard (tsbx alternative): check if command accesses protected paths.
-  const sandboxCheck = precheckCommand(command);
   const hasRisk = risk.level !== "low";
-  const hasSandboxDeny = sandboxCheck.action === "deny";
-
-  if (!hasRisk && !hasSandboxDeny) return null;
+  if (!hasRisk) return null;
 
   const badges: React.ReactNode[] = [];
   if (hasRisk) {
     const cls = risk.level === "high" ? "cmd-risk cmd-risk--high" : "cmd-risk cmd-risk--medium";
     const reasons = risk.reasons.length > 0 ? `\n原因:${risk.reasons.join("; ")}` : "";
     badges.push(
-      <span key="risk" className={cls} role="status" title={`⚠️ ${riskLabel(risk.level)}命令${reasons}`}>
-        ⚠️ {riskLabel(risk.level)}
-      </span>,
-    );
-  }
-  if (hasSandboxDeny) {
-    badges.push(
-      <span key="sandbox" className="cmd-risk cmd-risk--high" role="status"
-        title={`🛡️ 路径受保护:${sandboxCheck.reason} (${sandboxCheck.target})`}>
-        🛡️ 受保护路径
+      <span key="risk" className={cls} role="status" title={`${riskLabel(risk.level)}命令${reasons}`}>
+        {riskLabel(risk.level)}
       </span>,
     );
   }
@@ -276,6 +262,31 @@ function DiffView({
             <span className="diff__line-prefix">
               {l.kind === "add" ? "+" : l.kind === "del" ? "-" : " "}
             </span>
+            <span className="diff__line-text">{l.text}</span>
+          </div>
+        ))}
+      </pre>
+    </div>
+  );
+}
+
+/** Render pre-computed diff lines (Pi edit patch / write content). */
+function LinesDiffView({ path, lines, onOpenPath }: { path: string; lines: DiffLine[]; onOpenPath?: (path: string) => void }) {
+  const summary = summarizeDiff(lines);
+  return (
+    <div className="diff">
+      {path ? (
+        <button type="button" className="diff__path diff__path--clickable" onClick={() => onOpenPath?.(path)} title={`打开：${path}`}>{path}</button>
+      ) : null}
+      <div className="diff__stats">
+        <span className="diff__stats-add">+{summary.added}</span>
+        <span className="diff__stats-del">-{summary.removed}</span>
+      </div>
+      <pre className="diff__body">
+        {lines.map((l, i) => (
+          <div key={i} className={`diff__line diff__line--${l.kind}`}>
+            <span className="diff__line-num">{l.kind === "del" ? l.oldLine ?? "" : l.newLine ?? ""}</span>
+            <span className="diff__line-prefix">{l.kind === "add" ? "+" : l.kind === "del" ? "-" : " "}</span>
             <span className="diff__line-text">{l.text}</span>
           </div>
         ))}

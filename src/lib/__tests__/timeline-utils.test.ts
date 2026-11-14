@@ -16,7 +16,8 @@ describe("dayLabel", () => {
     expect(dayLabel("2026-07-30T10:00:00Z")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
   it("毫秒时间戳", () => {
-    expect(dayLabel(Date.UTC(2026, 6, 30))).toMatch(/^\d{4}-07-30$/);
+    // Local noon: the label is a local calendar day in every timezone.
+    expect(dayLabel(new Date(2026, 6, 30, 12).getTime())).toBe("2026-07-30");
   });
   it("无效返回 null", () => {
     expect(dayLabel("not-a-date")).toBeNull();
