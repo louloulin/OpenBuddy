@@ -74,6 +74,18 @@ try {
     await page.getByText('完成后再运行一次', { exact: false }).first().waitFor({ timeout: 30000 });
     await ctx.sleep(1200);
     return await ctx.shot('02-chat-markdown');`);
+  // Markdown host behaviour (R6): the code-block copy button must reach the main-process clipboard.
+  await step('code block copy', `
+    const before = (await ctx.audit()).main.filter(r => r.command === 'clipboard_write_text').length;
+    const copy = page.locator('button.md-code-action').first();
+    await copy.scrollIntoViewIfNeeded();
+    await copy.hover();
+    await copy.click();
+    await page.locator('button.md-code-action[aria-label="已复制"]').first().waitFor({ timeout: 5000 });
+    const after = (await ctx.audit()).main.filter(r => r.command === 'clipboard_write_text').length;
+    if (after !== before + 1) throw new Error('code block copy did not call clipboard_write_text');
+    await ctx.sleep(2500);
+    return { clipboardWrites: after };`);
   await step('tool approval', `
     const input = page.locator('.wb-composer__input');
     await input.fill('__TOOL__ 看看当前环境');
