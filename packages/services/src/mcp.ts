@@ -5,7 +5,7 @@ import {
 import { join } from "node:path";
 import { JsonStore, object, text, type Settings } from "./settings.js";
 import { McpAuthService } from "./mcp-auth.js";
-import type { Emit } from "../../../electron/agent/permissions.js";
+import type { Emit } from "@openbuddy/engine/permissions";
 import type { McpOAuthSettings } from "@earendil-works/pi-mcp/oauth";
 type Config = { mcpServers: Record<string, Record<string, unknown>> };
 export class McpService {

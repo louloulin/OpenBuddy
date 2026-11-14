@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createEngineHandlers } from "../../../../electron/ipc/handlers/agent.js";
 import { createSettings } from "../settings.js";
-import { Permissions } from "../../../../electron/agent/permissions.js";
+import { Permissions } from "@openbuddy/engine/permissions";
 const cleanups: Array<() => Promise<unknown>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();

@@ -11,7 +11,7 @@ import {
 } from "@earendil-works/pi-mcp/oauth";
 import type { McpExtensionOptions } from "@earendil-works/pi-coding-agent";
 import type { Settings } from "./settings.js";
-import type { Emit } from "../../../electron/agent/permissions.js";
+import type { Emit } from "@openbuddy/engine/permissions";
 
 /** Implements the SDK credential operations, with every state byte encrypted by safeStorage. */
 export class EncryptedMcpCredentials {

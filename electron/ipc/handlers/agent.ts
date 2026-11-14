@@ -7,10 +7,10 @@ import {
   type SafeStorage,
 } from "@openbuddy/services/settings";
 import { fileHandlers, type DesktopShell } from "@openbuddy/services/files";
-import { PiEngine, validateThinkingLevel } from "../../agent/pi.js";
+import { PiEngine, validateThinkingLevel } from "@openbuddy/engine/pi";
 import { modelKey } from "@openbuddy/services/providers";
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
-import type { Emit } from "../../agent/permissions.js";
+import type { Emit } from "@openbuddy/engine/permissions";
 /** A list of non-empty strings (queued prompts). */
 function strings(value: unknown): string[] {
   if (!Array.isArray(value) || value.some((v) => typeof v !== "string" || !v.trim())) throw Error("invalid_payload: list");
