@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import type { Emit } from "./permissions.js";
-import { object, text } from "../services/settings.js";
+import { object, text } from "@openbuddy/services/settings";
 type Kind = "select" | "confirm" | "input" | "editor";
 type Reason =
   | "resolved"

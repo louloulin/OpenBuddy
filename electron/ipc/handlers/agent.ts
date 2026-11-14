@@ -5,10 +5,10 @@ import {
   text,
   unsupported,
   type SafeStorage,
-} from "../../services/settings.js";
-import { fileHandlers, type DesktopShell } from "../../services/files.js";
+} from "@openbuddy/services/settings";
+import { fileHandlers, type DesktopShell } from "@openbuddy/services/files";
 import { PiEngine, validateThinkingLevel } from "../../agent/pi.js";
-import { modelKey } from "../../services/providers.js";
+import { modelKey } from "@openbuddy/services/providers";
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import type { Emit } from "../../agent/permissions.js";
 /** A list of non-empty strings (queued prompts). */

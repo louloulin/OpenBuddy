@@ -7,7 +7,7 @@ import { registerIpc } from './ipc/register.js';
 import { isEvent } from '@openbuddy/protocol/contract';
 import { WorkspaceAccess } from './shared/workspace-access.js';
 import { createEngineHandlers } from './ipc/handlers/index.js';
-import { PREVIEW_SCHEME, previewResponse } from './services/preview-protocol.js';
+import { PREVIEW_SCHEME, previewResponse } from '@openbuddy/services/preview-protocol';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const developmentURL = 'http://127.0.0.1:1420/';
