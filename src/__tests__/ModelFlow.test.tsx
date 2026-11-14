@@ -7,6 +7,7 @@ import { useSessionStore } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useQuestionStore } from "@/stores/question-store";
 import { loadUsage } from "@/lib/usage-quota";
+vi.mock("@/lib/sandbox-init", () => ({ tryActivateSandbox: async () => ({ activated: false }) }));
 const keyA = "model:a/shared"; const keyB = "model:b/shared";
 const state = (sessionId: string, providerId: string) => ({ sessionId, providerId, modelId: "shared", modelKey: `model:${providerId}/shared`, thinkingLevel: providerId === "a" ? "off" : "high", availableThinkingLevels: providerId === "a" ? ["off"] : ["off", "high"] });
 beforeEach(() => {

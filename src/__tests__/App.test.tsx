@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import App from "../App";
 import type { OpenBuddyBridge } from "@/lib/ipc";
 
+vi.mock("@/lib/sandbox-init", () => ({ tryActivateSandbox: async () => ({ activated: false }) }));
 
 afterEach(() => { delete window.openbuddy; });
 
