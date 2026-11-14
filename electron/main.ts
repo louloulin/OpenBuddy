@@ -5,8 +5,8 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { registerIpc } from './ipc/register.js';
 import { isEvent } from '@openbuddy/protocol/contract';
-import { WorkspaceAccess } from './shared/workspace-access.js';
-import { createEngineHandlers } from './ipc/handlers/index.js';
+import { WorkspaceAccess } from '@openbuddy/host/security/workspace-access';
+import { createEngineHandlers } from '@openbuddy/host/handlers/index';
 import { PREVIEW_SCHEME, previewResponse } from '@openbuddy/services/preview-protocol';
 
 const root = dirname(fileURLToPath(import.meta.url));

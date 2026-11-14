@@ -11,7 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
-import { createEngineHandlers } from "../../../../electron/ipc/handlers/agent.js";
+import { createEngineHandlers } from "@openbuddy/host/handlers/agent";
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 
 const cleanups: Array<() => Promise<unknown>> = [];

@@ -2,7 +2,7 @@ import { clipboard, dialog, ipcMain, nativeImage, type BrowserWindow, type OpenD
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { isCommand, validateCommandPayload, type CommandHandlers, type Payload, type AttachmentReference } from '@openbuddy/protocol/contract';
-import { FileAccess } from '../shared/file-access.js';
+import { FileAccess } from '@openbuddy/host/security/file-access';
 
 function dialogOptions(payload: Payload): OpenDialogOptions & SaveDialogOptions {
   const result: OpenDialogOptions & SaveDialogOptions = {};

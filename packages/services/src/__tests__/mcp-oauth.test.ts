@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSettings } from "../settings.js";
 import { McpAuthService } from "../mcp-auth.js";
-import { createEngineHandlers } from "../../../../electron/ipc/handlers/agent.js";
+import { createEngineHandlers } from "@openbuddy/host/handlers/agent";
 const cleanup: Array<() => Promise<unknown>> = [];
 afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn();
