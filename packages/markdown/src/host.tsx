@@ -93,9 +93,13 @@ export function getMarkdownHost(): MarkdownHost {
 const MarkdownHostContext = createContext<MarkdownHost | null>(null);
 
 export function MarkdownHostProvider({ host, children }: { host: MarkdownHost; children?: ReactNode }) {
-  // Installed while rendering, not in an effect: children's effects and callbacks that run
-  // outside React (createMarkdownHostConfig, openLocalPath) must already see it.
-  setMarkdownHost(host);
+  // Only the outermost provider installs the package-wide host, so a nested provider (say a
+  // preview pane with its own host) changes what its own subtree reads from context but never
+  // what code outside React (createMarkdownHostConfig, openLocalPath) uses for the whole app.
+  // Installed while rendering, not in an effect: children's effects and callbacks must
+  // already see it.
+  const outer = useContext(MarkdownHostContext);
+  if (!outer) setMarkdownHost(host);
   return <MarkdownHostContext.Provider value={host}>{children}</MarkdownHostContext.Provider>;
 }
 
