@@ -37,7 +37,7 @@ const SIZE_EXEMPT = [
 const SIZE_CEILING = {
   'apps/web/src/app/App.tsx': 1042,
   'apps/web/src/features/assistant/AssistantsPanel.tsx': 703,
-  'apps/web/src/features/chat/ChatView.tsx': 724,
+  'apps/web/src/features/chat/ChatView.tsx': 658,
   'apps/web/src/features/composer/Composer.tsx': 699,
   'apps/web/src/features/workbench/ToolSidePanel.tsx': 746,
   'packages/client/src/agent-client.ts': 1223,

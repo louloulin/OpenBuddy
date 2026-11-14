@@ -1,7 +1,7 @@
 import { useExtensionUiStore } from "@/features/approvals/state/extension-ui-store";
-import { memo, useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import { useSessionStore, type ChatMessage, type ToolCallView } from "@/features/chat/state/session-store";
+import { useSessionStore, type ToolCallView } from "@/features/chat/state/session-store";
 import { useSessionsStore } from "@/features/sessions/state/sessions-store";
 import { createMarkdownHostConfig } from "@openbuddy/markdown/markdown-host";
 import { agentForkSession, agentRegenerate, rewindExecute, rewindPoints, agentSteer, agentFollowUp } from "@openbuddy/client/agent-client";
@@ -16,8 +16,9 @@ import { friendlyError } from "@openbuddy/chat-core/error-format";
 import { invoke } from "@openbuddy/client/ipc";
 import { parseUserText, baseName, withModeInstruction } from "@openbuddy/chat-core/user-text";
 import { Composer } from "../composer/Composer";
-import { Markdown } from "@openbuddy/markdown";
-import { useTheme } from "@openbuddy/ui/ThemeProvider";
+import { UserNode, NoticeRow } from "./chat-view/rows";
+import { useStableCallback, useTopbarSlot } from "./chat-view/hooks";
+import { STICK_THRESHOLD, ANCHOR_GAP, RENDER_WINDOW, charsOf, blocksOf, nodeIds } from "./chat-view/transcript-metrics";
 import { PermissionInlineCard } from "../approvals/PermissionDialog";
 import { QuestionInlineCard } from "../approvals/QuestionInlineCard";
 import { FindBar, isFindHit } from "./FindBar";
@@ -28,7 +29,6 @@ import { buildNodes } from "@openbuddy/chat-core/turns";
 import { openLightbox } from "@openbuddy/ui/ImageLightbox";
 import { matchShortcut } from "@/shared/lib/shortcuts";
 import { TurnView } from "./TurnView";
-import { UserBubble } from "./UserBubble";
 import { ErrorCard } from "./ErrorCard";
 import { PromptHistory } from "./PromptHistory";
 import { ArrowDown } from "lucide-react";
@@ -37,72 +37,6 @@ import type { ModelOption } from "../models/ModelSelector";
 import type { HomeModeId } from "../../shared/content/scenes";
 import type { AgentEntry } from "@openbuddy/protocol/dto";
 import type { WorkspaceInfo } from "@openbuddy/client/agent-client";
-
-/** Pixels from the bottom within which the transcript keeps following new content. */
-const STICK_THRESHOLD = 80;
-/** Space kept above a just-sent prompt once it is scrolled to the top. */
-const ANCHOR_GAP = 16;
-/** Long sessions mount the newest nodes first and older ones in chunks of this size while scrolling up. */
-const RENDER_WINDOW = 30;
-/** Readable units in a message: a prompt, each paragraph of text, each step. */
-const charsOf = (m: { parts: Array<{ kind: string; text?: string }> }) => m.parts.reduce((n, p) => n + (p.text?.length ?? 0), 0);
-const blocksOf = (m: { role: string; parts: Array<{ kind: string; text?: string }> }) =>
-  m.role === "user" ? 1 : m.parts.reduce((n, p) => n + (p.kind === "text" ? (p.text ?? "").split(/\n\s*\n/).filter((x) => x.trim()).length : 1), 0);
-const nodeIds = (node: ReturnType<typeof buildNodes>[number]) => (node.kind === "turn" ? node.messages.map((m) => m.id) : [node.message.id]);
-
-/** A callback whose identity never changes but always runs the latest closure (keeps memoized rows still). */
-function useStableCallback<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R {
-  const ref = useRef(fn);
-  useLayoutEffect(() => { ref.current = fn; });
-  return useCallback((...args: A) => ref.current(...args), []);
-}
-
-/** One prompt row; memoized so streaming elsewhere does not re-render it. */
-const UserNode = memo(function UserNode({ message, editable, onEditFrom, onToast }: {
-  message: ChatMessage;
-  editable: boolean;
-  onEditFrom: (messageId: string, text: string, resend: boolean) => Promise<void>;
-  onToast: (msg: string) => void;
-}) {
-  return <UserBubble message={message} onToast={onToast} onEdit={editable ? (text, resend) => onEditFrom(message.id, text, resend) : undefined} />;
-});
-
-/**
- * 提示行 (§5.1): "上下文已压缩 ›" / "已切换到其他分支 ›" expand to the summary
- * Pi wrote; extension messages show their text; `!command` shows its output.
- */
-const NoticeRow = memo(function NoticeRow({ message }: { message: ChatMessage }) {
-  const [open, setOpen] = useState(false);
-  const { theme } = useTheme();
-  const kind = message.meta?.notice;
-  const text = message.parts[0]?.kind === "text" ? message.parts[0].text : "";
-  const label = kind === "compaction" ? "上下文已压缩" : kind === "branch" ? "已切换到其他分支" : kind === "bash" ? "命令" : "扩展消息";
-  if (kind === "bash") {
-    return (
-      <div className="chat-notice" data-msg-ids={message.id}>
-        <span className="chat-notice__label">{label}</span>
-        {text && <pre className="chat-notice__body">{text}</pre>}
-      </div>
-    );
-  }
-  return (
-    <div className={"chat-notice" + (open ? " chat-notice--open" : "")} data-msg-ids={message.id}>
-      {text ? (
-        <button type="button" className="chat-notice__label chat-notice__toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-          {label}<span className="chat-notice__chev" aria-hidden>›</span>
-        </button>
-      ) : <span className="chat-notice__label">{label}</span>}
-      {open && text && <div className="chat-notice__summary"><Markdown complete theme={theme}>{text}</Markdown></div>}
-    </div>
-  );
-});
-
-/** Find the App top bar's right slot (rendered by App before ChatView mounts). */
-function useTopbarSlot(): HTMLElement | null {
-  const [slot, setSlot] = useState<HTMLElement | null>(null);
-  useLayoutEffect(() => { setSlot(document.getElementById("chat-topbar-slot")); }, []);
-  return slot;
-}
 
 /** Center chat column: grouped turns + composer; tools for the conversation live in the top bar. */
 export function ChatView({
