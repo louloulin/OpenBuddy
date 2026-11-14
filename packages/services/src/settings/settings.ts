@@ -1,13 +1,11 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import type { SafeStorage } from "@openbuddy/kernel";
 
-export interface SafeStorage {
-  isEncryptionAvailable(): boolean;
-  getSelectedStorageBackend?(): string;
-  encryptString(value: string): Buffer;
-  decryptString(value: Buffer): string;
-}
+// Moved to @openbuddy/kernel (20261115-md R2); re-exported so existing importers keep working.
+export type { SafeStorage };
+export { object, text, bool, unsupported } from "@openbuddy/kernel";
 export class JsonStore<T> {
   constructor(
     readonly path: string,
@@ -163,20 +161,3 @@ export interface AppSettings {
   }>;
 }
 export type Settings = ReturnType<typeof createSettings>;
-export function object(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    throw Error("参数必须是对象");
-  return value as Record<string, unknown>;
-}
-export function text(value: unknown, name = "value"): string {
-  if (typeof value !== "string" || !value.trim() || value.includes("\0"))
-    throw Error(`${name} 必须是非空字符串`);
-  return value;
-}
-export function bool(value: unknown): boolean {
-  if (typeof value !== "boolean") throw Error("必须是布尔值");
-  return value;
-}
-export function unsupported(name: string): never {
-  throw Error(`not_implemented: ${name}`);
-}

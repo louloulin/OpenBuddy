@@ -33,6 +33,7 @@ The repository is a pnpm workspace. Packages are consumed as TypeScript source: 
 apps/desktop      Electron host: main/, preload/, ipc/register.ts, scripts/ (build, dev, UI checks)
 apps/web          React renderer: src/app (shell, palette, routing), src/features/*, src/shared/*
 packages/protocol IPC contract (commands, events) and DTO types
+packages/kernel   ports the host implements (events, shell, secrets, clock, logger) and payload validators (pure TS)
 packages/services settings, providers, mcp, skills, files, preview (Node)
 packages/engine   Pi session engine, permissions, extension UI bridge, checkpoints, artifacts (Node)
 packages/host     IPC command handlers and file/workspace access guards (Node)

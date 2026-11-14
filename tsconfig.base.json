@@ -18,6 +18,12 @@
       "@openbuddy/protocol/*": [
         "./packages/protocol/src/*"
       ],
+      "@openbuddy/kernel": [
+        "./packages/kernel/src/index.ts"
+      ],
+      "@openbuddy/kernel/*": [
+        "./packages/kernel/src/*"
+      ],
       "@openbuddy/services": [
         "./packages/services/src/index.ts"
       ],
