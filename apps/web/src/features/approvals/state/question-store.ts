@@ -1,20 +1,7 @@
 import { create } from "zustand";
 
-export interface QuestionRequest {
-  requestId: string;
-  sessionId: string;
-  kind: "select" | "confirm" | "input" | "editor";
-  title: string;
-  options?: string[];
-  message?: string;
-  placeholder?: string;
-  initialValue?: string;
-  /** Reserved for a future extension source; Pi's input API currently has no secret option. */
-  secret?: boolean;
-  timeoutMs?: number;
-  expiresAt?: number;
-}
-export type UiDismissReason = "resolved" | "cancelled" | "timeout" | "aborted" | "session_closed";
+import type { QuestionRequest, UiDismissReason } from "@openbuddy/client/types";
+export type { QuestionRequest, UiDismissReason } from "@openbuddy/client/types";
 interface QuestionState {
   queues: Record<string, QuestionRequest[]>;
   notices: Record<string, string>;
