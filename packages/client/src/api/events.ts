@@ -1,7 +1,7 @@
 // Event subscription: agent://… and app://… events from the host, fanned out to typed handlers.
 import type { ModelState, PermissionRequest, PromptComplete, SessionSummaryEvent, SessionUpdate, TurnErrorEvent } from "@openbuddy/protocol/dto";
 import { listen, type UnlistenFn } from "../ipc";
-import type { QuestionRequest, UiDismissReason } from "../../../../apps/web/src/features/approvals/state/question-store";
+import type { QuestionRequest, UiDismissReason } from "../types";
 import type { ExtensionUiState } from "./approvals";
 
 // ---------- event subscription ----------
