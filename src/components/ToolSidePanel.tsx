@@ -13,9 +13,9 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ToolCallView } from "@/stores/session-store";
-import type { SessionArtifact } from "@/lib/session-artifacts";
-import type { FileChange } from "@/lib/file-changes";
-import { aggregateFileChanges } from "@/lib/file-changes";
+import type { SessionArtifact } from "@openbuddy/chat-core/session-artifacts";
+import type { FileChange } from "@openbuddy/chat-core/file-changes";
+import { aggregateFileChanges } from "@openbuddy/chat-core/file-changes";
 import type { ChatMessage } from "@/stores/session-store";
 import {
   useUnifiedTabs,

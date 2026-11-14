@@ -11,7 +11,7 @@ import {
   ChevronLeftIcon,
   XCloseIcon,
 } from "@openbuddy/ui/icon/icons/index";
-import { matchesQuery, extractPlainText } from "@/lib/extract-text";
+import { matchesQuery, extractPlainText } from "@openbuddy/chat-core/extract-text";
 import type { ChatMessage } from "@/stores/session-store";
 
 interface FindBarProps {

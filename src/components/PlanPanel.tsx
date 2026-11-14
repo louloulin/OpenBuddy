@@ -7,7 +7,7 @@ import {
   reorderPlan,
   addPlanEntry,
   cycleEntryStatus,
-} from "@/lib/plan-utils";
+} from "@openbuddy/chat-core/plan-utils";
 import {
   CheckIcon,
   ClockIcon,

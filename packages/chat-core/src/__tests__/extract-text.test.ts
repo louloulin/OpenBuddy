@@ -4,7 +4,7 @@ import {
   highlightSegments,
   matchesQuery,
 } from "../extract-text";
-import type { ChatMessage } from "@/stores/session-store";
+import type { ChatMessage } from "../../../../src/stores/session-store";
 
 function msg(parts: ChatMessage["parts"]): ChatMessage {
   return { id: "m1", role: "assistant", parts, complete: true };

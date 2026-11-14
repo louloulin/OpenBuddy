@@ -4,7 +4,7 @@
  *
  * 对齐 WorkBuddy 的"导出对话"功能。
  */
-import type { ChatMessage } from "@/stores/session-store";
+import type { ChatMessage } from "../../../src/stores/session-store";
 
 /** Build a Markdown document from a session's message list. */
 export function buildSessionMarkdown(

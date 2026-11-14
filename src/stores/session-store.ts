@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { PiContent, PiMessage, Plan, PromptComplete, SessionUpdate, ToolCallContent, ToolCallUpdate } from "@openbuddy/protocol/dto";
-import { parseUserText } from "@/lib/user-text";
+import { parseUserText } from "@openbuddy/chat-core/user-text";
 
 export interface MessageMeta {
   /** Engine timestamp (ms) of the message; local clock for optimistic ones. */

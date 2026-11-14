@@ -9,7 +9,7 @@
  *
  * 纯函数、无副作用,便于单测。用于 Composer 发送前预估徽章。
  */
-import type { ChatMessage } from "@/stores/session-store";
+import type { ChatMessage } from "../../../src/stores/session-store";
 
 /** 单段文本的 token 估算。 */
 export function estimateTextTokens(text: string): number {

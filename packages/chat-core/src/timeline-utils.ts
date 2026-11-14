@@ -6,7 +6,7 @@
  * 消息可携带 `modelId` / `createdAt`。无这些字段时退化为「无分隔符」(不影响渲染)。
  * 纯函数、无副作用,便于单测。
  */
-import type { ChatMessage } from "@/stores/session-store";
+import type { ChatMessage } from "../../../src/stores/session-store";
 
 /** 带可选元数据的消息(前向兼容:缺省字段视为不存在)。 */
 export type TimelineMessage = ChatMessage & {

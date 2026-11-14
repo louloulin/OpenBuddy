@@ -62,14 +62,16 @@ function makeResolver(fileSet) {
     },
   };
 }
-const SPEC_RE = /((?:import|export)\s[^'"`]*?from\s+|import\(\s*|^\s*import\s+|vi\.mock\(\s*|vi\.importActual(?:<[^>]*>)?\(\s*|require\(\s*|@import\s+(?:url\()?)(['"])([^'"]+)\2/gm;
+// The prefixes are lookbehinds so a match covers only the quoted specifier: nested specifiers
+// such as vi.importActual<typeof import("a")>("a") are both seen.
+const SPEC_RE = /(?<=(?:import|export)\s[^'"`;]*?from\s+|import\(\s*|^\s*import\s+|vi\.mock\(\s*|vi\.importActual(?:<[^>]*>)?\(\s*|require\(\s*|@import\s+(?:url\()?)(['"])([^'"]+)\1/gm;
 function edgesOf(file, src, resolver) {
   const out = [];
   for (const m of src.matchAll(SPEC_RE)) {
-    const spec = m[3];
+    const spec = m[2];
     const target = resolver.resolve(file, spec);
     if (target === null) continue;
-    out.push({ spec, target, index: m.index + m[0].length - spec.length - 1 });
+    out.push({ spec, target, index: m.index + 1 });
   }
   return out;
 }

@@ -5,8 +5,8 @@ import {
   deriveActiveTab,
   type UseUnifiedTabsOptions,
 } from "../use-unified-tabs";
-import type { SessionArtifact } from "../session-artifacts";
-import type { FileChange } from "../file-changes";
+import type { SessionArtifact } from "@openbuddy/chat-core/session-artifacts";
+import type { FileChange } from "@openbuddy/chat-core/file-changes";
 
 const noop = () => {};
 function baseOptions(

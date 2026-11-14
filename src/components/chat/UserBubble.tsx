@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { openLightbox } from "@openbuddy/ui/ImageLightbox";
 import type { ChatMessage } from "@/stores/session-store";
 import { copyText } from "@openbuddy/platform/clipboard";
-import { baseName } from "@/lib/user-text";
+import { baseName } from "@openbuddy/chat-core/user-text";
 import { CopyGlyph, EditGlyph, FileGlyph } from "./icons";
 
 /** Prompts longer than this fold to a few lines. */

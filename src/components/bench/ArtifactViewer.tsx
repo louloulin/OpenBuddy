@@ -3,7 +3,7 @@ import { MoreHorizontal, ExternalLink, Pencil, Save, X } from "lucide-react";
 import { invoke, save as saveDialog } from "@openbuddy/client/ipc";
 import { artifactSave, checkpointList, checkpointRead, checkpointRestore, exportTextFile, type ArtifactInfo, type CheckpointRecord } from "@openbuddy/client/agent-client";
 import { copyText } from "@openbuddy/platform/clipboard";
-import { friendlyError } from "@/lib/error-format";
+import { friendlyError } from "@openbuddy/chat-core/error-format";
 import { appConfirm } from "../AppDialog";
 import { ArtifactPreview, useFileContent, type PreviewMode } from "./ArtifactPreview";
 import { DiffBlock } from "./DiffBlock";

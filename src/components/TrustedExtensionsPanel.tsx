@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { agentExtensionsAdd, agentExtensionsList, agentExtensionsRemove, agentExtensionsSetEnabled, type ExtensionsConfig } from "@openbuddy/client/agent-client";
 import { dialog } from "@openbuddy/client/ipc";
-import { friendlyError } from "@/lib/error-format";
+import { friendlyError } from "@openbuddy/chat-core/error-format";
 
 export function TrustedExtensionsPanel() {
   const [config, setConfig] = useState<ExtensionsConfig>();

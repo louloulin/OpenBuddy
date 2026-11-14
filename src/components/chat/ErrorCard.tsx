@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { describeError } from "@/lib/error-format";
+import { describeError } from "@openbuddy/chat-core/error-format";
 import { copyText } from "@openbuddy/platform/clipboard";
 import { AlertGlyph, ChevronGlyph } from "./icons";
 

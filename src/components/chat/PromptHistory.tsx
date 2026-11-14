@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { History } from "lucide-react";
 import type { ChatMessage } from "@/stores/session-store";
-import { baseName } from "@/lib/user-text";
+import { baseName } from "@openbuddy/chat-core/user-text";
 
 function clock(ms?: number): string {
   if (!ms) return "";

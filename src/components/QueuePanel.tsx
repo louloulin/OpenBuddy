@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { agentClearQueue, agentSetQueue } from "@openbuddy/client/agent-client";
-import { friendlyError } from "@/lib/error-format";
+import { friendlyError } from "@openbuddy/chat-core/error-format";
 import { EMPTY_PI_QUEUE, usePiQueueStore } from "@/stores/pi-queue-store";
 
 type Kind = "steering" | "followUp";

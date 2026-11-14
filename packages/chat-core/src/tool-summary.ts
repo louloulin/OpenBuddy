@@ -1,5 +1,5 @@
-import type { ToolCallView } from "@/stores/session-store";
-import type { DiffLine } from "@/lib/unified-diff";
+import type { ToolCallView } from "../../../src/stores/session-store";
+import type { DiffLine } from "./unified-diff";
 
 /** Pi built-in tools and MCP tools in plain words. */
 const LABELS: Record<string, string> = {

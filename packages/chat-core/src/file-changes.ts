@@ -5,9 +5,9 @@
  * 从会话消息的 tool_call content 里提取所有 diff,按 path 聚合成「每个文件的净变更」。
  * 纯函数、无副作用,便于单测。
  */
-import type { ChatMessage } from "@/stores/session-store";
+import type { ChatMessage } from "../../../src/stores/session-store";
 import type { DiffContent } from "@openbuddy/protocol/dto";
-import { extOf } from "./drop-utils";
+import { extOf } from "../../../src/lib/drop-utils";
 
 /** 单个文件的聚合变更。 */
 export interface FileChange {

@@ -7,7 +7,7 @@ import { Workbench } from "../bench/Workbench";
 import { ArtifactCards, type ArtifactsApi } from "../chat/ArtifactCards";
 import { PermissionCard } from "../PermissionDialog";
 import { revertToolCalls } from "../bench/revert";
-import { parseUserText, withModeInstruction } from "@/lib/user-text";
+import { parseUserText, withModeInstruction } from "@openbuddy/chat-core/user-text";
 import { useExtensionUiStore } from "@/stores/extension-ui-store";
 import { previewUrl } from "@openbuddy/client/agent-client";
 import { ThemeProvider } from "@openbuddy/ui/ThemeProvider";

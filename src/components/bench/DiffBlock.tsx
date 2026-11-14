@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { computeUnifiedDiff, summarizeDiff } from "@/lib/unified-diff";
+import { computeUnifiedDiff, summarizeDiff } from "@openbuddy/chat-core/unified-diff";
 
 /** Unified diff of two texts, in the transcript's diff style. */
 export function DiffBlock({ before, after, empty = "内容没有变化" }: { before: string; after: string; empty?: string }) {

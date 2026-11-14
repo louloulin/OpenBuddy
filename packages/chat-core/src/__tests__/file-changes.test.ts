@@ -4,7 +4,7 @@ import {
   fileIcon,
   changeStatus,
 } from "../file-changes";
-import type { ChatMessage } from "@/stores/session-store";
+import type { ChatMessage } from "../../../../src/stores/session-store";
 
 function diffMsg(path: string, old: string, ne: string): ChatMessage {
   return {

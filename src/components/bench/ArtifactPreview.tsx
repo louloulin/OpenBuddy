@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@openbuddy/client/ipc";
 import { previewUrl } from "@openbuddy/client/agent-client";
-import { friendlyError } from "@/lib/error-format";
+import { friendlyError } from "@openbuddy/chat-core/error-format";
 import { codeLanguage } from "@/lib/file-kind";
 import { Markdown } from "@openbuddy/markdown";
 import { FilePreview } from "../FilePreview";

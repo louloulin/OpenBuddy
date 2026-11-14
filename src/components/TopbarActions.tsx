@@ -1,4 +1,4 @@
-import { friendlyError } from "@/lib/error-format";
+import { friendlyError } from "@openbuddy/chat-core/error-format";
 /**
  * 对话页 TopBar 右侧操作菜单 — 对齐 WorkBuddy 的更多操作：
  *  - 导出为 Markdown（把当前会话渲染成 .md 文件，经系统保存对话框落盘）
@@ -17,7 +17,7 @@ import {
   agentSetSessionPinned,
   agentSetSessionArchived,
 } from "@openbuddy/client/agent-client";
-import { buildSessionMarkdown, sanitizeFilename } from "@/lib/export-markdown";
+import { buildSessionMarkdown, sanitizeFilename } from "@openbuddy/chat-core/export-markdown";
 
 interface TopbarActionsProps {
   sessionId: string;

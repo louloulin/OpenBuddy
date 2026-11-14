@@ -57,14 +57,14 @@ import {
   reportEvent,
 } from "./lib/telemetry-contract";
 import { IS_MACOS } from "@openbuddy/platform/platform";
-import { friendlyError } from "./lib/error-format";
+import { friendlyError } from "@openbuddy/chat-core/error-format";
 import { AppDialogHost } from "./components/AppDialog";
 import { ImageLightboxHost } from "@openbuddy/ui/ImageLightbox";
 import { SearchPalette, ShortcutsPanel } from "./components/ShortcutsPanel";
 import { matchShortcut } from "./lib/shortcuts";
 import { copyText } from "@openbuddy/platform/clipboard";
 import { useUnseenStore } from "./stores/unseen-store";
-import { parseUserText, baseName, EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END } from "./lib/user-text";
+import { parseUserText, baseName, EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END } from "@openbuddy/chat-core/user-text";
 
 
 export { EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END };

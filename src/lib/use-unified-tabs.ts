@@ -11,8 +11,8 @@
  * （去掉 mcpApp / expert / fileChange，其中 fileChange 合并到 changes）。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { SessionArtifact } from "@/lib/session-artifacts";
-import type { FileChange } from "@/lib/file-changes";
+import type { SessionArtifact } from "@openbuddy/chat-core/session-artifacts";
+import type { FileChange } from "@openbuddy/chat-core/file-changes";
 
 /** 右侧栏支持的视图。 */
 export type WorkspaceView =

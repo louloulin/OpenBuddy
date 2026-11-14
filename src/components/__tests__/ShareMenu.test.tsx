@@ -4,15 +4,15 @@ import { ShareMenu } from "../ShareMenu";
 import type { ChatMessage } from "@/stores/session-store";
 
 // triggerDownload 在 jsdom 下会走真实 document,我们 mock 掉 share 模块的核心副作用。
-vi.mock("@/lib/share", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/share")>("@/lib/share");
+vi.mock("@openbuddy/chat-core/share", async () => {
+  const actual = await vi.importActual<typeof import("@openbuddy/chat-core/share")>("@openbuddy/chat-core/share");
   return {
     ...actual,
     triggerDownload: vi.fn(),
   };
 });
 
-import { triggerDownload, buildMailtoUrl } from "@/lib/share";
+import { triggerDownload, buildMailtoUrl } from "@openbuddy/chat-core/share";
 import { copyText } from "@openbuddy/platform/clipboard";
 vi.mock("@openbuddy/platform/clipboard", () => ({ copyText: vi.fn(async () => {}) }));
 

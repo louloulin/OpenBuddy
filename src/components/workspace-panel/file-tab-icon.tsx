@@ -3,7 +3,7 @@
  *
  * 复用 `@/lib/file-changes` 的 `fileIcon` 映射，保证与「文件变更」面板一致。
  */
-import { fileIcon } from "@/lib/file-changes";
+import { fileIcon } from "@openbuddy/chat-core/file-changes";
 
 /** 按扩展名取一个 emoji 字符（无扩展名返回通用文件图标）。 */
 export function pickFileEmoji(fileName: string): string {

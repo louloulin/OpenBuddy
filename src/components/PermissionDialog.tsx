@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { usePermissionStore, selectPermissionForSession } from "@/stores/permission-store";
 import { agentResolvePermission } from "@openbuddy/client/agent-client";
 import type { PermissionRequest } from "@openbuddy/protocol/dto";
-import { checkCommandRisk, riskLabel } from "@/lib/command-risk";
-import { permissionObjectLabel, permissionTitle, toolCategory, toolSubject } from "@/lib/tool-summary";
+import { checkCommandRisk, riskLabel } from "@openbuddy/chat-core/command-risk";
+import { permissionObjectLabel, permissionTitle, toolCategory, toolSubject } from "@openbuddy/chat-core/tool-summary";
 import { ShieldAlertIcon } from "@openbuddy/ui/icon/icons/index";
 
 /** Open 设置 → 安全中心 (wired by App through a window event to avoid prop drilling). */

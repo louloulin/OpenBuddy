@@ -5,7 +5,7 @@
  * 路径、增删行(+绿/-红)、编辑次数。空(无 diff)时不渲染。
  */
 import { useMemo } from "react";
-import { aggregateFileChanges, fileIcon, changeStatus } from "@/lib/file-changes";
+import { aggregateFileChanges, fileIcon, changeStatus } from "@openbuddy/chat-core/file-changes";
 import type { ChatMessage } from "@/stores/session-store";
 
 interface FileChangesPanelProps {

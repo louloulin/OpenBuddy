@@ -1,4 +1,4 @@
-import { friendlyError } from "@/lib/error-format";
+import { friendlyError } from "@openbuddy/chat-core/error-format";
 import { createContext, useContext, useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, Check, Lightbulb, Search } from "lucide-react";
 import { THINKING_LABELS } from "@openbuddy/client/agent-client";

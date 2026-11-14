@@ -1,8 +1,8 @@
 import { memo, useEffect, useState } from "react";
 import type { ToolCallView } from "@/stores/session-store";
 import type { DiffContent, CommandOutputContent, ImageToolContent } from "@openbuddy/protocol/dto";
-import { checkCommandRisk, riskLabel } from "@/lib/command-risk";
-import { computeUnifiedDiff, hunksToUnifiedLines, summarizeDiff, type DiffLine } from "@/lib/unified-diff";
+import { checkCommandRisk, riskLabel } from "@openbuddy/chat-core/command-risk";
+import { computeUnifiedDiff, hunksToUnifiedLines, summarizeDiff, type DiffLine } from "@openbuddy/chat-core/unified-diff";
 import {
   CheckIcon,
   EditToolIcon,
@@ -13,7 +13,7 @@ import {
   ToolDefaultIcon,
   ViewedToolIcon,
 } from "@openbuddy/ui/icon/icons/index";
-import { diffStats, formatDuration, toolDiff, toolLabel, toolOutput, toolSubject } from "@/lib/tool-summary";
+import { diffStats, formatDuration, toolDiff, toolLabel, toolOutput, toolSubject } from "@openbuddy/chat-core/tool-summary";
 import { ChevronGlyph } from "./chat/icons";
 
 type ToolCallCardProps = {

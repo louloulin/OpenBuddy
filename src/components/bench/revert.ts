@@ -1,5 +1,5 @@
 import { turnRevert, type ArtifactInfo } from "@openbuddy/client/agent-client";
-import { friendlyError } from "@/lib/error-format";
+import { friendlyError } from "@openbuddy/chat-core/error-format";
 import { appConfirm } from "../AppDialog";
 
 const name = (p: string) => p.split(/[\\/]/).pop() || p;

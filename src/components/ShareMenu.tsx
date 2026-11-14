@@ -11,11 +11,11 @@ import {
   buildMailtoUrl,
   triggerDownload,
   type ShareFormat,
-} from "@/lib/share";
+} from "@openbuddy/chat-core/share";
 import type { ChatMessage } from "@/stores/session-store";
 import { save as saveDialog } from "@openbuddy/client/ipc";
 import { agentExportHtml } from "@openbuddy/client/agent-client";
-import { sanitizeFilename } from "@/lib/export-markdown";
+import { sanitizeFilename } from "@openbuddy/chat-core/export-markdown";
 import { copyText } from "@openbuddy/platform/clipboard";
 
 /** Mail clients reject very long mailto: URLs; the full text goes through 导出. */

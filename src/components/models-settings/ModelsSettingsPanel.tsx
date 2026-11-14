@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Eye, EyeOff, Loader2, Pencil, Plug, Plus, RefreshCw, Star, Trash2, X, Zap } from "lucide-react";
 import { appConfirm } from "../AppDialog";
-import { friendlyError, rawErrorText } from "@/lib/error-format";
+import { friendlyError, rawErrorText } from "@openbuddy/chat-core/error-format";
 import {
   agentsDefaultsGet,
   agentsDefaultsSave,
