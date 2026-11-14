@@ -807,9 +807,11 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
         (pi) => {
           pi.registerCommand("unsupported-ui", {
             handler: async (_args, ctx) => {
+              // Terminal-only UI degrades to a no-op; the command itself then fails.
               await ctx.ui.custom(() => {
                 throw Error("never");
               });
+              throw Error("extension_failed: needs a terminal");
             },
           });
         },
@@ -818,7 +820,7 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
     f.events.length = 0;
     await expect(
       f.call("agent_send", { sessionId: f.sid, text: "/unsupported-ui" }),
-    ).rejects.toThrow("not_implemented");
+    ).rejects.toThrow("extension_failed");
     // One error path: the rejected send carries the error; the task is marked failed, not completed.
     expect(f.events.some((e) => e.name === "agent://turn-error")).toBe(false);
     expect(
@@ -1137,5 +1139,18 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:r.id,result})+'\\n');});`,
     expect(
       f.events.some((e) => e.payload.event?.type === "agent_settled"),
     ).toBe(true);
+  });
+  it("remembers the system-notification switch (on by default)", async () => {
+    const f = await fixture();
+    expect(await f.call("notification_prefs_get")).toEqual({ system: true });
+    expect(await f.call("notification_prefs_set", { system: false })).toEqual({ system: false });
+    expect(await f.call("notification_prefs_get")).toEqual({ system: false });
+    await expect(f.call("notification_prefs_set", { system: "no" })).rejects.toThrow();
+  });
+  it("reports nothing (not an error) for a session that is not loaded yet", async () => {
+    const f = await fixture();
+    expect(await f.call("agent_session_info", { sessionId: "not-loaded-yet" })).toBeNull();
+    expect(await f.call("agent_session_usage", { sessionId: "not-loaded-yet" })).toBeNull();
+    expect(await f.call("agent_session_info", { sessionId: f.sid })).toMatchObject({ context: expect.any(Object) });
   });
 });

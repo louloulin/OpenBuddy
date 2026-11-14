@@ -41,14 +41,14 @@ describe("Sidebar", () => {
     useSessionsStore.getState().setIndependent([]);
   });
 
-  it("搜索暂缓禁用,设置按钮仍可打开", () => {
+  it("搜索按钮打开任务搜索(Ctrl/Cmd+K),设置按钮可打开", () => {
     const onOpenSearch = vi.fn();
     const onOpenSettings = vi.fn();
     render(
       <Sidebar {...base} onOpenSearch={onOpenSearch} onOpenSettings={onOpenSettings} />
     );
-    expect(screen.getByRole("button", { name: "搜索（后续版本开放）" })).toBeDisabled();
-    expect(onOpenSearch).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "搜索任务" }));
+    expect(onOpenSearch).toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "设置" }));
     expect(onOpenSettings).toHaveBeenCalled();
   });

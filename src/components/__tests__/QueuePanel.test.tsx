@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueuePanel } from "../QueuePanel";
-import { agentClearQueue } from "@/lib/agent-client";
+import { agentClearQueue, agentSetQueue } from "@/lib/agent-client";
 import { usePiQueueStore } from "@/stores/pi-queue-store";
-vi.mock("@/lib/agent-client", () => ({ agentClearQueue: vi.fn() }));
+vi.mock("@/lib/agent-client", () => ({ agentClearQueue: vi.fn(), agentSetQueue: vi.fn() }));
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -46,5 +46,22 @@ describe("Pi queue panel", () => {
     fireEvent.click(screen.getByRole("button", { name: "全部撤回" }));
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByText("steer item")).toBeInTheDocument();
+  });
+
+  it("edits, sends now, moves and withdraws single rows (U4.5)", async () => {
+    vi.mocked(agentSetQueue).mockImplementation(async (_sid, steering, followUp) => ({ steering, followUp }));
+    act(() => usePiQueueStore.getState().apply("A", { steering: [], followUp: ["第一条", "第二条", "第三条"] }));
+    const onEdit = vi.fn();
+    render(<QueuePanel sessionId="A" onEdit={onEdit} />);
+    fireEvent.click(screen.getByRole("button", { name: "立即插话：第二条" }));
+    await waitFor(() => expect(agentSetQueue).toHaveBeenLastCalledWith("A", ["第二条"], ["第一条", "第三条"]));
+    fireEvent.click(await screen.findByRole("button", { name: "上移：第三条" }));
+    await waitFor(() => expect(agentSetQueue).toHaveBeenLastCalledWith("A", ["第二条"], ["第三条", "第一条"]));
+    fireEvent.click(await screen.findByRole("button", { name: "编辑：第一条" }));
+    expect(onEdit).toHaveBeenCalledWith("第一条");
+    await waitFor(() => expect(agentSetQueue).toHaveBeenLastCalledWith("A", ["第二条"], ["第三条"]));
+    fireEvent.click(await screen.findByRole("button", { name: "撤回：第二条" }));
+    await waitFor(() => expect(screen.queryByText("第二条")).toBeNull());
+    expect(screen.getByText("排队中的消息 1")).toBeInTheDocument();
   });
 });

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { openLightbox } from "../ImageLightbox";
 import type { ChatMessage } from "@/stores/session-store";
 import { copyText } from "@/lib/clipboard";
 import { baseName } from "@/lib/user-text";
@@ -90,17 +91,20 @@ export function UserBubble({ message, onEdit, onToast }: {
       <div className="msg__user-col">
         {hasFiles ? (
           <div className="msg__chips">
-            {meta?.images?.map((img, i) => (
-              <img key={`img${i}`} className="msg__thumb" src={`data:${img.mimeType};base64,${img.data}`} alt={`图片 ${i + 1}`} />
+            {meta?.images?.map((img, i, all) => (
+              <button key={`img${i}`} type="button" className="msg__thumb-btn" aria-label={`查看图片 ${i + 1}`} onClick={() => openLightbox(all.map((x, j) => ({ src: `data:${x.mimeType};base64,${x.data}`, alt: `图片 ${j + 1}` })), i)}>
+                <img className="msg__thumb" src={`data:${img.mimeType};base64,${img.data}`} alt={`图片 ${i + 1}`} />
+              </button>
             ))}
             {meta?.attachments?.filter((path) => !meta.images?.length || !/\.(png|jpe?g|gif|webp)$/i.test(path)).map((path) => (
               <span key={path} className="msg__chip" title={path}><FileGlyph /><span className="msg__chip-name">{baseName(path)}</span></span>
             ))}
           </div>
         ) : null}
-        {(text || meta?.skill) && (
+        {(text || meta?.skill || meta?.mode) && (
           <div className={"msg__bubble" + (folded ? " msg__bubble--folded" : "")}>
             {meta?.skill && <span className="msg__skill">技能 · {meta.skill}</span>}
+            {meta?.mode && <span className="msg__skill msg__mode">{meta.mode === "plan" ? "想一想" : "问一问"}</span>}
             {text && <span className="msg__bubble-text">{folded ? text.slice(0, FOLDED_RENDER_CHARS) : text}</span>}
             {long && (
               <div>

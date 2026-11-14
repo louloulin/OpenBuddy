@@ -9,9 +9,10 @@ export function FeedbackButtons({ sessionId, turnKey }: { sessionId: string; tur
   const setRating = useFeedbackStore((s) => s.setRating);
   const current = entry?.rating ?? null;
   const [dialog, setDialog] = useState<FeedbackRating | null>(null);
+  // 👍 counts at once (no dialog in the way); 👎 is recorded only once a reason is given.
   const click = (rating: FeedbackRating) => {
-    setRating(sessionId, turnKey, rating);
-    if (current !== rating) setDialog(rating);
+    if (rating === "down" && current !== "down") setDialog("down");
+    else setRating(sessionId, turnKey, rating);
   };
   return (
     <>

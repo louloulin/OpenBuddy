@@ -197,6 +197,23 @@ export function remarkCodeLanguage() {
         }
       }
 
+      // ```ts title="src/a.ts"``` / ```ts file=src/a.ts``` / ```ts src/a.ts```: a whole-file block.
+      if (!shouldSetMeta && typeof node.meta === "string" && node.meta.trim()) {
+        const info = node.meta.trim();
+        const named = info.match(/(?:^|\s)(?:title|file|filename|path)=(?:"([^"]+)"|'([^']+)'|(\S+))/);
+        const bare = /^[^\s=]+$/.test(info) && /[./\\]/.test(info) && !/^\d/.test(info) ? info : undefined;
+        const filePath = named ? named[1] ?? named[2] ?? named[3] : bare;
+        if (filePath && !/\s/.test(filePath)) {
+          inferredLanguage = getHighlightLanguage(isKnownLanguage(originalLang) ? originalLang.toLowerCase() : LanguageUtil.getLanguageByFilename(filePath));
+          const meta = `${/^[a-zA-Z][a-zA-Z0-9+#-]*$/.test(originalLang) ? originalLang : "text"}:${filePath}`;
+          node.lang = inferredLanguage || originalLang;
+          // mdast-util-to-hast copies node.meta onto the code element's data: rewrite it too.
+          node.meta = meta;
+          node.data = { ...(node.data || {}), meta, hProperties: { ...((node.data as { hProperties?: Record<string, unknown> } | undefined)?.hProperties || {}), meta } } as typeof node.data;
+          return;
+        }
+      }
+
       if (inferredLanguage && shouldSetMeta) {
         node.lang = inferredLanguage;
         node.meta = originalLang;

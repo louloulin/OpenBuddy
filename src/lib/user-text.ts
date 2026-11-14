@@ -15,6 +15,8 @@ export interface UserDisplay {
   skill?: string;
   /** Expert persona injected ahead of the message. */
   expert?: string;
+  /** Sent in 想一想 (plan) or 问一问 (ask) mode. */
+  mode?: "plan" | "ask";
 }
 
 export const EXPERT_PERSONA_BEGIN = "<!--EXPERT_PERSONA_BEGIN-->";
@@ -30,8 +32,29 @@ function listPaths(block: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * 想一想 / 问一问 (20261115-ui §5.3, D6): the engine also restricts tools to
+ * read-only ones; this hidden block tells the model what is expected. It is
+ * stripped from the bubble and the title.
+ */
+const MODE_BLOCK = /\s*<openbuddy-(plan|ask)-mode>[\s\S]*?<\/openbuddy-\1-mode>\s*/;
+const MODE_TEXT: Record<"plan" | "ask", string> = {
+  plan: "本条消息处于「想一想」模式：先调研（只能读取，不能修改文件或执行命令），然后给出一份分步骤的执行计划，列出要改动的文件和风险。不要开始执行，等用户确认。",
+  ask: "本条消息处于「问一问」模式：只回答问题或解释，可以读取文件，不要修改任何文件或执行命令。",
+};
+export function withModeInstruction(text: string, mode: "craft" | "plan" | "ask"): string {
+  if (mode === "craft") return text;
+  return `<openbuddy-${mode}-mode>\n${MODE_TEXT[mode]}\n</openbuddy-${mode}-mode>\n${text}`;
+}
+
 export function parseUserText(raw: string): UserDisplay {
   let text = raw;
+  let mode: "plan" | "ask" | undefined;
+  const modeBlock = text.match(MODE_BLOCK);
+  if (modeBlock) {
+    mode = modeBlock[1] as "plan" | "ask";
+    text = modeBlock.index === 0 ? text.slice(modeBlock[0].length) : text.replace(modeBlock[0], "\n");
+  }
   let expert: string | undefined;
   if (text.includes(EXPERT_PERSONA_BEGIN)) {
     expert = "persona";
@@ -58,7 +81,7 @@ export function parseUserText(raw: string): UserDisplay {
     text = text.replace(listed[0], "");
   }
   if (!attachments.length) attachments = inlined;
-  return { text: text.trim(), attachments, ...(skill ? { skill } : {}), ...(expert ? { expert } : {}) };
+  return { text: text.trim(), attachments, ...(skill ? { skill } : {}), ...(expert ? { expert } : {}), ...(mode ? { mode } : {}) };
 }
 
 /** File name for an attachment chip. */

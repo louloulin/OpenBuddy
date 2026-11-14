@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ShareMenu } from "../ShareMenu";
 import type { ChatMessage } from "@/stores/session-store";
 
@@ -13,6 +13,8 @@ vi.mock("@/lib/share", async () => {
 });
 
 import { triggerDownload, buildMailtoUrl } from "@/lib/share";
+import { copyText } from "@/lib/clipboard";
+vi.mock("@/lib/clipboard", () => ({ copyText: vi.fn(async () => {}) }));
 
 const messages: ChatMessage[] = [
   { id: "u1", role: "user", complete: true, parts: [{ kind: "text", text: "你好" }] },
@@ -28,7 +30,7 @@ describe("ShareMenu", () => {
     render(<ShareMenu messages={messages} />);
     fireEvent.click(screen.getByRole("button", { name: "分享" }));
     expect(screen.getByText("导出 Markdown")).toBeInTheDocument();
-    expect(screen.getByText("通过邮件分享")).toBeInTheDocument();
+    expect(screen.getByText("复制并用邮件分享")).toBeInTheDocument();
   });
 
   it("导出 Markdown 触发 triggerDownload + onDone", () => {
@@ -45,19 +47,22 @@ describe("ShareMenu", () => {
   it("导出 HTML / 纯文本", () => {
     render(<ShareMenu messages={messages} title="X" />);
     fireEvent.click(screen.getByRole("button", { name: "分享" }));
-    fireEvent.click(screen.getByText("导出 HTML"));
+    fireEvent.click(screen.getByText("导出 HTML（仅对话）"));
     expect(triggerDownload).toHaveBeenCalledWith(expect.objectContaining({ filename: "X.html" }));
     fireEvent.click(screen.getByRole("button", { name: "分享" }));
     fireEvent.click(screen.getByText("导出纯文本"));
     expect(triggerDownload).toHaveBeenCalledWith(expect.objectContaining({ filename: "X.txt" }));
   });
 
-  it("通过邮件分享调用 openUrl(mailto:…)", () => {
+  it("复制全文后用 openUrl(mailto:…) 打开邮件客户端", async () => {
     const openUrl = vi.fn();
-    render(<ShareMenu messages={messages} title="分享主题" openUrl={openUrl} />);
+    const onDone = vi.fn();
+    render(<ShareMenu messages={messages} title="分享主题" openUrl={openUrl} onDone={onDone} />);
     fireEvent.click(screen.getByRole("button", { name: "分享" }));
-    fireEvent.click(screen.getByText("通过邮件分享"));
-    expect(openUrl).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByText("复制并用邮件分享"));
+    await waitFor(() => expect(openUrl).toHaveBeenCalledTimes(1));
+    expect(copyText).toHaveBeenCalledWith(expect.stringContaining("你好"));
+    expect(onDone).toHaveBeenCalledWith("已复制对话内容并打开邮件客户端");
     const url = openUrl.mock.calls[0][0] as string;
     expect(url.startsWith("mailto:?subject=")).toBe(true);
     expect(url).toContain(encodeURIComponent("分享主题"));

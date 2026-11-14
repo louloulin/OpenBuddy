@@ -12,6 +12,7 @@ vi.mock("@/lib/agent-client", async (importOriginal) => ({
 
 import { Composer } from "../Composer";
 import { slashToken } from "../SlashCommands";
+import { commandsList } from "@/lib/agent-client";
 
 const base = { streaming: false, onCancel: vi.fn() };
 const type = (input: HTMLElement, value: string) =>
@@ -73,5 +74,19 @@ describe("slash commands in the composer", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onSend).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "发送" })).toBeDisabled();
+  });
+
+  it("reloads the command list every time the menu opens (new skills show up, U4.8)", async () => {
+    render(<Composer {...base} onSend={vi.fn()} />);
+    const input = screen.getByRole("textbox");
+    type(input, "/co");
+    await screen.findByRole("listbox", { name: "可用命令" });
+    type(input, "/com");
+    expect(commandsList).toHaveBeenCalledTimes(1);
+    type(input, "");
+    vi.mocked(commandsList).mockResolvedValueOnce([{ name: "newskill", description: "刚装的技能", source: "skill" }] as never);
+    type(input, "/new");
+    expect(await screen.findByText("刚装的技能")).toBeInTheDocument();
+    expect(commandsList).toHaveBeenCalledTimes(2);
   });
 });

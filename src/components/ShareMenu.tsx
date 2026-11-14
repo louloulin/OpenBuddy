@@ -13,6 +13,13 @@ import {
   type ShareFormat,
 } from "@/lib/share";
 import type { ChatMessage } from "@/stores/session-store";
+import { save as saveDialog } from "@/lib/ipc";
+import { agentExportHtml } from "@/lib/agent-client";
+import { sanitizeFilename } from "@/lib/export-markdown";
+import { copyText } from "@/lib/clipboard";
+
+/** Mail clients reject very long mailto: URLs; the full text goes through 导出. */
+const MAIL_BODY_LIMIT = 1800;
 
 interface ShareMenuProps {
   messages: ChatMessage[];
@@ -20,9 +27,11 @@ interface ShareMenuProps {
   /** 宿主回调(打开系统邮件客户端)。依赖注入便于测试;缺省用 window.open。 */
   openUrl?: (url: string) => void;
   onDone?: (msg: string) => void;
+  /** Enables Pi's own HTML export (full session incl. tool steps). */
+  sessionId?: string;
 }
 
-export function ShareMenu({ messages, title, openUrl, onDone }: ShareMenuProps) {
+export function ShareMenu({ messages, title, openUrl, onDone, sessionId }: ShareMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -42,12 +51,31 @@ export function ShareMenu({ messages, title, openUrl, onDone }: ShareMenuProps) 
     onDone?.(`已导出 ${payload.filename}`);
   };
 
-  const shareMail = () => {
+  // 导出网页: Pi's exporter renders the whole session (tools, diffs, thinking) as one HTML file.
+  const exportPage = async () => {
+    setOpen(false);
+    if (!sessionId) return;
+    try {
+      const target = await saveDialog({ title: "导出网页", defaultPath: `${sanitizeFilename(title || "对话")}.html`, filters: [{ name: "网页", extensions: ["html"] }] });
+      if (!target) return;
+      await agentExportHtml(sessionId, target);
+      onDone?.("已导出网页");
+    } catch (e) {
+      onDone?.(`导出失败：${String(e instanceof Error ? e.message : e)}`);
+    }
+  };
+
+  // 复制内容并打开邮件客户端 (U8.1): the full text goes to the clipboard, the mail
+  // body carries what fits in a mailto: URL.
+  const shareMail = async () => {
     const payload = buildSharePayload(messages, "text", title);
-    const url = buildMailtoUrl(title || "对话分享", payload.content);
+    const long = payload.content.length > MAIL_BODY_LIMIT;
+    const copied = await copyText(payload.content).then(() => true, () => false);
+    const body = long ? `${payload.content.slice(0, MAIL_BODY_LIMIT)}\n\n……（内容较长，${copied ? "完整内容已复制，可直接粘贴" : "完整对话请用导出保存后作为附件发送"}）` : payload.content;
+    const url = buildMailtoUrl(title || "对话分享", body);
     (openUrl ?? ((u: string) => window.open(u, "_blank")))(url);
     setOpen(false);
-    onDone?.("已打开邮件分享");
+    onDone?.(copied ? "已复制对话内容并打开邮件客户端" : "已打开邮件客户端");
   };
 
   return (
@@ -70,15 +98,20 @@ export function ShareMenu({ messages, title, openUrl, onDone }: ShareMenuProps) 
           <button type="button" className="share-menu__item" onClick={() => exportAs("markdown")}>
             导出 Markdown
           </button>
+          {sessionId && (
+            <button type="button" className="share-menu__item" onClick={() => void exportPage()}>
+              导出网页（含步骤）
+            </button>
+          )}
           <button type="button" className="share-menu__item" onClick={() => exportAs("html")}>
-            导出 HTML
+            导出 HTML（仅对话）
           </button>
           <button type="button" className="share-menu__item" onClick={() => exportAs("text")}>
             导出纯文本
           </button>
           <div className="share-menu__divider" />
-          <button type="button" className="share-menu__item" onClick={shareMail}>
-            通过邮件分享
+          <button type="button" className="share-menu__item" onClick={() => void shareMail()}>
+            复制并用邮件分享
           </button>
         </div>
       )}

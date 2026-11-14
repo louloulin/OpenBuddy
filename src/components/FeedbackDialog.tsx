@@ -19,6 +19,9 @@ interface FeedbackDialogProps {
   onToast?: (msg: string) => void;
 }
 
+/** 👎 must say why (20261115-ui U3.7): one or more of these. */
+export const DOWN_REASONS = ["不准确或有错误", "没按我的要求做", "回答不完整", "太啰嗦", "代码或命令有问题", "其他"];
+
 const STAR_LABELS: Record<number, string> = {
   1: "很差",
   2: "较差",
@@ -38,6 +41,9 @@ export function FeedbackDialog({
   const [stars, setStars] = useState(0);
   const [hover, setHover] = useState(0);
   const [note, setNote] = useState("");
+  const [reasons, setReasons] = useState<string[]>([]);
+  const down = rating === "down";
+  const missingReason = down && reasons.length === 0;
 
   // 打开时重置为空(让用户每次重新选);保留 rating 方向。
   useEffect(() => {
@@ -45,16 +51,32 @@ export function FeedbackDialog({
       setStars(0);
       setHover(0);
       setNote("");
+      setReasons([]);
     }
   }, [open]);
 
+  // Esc closes like every other dialog (capture phase, so the composer's Esc-to-stop doesn't also fire).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.isComposing) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [open, onClose]);
+
   const submit = () => {
+    if (missingReason) return;
     useFeedbackStore
       .getState()
       .setDetailed(sessionId, messageId, {
         rating,
-        stars: stars > 0 ? stars : undefined,
+        stars: !down && stars > 0 ? stars : undefined,
         note: note.trim() || undefined,
+        reasons: down ? reasons : undefined,
       });
     onToast?.("已提交反馈");
     onClose();
@@ -87,6 +109,18 @@ export function FeedbackDialog({
           </button>
         </div>
         <div className="feedback-dialog__body">
+          {down ? (
+            <div className="feedback-dialog__reasons" role="group" aria-label="哪里不好">
+              {DOWN_REASONS.map((r) => {
+                const on = reasons.includes(r);
+                return (
+                  <button key={r} type="button" className={"feedback-dialog__reason" + (on ? " feedback-dialog__reason--on" : "")} aria-pressed={on} onClick={() => setReasons((xs) => (on ? xs.filter((x) => x !== r) : [...xs, r]))}>
+                    {r}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
           <div className="feedback-dialog__stars">
             {[1, 2, 3, 4, 5].map((n) => (
               <button
@@ -108,9 +142,10 @@ export function FeedbackDialog({
               {shown > 0 ? STAR_LABELS[shown] : "点击评分(可选)"}
             </span>
           </div>
+          )}
           <textarea
             className="feedback-dialog__note"
-            placeholder="补充说明(可选)"
+            placeholder={down ? "具体哪里不对？(可选)" : "补充说明(可选)"}
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
@@ -124,10 +159,12 @@ export function FeedbackDialog({
           >
             取消
           </button>
+          {missingReason && <span className="feedback-dialog__hint">请至少选择一个原因</span>}
           <button
             type="button"
             className="feedback-dialog__btn feedback-dialog__btn--primary"
             onClick={submit}
+            disabled={missingReason}
           >
             提交
           </button>

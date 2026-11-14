@@ -31,6 +31,22 @@ async function digestOf(path: string, size: number): Promise<string | undefined>
     return hash.digest('hex');
   } finally { await fd.close(); }
 }
+const MIME_BY_EXT: Record<string, string> = {
+  pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', doc: 'application/msword',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', xls: 'application/vnd.ms-excel',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', zip: 'application/zip',
+};
+function formatBytes(n: number): string {
+  return n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+/** A file the model should open with its tools instead of reading inline (binary, or too large). */
+function reference(path: string, size: number, why: string): string {
+  const ext = basename(path).split('.').pop()?.toLowerCase() ?? '';
+  const type = MIME_BY_EXT[ext] ?? 'application/octet-stream';
+  return `<attachment name=${JSON.stringify(basename(path))} path=${JSON.stringify(path)} type=${JSON.stringify(type)} size=${JSON.stringify(formatBytes(size))}>
+${why}，未内联；需要时请用工具读取该路径。
+</attachment>`;
+}
 function imageMime(bytes: Buffer): string | undefined {
   if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return 'image/png';
   if (bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) return 'image/jpeg';
@@ -68,7 +84,8 @@ export class FileAccess {
       try {
         const before = await fd.stat();
         if (!identity(before, grant)) throw new Error('file_changed: select the file again');
-        if (before.size > IMAGE_LIMIT || (total += before.size) > TOTAL_LIMIT) throw new Error('attachment_too_large');
+        // Too large to read inline: hand the model the path instead of failing the send.
+        if (before.size > IMAGE_LIMIT || total + before.size > TOTAL_LIMIT) { text.push(reference(path, before.size, '文件较大')); continue; }
         const buffer = Buffer.alloc(before.size + 1);
         let length = 0;
         while (length < buffer.length) {
@@ -82,15 +99,19 @@ export class FileAccess {
         const mimeType = imageMime(bytes);
         if (mimeType) {
           if (!this.decodableImage(bytes)) throw new Error('invalid_image: file cannot be decoded or exceeds pixel limits');
+          total += bytes.length;
           images.push({ type: 'image', data: bytes.toString('base64'), mimeType });
         }
         else {
-          if (bytes.length > TEXT_LIMIT) throw new Error('attachment_too_large: text maximum 256 KiB');
-          let decoded: string;
-          try { decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { throw new Error('unsupported_attachment: expected image or UTF-8 text'); }
-          if (/[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(decoded)) throw new Error('unsupported_attachment: binary data');
-          // Quoted context is data, not an instruction supplied by the shell.
-          text.push(`<attachment name=${JSON.stringify(basename(path))}>\n${decoded}\n</attachment>`);
+          let decoded: string | undefined;
+          try { decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { decoded = undefined; }
+          if (decoded === undefined || /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(decoded)) text.push(reference(path, bytes.length, '二进制文件'));
+          else if (bytes.length > TEXT_LIMIT) text.push(reference(path, bytes.length, '文本较长'));
+          else {
+            total += bytes.length;
+            // Quoted context is data, not an instruction supplied by the shell.
+            text.push(`<attachment name=${JSON.stringify(basename(path))}>\n${decoded}\n</attachment>`);
+          }
         }
       } finally { await fd.close(); }
     }

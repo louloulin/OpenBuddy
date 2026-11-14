@@ -49,11 +49,30 @@ it("cancels on SDK AbortSignal and timeout and rejects stale resolutions", async
   const timed = ui.select("Timeout", ["x"], { timeout: 10 });
   expect(await timed).toBeUndefined();
   expect(events.at(-1).reason).toBe("timeout");
-  await expect(
-    ui.custom(() => {
+  // Terminal-only APIs degrade instead of throwing; the user is told once.
+  expect(
+    await ui.custom(() => {
       throw Error("should not run");
     }),
-  ).rejects.toThrow("not_implemented");
+  ).toBeUndefined();
+  await ui.custom(() => { throw Error("x"); });
+  expect(events.filter((e) => typeof e.message === "string" && e.message.includes("自定义界面"))).toHaveLength(1);
+  expect(ui.theme.fg("accent", "hi")).toBe("hi");
+  ui.setEditorText("draft");
+  expect(ui.getEditorText()).toBe("draft");
+  expect(() => ui.setFooter(() => ({}) as never)).not.toThrow();
+  expect(ui.setTheme("dark").success).toBe(false);
+});
+it("waits for the user without a default timeout", async () => {
+  const events: any[] = [];
+  const bridge = new ExtensionUiBridge((_n, p) => events.push(p));
+  const ui = bridge.context("s");
+  const answer = ui.confirm("Sure?", "msg");
+  const request = events.at(-1);
+  expect(request.timeoutMs).toBeUndefined();
+  await new Promise((r) => setTimeout(r, 20));
+  bridge.resolve({ sessionId: "s", requestId: request.requestId, value: true });
+  expect(await answer).toBe(true);
 });
 it("prevents stale contexts from opening new dialogs after cancellation or same-id replacement", async () => {
   const events: any[] = [];

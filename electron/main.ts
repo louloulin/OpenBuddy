@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, Menu, nativeTheme, safeStorage, shell, session, type MenuItemConstructorOptions } from 'electron';
+import { app, BrowserWindow, dialog, Menu, nativeTheme, Notification, protocol, safeStorage, shell, session, type MenuItemConstructorOptions } from 'electron';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -7,6 +7,7 @@ import { registerIpc } from './ipc/register.js';
 import { isEvent } from './shared/contract.js';
 import { WorkspaceAccess } from './shared/workspace-access.js';
 import { createEngineHandlers } from './ipc/handlers/index.js';
+import { PREVIEW_SCHEME, previewResponse } from './services/preview-protocol.js';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const developmentURL = 'http://127.0.0.1:1420/';
@@ -15,12 +16,17 @@ let shutdown: (() => Promise<void>) | undefined;
 let quitting = false;
 let runningTasks: (() => Promise<unknown[]>) | undefined;
 let cleanup: Promise<void> | undefined;
+let previewRoots: () => string[] = () => [];
 function disposeEngine(): Promise<void> {
   return cleanup ??= Promise.resolve().then(() => shutdown?.()).catch(error => { console.error('Engine shutdown failed', error); });
 }
 
 function external(url: string): void {
-  try { const parsed = new URL(url); if (['https:', 'http:'].includes(parsed.protocol) && !parsed.username && !parsed.password) void shell.openExternal(parsed.href); } catch { /* Invalid destinations are blocked. */ }
+  try {
+    const parsed = new URL(url);
+    // mailto: hands a share intent to the mail client (20261115-ui U8.1); nothing else leaves the app.
+    if ((['https:', 'http:'].includes(parsed.protocol) && !parsed.username && !parsed.password) || parsed.protocol === 'mailto:') void shell.openExternal(parsed.href);
+  } catch { /* Invalid destinations are blocked. */ }
 }
 
 async function createWindow(): Promise<void> {
@@ -30,18 +36,24 @@ async function createWindow(): Promise<void> {
     frame: false, show: false, backgroundColor: nativeTheme.shouldUseDarkColors ? '#1a1a1a' : '#ffffff',
     // macOS keeps native traffic lights over the custom sidebar header.
     ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 16, y: 18 } } : {}),
-    webPreferences: { preload: join(root, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true, allowRunningInsecureContent: false, webviewTag: false },
+    // plugins: Chromium's PDF viewer inside the artifact preview iframe.
+    webPreferences: { preload: join(root, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true, allowRunningInsecureContent: false, webviewTag: false, plugins: true },
   });
   window = win;
   win.webContents.on('console-message', event => { console.log('RENDERER_CONSOLE', event.level, event.message); });
   win.webContents.on('render-process-gone', (_event, details) => { console.error('RENDERER_GONE', details.reason); });
   win.webContents.on('did-fail-load', (_event, code, description) => { console.error('RENDERER_LOAD_FAILED', code, description); });
-  const engine = await createEngineHandlers({ userData: app.getPath('userData'), safeStorage, shell, emit: (event: string, payload: unknown) => { if (isEvent(event) && !win.isDestroyed()) win.webContents.send(event, payload); } });
+  let notificationsEnabled = () => true;
+  const notify = notifier(win, () => notificationsEnabled());
+  const engine = await createEngineHandlers({ userData: app.getPath('userData'), safeStorage, shell, emit: (event: string, payload: unknown) => { if (isEvent(event) && !win.isDestroyed()) { win.webContents.send(event, payload); notify(event, payload); } } });
+  previewRoots = engine.previewRoots;
+  notificationsEnabled = engine.notificationsEnabled;
   cleanup = undefined;
   shutdown = async () => { await engine.shutdown(); };
   runningTasks = async () => { try { return await engine.handlers.tasks_list({}) as unknown[]; } catch { return []; } };
   const workspaceAccess = await WorkspaceAccess.create(app.getPath('userData'));
-  const unregister = registerIpc(win, engine.handlers, trustedURL, workspaceAccess);
+  const unregister = registerIpc(win, engine.handlers, trustedURL, workspaceAccess, { attachmentsDir: join(app.getPath('userData'), 'attachments'), exportHtml: engine.exportHtml });
+  win.on('focus', () => { if (process.platform !== 'win32') app.setBadgeCount(0); });
   win.webContents.setWindowOpenHandler(({ url }) => { external(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (event, url) => { if (url.split('#')[0] !== trustedURL) { event.preventDefault(); external(url); } });
   win.webContents.on('will-attach-webview', event => event.preventDefault());
@@ -80,6 +92,44 @@ async function createWindow(): Promise<void> {
   }
 }
 
+/**
+ * System notifications (20261115-ui U6.1): only while the window is not
+ * focused — approval needed, task finished, task failed. Clicking one brings
+ * the window back and opens that session.
+ */
+function notifier(win: BrowserWindow, enabled: () => boolean): (event: string, payload: unknown) => void {
+  const running = new Set<string>();
+  let unseen = 0;
+  const show = (sessionId: string, title: string, body: string) => {
+    if (win.isDestroyed() || win.isFocused() || !enabled() || !Notification.isSupported() || process.env.OPENBUDDY_SMOKE_TEST === '1') return;
+    const note = new Notification({ title, body, silent: false });
+    note.on('click', () => {
+      if (win.isDestroyed()) return;
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+      win.webContents.send('app://focus-session', { sessionId });
+    });
+    note.show();
+    unseen++;
+    if (process.platform !== 'win32') app.setBadgeCount(unseen);
+  };
+  win.on('focus', () => { unseen = 0; });
+  return (event, payload) => {
+    const data = (payload ?? {}) as { sessionId?: unknown; status?: unknown; toolKind?: unknown; destructive?: unknown };
+    const sessionId = typeof data.sessionId === 'string' ? data.sessionId : '';
+    if (!sessionId) return;
+    if (event === 'agent://permission') {
+      show(sessionId, data.destructive ? 'Buddy 想删除文件，需要你确认' : 'Buddy 需要你的确认', `等待批准：${String(data.toolKind ?? '操作')}`);
+    } else if (event === 'agent://session-status') {
+      if (data.status === 'running') { running.add(sessionId); return; }
+      if (!running.delete(sessionId)) return;
+      if (data.status === 'failed') show(sessionId, '任务失败', '点击查看出了什么问题');
+      else show(sessionId, '任务完成', 'Buddy 已经完成了这个任务');
+    }
+  };
+}
+
 /** Ask before closing while tasks are still running in background sessions. */
 async function confirmQuit(win: BrowserWindow | null): Promise<boolean> {
   if (process.env.OPENBUDDY_SMOKE_TEST === '1' || !runningTasks) return true;
@@ -103,15 +153,20 @@ function installMenu(): void {
 }
 
 app.setName('OpenBuddy');
+// Must be registered before ready: artifacts preview on their own standard, secure origin.
+protocol.registerSchemesAsPrivileged([{ scheme: PREVIEW_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);
 if (process.env.OPENBUDDY_SMOKE_TEST === '1') app.setPath('userData', mkdtempSync(join(tmpdir(), 'openbuddy-smoke-')));
 app.whenReady().then(async () => {
   // Only clipboard writes are granted; everything else (camera, notifications, …) stays denied.
   session.defaultSession.setPermissionRequestHandler((_contents, permission, callback) => callback(permission === 'clipboard-sanitized-write'));
   session.defaultSession.setPermissionCheckHandler((_contents, permission) => permission === 'clipboard-sanitized-write');
   installMenu();
+  session.defaultSession.protocol.handle(PREVIEW_SCHEME, request => previewResponse(request.url, previewRoots()));
   const dev = !app.isPackaged;
-  const csp = `default-src 'self'; script-src 'self'${dev ? " 'unsafe-inline'" : ''}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'${dev ? ' ws://127.0.0.1:1420' : ''}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'`;
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => callback({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [csp] } }));
+  const csp = `default-src 'self'; script-src 'self'${dev ? " 'unsafe-inline'" : ''}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'${dev ? ' ws://127.0.0.1:1420' : ''}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src ${PREVIEW_SCHEME}:`;
+  // The app policy belongs to the app's own pages. Preview responses carry their own, stricter
+  // CSP, and Chromium's PDF viewer (chrome-extension:) needs its chrome:// resources.
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => callback(/^(https?|file):/.test(details.url) ? { responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [csp] } } : {}));
   await createWindow();
   app.on('activate', () => { if (!window) void createWindow(); });
 }).catch(error => { console.error('OpenBuddy startup failed', error); app.exit(1); });

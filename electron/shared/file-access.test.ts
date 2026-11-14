@@ -46,14 +46,17 @@ it('expires native grants after the window-scoped authorization lifetime', async
   await expect(access.attach([{ path }])).rejects.toThrow('file_not_authorized');
   expect(await access.allowsNativePath(path)).toBe(false);
 });
-it('rejects an aggregate image transfer over 20 MiB before returning data', async () => {
+it('never inlines more than 20 MiB: files past the budget become path references', async () => {
   const { FileAccess } = await import('./file-access.js');
   const access = new FileAccess(() => true), dir = await fixture(), refs = [];
   for (let n = 0; n < 3; n++) {
     const path = join(dir, `${n}.png`);
     await writeFile(path, png); await truncate(path, 8 * 1024 * 1024); await access.grant(path); refs.push({ path });
   }
-  await expect(access.attach(refs)).rejects.toThrow('attachment_too_large');
+  const result = await access.attach(refs);
+  expect(result.images).toHaveLength(2);
+  expect(result.text).toContain('2.png');
+  expect(result.text).toContain('未内联');
 });
 it('uses bytes rather than an image extension and enforces bounded text and total size', async () => {
   const { FileAccess } = await import('./file-access.js');
@@ -61,9 +64,15 @@ it('uses bytes rather than an image extension and enforces bounded text and tota
   const fake = join(dir, 'fake.png'), text = join(dir, 'note.txt'), huge = join(dir, 'huge.png');
   await writeFile(fake, Buffer.from([0, 255, 1, 2])); await writeFile(text, 'hello workspace'); await writeFile(huge, png); await truncate(huge, 10 * 1024 * 1024 + 1);
   await access.grant(fake); await access.grant(text); await access.grant(huge);
-  await expect(access.attach([{ path: fake }])).rejects.toThrow('unsupported_attachment');
+  // Bytes decide: a fake .png is not inlined as an image, it is referenced as a binary file.
+  const fakeResult = await access.attach([{ path: fake }]);
+  expect(fakeResult.images).toHaveLength(0);
+  expect(fakeResult.text).toMatch(/二进制文件，未内联/);
   expect((await access.attach([{ path: text }])).text).toContain('hello workspace');
-  await expect(access.attach([{ path: huge }])).rejects.toThrow('attachment_too_large');
+  // Too large to read: referenced by path without reading its bytes.
+  const hugeResult = await access.attach([{ path: huge }]);
+  expect(hugeResult.images).toHaveLength(0);
+  expect(hugeResult.text).toMatch(/文件较大，未内联/);
   const alias = join(dir, 'alias'); await symlink(text, alias);
   await expect(access.attach([{ path: alias }])).rejects.toThrow('file_not_authorized');
 });

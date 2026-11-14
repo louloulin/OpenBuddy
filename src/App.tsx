@@ -16,6 +16,7 @@ import { ModelRuntimeContext, type ModelOption } from "./components/ModelSelecto
 import { useExtensionUiStore } from "./stores/extension-ui-store";
 import { useAgentModelStore } from "./stores/agent-model-store";
 import { useSessionStore } from "./stores/session-store";
+import { useArtifactsStore } from "./stores/artifacts-store";
 import { useSessionsStore } from "./stores/sessions-store";
 import { usePermissionStore } from "./stores/permission-store";
 import { useQuestionStore } from "./stores/question-store";
@@ -58,6 +59,11 @@ import {
 import { IS_MACOS } from "./lib/platform";
 import { friendlyError } from "./lib/error-format";
 import { AppDialogHost } from "./components/AppDialog";
+import { ImageLightboxHost } from "./components/ImageLightbox";
+import { SearchPalette, ShortcutsPanel } from "./components/ShortcutsPanel";
+import { matchShortcut } from "./lib/shortcuts";
+import { copyText } from "./lib/clipboard";
+import { useUnseenStore } from "./stores/unseen-store";
 import { parseUserText, baseName, EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END } from "./lib/user-text";
 
 
@@ -91,6 +97,17 @@ function extractMarkdownBody(raw: string): string {
 }
 
 
+
+const LEVEL_ORDER = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+/** What Pi will use for a requested level (unset = Pi's default "medium"): the next supported one up. */
+function clampThinking(requested: string | undefined, levels: string[]): string | undefined {
+  if (!levels.length) return undefined;
+  const want = requested ?? "medium";
+  if (levels.includes(want)) return want;
+  const i = LEVEL_ORDER.indexOf(want);
+  return levels.find(level => LEVEL_ORDER.indexOf(level) >= i) ?? levels[levels.length - 1];
+}
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -108,6 +125,9 @@ function Shell() {
   const [trustRequest, setTrustRequest] = useState<{ cwd?: string; reason?: string } | null>(null);
   const [placeholderView, setPlaceholderView] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  /** Ctrl/Cmd+K search and the Ctrl/Cmd+/ shortcut list (20261115-ui U8.2). */
+  const [palette, setPalette] = useState<"search" | "shortcuts" | null>(null);
+
   const [toast, setToast] = useState<string | null>(null);
   const focusedModelSession = useSessionStore(state => state.sessionId);
   const homeModelKey = useAgentModelStore(state => state.homeModelKey);
@@ -118,10 +138,15 @@ function Shell() {
   const modelOperation = useRef(0);
   const modelPending = useRef(false);
   const [models, setModels] = useState<ModelOption[]>([]);
+  // Home (no session yet): the thinking level new tasks start with = defaults.defaultThinkingLevel.
+  const [homeThinking, setHomeThinking] = useState<string | undefined>(undefined);
+  useEffect(() => { void agentsDefaultsGet().then(d => setHomeThinking(d.defaultThinkingLevel)).catch(() => {}); }, [models]);
+  const homeLevels = models.find(model => model.id === homeModelKey)?.availableThinkingLevels ?? [];
   const [workspaces, setWorkspaces] = useState<WorkspaceInfo[]>([]);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showToastRef = useRef<(message: string) => void>(() => {});
   const cwdRef = useRef<string>("");
+  const selectSessionRef = useRef<((sessionId: string, cwd?: string) => Promise<void>) | null>(null);
   const resourceSessionRef = useRef<string | undefined>(undefined);
 
   const sessionStore = useSessionStore;
@@ -192,7 +217,7 @@ function Shell() {
         unlisten = await subscribeAgentEvents({
           onModelState: state => useAgentModelStore.getState().apply(state),
           onUpdate: (u) => {
-            sessionStore.getState().applyUpdate(u);
+            sessionStore.getState().queueUpdate(u);
             if (u.type === "queue_update" && u.sessionId && Array.isArray(u.steering) && Array.isArray(u.followUp)) {
               usePiQueueStore.getState().apply(u.sessionId, { steering: u.steering.filter((text): text is string => typeof text === "string"), followUp: u.followUp.filter((text): text is string => typeof text === "string") });
             }
@@ -206,6 +231,14 @@ function Shell() {
             }
           },
           onPermissionDismiss: (event) => permissionStore.getState().dismiss(event.requestId, event.sessionId),
+          onArtifacts: (event) => { void useArtifactsStore.getState().refresh(event.sessionId); },
+          // A system notification was clicked: open that session.
+          onFocusSession: (event) => {
+            const state = sessionsStore.getState();
+            const entry = state.independent.find((x) => x.sessionId === event.sessionId)
+              ?? Object.values(state.workspaceSessions).flat().find((x) => x.sessionId === event.sessionId);
+            void selectSessionRef.current?.(event.sessionId, entry?.cwd);
+          },
           onSessionStatus: (event) => {
             sessionsStore.getState().upsert({ sessionId: event.sessionId, status: sessionStatusOf(event.status) });
           },
@@ -231,6 +264,7 @@ function Shell() {
             if (p.sessionId !== sessionStore.getState().sessionId && p.stopReason !== "cancelled") {
               const title = sessionsStore.getState().titleOf?.(p.sessionId) ?? "任务";
               void notificationAppend("session_complete", failed ? `任务失败：${title}` : `任务完成：${title}`, undefined, p.sessionId, failed ? "error" : "info");
+              if (!failed) useUnseenStore.getState().mark(p.sessionId);
               void dispatchNotification({
                 title: failed ? "OpenBuddy 任务失败" : "OpenBuddy 任务完成",
                 body: title,
@@ -536,6 +570,12 @@ function Shell() {
       if (operation === modelOperation.current) { modelPending.current = false; setModelBusy(false); }
     }
   };
+  /** Home: save the level new tasks start with (the engine reads it at agent_new_session). */
+  const handleHomeThinkingChange = async (level: string) => {
+    const defaults = await agentsDefaultsGet();
+    await agentsDefaultsSave({ ...defaults, defaultThinkingLevel: level });
+    setHomeThinking(level);
+  };
   const handleThinkingChange = async (level: string) => {
     const sid = sessionStore.getState().sessionId;
     if (!sid || modelPending.current || sessionStore.getState().streaming) throw new Error("请在会话空闲时调整思考等级");
@@ -613,6 +653,8 @@ function Shell() {
     sessionStore.getState().hydrate(sessionId, snapshot.messages, snapshot.busy, force);
     usePiQueueStore.getState().apply(sessionId, snapshot.queue);
     sessionsStore.getState().upsert({ sessionId, status: sessionStatusOf(snapshot.status) });
+    // Artifacts need the loaded session; ChatView's own request may have raced the load.
+    void useArtifactsStore.getState().refresh(sessionId);
     return snapshot;
   };
 
@@ -631,6 +673,8 @@ function Shell() {
       if (operation === modelOperation.current) { modelPending.current = false; setModelBusy(false); }
     }
   };
+
+  selectSessionRef.current = handleSelectSession;
 
   // Rewind rewrites the backend history, so the cached transcript is rebuilt from the engine.
   const handleRewound = async () => {
@@ -798,10 +842,32 @@ function Shell() {
     }
   };
 
+  // Global shortcuts from the registry (src/lib/shortcuts.ts); the latest handlers via a ref.
+  const shortcutRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  shortcutRef.current = (e) => {
+    if (e.isComposing || e.defaultPrevented) return;
+    const run = (fn: () => void) => { e.preventDefault(); fn(); };
+    if (matchShortcut(e, "newTask")) run(() => { setPalette(null); handleNewSession(); });
+    else if (matchShortcut(e, "search")) run(() => setPalette((p) => (p === "search" ? null : "search")));
+    else if (matchShortcut(e, "shortcuts")) run(() => setPalette((p) => (p === "shortcuts" ? null : "shortcuts")));
+    else if (matchShortcut(e, "settings")) run(() => setSettingsOpen(true));
+    else if (matchShortcut(e, "toggleSidebar")) run(() => setSidebarCollapsed((v) => !v));
+    else if (matchShortcut(e, "copyLast")) run(() => {
+      const last = [...sessionStore.getState().messages].reverse().find((m) => m.role === "assistant" && m.parts.some((p) => p.kind === "text" && p.text.trim()));
+      if (!last) { showToast("还没有可复制的回答"); return; }
+      const text = last.parts.filter((p): p is Extract<typeof p, { kind: "text" }> => p.kind === "text").map((p) => p.text).join("\n\n");
+      void copyText(text).then(() => showToast("已复制最后一条回答"), () => showToast("复制失败"));
+    });
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => shortcutRef.current(e);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const activeNav = placeholderView ?? (currentSessionId ? "" : "新建任务");
 
   return (
-    <ModelRuntimeContext.Provider value={{ busy: modelBusy, unavailableReason: !focusedModelSession && invalidDefault ? "默认模型不可用，请重新选择模型" : undefined, canSend: !!currentModelId && models.some(model => model.id === currentModelId), thinkingLevel: activeModelState?.thinkingLevel, thinkingLevels: activeModelState?.availableThinkingLevels ?? [], onThinkingChange: activeModelState ? handleThinkingChange : undefined }}>
+    <ModelRuntimeContext.Provider value={{ busy: modelBusy, unavailableReason: !focusedModelSession && invalidDefault ? "默认模型不可用，请重新选择模型" : undefined, canSend: !!currentModelId && models.some(model => model.id === currentModelId), thinkingLevel: focusedModelSession ? activeModelState?.thinkingLevel : clampThinking(homeThinking, homeLevels), thinkingLevels: focusedModelSession ? activeModelState?.availableThinkingLevels ?? [] : homeLevels, onThinkingChange: focusedModelSession ? (activeModelState ? handleThinkingChange : undefined) : homeLevels.length > 1 ? handleHomeThinkingChange : undefined }}>
     <div className={"app" + (IS_MACOS ? " app--macos" : "")}>
       {/* macOS 使用系统原生 Overlay 标题栏(红绿灯 + 原生菜单栏),
           不再渲染自绘 TitleBar;Windows/Linux 保持自绘。 */}
@@ -816,7 +882,7 @@ function Shell() {
           onOpenSettings={() => setSettingsOpen(true)}
           onToggleCollapse={() => setSidebarCollapsed(true)}
           onToggleWorkspace={handleToggleWorkspace}
-          onOpenSearch={() => showToast("会话搜索将在后续版本提供")}
+          onOpenSearch={() => setPalette("search")}
           onPlaceholder={handlePlaceholder}
           onToast={showToast}
           onOpenProject={handleOpenProjectFromSidebar}
@@ -958,7 +1024,10 @@ function Shell() {
         </main>
       </div>
       <Toast message={toast} />
+      {palette === "search" && <SearchPalette sessions={[...useSessionsStore.getState().independent, ...Object.values(useSessionsStore.getState().workspaceSessions).flat()]} onClose={() => setPalette(null)} onNewTask={handleNewSession} onOpen={(s) => { void handleSelectSession(s.sessionId, s.cwd); }} />}
+      {palette === "shortcuts" && <ShortcutsPanel onClose={() => setPalette(null)} />}
       <AppDialogHost />
+      <ImageLightboxHost />
       <SettingsPanel open={settingsOpen} initialSection={settingsSection} onClose={() => { setSettingsOpen(false); setSettingsSection(undefined); }} onModelsChanged={refreshModels} />
       <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} init={init} />
       <FolderTrustDialog

@@ -44,22 +44,21 @@ export const SlashCommands = forwardRef<SlashCommandsHandle, SlashCommandsProps>
   const [activeIdx, setActiveIdx] = useState(0);
   // Escape hides the menu for the current token until it changes.
   const [dismissedAt, setDismissedAt] = useState<number | null>(null);
-  const loadedRef = useRef(false);
   const listRef = useRef<HTMLUListElement>(null);
 
   const token = useMemo(() => slashToken(text, cursor), [text, cursor]);
+  const open = !!token;
 
-  // Load lazily the first time a slash token appears so new extensions show up.
+  // Reload every time the menu opens, so skills / extensions / prompts added since show up
+  // (20261115-ui U4.8, D7). The previous list stays visible while the new one loads.
   useEffect(() => {
-    if (!token || loadedRef.current) return;
-    loadedRef.current = true;
+    if (!open) return;
+    let stale = false;
     commandsList()
-      .then(setCommands)
-      .catch(() => {
-        loadedRef.current = false;
-        setCommands([]);
-      });
-  }, [token]);
+      .then((list) => { if (!stale) setCommands(list); })
+      .catch(() => { /* keep what we had */ });
+    return () => { stale = true; };
+  }, [open]);
 
   const matches = useMemo(() => {
     if (!token) return [] as SlashCommand[];

@@ -88,6 +88,28 @@ export function add(a: number, b: number): number {
 | 测试 | 待运行 |
 
 > 提示：以上内容由本地测试服务器生成。`;
+const APPLY_ANSWER = [
+  '按你的要求整理好了会议纪要模板，点代码块右上角的「应用」即可写入文件（写入前会先给你看改动）：',
+  '',
+  '```md title="notes/meeting.md"',
+  '# 周会纪要',
+  '',
+  '- 日期：2026-11-14',
+  '- 参会：产品、设计、研发',
+  '',
+  '## 结论',
+  '1. 工作台改为标签页',
+  '2. 长会话首屏只渲染最近 30 段',
+  '```',
+  '',
+  '另外，`src/app.ts` 第 3–5 行是这样调用的（只是摘录，不能直接覆盖整个文件）：',
+  '',
+  '```ts:3:5:src/app.ts',
+  'const bench = createWorkbench();',
+  'bench.open("notes/meeting.md");',
+  'bench.focus();',
+  '```',
+].join('\n');
 const LONG_CODE = Array.from({ length: 30 }, (_, i) => i === 0 ? 'export function plan(steps: string[]) {' : i === 29 ? '}' : `  console.log("step ${i}", steps[${i - 1}] ?? "-");`).join('\n');
 const LONG_ANSWER = `## 重构方案
 
@@ -110,6 +132,38 @@ ${LONG_CODE}
 ---
 
 完成后再运行一次 \`pnpm test\`。`;
+// __FILES__: an agent turn that writes several artifacts (streamed slowly so the
+// "生成中 · KB" progress is visible), then edits one, then answers.
+const REPORT_MD = ['# 季度销售分析报告（初稿）', '', '> 数据来源：data/sales.csv，统计口径为含税金额。', '',
+  '## 一、总体结论', '', '- 本季度销售额 **1,284 万元**，环比增长 12.4%', '- 华东区贡献 41%，仍是最大市场', '- 新品线占比首次超过 20%', '',
+  '## 二、分区表现', '', '| 区域 | 销售额（万元） | 环比 | 备注 |', '| --- | ---: | ---: | --- |', '| 华东 | 526 | +9.8% | 稳定 |', '| 华南 | 301 | +18.2% | 新品拉动 |', '| 华北 | 254 | +7.1% | — |', '| 西部 | 203 | +15.6% | 渠道扩张 |', '',
+  '## 三、下一步', '', '1. 加大华南新品投放', '2. 西部渠道复制华南经验', '3. 每周跟踪库存周转', '',
+  ...Array.from({ length: 60 }, (_, i) => `附注 ${i + 1}：本段为明细说明，用于演示较长文件写入时的进度显示与预览分块渲染，内容不影响结论。`)].join('\n') + '\n';
+const INDEX_HTML = `<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>销售看板</title>
+<style>body{font-family:system-ui,sans-serif;margin:0;padding:32px;background:#f7f6f3;color:#1d1c1a}h1{margin:0 0 4px;font-size:26px}p{color:#6b6862}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin:24px 0}.card{background:#fff;border-radius:14px;padding:18px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.card b{display:block;font-size:24px;margin-top:6px}button{border:0;border-radius:999px;background:#1d1c1a;color:#fff;padding:9px 16px;font-size:14px;cursor:pointer}</style></head>
+<body><h1>季度销售看板</h1><p>由 Buddy 生成 · 数据截至本季度末</p>
+<div class="grid"><div class="card">总销售额<b>1,284 万</b></div><div class="card">环比<b>+12.4%</b></div><div class="card">新品占比<b>21%</b></div><div class="card">客单价<b>¥ 3,420</b></div></div>
+<button id="b">点我计数：0</button><script>let n=0;const b=document.getElementById('b');b.onclick=()=>{b.textContent='点我计数：'+(++n)};</script></body></html>
+`;
+const SALES_CSV = 'month,region,amount,growth\n' + Array.from({ length: 24 }, (_, i) => `2026-${String((i % 12) + 1).padStart(2, '0')},${['华东', '华南', '华北', '西部'][i % 4]},${(100 + i * 7.5).toFixed(1)},${(i % 5) * 2.4}%`).join('\n') + '\n';
+const SUMMARY_JSON = JSON.stringify({ quarter: '2026Q3', total: 12840000, currency: 'CNY', regions: [{ name: '华东', share: 0.41 }, { name: '华南', share: 0.23 }, { name: '华北', share: 0.2 }, { name: '西部', share: 0.16 }], notes: ['含税金额', '不含退款'] });
+// __STRESS__ (20261115-ui U0.1): 30 tool calls, a 1MB write streamed in 400 pieces, then a ~20k-char answer with code and tables.
+const STRESS_ANSWER = Array.from({ length: 12 }, (_, i) => [
+  `## 第 ${i + 1} 部分：模块拆分与验证`, '',
+  ...Array.from({ length: 6 }, (_, j) => `${j + 1}. 第 ${i + 1}.${j + 1} 步：读取现有实现，列出依赖关系，确认可以单独验证后再提交，避免一次改动过大导致回滚困难。`), '',
+  '```ts', ...Array.from({ length: 18 }, (_, k) => `export function step${i}_${k}(input: number[]): number { return input.reduce((a, b) => a + b * ${k + 1}, ${i}); }`), '```', '',
+  '| 模块 | 负责人 | 状态 | 备注 |', '| --- | --- | --- | --- |', ...Array.from({ length: 6 }, (_, r) => `| 模块 ${i}-${r} | Buddy | ${['进行中', '已完成', '待开始'][r % 3]} | 第 ${r + 1} 行说明文字 |`), '',
+  '这一部分完成后再运行一次全部测试，并记录耗时，方便和基线对比。', '',
+].join('\n')).join('\n');
+const STRESS_BIG = 'x'.repeat(1024 * 1024);
+async function streamToolArgs(chunk, index, id, name, args, pieces, delay) {
+  chunk({ tool_calls: [{ index, id, type: 'function', function: { name, arguments: '' } }] });
+  const json = JSON.stringify(args);
+  const size = Math.ceil(json.length / pieces);
+  for (let i = 0; i < json.length; i += size) { chunk({ tool_calls: [{ index, function: { arguments: json.slice(i, i + size) } }] }); if (delay) await sleep(delay); }
+}
 function chunker(res, model) {
   return (delta, finish_reason = null, extra = {}) => res.write(`data: ${JSON.stringify({ id: 'fx', object: 'chat.completion.chunk', created: 1, model, choices: [{ index: 0, delta, finish_reason }], ...extra })}\n\n`);
 }
@@ -138,6 +192,50 @@ const fixtureServer = createServer(async (req, res) => {
   const chunk = chunker(res, input.model);
   chunk({ role: 'assistant' });
   const finish = (reason = 'stop') => { chunk({}, reason, {}); res.write(`data: ${JSON.stringify({ id: 'fx', object: 'chat.completion.chunk', created: 1, model: input.model, choices: [], usage: { prompt_tokens: 1200, completion_tokens: 180, total_tokens: 1380 } })}\n\n`); res.end('data: [DONE]\n\n'); };
+  const toolsSinceUser = messages.slice(messages.findLastIndex(m => m.role === 'user') + 1).filter(m => m.role === 'tool').length;
+  if (lastUserText.includes('__STRESS__')) {
+    if (toolsSinceUser === 0) {
+      await streamText(chunk, '先把目录结构看一遍。', fixture.delayMs);
+      for (let i = 0; i < 30; i++) chunk({ tool_calls: [{ index: i, id: `call_ls_${i}`, type: 'function', function: { name: 'ls', arguments: JSON.stringify({ path: '.' }) } }] });
+      finish('tool_calls'); return;
+    }
+    if (toolsSinceUser === 30) {
+      await streamText(chunk, '写入一个 1MB 的数据文件。', fixture.delayMs);
+      await streamToolArgs(chunk, 0, 'call_big_1', 'write', { path: 'stress/big.txt', content: STRESS_BIG }, 400, fixture.stressDelay ?? 8);
+      finish('tool_calls'); return;
+    }
+    await streamText(chunk, STRESS_ANSWER, fixture.stressAnswerDelay ?? 4);
+    finish(); return;
+  }
+  if (lastUserText.includes('__FILES__')) {
+    if (toolsSinceUser === 0) {
+      for (const t of ['用户要一份分析报告和看板。', '先写报告，再生成网页和数据文件。']) { chunk({ reasoning_content: t }); await sleep(150); }
+      await streamText(chunk, '好的，我先生成报告、网页看板和整理后的数据。', fixture.delayMs);
+      await streamToolArgs(chunk, 0, 'call_w_1', 'write', { path: 'docs/report.md', content: REPORT_MD }, 40, fixture.filesDelay ?? 120);
+      await streamToolArgs(chunk, 1, 'call_w_2', 'write', { path: 'site/index.html', content: INDEX_HTML }, 6, 60);
+      await streamToolArgs(chunk, 2, 'call_w_3', 'write', { path: 'data/sales.csv', content: SALES_CSV }, 3, 40);
+      await streamToolArgs(chunk, 3, 'call_w_4', 'write', { path: 'data/summary.json', content: SUMMARY_JSON }, 2, 40);
+      finish('tool_calls'); return;
+    }
+    if (toolsSinceUser === 4) {
+      await streamText(chunk, '把报告标题从初稿改成终稿。', fixture.delayMs);
+      await streamToolArgs(chunk, 0, 'call_e_1', 'edit', { path: 'docs/report.md', edits: [{ oldText: '季度销售分析报告（初稿）', newText: '季度销售分析报告（终稿）' }, { oldText: '3. 每周跟踪库存周转', newText: '3. 每周跟踪库存周转\n4. 月底复盘新品毛利' }] }, 2, 40);
+      finish('tool_calls'); return;
+    }
+    await streamText(chunk, '已完成：\n\n- `docs/report.md` 季度分析报告（已定稿）\n- `site/index.html` 可交互的销售看板\n- `data/sales.csv`、`data/summary.json` 整理后的数据\n\n可以在右侧工作台预览、编辑或还原这些文件。', fixture.delayMs / 3);
+    finish(); return;
+  }
+  if (lastUserText.includes('__RM__')) {
+    if (toolsSinceUser === 0) {
+      await streamText(chunk, '清理旧的构建产物。', fixture.delayMs);
+      chunk({ tool_calls: [{ index: 0, id: 'call_rm_1', type: 'function', function: { name: 'bash', arguments: '' } }] });
+      chunk({ tool_calls: [{ index: 0, function: { arguments: '{"command":"rm -rf build dist/old"}' } }] });
+      finish('tool_calls'); return;
+    }
+    const denied = typeof last?.content === 'string' && last.content.includes('用户拒绝');
+    await streamText(chunk, denied ? `收到，你拒绝了删除（${String(last.content).slice(0, 60)}）。我改为先把 build 目录移到 build.bak 备份。` : '已清理完成。', fixture.delayMs);
+    finish(); return;
+  }
   if (last?.role === 'tool') {
     await streamText(chunk, '命令已执行，输出为 `hi`。工具调用正常完成。', fixture.delayMs);
     finish(); return;
@@ -153,6 +251,11 @@ const fixtureServer = createServer(async (req, res) => {
     await streamText(chunk, ANSWER.slice(0, 160), fixture.delayMs);
     await new Promise(r => fixture.held.push(r));
     await streamText(chunk, ANSWER.slice(160), 20);
+    finish(); return;
+  }
+  if (lastUserText.includes('__APPLY__')) {
+    // 20261115-ui U1.7: 「应用」 only on a block that names a whole file; an excerpt keeps its line range.
+    await streamText(chunk, APPLY_ANSWER, fixture.delayMs / 6);
     finish(); return;
   }
   if (lastUserText.includes('__LONG__')) {

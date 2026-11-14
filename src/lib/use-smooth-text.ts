@@ -40,14 +40,25 @@ export function useSmoothText(target: string, live: boolean): string {
   // Not an extension of what is on screen (final snapshot, edit): jump.
   if (animate && !target.startsWith(shownRef.current)) shownRef.current = target;
 
+  // Wakes the loop when new text arrives after it went idle.
+  const wakeRef = useRef<(() => void) | null>(null);
+  useEffect(() => { wakeRef.current?.(); }, [target]);
+
   useEffect(() => {
     if (!animate) {
       shownRef.current = targetRef.current;
       return;
     }
     let raf = 0;
+    let idle = false;
     let last = performance.now();
     let carry = 0;
+    wakeRef.current = () => {
+      if (!idle) return;
+      idle = false;
+      last = performance.now();
+      raf = window.requestAnimationFrame(tick);
+    };
     const tick = (now: number) => {
       const elapsed = now - last;
       if (elapsed >= FRAME_MS) {
@@ -66,13 +77,19 @@ export function useSmoothText(target: string, live: boolean): string {
             setShown(next);
           }
         } else {
+          // Caught up: stop the loop until more text arrives.
           carry = 0;
+          idle = true;
+          return;
         }
       }
       raf = window.requestAnimationFrame(tick);
     };
     raf = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(raf);
+    return () => {
+      wakeRef.current = null;
+      window.cancelAnimationFrame(raf);
+    };
   }, [animate]);
 
   if (!animate) return target;

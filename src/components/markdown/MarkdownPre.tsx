@@ -12,8 +12,9 @@ import { extractCodeFromChildren } from "./utils/collect-text";
 import type { MarkdownConfig } from "./types";
 
 type FileInfo = {
-  startLine: number;
-  endLine: number;
+  /** Absent when the fence names a whole file (`ts:src/a.ts`, ```ts title="src/a.ts"```). */
+  startLine?: number;
+  endLine?: number;
   filePath: string;
   fileName: string;
   metaLanguage?: string;
@@ -55,6 +56,13 @@ function parseMeta(meta: string | undefined | null): FileInfo | null {
       fileName: filePath.split(/[\\/]/).pop() || filePath,
       metaLanguage: match2[1],
     };
+  }
+
+  // `lang:path` without lines: the block is the whole file, so it can be applied.
+  const match4 = meta.match(/^([a-zA-Z][a-zA-Z0-9+#-]*):([^\d\s][^\s]*)$/);
+  if (match4 && /[./\\]/.test(match4[2])) {
+    const filePath = match4[2];
+    return { filePath, fileName: filePath.split(/[\\/]/).pop() || filePath, metaLanguage: match4[1] };
   }
 
   return null;
@@ -125,14 +133,17 @@ export const MarkdownPre = memo(function MarkdownPre({
 
   const handleClickTitle = useCallback(() => {
     if (!clickable || !fileInfo || !pathClickHandler?.onPathClick) return;
-    pathClickHandler.onPathClick(fileInfo.filePath, "file", {
+    pathClickHandler.onPathClick(fileInfo.filePath, "file", fileInfo.startLine !== undefined ? {
       start: fileInfo.startLine,
       end: fileInfo.endLine,
-    });
+    } : undefined);
   }, [clickable, fileInfo, pathClickHandler]);
 
+  // "应用" only where the answer says which file the block is: a fragment with line numbers or
+  // an anonymous snippet would overwrite a whole file with a piece of it (§4-A8).
+  const applicable = !!onApplyCode && !!fileInfo && fileInfo.startLine === undefined;
   const handleApply = useCallback(() => {
-    if (onApplyCode) onApplyCode(code, language, fileInfo?.filePath);
+    if (onApplyCode && fileInfo) onApplyCode(code, language, fileInfo.filePath);
     if (onCodeBlockAction && requestId && language) {
       onCodeBlockAction("apply", code, language, requestId);
     }
@@ -198,13 +209,13 @@ export const MarkdownPre = memo(function MarkdownPre({
   const [expanded, setExpanded] = useState(false);
   const folded = foldable && !expanded;
 
-  const applyButton = onApplyCode ? (
+  const applyButton = applicable ? (
     <button
       type="button"
       className="md-code-action"
       onClick={handleApply}
-      aria-label="应用到对话"
-      title="应用"
+      aria-label={`应用到 ${fileInfo!.filePath}`}
+      title={`写入 ${fileInfo!.filePath}（先看改动，可还原）`}
     >
       <span className="md-code-action-label">应用</span>
     </button>
@@ -221,7 +232,7 @@ export const MarkdownPre = memo(function MarkdownPre({
               }
               title={
                 clickable && fileInfo
-                  ? `${fileInfo.startLine}:${fileInfo.endLine}:${fileInfo.filePath}`
+                  ? fileInfo.startLine !== undefined ? `${fileInfo.startLine}:${fileInfo.endLine}:${fileInfo.filePath}` : fileInfo.filePath
                   : language || "code"
               }
               onClick={clickable ? handleClickTitle : undefined}
@@ -241,9 +252,11 @@ export const MarkdownPre = memo(function MarkdownPre({
               {clickable && fileInfo ? (
                 <>
                   {fileInfo.fileName}
-                  <span className="md-code-line-range">
-                    L{fileInfo.startLine}-L{fileInfo.endLine}
-                  </span>
+                  {fileInfo.startLine !== undefined && (
+                    <span className="md-code-line-range">
+                      L{fileInfo.startLine}-L{fileInfo.endLine}
+                    </span>
+                  )}
                 </>
               ) : (
                 language || "code"

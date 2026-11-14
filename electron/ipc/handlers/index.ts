@@ -5,9 +5,9 @@ import {
 export async function createEngineHandlers(
   options: Omit<EngineOptions, "userDataDir"> & { userData: string },
 ) {
-  const { handlers, dispose } = await createHandlers({
+  const { handlers, dispose, previewRoots, exportHtml, notificationsEnabled } = await createHandlers({
     ...options,
     userDataDir: options.userData,
   });
-  return { handlers, shutdown: dispose };
+  return { handlers, shutdown: dispose, previewRoots, exportHtml, notificationsEnabled };
 }

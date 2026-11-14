@@ -118,3 +118,15 @@ describe("navigateHistory", () => {
     expect(r.text).toBe("x");
   });
 });
+
+import { loadInputHistory, saveInputHistory } from "../input-history";
+describe("persisted prompt history (U4.8)", () => {
+  it("survives a restart and drops junk", () => {
+    localStorage.setItem("openbuddy.prompt-history", JSON.stringify(["一", 3, "", "二"]));
+    expect(loadInputHistory(10).items).toEqual(["一", "二"]);
+    saveInputHistory(pushHistory(loadInputHistory(2), "三"));
+    expect(JSON.parse(localStorage.getItem("openbuddy.prompt-history")!)).toEqual(["二", "三"]);
+    localStorage.setItem("openbuddy.prompt-history", "{bad");
+    expect(loadInputHistory().items).toEqual([]);
+  });
+});

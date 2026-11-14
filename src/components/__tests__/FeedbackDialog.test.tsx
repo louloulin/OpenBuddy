@@ -85,27 +85,28 @@ describe("FeedbackDialog", () => {
   it("提交写入 setDetailed(stars + note)并关闭", () => {
     const onClose = vi.fn();
     const onToast = vi.fn();
-    render(
-      <FeedbackDialog
-        open
-        sessionId="s1"
-        messageId="m1"
-        rating="down"
-        onClose={onClose}
-        onToast={onToast}
-      />,
-    );
+    render(<FeedbackDialog open sessionId="s1" messageId="m1" rating="up" onClose={onClose} onToast={onToast} />);
     fireEvent.click(screen.getByLabelText("2 星"));
-    fireEvent.change(screen.getByPlaceholderText("补充说明(可选)"), {
-      target: { value: "太长了" },
-    });
+    fireEvent.change(screen.getByPlaceholderText("补充说明(可选)"), { target: { value: "还行" } });
     fireEvent.click(screen.getByText("提交"));
     const e = useFeedbackStore.getState().entries["s1:m1"];
-    expect(e.rating).toBe("down");
-    expect(e.stars).toBe(2);
-    expect(e.note).toBe("太长了");
+    expect(e).toMatchObject({ rating: "up", stars: 2, note: "还行" });
     expect(onClose).toHaveBeenCalled();
     expect(onToast).toHaveBeenCalledWith("已提交反馈");
+  });
+
+  it("踩必须选原因才能提交（U3.7）", () => {
+    const onClose = vi.fn();
+    render(<FeedbackDialog open sessionId="s1" messageId="m1" rating="down" onClose={onClose} />);
+    expect(screen.queryByLabelText("2 星")).not.toBeInTheDocument();
+    expect(screen.getByText("提交")).toBeDisabled();
+    expect(screen.getByText("请至少选择一个原因")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("太啰嗦"));
+    fireEvent.click(screen.getByText("代码或命令有问题"));
+    fireEvent.change(screen.getByPlaceholderText(/具体哪里不对/), { target: { value: "太长了" } });
+    fireEvent.click(screen.getByText("提交"));
+    expect(useFeedbackStore.getState().entries["s1:m1"]).toMatchObject({ rating: "down", reasons: ["太啰嗦", "代码或命令有问题"], note: "太长了" });
+    expect(onClose).toHaveBeenCalled();
   });
 
   it("取消按钮关闭但不写入详细评分", () => {
@@ -123,6 +124,15 @@ describe("FeedbackDialog", () => {
     fireEvent.click(screen.getByText("取消"));
     expect(onClose).toHaveBeenCalled();
     // 取消不写入详细评分(本测试未先 setRating,所以条目不存在)。
+    expect(useFeedbackStore.getState().entries["s1:m1"]).toBeUndefined();
+  });
+
+  it("Esc 关闭且不写入（与其他对话框一致）", () => {
+    const onClose = vi.fn();
+    render(<FeedbackDialog open sessionId="s1" messageId="m1" rating="down" onClose={onClose} />);
+    fireEvent.click(screen.getByText("太啰嗦"));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
     expect(useFeedbackStore.getState().entries["s1:m1"]).toBeUndefined();
   });
 

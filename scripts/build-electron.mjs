@@ -7,9 +7,11 @@ await writeFile(new URL('../dist-electron/preload.cjs', import.meta.url), preloa
 const indexURL = new URL('../dist/index.html', import.meta.url);
 try {
   let html = await readFile(indexURL, 'utf8');
-  if (!html.includes('http-equiv="Content-Security-Policy"')) {
-    const policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'";
-    html = html.replace('<head>', `<head>\n    <meta http-equiv="Content-Security-Policy" content="${policy}" />`);
-    await writeFile(indexURL, html);
-  }
+  // Same policy as electron/main.ts; only artifact previews (ob-preview://, sandboxed) may be framed.
+  const policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src ob-preview:";
+  const tag = `<meta http-equiv="Content-Security-Policy" content="${policy}" />`;
+  const next = html.includes('http-equiv="Content-Security-Policy"')
+    ? html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/, tag)
+    : html.replace('<head>', `<head>\n    ${tag}`);
+  if (next !== html) await writeFile(indexURL, next);
 } catch (error) { if (error.code !== 'ENOENT') throw error; }

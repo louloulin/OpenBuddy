@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { ArrowUp, X, type LucideIcon } from "lucide-react";
 import { open as openDialog } from "@/lib/ipc";
 import { getPathForFile } from "@/lib/ipc";
@@ -6,13 +6,10 @@ import { ChevronDownIcon } from "@/foundation/components/Icon/icons";
 import { ModelRuntimeContext, ModelSelector, type ModelOption } from "./ModelSelector";
 import { ThumbImg } from "./experts-panel/shared/ThumbImg";
 import { ContextUsagePill } from "./ContextUsagePill";
+import { clipboardSaveImage, type AgentMode } from "@/lib/agent-client";
 import {
-  blocks,
-  assemblePrompt,
-  blockLabel,
-} from "@/lib/content-blocks";
-import {
-  createInputHistory,
+  loadInputHistory,
+  saveInputHistory,
   pushHistory,
   navigateHistory,
   type InputHistory,
@@ -27,6 +24,12 @@ import {
 import type { HomeModeId } from "./home-scenes";
 import type { AgentEntry } from "@/lib/types";
 import type { WorkspaceInfo } from "@/lib/agent-client";
+
+const AGENT_MODES: ReadonlyArray<readonly [AgentMode, string, string]> = [
+  ["craft", "做一做", "直接动手：可以读写文件、执行命令"],
+  ["plan", "想一想", "先调研并给出计划，确认后再执行（只读）"],
+  ["ask", "问一问", "只回答问题，不改文件（只读）"],
+];
 
 /**
  * WorkBuddy 风格输入卡片(圆角16):左下 +,右下 Auto 下拉/麦克风/发送;
@@ -55,6 +58,8 @@ export function Composer({
   cwd,
   workspaces,
   onSelectWorkspace,
+  agentMode,
+  onAgentModeChange,
   // Seed text (from HomePage chips). Consumed once, then cleared via callback.
   initialText,
   onInitialTextConsumed,
@@ -108,6 +113,9 @@ export function Composer({
   cwd?: string;
   workspaces?: WorkspaceInfo[];
   onSelectWorkspace?: (cwd: string) => void;
+  /** 做一做 / 想一想 / 问一问 (shown when onAgentModeChange is given). */
+  agentMode?: AgentMode;
+  onAgentModeChange?: (mode: AgentMode) => void;
   /** Optional initial text to seed the input (one-shot, then cleared). */
   initialText?: string;
   onInitialTextConsumed?: () => void;
@@ -169,20 +177,10 @@ export function Composer({
   // 仍显示 +N(新增 token),有占比信息时叠加(此处保守不取,避免与 pill 抢请求)。
   // 输入历史(arrow-key recall,对齐 WorkBuddy use-input-history):内存中按发送追加,
   // ↑/↓ 在输入框回溯。draftRef 暂存「回到输入框」时恢复的草稿。
-  const histRef = useRef<InputHistory>(createInputHistory(50));
-  const histCursorRef = useRef<number>(0);
+  const histRef = useRef<InputHistory>(loadInputHistory(100));
+  const histCursorRef = useRef<number>(histRef.current.items.length);
   const draftRef = useRef<string>("");
-  // 多块提示预览(对齐 WorkBuddy content-blocks):把当前引用(expert/attachments/
-  // sceneTag)组装成块,显示为 chip 行 + 组装后的预览(便于用户确认最终发送内容)。
-  const blockList = useMemo(() => {
-    const list = [];
-    if (activeExpertName) list.push(blocks.expert({ name: activeExpertName, path: "", scope: "local", raw: "" }));
-    if (sceneTag) list.push(blocks.skill(sceneTag.label));
-    for (const p of attachments) list.push(blocks.file(p));
-    return list;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeExpertName, sceneTag, attachments]);
-  const hasRefs = blockList.length > 0;
+  // Attachments, the scene tag and the expert each have their own chip; no second preview row (20261115-ui U4.1).
   const ref = useRef<HTMLTextAreaElement>(null);
 
   // 统一更新入口:每次写入输入框内容时同步把草稿推给父组件(若启用持久化)。
@@ -276,7 +274,8 @@ export function Composer({
     } catch { setSendError("发送失败，请检查错误后重试。"); return; }
     // 记入输入历史(arrow-key recall)。
     if (body && body.trim()) {
-      histRef.current = pushHistory(histRef.current, body);
+      histRef.current = pushHistory(loadInputHistory(100), body);
+      saveInputHistory(histRef.current);
       histCursorRef.current = histRef.current.items.length;
       draftRef.current = "";
     }
@@ -389,17 +388,6 @@ export function Composer({
           </div>
         )}
 
-        {/* 多块提示预览(对齐 WorkBuddy content-blocks):引用块 chip 行 */}
-        {hasRefs && (
-          <div className="composer-blocks" title={assemblePrompt(blockList)}>
-            {blockList.map((b) => (
-              <span key={b.id} className="composer-blocks__chip">
-                {blockLabel(b)}
-              </span>
-            ))}
-          </div>
-        )}
-
         {/* Attachment chips */}
         {attachments.length > 0 && (
           <div className="composer-attachments">
@@ -455,7 +443,7 @@ export function Composer({
             apiReady
               ? sceneTag
                 ? "" // 有操作类型标签时不显示占位文案(匹配 WorkBuddy)
-                : placeholder ?? "今天帮你做些什么? @ 引用对话文件,/ 调用技能与指令"
+                : placeholder ?? (agentMode === "plan" ? "说说要做什么，Buddy 先调研并给出计划，确认后再动手" : agentMode === "ask" ? "问点什么，Buddy 只回答、不改文件" : "今天帮你做些什么？/ 调用技能与指令，可粘贴截图或拖入文件")
               : ""
           }
           onChange={(e) => {
@@ -473,6 +461,16 @@ export function Composer({
           onKeyUp={(e) =>
             setCursorPos((e.target as HTMLTextAreaElement).selectionStart ?? cursorPos)
           }
+          onPaste={(e) => {
+            // 粘贴截图: saved by the main process as a granted attachment (§5.3).
+            const hasImage = Array.from(e.clipboardData.items).some((item) => item.kind === "file" && item.type.startsWith("image/"));
+            if (!hasImage || disabled || !apiReady) return;
+            e.preventDefault();
+            void clipboardSaveImage().then((saved) => {
+              if (!saved) { onToast?.("剪贴板里没有可用的图片"); return; }
+              setAttachments((prev) => Array.from(new Set([...prev, saved.path])));
+            }, (error) => onToast?.(`无法粘贴图片：${String(error)}`));
+          }}
           onKeyDown={(e) => {
             if (e.nativeEvent.isComposing) return;
             // The slash menu (when open) owns ↑↓/Enter/Tab/Esc.
@@ -480,9 +478,15 @@ export function Composer({
             if (e.key === "Enter" && !e.shiftKey && !(e.altKey && !streaming)) {
               e.preventDefault();
               // While a reply is running, Enter queues the message instead of doing nothing;
-              // Alt/⌥+Enter steers the running reply at its next tool step.
-              if (streaming && onEnqueue) void enqueue(e.altKey ? "steer" : undefined);
+              // Ctrl/Cmd+Enter (or Alt/⌥+Enter) steers the running reply at its next tool step.
+              if (streaming && onEnqueue) void enqueue(e.altKey || e.ctrlKey || e.metaKey ? "steer" : undefined);
               else send();
+              return;
+            }
+            // Esc stops the running reply (popovers handled theirs above).
+            if (e.key === "Escape" && streaming && onCancel) {
+              e.preventDefault();
+              onCancel();
               return;
             }
             // 输入历史 arrow-key recall(对齐 WorkBuddy use-input-history)。
@@ -495,6 +499,9 @@ export function Composer({
               if (e.key === "ArrowUp" && (atFirstLine || navigating)) {
                 if (histCursorRef.current === histRef.current.items.length) {
                   draftRef.current = text; // 进入历史前暂存当前草稿
+                  // Another composer (home / another chat) may have added prompts since.
+                  histRef.current = loadInputHistory(100);
+                  histCursorRef.current = histRef.current.items.length;
                 }
                 const r = navigateHistory(histRef.current, histCursorRef.current, "up", draftRef.current);
                 if (r.text !== text) {
@@ -558,6 +565,24 @@ export function Composer({
           )}
           {permissionInline && (
             <PermissionPicker onToast={onToast} />
+          )}
+          {onAgentModeChange && (
+            <div className="composer-mode" role="radiogroup" aria-label="工作方式">
+              {AGENT_MODES.map(([mode, label, tip]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={(agentMode ?? "craft") === mode}
+                  className={"composer-mode__opt" + ((agentMode ?? "craft") === mode ? " composer-mode__opt--on" : "")}
+                  disabled={streaming}
+                  onClick={(e) => { e.stopPropagation(); onAgentModeChange(mode); }}
+                  data-tip={tip}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           )}
           <div className="wb-composer__spacer" />
           {usageSessionId && <ContextUsagePill sessionId={usageSessionId} onRefreshSignal={usageMsgCount} />}

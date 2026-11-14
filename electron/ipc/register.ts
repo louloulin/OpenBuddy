@@ -1,5 +1,6 @@
 import { clipboard, dialog, ipcMain, nativeImage, type BrowserWindow, type OpenDialogOptions, type SaveDialogOptions } from 'electron';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { isCommand, validateCommandPayload, type CommandHandlers, type Payload, type AttachmentReference } from '../shared/contract.js';
 import { FileAccess } from '../shared/file-access.js';
 
@@ -23,7 +24,7 @@ function dialogOptions(payload: Payload): OpenDialogOptions & SaveDialogOptions 
   return result;
 }
 
-export function registerIpc(window: BrowserWindow, handlers: CommandHandlers, trustedURL: string, workspaces?: { grant(path: string): Promise<void>; allows(path: string): Promise<boolean> }): () => void {
+export function registerIpc(window: BrowserWindow, handlers: CommandHandlers, trustedURL: string, workspaces?: { grant(path: string): Promise<void>; allows(path: string): Promise<boolean> }, options: { attachmentsDir?: string; exportHtml?: (sessionId: string, path: string) => Promise<string> } = {}): () => void {
   const exportGrants = new Set<string>();
   const fileAccess = new FileAccess(bytes => {
     const image = nativeImage.createFromBuffer(bytes);
@@ -41,9 +42,44 @@ export function registerIpc(window: BrowserWindow, handlers: CommandHandlers, tr
       await writeFile(payload.path, payload.content, 'utf8');
       return payload.path;
     },
+    // Pasted screenshot: saved under userData and granted like a file picked in the dialog.
+    clipboard_save_image: async () => {
+      if (!options.attachmentsDir) return null;
+      // Electron 45: async W3C-style clipboard. Any image type is re-encoded to PNG.
+      const items = await clipboard.read();
+      let bytes: Buffer | null = null;
+      for (const item of items) {
+        const type = item.types.find(t => t.startsWith('image/'));
+        if (!type) continue;
+        const blob = await item.getType(type) as Blob;
+        if (blob.size > 30 * 1024 * 1024) throw new Error('attachment_too_large');
+        const raw = Buffer.from(await blob.arrayBuffer());
+        const image = nativeImage.createFromBuffer(raw);
+        if (image.isEmpty()) continue;
+        bytes = type === 'image/png' ? raw : image.toPNG();
+        break;
+      }
+      if (!bytes) return null;
+      // A readable name: it is what the attachment chip and the model see.
+      const stamp = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const name = `截图 ${stamp.getFullYear()}-${pad(stamp.getMonth() + 1)}-${pad(stamp.getDate())} ${pad(stamp.getHours())}.${pad(stamp.getMinutes())}.${pad(stamp.getSeconds())}.png`;
+      const dir = join(options.attachmentsDir, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+      await mkdir(dir, { recursive: true });
+      const path = join(dir, name);
+      await writeFile(path, bytes);
+      await fileAccess.grant(path);
+      return { path, name, size: bytes.length };
+    },
+    // Real HTML export (Pi's exporter) to a path the user chose in the save dialog.
+    agent_export_html: async payload => {
+      if (typeof payload.outputPath !== 'string' || !exportGrants.delete(payload.outputPath)) throw new Error('export_path_not_authorized');
+      if (!options.exportHtml) throw new Error('not_implemented: agent_export_html');
+      return options.exportHtml(String(payload.sessionId), payload.outputPath);
+    },
     clipboard_write_text: payload => {
       if (typeof payload.text !== 'string' || payload.text.length > 8 * 1024 * 1024) throw new Error('invalid_payload: text');
-      clipboard.writeText(payload.text);
+      return clipboard.writeText(payload.text);
     },
     window_edit: payload => {
       const action = String(payload.action);

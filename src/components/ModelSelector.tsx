@@ -1,6 +1,8 @@
 import { friendlyError } from "@/lib/error-format";
 import { createContext, useContext, useEffect, useId, useRef, useState } from "react";
-import { ChevronDown, Check, Search } from "lucide-react";
+import { ChevronDown, Check, Lightbulb, Search } from "lucide-react";
+import { THINKING_LABELS } from "@/lib/agent-client";
+import { formatTokens } from "./models-settings/model-config";
 
 export interface ModelOption {
   /** Complete provider/model key; never a bare model slug. */
@@ -13,6 +15,8 @@ export interface ModelOption {
   input?: ("text" | "image")[];
   reasoning?: boolean;
   contextWindow?: number;
+  /** Levels the model accepts (from providers_list); drives the home thinking control. */
+  availableThinkingLevels?: string[];
 }
 export interface ModelRuntimeControls {
   busy: boolean;
@@ -23,7 +27,7 @@ export interface ModelRuntimeControls {
   onThinkingChange?: (level: string) => Promise<void>;
 }
 export const ModelRuntimeContext = createContext<ModelRuntimeControls>({ busy: false, thinkingLevels: [] });
-const LEVEL_LABELS: Record<string, string> = { off: "关闭", minimal: "最少", low: "低", medium: "中", high: "高", xhigh: "最高" };
+const LEVEL_LABELS = THINKING_LABELS;
 
 export function ModelSelector({ modelId, models, onModelChange, disabled = false }: {
   modelId?: string;
@@ -85,11 +89,11 @@ export function ModelSelector({ modelId, models, onModelChange, disabled = false
             const group = filtered.filter(model => (model.providerId ?? "unknown") === providerId);
             const providerLabel = group[0]?.providerLabel || providerId;
             return <div key={providerId} role="group" aria-label={providerLabel}>
-              <div className="model-selector__provider">{providerLabel}<small> {providerId}</small></div>
+              <div className="model-selector__provider">{providerLabel}{providerLabel !== providerId && <small> {providerId}</small>}</div>
               {group.map(model => <button key={model.id} id={`${menuId}-${filtered.indexOf(model)}`} type="button" role="option" aria-selected={model.id === modelId} disabled={busy || disabled} className={`model-selector__item${model.id === modelId ? " model-selector__item--active" : ""}${filtered[active]?.id === model.id ? " model-selector__item--focused" : ""}`} onClick={() => { void choose(model.id); }}>
                 <span className="model-selector__item-label">{model.label || model.modelId || model.id}</span>
                 <span className="model-selector__item-id">{model.modelId || model.id}</span>
-                <span className="model-selector__capabilities">{model.input?.includes("image") ? "图片 " : ""}{model.reasoning ? "思考 " : ""}{model.contextWindow ? `${Math.round(model.contextWindow / 1024)}K` : ""}</span>
+                <span className="model-selector__capabilities">{model.input?.includes("image") ? "图片 " : ""}{model.reasoning ? "思考 " : ""}{model.contextWindow ? formatTokens(model.contextWindow) : ""}</span>
                 {model.id === modelId && <Check size={14} />}
               </button>)}
             </div>;
@@ -100,11 +104,21 @@ export function ModelSelector({ modelId, models, onModelChange, disabled = false
       {busy && <span role="status" className="model-selector__feedback">切换中…</span>}
       {error && <p role="alert" className="model-selector__error">{error}</p>}
     </div>
-    {controls.onThinkingChange && controls.thinkingLevels.length > 1 && <label className="model-thinking">思考
-      <select aria-label="思考等级" value={controls.thinkingLevel ?? "off"} disabled={disabled || busy} onChange={event => {
+    {controls.onThinkingChange && controls.thinkingLevels.length > 1 && (() => {
+      const change = (level: string) => {
+        if (level === controls.thinkingLevel) return;
         setPending(true); setError("");
-        void controls.onThinkingChange!(event.target.value).catch(error => setError(`思考等级切换失败：${friendlyError(error)}`)).finally(() => setPending(false));
-      }}>{controls.thinkingLevels.map(level => <option key={level} value={level}>{LEVEL_LABELS[level] ?? level}</option>)}</select>
-    </label>}
+        void controls.onThinkingChange!(level).catch(error => setError(`思考等级切换失败：${friendlyError(error)}`)).finally(() => setPending(false));
+      };
+      // Few levels (what most models really support): one click, all visible. Many: a select.
+      return controls.thinkingLevels.length <= 4
+        ? <div className="model-thinking model-thinking--seg" role="radiogroup" aria-label="思考等级">
+            <span className="model-thinking__label" aria-hidden title="思考等级"><Lightbulb size={13} /></span>
+            {controls.thinkingLevels.map(level => <button key={level} type="button" role="radio" aria-checked={(controls.thinkingLevel ?? "off") === level} disabled={disabled || busy} className={"model-thinking__opt" + ((controls.thinkingLevel ?? "off") === level ? " model-thinking__opt--on" : "")} onClick={() => change(level)}>{LEVEL_LABELS[level] ?? level}</button>)}
+          </div>
+        : <label className="model-thinking">思考
+            <select aria-label="思考等级" value={controls.thinkingLevel ?? "off"} disabled={disabled || busy} onChange={event => change(event.target.value)}>{controls.thinkingLevels.map(level => <option key={level} value={level}>{LEVEL_LABELS[level] ?? level}</option>)}</select>
+          </label>;
+    })()}
   </div>;
 }

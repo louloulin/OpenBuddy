@@ -21,9 +21,10 @@ export class ExtensionUiBridge {
       finish: (value: string | boolean | undefined, reason: Reason) => void;
     }
   >();
+  /** 0 = no timeout: like tool approvals, extension dialogs wait for the user (20261115-ui E3). */
   constructor(
     private emit: Emit,
-    private timeoutMs = 120000,
+    private timeoutMs = 0,
   ) {}
   private request(
     sessionId: string,
@@ -36,15 +37,15 @@ export class ExtensionUiBridge {
       return Promise.resolve(kind === "confirm" ? false : undefined);
     const requestId = randomUUID(),
       timeout = opts?.timeout ?? this.timeoutMs;
-    if (!Number.isFinite(timeout) || timeout <= 0)
+    if (!Number.isFinite(timeout) || timeout < 0)
       throw Error("invalid UI timeout");
     return new Promise((resolve) => {
       const onAbort = () => finish(undefined, "aborted");
-      const timer = setTimeout(() => finish(undefined, "timeout"), timeout);
-      timer.unref?.();
+      const timer = timeout > 0 ? setTimeout(() => finish(undefined, "timeout"), timeout) : undefined;
+      timer?.unref?.();
       const finish = (value: string | boolean | undefined, reason: Reason) => {
         if (!this.pending.has(requestId)) return;
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         opts?.signal?.removeEventListener("abort", onAbort);
         this.pending.delete(requestId);
         this.emit("agent://ui-dismiss", { requestId, sessionId, reason });
@@ -63,7 +64,7 @@ export class ExtensionUiBridge {
         kind,
         title,
         ...fields,
-        timeoutMs: timeout,
+        ...(timeout > 0 ? { timeoutMs: timeout } : {}),
       });
     });
   }
@@ -117,9 +118,21 @@ export class ExtensionUiBridge {
         : Promise.resolve(kind === "confirm" ? false : undefined);
     const state = (kind: string, fields: Record<string, unknown>) =>
       active() && this.emit("agent://ui-state", { sessionId, kind, ...fields });
-    const unsupported = (name: string): never => {
-      throw Error(`not_implemented: desktop extension UI ${name}`);
+    // Terminal-only APIs (TUI component factories, terminal input, themes)
+    // have nothing to render on the desktop: they degrade to no-ops, and the
+    // user is told once per session instead of the extension crashing (F9).
+    const told = new Set<string>();
+    const degraded = (name: string) => {
+      if (!active() || told.has(name)) return;
+      told.add(name);
+      this.emit("agent://ui-notification", { sessionId, message: `扩展使用了终端界面功能（${name}），桌面版不显示这部分。`, severity: "info" });
     };
+    let editorText = "";
+    let toolsExpanded = false;
+    // A theme whose styling functions return the text unchanged.
+    const theme = new Proxy({}, {
+      get: (_t, key) => (key === "name" ? "openbuddy" : (...args: unknown[]) => { const last = args[args.length - 1]; return typeof last === "string" ? last : ""; }),
+    });
     const supported: Partial<ExtensionUIContext> = {
       select: async (title, options, opts) =>
         (await ask("select", title, { options: [...options] }, opts)) as
@@ -142,23 +155,38 @@ export class ExtensionUiBridge {
           });
       },
       setStatus: (key, value) => state("status", { key, text: value }),
-      setWorkingMessage: (message) => state("working", { message }),
+      // null (not undefined) so "clear the message" survives IPC serialization.
+      setWorkingMessage: (message) => state("working", { message: message ?? null }),
       setWorkingVisible: (visible) => state("working", { visible }),
       setTitle: (title) => state("title", { title }),
       setWidget: (key, content, options) => {
-        if (content !== undefined && !Array.isArray(content))
-          unsupported("component widget");
+        if (content !== undefined && !Array.isArray(content)) return degraded("组件小部件");
         state("widget", { key, lines: content, placement: options?.placement });
       },
-      setEditorText: (text) => state("editor", { action: "set", text }),
-      pasteToEditor: (text) => state("editor", { action: "paste", text }),
-      custom: async () => unsupported("custom"),
+      setEditorText: (text) => { editorText = text; state("editor", { action: "set", text }); },
+      pasteToEditor: (text) => { editorText += text; state("editor", { action: "paste", text }); },
+      getEditorText: () => editorText,
+      setWorkingIndicator: () => {},
+      setHiddenThinkingLabel: () => {},
+      onTerminalInput: () => { degraded("终端输入"); return () => {}; },
+      setFooter: (factory) => { if (factory) degraded("页脚"); },
+      setHeader: (factory) => { if (factory) degraded("页眉"); },
+      setEditorComponent: (factory) => { if (factory) degraded("自定义输入框"); },
+      getEditorComponent: () => undefined,
+      addAutocompleteProvider: () => degraded("自动补全"),
+      get theme() { return theme as ExtensionUIContext["theme"]; },
+      getAllThemes: () => [{ name: "openbuddy", path: undefined }],
+      getTheme: () => undefined,
+      setTheme: () => ({ success: false, error: "桌面版使用应用自身的主题" }),
+      getToolsExpanded: () => toolsExpanded,
+      setToolsExpanded: (expanded) => { toolsExpanded = expanded; },
+      custom: async () => { degraded("自定义界面"); return undefined as never; },
     };
     return new Proxy(supported, {
       get(target, key) {
         if (key in target) return Reflect.get(target, key);
-        if (key === "theme") return unsupported("theme");
-        return () => unsupported(String(key));
+        // Methods added to the SDK later: no-op rather than crash the extension.
+        return () => undefined;
       },
     }) as ExtensionUIContext;
   }

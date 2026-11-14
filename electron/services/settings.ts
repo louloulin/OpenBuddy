@@ -149,6 +149,8 @@ export interface AppSettings {
     string,
     { pinned?: boolean; archived?: boolean; title?: string }
   >;
+  /** System notifications while the window is in the background (20261115-ui U6.1); on by default. */
+  notifyPrefs?: { system?: boolean };
   notifications: Array<{
     id: number;
     kind: string;

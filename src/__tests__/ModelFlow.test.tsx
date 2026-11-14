@@ -68,7 +68,8 @@ describe("App model runtime flow", () => {
     fireEvent.click(screen.getByText("Session Two"));
     await waitFor(() => expect(picker()).toHaveAccessibleName(/Provider B/));
     backend.emit("agent://model-state", state("one", "a")); expect(picker()).toHaveAccessibleName(/Provider B/);
-    expect(screen.getByRole("combobox", { name: "思考等级" })).toHaveValue("high");
+    // Two levels → a segmented control with the session's level checked.
+    expect(within(screen.getByRole("radiogroup", { name: "思考等级" })).getByRole("radio", { name: "高" })).toHaveAttribute("aria-checked", "true");
     backend.emit("agent://event", { sessionId: "two", event: { type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "done" }], usage: { input: 3, output: 2, totalTokens: 5 } } } });
     backend.emit("agent://event", { sessionId: "two", event: { type: "agent_settled" } });
     expect(loadUsage()[0]).toMatchObject({ modelId: keyB, promptTokens: 3, completionTokens: 2 });

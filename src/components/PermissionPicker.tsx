@@ -6,12 +6,14 @@ import {
   ShieldCheckIcon,
 } from "@/foundation/components/Icon/icons";
 import { permissionModeGet, permissionModeSet } from "@/lib/agent-client";
+import { listen } from "@/lib/ipc";
+import { appConfirmWithOption } from "./AppDialog";
 import type { PermissionMode } from "@/lib/agent-client";
 
 const MODES: { id: PermissionMode; label: string; desc: string }[] = [
   { id: "ask", label: "审批模式", desc: "每次工具调用都需要确认" },
   { id: "auto", label: "自动模式", desc: "安全操作自动执行,风险操作询问" },
-  { id: "always-approve", label: "始终允许", desc: "所有工具调用自动批准" },
+  { id: "always-approve", label: "完全访问", desc: "不再询问：改文件、删文件、运行命令都自动执行" },
 ];
 
 export function PermissionPicker({
@@ -33,6 +35,11 @@ export function PermissionPicker({
       .catch(() => {
         /* 读不到就用默认 ask */
       });
+    // Changed elsewhere (another picker, 设置·安全): follow it.
+    let off: (() => void) | undefined;
+    let gone = false;
+    void listen<{ mode?: PermissionMode }>("agent://permission-mode", (e) => { if (e.payload?.mode) setMode(e.payload.mode); }).then((u) => { if (gone) u(); else off = u; }, () => { /* no bridge (tests) */ });
+    return () => { gone = true; off?.(); };
   }, []);
 
   // Close on outside click.
@@ -52,6 +59,18 @@ export function PermissionPicker({
       if (next === mode) {
         setOpen(false);
         return;
+      }
+      if (next === "always-approve") {
+        // 完全访问 skips every confirmation, deletions included: ask twice (U5.5).
+        setOpen(false);
+        const { ok } = await appConfirmWithOption({
+          title: "切换到完全访问？",
+          message: "之后 Buddy 改动或删除文件、运行命令都不会再征求你的同意，也包括 rm 这类删除操作。改动仍会留快照，可在工作台还原。只在你信任当前任务和工作空间时使用。",
+          confirmLabel: "切换到完全访问",
+          danger: true,
+          checkbox: { label: "我了解风险，愿意让 Buddy 不经确认执行操作", checked: false, required: true },
+        });
+        if (!ok) return;
       }
       setBusy(true);
       try {
@@ -73,7 +92,7 @@ export function PermissionPicker({
     <div className="permission-picker" ref={popRef}>
       <button
         type="button"
-        className="wb-composer-meta__btn"
+        className={"wb-composer-meta__btn" + (mode === "always-approve" ? " permission-picker__trigger--full" : "")}
         onClick={() => setOpen((v) => !v)}
         title={`权限模式 · ${current.desc}`}
       >

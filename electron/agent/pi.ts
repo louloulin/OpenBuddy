@@ -8,21 +8,27 @@ import {
   type SessionInfo,
   type ExtensionFactory,
 } from "@earendil-works/pi-coding-agent";
-import { mkdir, realpath, unlink } from "node:fs/promises";
+import { mkdir, realpath, rename, unlink } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join, relative, isAbsolute, sep } from "node:path";
+import { basename, dirname, join, relative, resolve as resolvePath, isAbsolute, sep } from "node:path";
 import { Providers, modelKey } from "../services/providers.js";
 import { ExtensionUiBridge } from "./ui.js";
 import { SkillsService } from "../services/skills.js";
 import { McpService } from "../services/mcp.js";
 import type { Settings } from "../services/settings.js";
 import { Permissions, type Emit } from "./permissions.js";
+import { CheckpointStore } from "./checkpoints.js";
+import { collectArtifacts } from "./artifacts.js";
+
+/** 做一做 / 想一想 / 问一问 (20261115-ui §5.8): plan and ask only get read-only tools. */
+export type AgentMode = "craft" | "plan" | "ask";
+const READ_ONLY_TOOLS = ["read", "grep", "find", "ls"];
 export type ThinkingLevel = Parameters<AgentSession["setThinkingLevel"]>[0];
 export function validateThinkingLevel(value: unknown): ThinkingLevel {
   if (
     typeof value !== "string" ||
-    !["off", "minimal", "low", "medium", "high", "xhigh"].includes(value)
+    !["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(value)
   )
     throw Error("invalid_thinking_level");
   return value as ThinkingLevel;
@@ -47,6 +53,8 @@ export function slimEvent(event: AgentSessionEvent): unknown {
       partial?: { content?: Array<Record<string, unknown>>; usage?: unknown };
       error?: { errorMessage?: string };
     };
+    // Raw argument deltas are summarized by the engine instead (see toolArgProgress).
+    if (source.type === "toolcall_delta") return undefined;
     const slim: Record<string, unknown> = { type: source.type };
     for (const key of ["contentIndex", "delta", "content", "toolCall", "reason"])
       if (source[key] !== undefined) slim[key] = source[key];
@@ -57,19 +65,76 @@ export function slimEvent(event: AgentSessionEvent): unknown {
     }
     if (source.type === "error" && source.error?.errorMessage)
       slim.errorMessage = source.error.errorMessage;
-    return { type: "message_update", assistantMessageEvent: slim, usage: source.partial?.usage };
+    // The finished block / arguments arrive again in message_end right after: do not send
+    // them twice (a 1MB write used to cross IPC three times — 20261115-ui §3 budget).
+    if (source.type === "text_end" || source.type === "thinking_end") delete slim.content;
+    if (source.type === "toolcall_end" && slim.toolCall && typeof slim.toolCall === "object") {
+      const call = slim.toolCall as { arguments?: unknown };
+      slim.toolCall = { ...call, arguments: smallArgs(call.arguments) };
+    }
+    // `partial.usage` is cumulative and only message_end's is used.
+    return { type: "message_update", assistantMessageEvent: slim };
+  }
+  // The renderer already holds the arguments from message_end; keep small ones for display.
+  if (event.type === "tool_execution_start" && argsSize(event.args) > MAX_FORWARDED_ARGS) {
+    const { args: _args, ...rest } = event;
+    return rest;
   }
   // Both repeat content the renderer already received through message_end.
   if (event.type === "agent_end") return { type: "agent_end", willRetry: event.willRetry };
   if (event.type === "turn_end") return { type: "turn_end" };
   if (event.type === "entry_appended") return undefined;
+  // Updates repeat the arguments and the cumulative output: send the output tail only.
+  if (event.type === "tool_execution_update") {
+    const content = (event.partialResult as { content?: Array<{ type?: string; text?: string }> } | undefined)?.content;
+    return {
+      type: event.type,
+      toolCallId: event.toolCallId,
+      toolName: event.toolName,
+      ...(Array.isArray(content) ? { partialResult: { content: content.map((part) => (part.type === "text" && typeof part.text === "string" && part.text.length > TOOL_OUTPUT_TAIL ? { ...part, text: part.text.slice(-TOOL_OUTPUT_TAIL) } : part)) } } : {}),
+    };
+  }
   return event;
+}
+const TOOL_OUTPUT_TAIL = 8 * 1024;
+const MAX_FORWARDED_ARGS = 32 * 1024;
+/** Approximate JSON size of tool arguments without serializing megabytes. */
+function argsSize(args: unknown, depth = 0): number {
+  if (typeof args === "string") return args.length + 2;
+  if (!args || typeof args !== "object") return 8;
+  if (depth > 3) return MAX_FORWARDED_ARGS + 1;
+  let n = 2;
+  for (const [k, v] of Object.entries(args)) {
+    n += k.length + 4 + argsSize(v, depth + 1);
+    if (n > MAX_FORWARDED_ARGS) break;
+  }
+  return n;
+}
+/** Arguments for display while the full copy is on its way: large values are left out. */
+export function smallArgs(args: unknown): unknown {
+  if (argsSize(args) <= MAX_FORWARDED_ARGS) return args;
+  if (!args || typeof args !== "object" || Array.isArray(args)) return {};
+  return Object.fromEntries(Object.entries(args).filter(([, v]) => argsSize(v) <= 1024));
+}
+/** Text/thinking deltas are merged for this long before crossing IPC. */
+const DELTA_COALESCE_MS = 16;
+const TOOL_DELTA_INTERVAL_MS = 100;
+/** Best-effort `path` / `command` from the first bytes of streamed tool-call JSON. */
+export function partialToolArgs(head: string, parsed?: unknown): { path?: string; command?: string } {
+  const args = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+  const out: { path?: string; command?: string } = {};
+  const unescape = (v: string) => { try { return JSON.parse(`"${v}"`) as string; } catch { return v; } };
+  const path = typeof args.path === "string" ? args.path : typeof args.file_path === "string" ? args.file_path : head.match(/"(?:path|file_path)"\s*:\s*"((?:[^"\\]|\\.)*)"/)?.[1];
+  const command = typeof args.command === "string" ? args.command : head.match(/"command"\s*:\s*"((?:[^"\\]|\\.)*)/)?.[1];
+  if (path) out.path = typeof args.path === "string" || typeof args.file_path === "string" ? path : unescape(path);
+  if (command) out.command = (typeof args.command === "string" ? command : unescape(command)).slice(0, 500);
+  return out;
 }
 
 const PERSONA = /<!--EXPERT_PERSONA_BEGIN-->[\s\S]*?<!--EXPERT_PERSONA_END-->/g;
 /** First-turn title shown in the sidebar: the user's own words, without injected context. */
 export function deriveTitle(raw: string): string | undefined {
-  let text = raw.replace(PERSONA, "");
+  let text = raw.replace(PERSONA, "").replace(/\s*<openbuddy-(plan|ask)-mode>[\s\S]*?<\/openbuddy-\1-mode>\s*/, "");
   let skill: string | undefined;
   const block = text.match(/^\s*<skill name="([^"]+)"[^>]*>[\s\S]*?<\/skill>\s*/);
   if (block) {
@@ -104,6 +169,13 @@ function messageText(message: { content?: unknown }): string {
 }
 
 interface Slot {
+  /** Streaming tool-call arguments per content index (summarized for the renderer). */
+  toolArgs?: Map<number, { bytes: number; head: string; at: number }>;
+  /** Text/thinking delta waiting to be merged with the next ones (see emitEvent). */
+  pendingDelta?: { type: string; contentIndex?: number; delta: string; timer?: ReturnType<typeof setTimeout> };
+  lastDeltaAt?: number;
+  /** Tool set the session was created with (restored by 做一做). */
+  defaultTools: string[];
   id: string;
   session: AgentSession;
   unsubscribe: () => void;
@@ -138,6 +210,9 @@ export class PiEngine {
   readonly providers: Providers;
   readonly skills: SkillsService;
   readonly mcp: McpService;
+  readonly checkpoints: CheckpointStore;
+  /** Per-session mode, reapplied whenever the session slot is rebuilt. */
+  private modes = new Map<string, AgentMode>();
   private slots = new Map<string, Slot>();
   private opening = new Map<string, Promise<Slot>>();
   private focusedId?: string;
@@ -163,6 +238,17 @@ export class PiEngine {
     this.skills = new SkillsService(settings);
     this.mcp = new McpService(settings, openUrl, emit);
     this.sessionDir = join(settings.dir, "sessions");
+    this.checkpoints = new CheckpointStore(join(settings.dir, "checkpoints"), (path) => this.trash(path));
+  }
+  /** Move a file to the OS trash; outside Electron (tests) into `<dir>/trash`. */
+  private async trash(path: string) {
+    try {
+      const electron = (await import("electron")) as unknown as { shell?: { trashItem?: (p: string) => Promise<void> } };
+      if (typeof electron.shell?.trashItem === "function") return await electron.shell.trashItem(path);
+    } catch { /* not running inside Electron */ }
+    const target = join(this.settings.dir, "trash", `${Date.now()}-${basename(path)}`);
+    await mkdir(dirname(target), { recursive: true });
+    await rename(path, target);
   }
   async initialize() {
     await mkdir(this.cwd, { recursive: true, mode: 0o700 });
@@ -213,7 +299,49 @@ export class PiEngine {
   has(id: string) {
     return this.slots.has(id);
   }
+  /**
+   * Forward one renderer event. Consecutive text/thinking deltas of the same block are
+   * merged (leading edge immediately, then at most one IPC message per 16ms); anything
+   * else flushes the pending delta first so ordering is preserved.
+   */
+  private emitEvent(slot: Slot, event: unknown) {
+    const update = (event as { type?: string; assistantMessageEvent?: { type?: string; contentIndex?: number; delta?: unknown } }).type === "message_update"
+      ? (event as { assistantMessageEvent: { type?: string; contentIndex?: number; delta?: unknown } }).assistantMessageEvent
+      : undefined;
+    const mergeable = !!update && (update.type === "text_delta" || update.type === "thinking_delta") && typeof update.delta === "string" && Object.keys(update).every((k) => k === "type" || k === "contentIndex" || k === "delta");
+    if (mergeable) {
+      const pending = slot.pendingDelta;
+      if (pending && pending.type === update!.type && pending.contentIndex === update!.contentIndex) {
+        pending.delta += update!.delta as string;
+        return;
+      }
+      this.flushDelta(slot);
+      const now = Date.now();
+      if (now - (slot.lastDeltaAt ?? 0) >= DELTA_COALESCE_MS) {
+        slot.lastDeltaAt = now;
+        this.emit("agent://event", { sessionId: slot.id, event });
+        return;
+      }
+      const next: NonNullable<Slot["pendingDelta"]> = { type: update!.type!, contentIndex: update!.contentIndex, delta: update!.delta as string };
+      next.timer = setTimeout(() => { if (slot.pendingDelta === next) this.flushDelta(slot); }, DELTA_COALESCE_MS - (now - (slot.lastDeltaAt ?? 0)));
+      slot.pendingDelta = next;
+      return;
+    }
+    this.flushDelta(slot);
+    this.emit("agent://event", { sessionId: slot.id, event });
+  }
+  private flushDelta(slot: Slot) {
+    const pending = slot.pendingDelta;
+    if (!pending) return;
+    slot.pendingDelta = undefined;
+    if (pending.timer) clearTimeout(pending.timer);
+    slot.lastDeltaAt = Date.now();
+    const assistantMessageEvent: Record<string, unknown> = { type: pending.type, delta: pending.delta };
+    if (pending.contentIndex !== undefined) assistantMessageEvent.contentIndex = pending.contentIndex;
+    this.emit("agent://event", { sessionId: slot.id, event: { type: "message_update", assistantMessageEvent } });
+  }
   private emitStatus(slot: Slot) {
+    this.flushDelta(slot);
     this.emit("agent://session-status", {
       sessionId: slot.id,
       status: this.runStatus(slot),
@@ -227,10 +355,47 @@ export class PiEngine {
   private invalidateList() {
     this.listCache = undefined;
   }
+  /** Throttled `toolcall_delta` summary: target path / command and bytes streamed so far. */
+  private toolArgProgress(slot: Slot, source: { contentIndex?: number; delta?: string; partial?: { content?: Array<{ arguments?: unknown }> } }) {
+    const index = source.contentIndex ?? 0;
+    const map = (slot.toolArgs ??= new Map());
+    const state = map.get(index) ?? { bytes: 0, head: "", at: 0 };
+    const delta = typeof source.delta === "string" ? source.delta : "";
+    state.bytes += delta.length;
+    if (state.head.length < 4096) state.head += delta;
+    map.set(index, state);
+    const now = Date.now();
+    if (now - state.at < TOOL_DELTA_INTERVAL_MS) return;
+    state.at = now;
+    this.emitEvent(slot, {
+      type: "message_update", assistantMessageEvent: { type: "toolcall_delta", contentIndex: index, partialArgs: partialToolArgs(state.head, source.partial?.content?.[index]?.arguments), bytes: state.bytes } });
+  }
   private onEvent(slot: Slot, event: AgentSessionEvent) {
     const sessionId = slot.id;
+    if (event.type === "message_update") {
+      const source = event.assistantMessageEvent as unknown as { type: string; contentIndex?: number; delta?: string; partial?: { content?: Array<{ arguments?: unknown }> } };
+      if (source.type === "toolcall_delta") this.toolArgProgress(slot, source);
+      else if (source.type === "toolcall_start" || source.type === "toolcall_end") slot.toolArgs?.delete(source.contentIndex ?? 0);
+    }
+    if (event.type === "message_start") slot.toolArgs = undefined;
+    // An extension or /name renamed the session, or the thinking level moved (e.g. clamped after
+    // a model switch): keep the sidebar title and the composer's thinking control in sync (C7/C8).
+    if (event.type === "session_info_changed" && event.name?.trim()) {
+      this.metadata(sessionId, { title: event.name.trim() });
+      this.invalidateList();
+      this.emit("agent://summary", { sessionId, title: event.name.trim() });
+    }
+    if (event.type === "thinking_level_changed") {
+      try { this.emit("agent://model-state", this.modelState(sessionId)); } catch { /* model not resolved yet */ }
+    }
     const payload = slimEvent(event);
-    if (payload) this.emit("agent://event", { sessionId, event: payload });
+    if (payload) this.emitEvent(slot, payload);
+    if (event.type === "tool_execution_end") {
+      void this.checkpoints.finish(event.toolCallId).then(
+        (record) => { if (record || event.toolName === "write" || event.toolName === "edit") this.emit("agent://artifacts", { sessionId }); },
+        () => {},
+      );
+    }
     if (event.type === "agent_start") {
       slot.finalError = undefined;
       slot.failed = false;
@@ -326,6 +491,8 @@ export class PiEngine {
       }),
       extensionFactories: [
         this.permissions.extension(sessionId),
+        // After the permission gate: only calls that may run get a snapshot.
+        this.checkpoints.extension(sessionId, () => cwd),
         this.mcp.extension(),
         ...this.extensionFactories,
       ],
@@ -347,7 +514,11 @@ export class PiEngine {
       tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "mcp__*"],
       thinkingLevel: requestedThinking,
     });
+    const defaultTools = session.getActiveToolNames();
+    const mode = this.modes.get(session.sessionId) ?? "craft";
+    if (mode !== "craft") session.setActiveToolsByName(defaultTools.filter((name) => READ_ONLY_TOOLS.includes(name)));
     const slot: Slot = {
+      defaultTools,
       id: session.sessionId,
       session,
       unsubscribe: () => {},
@@ -557,13 +728,10 @@ export class PiEngine {
       // Extension commands are truly handled without an agent run, so Pi emits no settled.
       // Complete the host's send lifecycle only after the command handler has finished.
       if (disposition === "handled" && generation === slot.generation)
-        this.emit("agent://event", {
-          sessionId: id,
-          event: {
-            type: "agent_settled",
-            aborted: slot.cancelledGeneration === generation,
-            commandHandled: true,
-          },
+        this.emitEvent(slot, {
+          type: "agent_settled",
+          aborted: slot.cancelledGeneration === generation,
+          commandHandled: true,
         });
     } catch (error) {
       if (generation === slot.generation) slot.failed = true;
@@ -591,7 +759,7 @@ export class PiEngine {
     const result = await slot.session.navigateTree(entryId, { summarize: false });
     if (result.cancelled) throw Error("rewind_cancelled: 已取消");
     this.invalidateList();
-    this.emit("agent://event", { sessionId: slot.id, event: { type: "session_rewound", messages: slot.session.messages } });
+    this.emitEvent(slot, { type: "session_rewound", messages: slot.session.messages });
     return result.editorText ?? "";
   }
   /** 从这里编辑: drop this prompt and everything after it; returns the prompt text. */
@@ -613,6 +781,52 @@ export class PiEngine {
     const text = (await this.navigateBefore(slot, last.entryId)) || last.text;
     await this.send(id, text, images.length ? images : undefined);
   }
+  // ---- 产物 / 快照 (20261115-ui §5.5–5.6) ----
+  /** Files this session created or modified (write/edit), from its full history. */
+  async artifacts(id: string) {
+    const slot = this.slot(id);
+    const entries = slot.session.sessionManager.getEntries() as unknown as Parameters<typeof collectArtifacts>[0];
+    return collectArtifacts(entries, slot.session.sessionManager.getCwd(), await this.checkpoints.list(id));
+  }
+  /** A path this session may write: inside its workspace. */
+  private writablePath(id: string, path: string) {
+    const cwd = this.slot(id).session.sessionManager.getCwd();
+    const target = resolvePath(cwd, path);
+    const rel = relative(resolvePath(cwd), target);
+    if (!isAbsolute(path) || rel === "" || rel.startsWith("..") || isAbsolute(rel)) throw Error("path_outside_workspace: 只能修改工作区内的文件");
+    return target;
+  }
+  checkpointList(id: string, path?: string) { return this.checkpoints.list(id, path); }
+  checkpointRead(id: string, hash: string) { return this.checkpoints.read(id, hash); }
+  async checkpointRestore(id: string, path: string, hash: string | null) {
+    await this.checkpoints.restore(id, this.writablePath(id, path), hash);
+    this.emit("agent://artifacts", { sessionId: id });
+  }
+  async turnRevert(id: string, toolCallIds: string[], opts: { skip?: string[]; force?: boolean } = {}) {
+    if (this.slot(id).busy) throw Error("会话忙碌");
+    const result = await this.checkpoints.revert(id, toolCallIds, opts);
+    if (result.restored.length) this.emit("agent://artifacts", { sessionId: id });
+    return result;
+  }
+  async artifactSave(id: string, path: string, content: string, origin: "user" | "apply" = "user") {
+    await this.checkpoints.userSave(id, this.writablePath(id, path), content, origin);
+    this.emit("agent://artifacts", { sessionId: id });
+  }
+  setMode(id: string, mode: AgentMode) {
+    const slot = this.slot(id);
+    this.modes.set(id, mode);
+    slot.session.setActiveToolsByName(mode === "craft" ? slot.defaultTools : slot.defaultTools.filter((name) => READ_ONLY_TOOLS.includes(name)));
+  }
+  mode(id: string): AgentMode { return this.modes.get(id) ?? "craft"; }
+  abortRetry(id: string) { this.live(id).abortRetry(); }
+  async exportHtml(id: string, outputPath: string) {
+    if (!isAbsolute(outputPath)) throw Error("invalid_payload: outputPath");
+    return this.live(id).exportToHtml(outputPath);
+  }
+  /** Workspaces the preview protocol may serve: live session folders and the inbox. */
+  previewRoots(): string[] {
+    return [this.inbox, ...[...this.slots.values()].map((s) => s.session.sessionManager.getCwd())];
+  }
   queueState(id: string) {
     const s = this.live(id);
     return {
@@ -622,6 +836,20 @@ export class PiEngine {
   }
   clearQueue(id: string) {
     return this.live(id).clearQueue();
+  }
+  /**
+   * Replace the pending queue (撤回一条 / 改成插话 / 调整顺序, 20261115-ui U4.5). Pi only offers
+   * clear + append, so the new order is re-queued; queued images are not kept.
+   */
+  async setQueue(id: string, steering: string[], followUp: string[]) {
+    const slot = this.slot(id),
+      session = slot.session;
+    session.clearQueue();
+    if (slot.busy) {
+      for (const text of steering) await session.steer(text);
+      for (const text of followUp) await session.followUp(text);
+    }
+    return this.queueState(id);
   }
   async queue(
     id: string,
@@ -699,6 +927,7 @@ export class PiEngine {
       await slot.session.abort();
       await slot.session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
     } finally {
+      this.flushDelta(slot);
       slot.unsubscribe();
       slot.session.dispose();
       this.invalidateList();
@@ -821,6 +1050,8 @@ export class PiEngine {
     const messageTokens = Math.max(0, used - systemPromptTokens - toolDefinitionsTokens);
     return {
       cwd: session.sessionManager.getCwd(),
+      mode: this.mode(id),
+      cost: stats.cost,
       model: session.model?.id,
       modelDisplayName: session.model?.name,
       ...this.modelState(id),

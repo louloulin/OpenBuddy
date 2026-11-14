@@ -14,6 +14,8 @@ export interface MessageMeta {
   /** User message chips. */
   attachments?: string[];
   skill?: string;
+  /** 想一想 / 问一问 prompt. */
+  mode?: "plan" | "ask";
   expert?: string;
   images?: Array<{ data: string; mimeType: string }>;
   /** Optimistic user message not yet echoed by the engine. */
@@ -40,6 +42,8 @@ export interface ToolCallView {
   details?: unknown;
   durationMs?: number;
   startedAt?: number;
+  /** Argument text streamed so far (large writes show progress before they run). */
+  argBytes?: number;
 }
 interface Usage { promptTokens?: number; completionTokens?: number; totalTokens?: number }
 export interface RetryState { attempt: number; maxAttempts: number; delayMs: number; errorMessage?: string; startedAt: number }
@@ -65,7 +69,10 @@ interface SessionState {
   /** Undo an optimistic send that never reached the engine. */
   dropPending(sessionId?: string): void;
   pushAssistant(text: string): void;
-  applyUpdate(update: SessionUpdate): void; setMessages(messages: ChatMessage[]): void;
+  applyUpdate(update: SessionUpdate): void;
+  /** Streamed engine events: applied together once per frame (see flushQueuedUpdates). */
+  queueUpdate(update: SessionUpdate): void;
+  setMessages(messages: ChatMessage[]): void;
   setPlan(plan: Plan | null): void; setPlanMode(enabled: boolean): void;
 }
 let seq = 0;
@@ -123,6 +130,7 @@ function userMessage(message: PiMessage, id = nextId()): ChatMessage {
       timestamp: message.timestamp,
       ...(display.attachments.length ? { attachments: display.attachments } : {}),
       ...(display.skill ? { skill: display.skill } : {}),
+      ...(display.mode ? { mode: display.mode } : {}),
       ...(display.expert ? { expert: display.expert } : {}),
       ...(images.length ? { images } : {}),
     },
@@ -152,12 +160,17 @@ function finish(t: SessionTranscript): SessionTranscript {
       .map(m => (m.complete && !m.meta?.pending ? m : { ...m, complete: true })),
   };
 }
+/**
+ * The streaming assistant message, created if missing. `messages` is the
+ * transcript's own array when nothing was created — copy before writing to it.
+ */
 function ensureAssistant(t: SessionTranscript): { messages: ChatMessage[]; index: number; id: string } {
   const index = t.messages.findIndex(m => m.id === t.streamingMessageId && !m.complete);
-  if (index >= 0) return { messages: [...t.messages], index, id: t.messages[index].id };
+  if (index >= 0) return { messages: t.messages, index, id: t.messages[index].id };
   const id = nextId();
   return { messages: [...t.messages, { id, role: "assistant", parts: [], complete: false, meta: { timestamp: Date.now() } }], index: t.messages.length, id };
 }
+const writable = (t: SessionTranscript, messages: ChatMessage[]) => (messages === t.messages ? [...messages] : messages);
 function sumUsage(usage: Usage, message: PiMessage): Usage {
   const u = message.usage;
   if (!u) return usage;
@@ -189,7 +202,9 @@ function applyMessage(t: SessionTranscript, message: PiMessage, live: boolean): 
     return { ...t, messages: [...t.messages, userMessage(message)] };
   }
   if (message.role === "assistant") {
-    const { messages, index } = live ? ensureAssistant(t) : { messages: [...t.messages, { id: nextId(), role: "assistant" as const, parts: [], complete: false }], index: t.messages.length };
+    const found = live ? ensureAssistant(t) : { messages: [...t.messages, { id: nextId(), role: "assistant" as const, parts: [], complete: false }], index: t.messages.length };
+    const messages = writable(t, found.messages);
+    const index = found.index;
     messages[index] = { ...messages[index], parts: assistantParts(message, messages[index].parts), complete: true, meta: assistantMeta(message, live ? Date.now() : undefined) };
     return { ...t, messages, streamingMessageId: live ? null : t.streamingMessageId, usage: sumUsage(t.usage, message) };
   }
@@ -205,10 +220,26 @@ export function transcriptFromMessages(history: PiMessage[], busy = false): Sess
 }
 /** Streaming deltas: content is assembled from deltas only (no cumulative snapshots). */
 function applyDelta(t: SessionTranscript, delta: NonNullable<SessionUpdate["assistantMessageEvent"]>): SessionTranscript {
-  const { messages, index, id } = ensureAssistant(t);
-  const parts = [...messages[index].parts];
+  const found = ensureAssistant(t);
+  const { index, id } = found;
   const contentIndex = delta.contentIndex ?? 0;
-  const at = parts.findIndex(p => p.contentIndex === contentIndex);
+  const original = found.messages[index].parts;
+  const at = original.findIndex(p => p.contentIndex === contentIndex);
+  // Slim toolcall_delta: show the target path / command and progress while the arguments stream.
+  if (delta.type === "toolcall_delta") {
+    const part = at >= 0 ? original[at] : undefined;
+    if (part?.kind !== "tool_call" || (!delta.partialArgs && delta.bytes === undefined)) {
+      return found.messages === t.messages && t.streamingMessageId === id && t.busy ? t : { ...t, messages: found.messages, streamingMessageId: id, busy: true };
+    }
+    const current = part.toolCall.rawInput && typeof part.toolCall.rawInput === "object" ? (part.toolCall.rawInput as Record<string, unknown>) : {};
+    const rawInput = { ...(delta.partialArgs ?? {}), ...current };
+    const parts = [...original];
+    parts[at] = { ...part, toolCall: { ...part.toolCall, rawInput, ...(delta.bytes !== undefined ? { argBytes: delta.bytes } : {}) } };
+    const messages = writable(t, found.messages);
+    messages[index] = { ...messages[index], parts };
+    return { ...t, messages, streamingMessageId: id, busy: true };
+  }
+  const parts = [...original];
   const kind = delta.type.startsWith("thinking_") ? "thought" : delta.type.startsWith("text_") ? "text" : undefined;
   if (kind) {
     const previous = at >= 0 ? parts[at] : undefined;
@@ -220,9 +251,11 @@ function applyDelta(t: SessionTranscript, delta: NonNullable<SessionUpdate["assi
     const part = toolPart(delta.toolCall, contentIndex, parts);
     if (at >= 0) parts[at] = part; else parts.push(part);
   } else {
-    return { ...t, messages, streamingMessageId: id, busy: true };
+    // Nothing to show for this delta: keep the transcript identical so nothing re-renders.
+    return found.messages === t.messages && t.streamingMessageId === id && t.busy ? t : { ...t, messages: found.messages, streamingMessageId: id, busy: true };
   }
   parts.sort((a, b) => (a.contentIndex ?? 0) - (b.contentIndex ?? 0));
+  const messages = writable(t, found.messages);
   messages[index] = { ...messages[index], parts };
   return { ...t, messages, streamingMessageId: id, busy: true };
 }
@@ -235,7 +268,7 @@ function reduce(t: SessionTranscript, event: SessionUpdate): SessionTranscript {
     case "message_start": {
       if (event.message?.role !== "assistant") return t;
       const { messages, id } = ensureAssistant(t);
-      return { ...t, messages, streamingMessageId: id };
+      return messages === t.messages && t.streamingMessageId === id ? t : { ...t, messages, streamingMessageId: id };
     }
     case "message_update": return event.assistantMessageEvent ? applyDelta(t, event.assistantMessageEvent) : t;
     case "message_end": return event.message ? applyMessage(t, event.message, true) : t;
@@ -260,33 +293,84 @@ function reduce(t: SessionTranscript, event: SessionUpdate): SessionTranscript {
     case "compaction_end": {
       const next = { ...t, compacting: null };
       if (!event.result || event.aborted) return next;
-      return { ...next, messages: [...next.messages, { id: nextId(), role: "notice", complete: true, parts: [], meta: { notice: "compaction", timestamp: Date.now() } }] };
+      const summary = typeof (event.result as { summary?: unknown }).summary === "string" ? (event.result as { summary: string }).summary : "";
+      return { ...next, messages: [...next.messages, { id: nextId(), role: "notice", complete: true, parts: summary ? [{ kind: "text", text: summary }] : [], meta: { notice: "compaction", timestamp: Date.now() } }] };
     }
     default: return t;
   }
 }
+/** Engine events waiting for the next frame. */
+let queued: SessionUpdate[] = [];
+let flushToken = 0;
+/** Last keystroke in the window: streaming yields frames to typing (20261115-ui §3). */
+let lastInputAt = -Infinity;
+if (typeof window !== "undefined") {
+  const mark = () => { lastInputAt = performance.now(); };
+  window.addEventListener("keydown", mark, { capture: true, passive: true });
+  window.addEventListener("input", mark, { capture: true, passive: true });
+}
+const TYPING_MS = 150;
+function scheduleFlush(run: () => void) {
+  const token = ++flushToken;
+  const once = () => { if (token === flushToken) run(); };
+  // rAF pauses in a hidden window; the timer keeps background sessions moving.
+  if (typeof requestAnimationFrame === "function") {
+    // While the user types, render the stream every other frame so most frames only carry
+    // the keystroke (still ≤ 33ms behind; the 50ms timer below bounds the wait).
+    const typing = performance.now() - lastInputAt < TYPING_MS;
+    requestAnimationFrame(typing ? () => requestAnimationFrame(once) : once);
+  }
+  setTimeout(once, 50);
+}
 export const useSessionStore = create<SessionState>((set, get) => {
+  /** Apply every queued engine event in one store update (one render per frame). */
+  const flush = () => {
+    flushToken++;
+    if (!queued.length) return;
+    const events = queued;
+    queued = [];
+    set(state => {
+      let transcripts = state.transcripts;
+      for (const event of events) {
+        const sid = event.sessionId ?? event.__sessionId;
+        if (!sid) continue;
+        const current = transcripts[sid];
+        const next = reduce(current ?? empty(), event);
+        if (next === current) continue;
+        if (transcripts === state.transcripts) transcripts = { ...transcripts };
+        transcripts[sid] = next;
+      }
+      if (transcripts === state.transcripts) return state;
+      const active = state.sessionId ? transcripts[state.sessionId] : undefined;
+      return { transcripts, ...(active && active !== state.transcripts[state.sessionId!] ? mirror(active) : {}) };
+    });
+  };
+  /** Direct actions must see every event that arrived before them. */
+  const sync = () => { if (queued.length) flush(); };
   const apply = (sid: string | null | undefined, reducer: (t: SessionTranscript) => SessionTranscript) => {
     if (!sid) return;
+    sync();
     set(state => {
-      const next = reducer(state.transcripts[sid] ?? empty());
+      const current = state.transcripts[sid];
+      const next = reducer(current ?? empty());
+      if (next === current) return state;
       return { transcripts: { ...state.transcripts, [sid]: next }, ...(state.sessionId === sid ? mirror(next) : {}) };
     });
   };
   return {
     sessionId: null, transcripts: {}, ...mirror(), planMode: false,
-    setSession: id => set(state => {
+    setSession: id => { sync(); set(state => {
       const t = (id ? state.transcripts[id] : undefined) ?? empty();
       return { sessionId: id, transcripts: id && !state.transcripts[id] ? { ...state.transcripts, [id]: t } : state.transcripts, ...mirror(t) };
-    }),
-    reset: () => set({ sessionId: null, ...mirror() }),
-    hydrate: (id, history, busy, force = false) => set(state => {
+    }); },
+    reset: () => { sync(); set({ sessionId: null, ...mirror() }); },
+    hydrate: (id, history, busy, force = false) => { sync(); set(state => {
       const cached = state.transcripts[id];
       // A cached transcript has been receiving this session's live events all along.
       const next = cached && cached.messages.length && !force ? { ...cached, busy: busy || cached.busy } : transcriptFromMessages(history, busy);
       if (busy && !next.streamingMessageId) Object.assign(next, { turnStartedAt: next.turnStartedAt ?? Date.now() });
       return { transcripts: { ...state.transcripts, [id]: next }, ...(state.sessionId === id ? mirror(next) : {}) };
-    }),
+    }); },
     startStreaming: sessionId => apply(sessionId ?? get().sessionId, t => {
       const { messages, id } = ensureAssistant(t);
       return { ...t, messages, streamingMessageId: id, busy: true, error: null, retry: null, usage: {}, turnStartedAt: Date.now() };
@@ -294,16 +378,16 @@ export const useSessionStore = create<SessionState>((set, get) => {
     markComplete: p => apply(p.sessionId, t => ({ ...finish(t), usage: { ...t.usage, ...p.usage } })),
     setError: (error, sessionId) => apply(sessionId ?? get().sessionId, t => (error ? { ...finish(t), error } : { ...t, error: null })),
     stopStreaming: sessionId => apply(sessionId ?? get().sessionId, finish),
-    dropSessionCache: id => set(state => {
+    dropSessionCache: id => { sync(); set(state => {
       const transcripts = { ...state.transcripts }; delete transcripts[id];
       return { transcripts, ...(state.sessionId === id ? mirror() : {}) };
-    }),
+    }); },
     pushUser: (text, attachments, sessionId) => apply(sessionId ?? get().sessionId, t => {
       const display = parseUserText(text);
       return { ...t, error: null, messages: [...t.messages, {
         id: nextId(), role: "user", complete: true,
         parts: display.text ? [{ kind: "text", text: display.text }] : [],
-        meta: { pending: true, timestamp: Date.now(), ...(attachments?.length ? { attachments } : display.attachments.length ? { attachments: display.attachments } : {}), ...(display.skill ? { skill: display.skill } : {}) },
+        meta: { pending: true, timestamp: Date.now(), ...(attachments?.length ? { attachments } : display.attachments.length ? { attachments: display.attachments } : {}), ...(display.skill ? { skill: display.skill } : {}), ...(display.mode ? { mode: display.mode } : {}) },
       }] };
     }),
     dropPending: sessionId => apply(sessionId ?? get().sessionId, t => {
@@ -318,22 +402,36 @@ export const useSessionStore = create<SessionState>((set, get) => {
       foreignListeners.get(sid)?.(event);
       apply(sid, t => reduce(t, event));
     },
+    queueUpdate: event => {
+      const sid = event.sessionId ?? event.__sessionId;
+      if (!sid) return;
+      foreignListeners.get(sid)?.(event);
+      queued.push(event);
+      if (queued.length === 1) scheduleFlush(flush);
+    },
     setMessages: messages => apply(get().sessionId, t => ({ ...t, messages })),
     setPlan: plan => apply(get().sessionId, t => ({ ...t, plan })),
     setPlanMode: planMode => set({ planMode }),
   };
 });
+/** Patch one tool call; only the message holding it gets a new object. */
 function updateTool(t: SessionTranscript, toolCallId: string, name: string, patch: Partial<ToolCallView>): SessionTranscript {
-  let found = false;
-  const messages = t.messages.map(message => message.role !== "assistant" ? message : ({ ...message, parts: message.parts.map(part => {
-    if (part.kind !== "tool_call" || part.toolCall.toolCallId !== toolCallId) return part;
-    found = true;
+  for (let mi = t.messages.length - 1; mi >= 0; mi--) {
+    const message = t.messages[mi];
+    if (message.role !== "assistant") continue;
+    const pi = message.parts.findIndex(part => part.kind === "tool_call" && part.toolCall.toolCallId === toolCallId);
+    if (pi < 0) continue;
+    const part = message.parts[pi] as Extract<MessagePart, { kind: "tool_call" }>;
     const rawInput = patch.rawInput !== undefined && patch.rawInput !== null ? patch.rawInput : part.toolCall.rawInput;
-    return { ...part, toolCall: { ...part.toolCall, ...patch, rawInput, startedAt: part.toolCall.startedAt ?? patch.startedAt } };
-  }) }));
-  if (found) return { ...t, messages };
-  const next = ensureAssistant({ ...t, messages });
-  next.messages[next.index] = { ...next.messages[next.index], parts: [...next.messages[next.index].parts, { kind: "tool_call", toolCall: { toolCallId, title: name, kind: name, status: "in_progress", content: [], ...patch } }] };
-  return { ...t, messages: next.messages, streamingMessageId: next.id };
+    const parts = [...message.parts];
+    parts[pi] = { ...part, toolCall: { ...part.toolCall, ...patch, rawInput, startedAt: part.toolCall.startedAt ?? patch.startedAt } };
+    const messages = [...t.messages];
+    messages[mi] = { ...message, parts };
+    return { ...t, messages };
+  }
+  const next = ensureAssistant(t);
+  const messages = writable(t, next.messages);
+  messages[next.index] = { ...messages[next.index], parts: [...messages[next.index].parts, { kind: "tool_call", toolCall: { toolCallId, title: name, kind: name, status: "in_progress", content: [], ...patch } }] };
+  return { ...t, messages, streamingMessageId: next.id };
 }
 export type { ToolCallUpdate };

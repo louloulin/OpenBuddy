@@ -18,6 +18,8 @@ export interface FeedbackEntry {
   stars?: number;
   /** 可选文字备注。 */
   note?: string;
+  /** 👎 的原因(至少一个,20261115-ui U3.7)。 */
+  reasons?: string[];
   ts: number;
 }
 
@@ -67,7 +69,7 @@ interface FeedbackState {
   setDetailed: (
     sessionId: string,
     messageId: string,
-    data: { rating: FeedbackRating; stars?: number; note?: string },
+    data: { rating: FeedbackRating; stars?: number; note?: string; reasons?: string[] },
   ) => void;
   /** 显式清除一条反馈。 */
   clearRating: (sessionId: string, messageId: string) => void;
@@ -106,6 +108,7 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
           rating: data.rating,
           stars: clampStars(data.stars),
           note: data.note?.trim() || undefined,
+          reasons: data.reasons?.length ? [...data.reasons] : undefined,
           ts: Date.now(),
         },
       };

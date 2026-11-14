@@ -1,4 +1,6 @@
 import { useAgentModelStore } from "@/stores/agent-model-store";
+import { keyLabel } from "@/lib/shortcuts";
+import { ShortcutList } from "./ShortcutsPanel";
 import { appConfirm } from "./AppDialog";
 /**
  * Settings 面板的各个真实分区。
@@ -28,6 +30,7 @@ import {
   Database,
   Key,
   Mail,
+  Bell,
   CheckCheck,
   Filter,
   Rows3,
@@ -47,6 +50,8 @@ import {
   memoryRewrite,
   notificationClear,
   notificationList,
+  notificationPrefsGet,
+  notificationPrefsSet,
   notificationMarkAllRead,
   notificationMarkRead,
   permissionList,
@@ -71,20 +76,6 @@ import type {
 } from "@/lib/types";
 
 const FONT_KEY = "openbuddy.fontSize";
-const SHORTCUTS_KEY = "openbuddy.shortcuts";
-
-const DEFAULT_SHORTCUTS: { key: string; action: string }[] = [
-  { key: "Ctrl/Cmd + N", action: "新建任务" },
-  { key: "Ctrl/Cmd + K", action: "搜索会话" },
-  { key: "Ctrl/Cmd + ,", action: "打开设置" },
-  { key: "Ctrl/Cmd + B", action: "切换侧栏" },
-  { key: "Ctrl/Cmd + Enter", action: "发送消息" },
-  { key: "Shift + Enter", action: "换行" },
-  { key: "Esc", action: "停止生成 / 关闭对话框" },
-  { key: "/ ", action: "触发技能/命令补全" },
-  { key: "@ ", action: "引用对话文件" },
-];
-
 function SectionShell({
   title,
   desc,
@@ -192,39 +183,10 @@ export function PersonalizeSettingsPanel() {
 // ---------- 快捷键 ----------
 
 export function ShortcutsSettingsPanel() {
-  const [shortcuts, setShortcuts] = useState<{ key: string; action: string }[]>(() => {
-    try {
-      const saved = localStorage.getItem(SHORTCUTS_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch {
-      /* ignore */
-    }
-    return DEFAULT_SHORTCUTS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(shortcuts));
-  }, [shortcuts]);
-
+  // Generated from the one registry the handlers use (20261115-ui U8.2): only shortcuts that work.
   return (
-    <SectionShell
-      title="快捷键"
-      desc="OpenBuddy 内置的快捷键。这些值保存在本地，重装会恢复默认。"
-    >
-      <ul className="shortcuts-list">
-        {shortcuts.map((s, i) => (
-          <li key={i} className="shortcuts-list__row">
-            <span className="shortcuts-list__action">{s.action}</span>
-            <kbd className="shortcuts-list__key">{s.key}</kbd>
-          </li>
-        ))}
-      </ul>
-      <button
-        className="settings-reset"
-        onClick={() => setShortcuts(DEFAULT_SHORTCUTS)}
-      >
-        重置为默认
-      </button>
+    <SectionShell title="快捷键" desc={`按 ${keyLabel("Mod")}+/ 随时查看这份列表。`}>
+      <ShortcutList />
     </SectionShell>
   );
 }
@@ -977,7 +939,7 @@ export function AgentSettingsPanel() {
 const PERMISSION_OPTIONS: { value: string; label: string }[] = [
   { value: "ask", label: "审批模式（每次询问）" },
   { value: "auto", label: "自动模式（高风险操作询问）" },
-  { value: "always-approve", label: "始终允许" },
+  { value: "always-approve", label: "完全访问（不再询问）" },
 ];
 
 /** AssistantSettingsPanel — 助理角色列表 + 新会话默认模型/权限偏好。
@@ -1223,6 +1185,8 @@ export function AgentMailSettingsPanel() {
     (e) => filter === "all" || String(e.kind) === filter,
   );
   const unreadCount = entries.filter((e) => !e.read).length;
+  const [systemNotify, setSystemNotify] = useState<boolean | undefined>(undefined);
+  useEffect(() => { notificationPrefsGet().then((p) => setSystemNotify(p.system), () => setSystemNotify(true)); }, []);
 
   return (
     <SectionShell
@@ -1247,6 +1211,31 @@ export function AgentMailSettingsPanel() {
         >
           <Trash2 size={14} /> 清空
         </button>
+      </div>
+
+      <div className="settings-row">
+        <div className="settings-row__label">
+          <Bell size={16} />
+          <span>系统通知</span>
+          <span className="settings-row__hint">窗口不在前台时，任务完成、失败或需要你确认时弹出系统通知，点击直接打开对应任务</span>
+        </div>
+        <div className="settings-row__control">
+          <label className="ob-switch">
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label="系统通知"
+              checked={systemNotify ?? true}
+              disabled={systemNotify === undefined}
+              onChange={(e) => {
+                const next = e.target.checked;
+                setSystemNotify(next);
+                void notificationPrefsSet(next).catch(() => setSystemNotify(!next));
+              }}
+            />
+            <span className="ob-switch__track" aria-hidden="true"><span className="ob-switch__thumb" /></span>
+          </label>
+        </div>
       </div>
 
       <div className="settings-row">

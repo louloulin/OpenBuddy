@@ -1,6 +1,8 @@
 import { invoke } from "@/lib/ipc";
 import { ask, save } from "@/lib/ipc";
 import type { MarkdownConfig, PathType } from "@/components/markdown/types";
+import { appConfirm } from "@/components/AppDialog";
+import { artifactSave } from "@/lib/agent-client";
 
 export type MarkdownHostOptions = {
   cwd?: string;
@@ -162,37 +164,35 @@ export function createMarkdownHostConfig(
 
       let target: string | null = null;
 
-      // If fence meta already named a file, confirm write directly to that path
-      // (still restricted by write_text_file workspace check).
+      // The fence named the file: show what would change, then write through the checkpoint
+      // store so the write can be undone from the workbench (20261115-ui U1.7).
       if (preferredPath && preferredPath.trim()) {
         const resolved = joinPath(cwd, preferredPath.trim());
-        const preview = linePreview(code);
-        let ok = false;
+        let before: string | null = null;
         try {
-          ok = await ask(
-            `将把代码写入：\n${resolved}\n\n${preview}\n\n确认覆盖/创建该文件？`,
-            {
-              title: "应用代码到文件",
-              kind: "warning",
-              okLabel: "写入",
-              cancelLabel: "取消",
-            },
-          );
+          before = await invoke<string>("read_text_file", { path: resolved, maxBytes: 4 * 1024 * 1024 });
         } catch {
-          toast("无法显示确认对话框");
+          before = null; // new file
+        }
+        if (before === code) {
+          toast("内容与当前文件相同，无需写入");
           return;
         }
-        if (!ok) {
-          toast("已取消写入");
-          return;
-        }
+        const ok = await appConfirm({
+          title: before === null ? `新建 ${preferredPath.trim()}？` : `覆盖 ${preferredPath.trim()}？`,
+          message: `位置：${resolved}${sessionId ? "\n写入前会留快照，之后可在工作台的变更里还原。" : ""}`,
+          diff: { before: before ?? "", after: code },
+          confirmLabel: before === null ? "新建文件" : "写入",
+        });
+        if (!ok) return;
         try {
-          const written = await invoke<string>("write_text_file", {
-            path: preferredPath.trim(),
-            content: code,
-            workspaceRoot: cwd,
-          });
-          toast(`已写入 ${written}`);
+          if (sessionId) {
+            await artifactSave(sessionId, resolved, code, "apply");
+            toast(`已写入 ${preferredPath.trim()} · 可还原`);
+          } else {
+            const written = await invoke<string>("write_text_file", { path: preferredPath.trim(), content: code, workspaceRoot: cwd });
+            toast(`已写入 ${written}`);
+          }
         } catch (e) {
           toast(String(e).replace(/^Error:\s*/, ""));
         }

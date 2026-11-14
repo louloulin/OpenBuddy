@@ -1,4 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { keyLabel } from "@/lib/shortcuts";
+import { useUnseenStore } from "@/stores/unseen-store";
 import { appConfirm } from "./AppDialog";
 import { useSessionsStore, selectHasFilter } from "@/stores/sessions-store";
 import { usePermissionStore } from "@/stores/permission-store";
@@ -538,6 +540,7 @@ export function Sidebar({
   onOpenSettings,
   onToggleCollapse,
   onToggleWorkspace,
+  onOpenSearch,
   onPlaceholder,
   onToast,
   onOpenProject,
@@ -572,6 +575,7 @@ export function Sidebar({
   const expanded = useSessionsStore((s) => s.expanded);
   const currentSessionId = useSessionsStore((s) => s.currentSessionId);
   const permissionQueues = usePermissionStore((s) => s.queues);
+  const unseenIds = useUnseenStore((s) => s.ids);
   const questionQueues = useQuestionStore((s) => s.queues);
   const upsertSession = useSessionsStore((s) => s.upsert);
   const removeSession = useSessionsStore((s) => s.remove);
@@ -703,6 +707,7 @@ export function Sidebar({
     const awaiting = (permissionQueues[s.sessionId]?.length ?? 0) + (questionQueues[s.sessionId]?.length ?? 0) > 0;
     const working = s.status === "working";
     const failed = s.status === "failed";
+    const unseen = unseenIds.includes(s.sessionId) && s.sessionId !== currentSessionId;
     return (
     <button
       key={s.sessionId}
@@ -722,6 +727,8 @@ export function Sidebar({
         <span className="sidebar__conv-state sidebar__conv-state--working" aria-label="执行中" />
       ) : failed ? (
         <span className="sidebar__conv-state sidebar__conv-state--failed" aria-label="执行出错" />
+      ) : unseen ? (
+        <span className="sidebar__conv-state sidebar__conv-state--done" aria-label="已完成未查看" title="已完成，还没查看" />
       ) : null}
       <span className="sidebar__conv-title">{s.title || "未命名会话"}</span>
       {s.pinned && <PinFilledIcon size="sm" className="sidebar__conv-pin" />}
@@ -793,7 +800,7 @@ export function Sidebar({
         >
           <SidebarToggleIcon size="md" />
         </button>
-        <button className="sidebar__icon-btn" aria-label="搜索（后续版本开放）" disabled title="会话搜索暂未开放">
+        <button className="sidebar__icon-btn" aria-label="搜索任务" data-tip={`搜索任务 (${keyLabel("Mod")}+K)`} onClick={onOpenSearch}>
           <SearchIcon size="md" />
         </button>
         <div className="task-filter-wrap" ref={filterRef}>

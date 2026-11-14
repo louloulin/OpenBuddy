@@ -11,6 +11,11 @@ import { PiEngine, validateThinkingLevel } from "../../agent/pi.js";
 import { modelKey } from "../../services/providers.js";
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import type { Emit } from "../../agent/permissions.js";
+/** A list of non-empty strings (queued prompts). */
+function strings(value: unknown): string[] {
+  if (!Array.isArray(value) || value.some((v) => typeof v !== "string" || !v.trim())) throw Error("invalid_payload: list");
+  return value as string[];
+}
 export interface EngineOptions {
   userDataDir: string;
   emit: Emit;
@@ -128,6 +133,7 @@ export async function createEngineHandlers(options: EngineOptions) {
       ),
     agent_get_queue: (p) => engine.queueState(text(p.sessionId)),
     agent_clear_queue: (p) => engine.clearQueue(text(p.sessionId)),
+    agent_set_queue: (p) => engine.setQueue(text(p.sessionId), strings(p.steering), strings(p.followUp)),
     agent_fork_session: (p) => engine.fork(text(p.sessionId)),
     agent_extensions_list: () => engine.extensionsConfig(),
     agent_extensions_add: (p) =>
@@ -148,6 +154,14 @@ export async function createEngineHandlers(options: EngineOptions) {
     rewind_execute: (p) => engine.rewind(text(p.sessionId), text(p.entryId)),
     agent_regenerate: (p) => engine.regenerate(text(p.sessionId)),
     agent_compact: (p) => engine.compact(text(p.sessionId), typeof p.instructions === "string" ? p.instructions : undefined),
+    artifacts_list: (p) => engine.artifacts(text(p.sessionId)),
+    checkpoint_list: (p) => engine.checkpointList(text(p.sessionId), typeof p.path === "string" ? p.path : undefined),
+    checkpoint_read: (p) => engine.checkpointRead(text(p.sessionId), text(p.hash)),
+    checkpoint_restore: (p) => engine.checkpointRestore(text(p.sessionId), text(p.path), typeof p.hash === "string" ? p.hash : null),
+    turn_revert: (p) => engine.turnRevert(text(p.sessionId), p.toolCallIds as string[], { skip: Array.isArray(p.skip) ? (p.skip as string[]) : undefined, force: p.force === true }),
+    artifact_save: (p) => engine.artifactSave(text(p.sessionId), text(p.path), String(p.content), p.origin === "apply" ? "apply" : "user"),
+    agent_set_mode: (p) => engine.setMode(text(p.sessionId), p.mode as "craft" | "plan" | "ask"),
+    agent_abort_retry: (p) => engine.abortRetry(text(p.sessionId)),
     task_kill: (p) => engine.cancel(text(p.taskId)),
     agent_rename_session: (p) =>
       engine.rename(text(p.sessionId), text(p.title)),
@@ -165,8 +179,10 @@ export async function createEngineHandlers(options: EngineOptions) {
       engine.metadata(id, { archived });
       return archived;
     },
-    agent_session_info: (p) => engine.info(text(p.sessionId)),
-    agent_session_usage: (p) => engine.usage(text(p.sessionId)),
+    // A session that is not loaded yet (just picked in the sidebar) has nothing to report: null,
+    // not an error, so opening a task does not leave failed calls behind.
+    agent_session_info: (p) => (engine.has(text(p.sessionId)) ? engine.info(text(p.sessionId)) : null),
+    agent_session_usage: (p) => (engine.has(text(p.sessionId)) ? engine.usage(text(p.sessionId)) : null),
     agent_set_model: (p) =>
       engine.setModel(
         text(p.sessionId),
@@ -178,7 +194,7 @@ export async function createEngineHandlers(options: EngineOptions) {
       engine.setThinkingLevel(text(p.sessionId), p.level),
     agent_resolve_ui: (p) => engine.ui.resolve(p),
     agent_resolve_permission: (p) =>
-      engine.permissions.resolve(text(p.requestId), p.optionId, p.cancelled),
+      engine.permissions.resolve(text(p.requestId), p.optionId, p.cancelled, p.reason),
     agent_resolve_question: (p) => engine.ui.resolve(p),
     folder_trust_respond: (p) =>
       engine.setFolderTrust(text(p.cwd), bool(p.trusted)),
@@ -230,6 +246,7 @@ export async function createEngineHandlers(options: EngineOptions) {
       emit("agent://models-update", {});
     },
     providers_fetch_models: (p) => engine.providers.fetchModels(p),
+    providers_test: (p) => engine.providers.test(p),
     account_get_api_key: () =>
       settings.secrets.has("provider:grok") ? "••••" : null,
     account_set_api_key: async (p) => {
@@ -351,6 +368,12 @@ export async function createEngineHandlers(options: EngineOptions) {
       update((c) => {
         for (const n of c.notifications) n.read = true;
       }),
+    notification_prefs_get: () => ({ system: settings.config.read().notifyPrefs?.system !== false }),
+    notification_prefs_set: (p) => {
+      if (typeof p.system !== "boolean") throw Error("system必须为布尔值");
+      update((c) => { c.notifyPrefs = { ...c.notifyPrefs, system: p.system === true }; });
+      return { system: p.system === true };
+    },
     notification_clear: () =>
       update((c) => {
         c.notifications = [];
@@ -367,5 +390,5 @@ export async function createEngineHandlers(options: EngineOptions) {
         throw Error(String(settings.secrets.redact(message)));
       }
     };
-  return { handlers, dispose: () => engine.shutdown() };
+  return { handlers, dispose: () => engine.shutdown(), previewRoots: () => engine.previewRoots(), exportHtml: (id: string, path: string) => engine.exportHtml(id, path), notificationsEnabled: () => settings.config.read().notifyPrefs?.system !== false };
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import type { ToolCallView } from "@/stores/session-store";
 import type { DiffContent, CommandOutputContent, ImageToolContent } from "@/lib/types";
 import { checkCommandRisk, riskLabel } from "@/lib/command-risk";
@@ -22,7 +22,15 @@ type ToolCallCardProps = {
   cwd?: string;
   /** Open the right-side detail drawer. */
   onOpen?: (tc: ToolCallView) => void;
+  /** The turn ended (stopped by the user) before this call finished. */
+  stopped?: boolean;
 };
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n}B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(n < 10 * 1024 ? 1 : 0)}KB`;
+  return `${(n / 1024 / 1024).toFixed(1)}MB`;
+}
 
 function ToolIcon({ name }: { name: string }) {
   if (name === "bash" || name === "powershell") return <TerminalToolIcon size={14} />;
@@ -49,18 +57,24 @@ function useElapsed(startedAt: number | undefined, running: boolean): number | u
  * One tool call as a single transcript row: icon · what · object · time · status.
  * Details (command output, diff) open in the side drawer.
  */
-export function ToolCallCard({ tc, cwd, onOpen }: ToolCallCardProps) {
-  const running = tc.status === "in_progress";
+export const ToolCallCard = memo(function ToolCallCard({ tc, cwd, onOpen, stopped }: ToolCallCardProps) {
+  const running = tc.status === "in_progress" && !stopped;
   const elapsed = useElapsed(tc.startedAt, running);
+  // Arguments still streaming (e.g. a large write) before the tool runs.
+  const generating = running && !tc.startedAt && (tc.argBytes ?? 0) > 0;
   const label = toolLabel(tc.kind);
   const subject = toolSubject(tc.kind, tc.rawInput, cwd);
   const diff = !running ? toolDiff(tc) : undefined;
   const stats = diff ? diffStats(diff.lines) : undefined;
-  const time = running ? (elapsed !== undefined && elapsed >= 1000 ? formatDuration(elapsed) : "") : formatDuration(tc.durationMs);
-  const statusLabel = tc.status === "completed" ? "完成" : tc.status === "failed" ? "失败" : "运行中";
-  const lastLine = running ? toolOutput(tc).trimEnd().split("\n").at(-1) : undefined;
+  const time = generating
+    ? `生成中 · ${formatBytes(tc.argBytes ?? 0)}`
+    : running ? (elapsed !== undefined && elapsed >= 1000 ? formatDuration(elapsed) : "") : stopped ? "" : formatDuration(tc.durationMs);
+  const status = stopped ? "stopped" : tc.status;
+  const statusLabel = stopped ? "已停止" : tc.status === "completed" ? "完成" : tc.status === "failed" ? "失败" : "运行中";
+  // Live output: the last few lines, like a terminal tail.
+  const tail = running ? toolOutput(tc).trimEnd().split("\n").filter(Boolean).slice(-3) : [];
   return (
-    <div className={"toolrow toolrow--" + tc.status}>
+    <div className={"toolrow toolrow--" + status}>
       <button
         type="button"
         className="toolrow__main"
@@ -78,15 +92,19 @@ export function ToolCallCard({ tc, cwd, onOpen }: ToolCallCardProps) {
           </span>
         )}
         {time && <span className="toolrow__time">{time}</span>}
-        <span className={"toolrow__mark toolrow__mark--" + tc.status} aria-hidden>
-          {tc.status === "completed" ? <CheckIcon size={12} strokeWidth={2.5} /> : tc.status === "failed" ? "!" : <span className="toolrow__spinner" />}
-        </span>
+        {stopped ? (
+          <span className="toolrow__stopped">已停止</span>
+        ) : (
+          <span className={"toolrow__mark toolrow__mark--" + tc.status} aria-hidden>
+            {tc.status === "completed" ? <CheckIcon size={12} strokeWidth={2.5} /> : tc.status === "failed" ? "!" : <span className="toolrow__spinner" />}
+          </span>
+        )}
         {onOpen && <span className="toolrow__go" aria-hidden><ChevronGlyph /></span>}
       </button>
-      {lastLine && <div className="toolrow__live">{lastLine}</div>}
+      {tail.length > 0 && <div className="toolrow__live">{tail.map((line, i) => <div key={i} className="toolrow__live-line">{line}</div>)}</div>}
     </div>
   );
-}
+});
 
 // ---------- shared detail body (drawer / artifacts) ----------
 

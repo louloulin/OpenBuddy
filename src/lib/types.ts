@@ -144,6 +144,10 @@ export interface PiMessageDelta {
   content?: string;
   toolCall?: PiContent;
   partial?: PiMessage;
+  /** Slim `toolcall_delta` (main process): fields parsed from the partial arguments so far. */
+  partialArgs?: { path?: string; command?: string };
+  /** Slim `toolcall_delta`: length of the argument text streamed so far. */
+  bytes?: number;
 }
 export interface SessionUpdate {
   type: string;
@@ -238,6 +242,8 @@ export interface PermissionRequest {
   /** Optional partial raw input to show the user what they're approving. */
   rawInput?: unknown;
   options: PermissionOption[];
+  /** Set when the call deletes files (bash rm, delete tools): the card asks harder. */
+  destructive?: { command?: string; paths?: string[] };
 }
 
 // ---------- prompt completion ----------

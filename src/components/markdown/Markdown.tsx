@@ -1,6 +1,8 @@
 import {
   Component,
+  createContext,
   memo,
+  useContext,
   useEffect,
   useMemo,
   useState,
@@ -242,6 +244,13 @@ function MarkdownImage({
 
 /* ---------- main renderer ---------- */
 
+/** Whether the block being rendered has finished streaming (see `components` below). */
+const MarkdownCompleteContext = createContext(true);
+function MermaidWhenComplete(props: Omit<React.ComponentProps<typeof MarkdownPreMermaid>, "complete">) {
+  const complete = useContext(MarkdownCompleteContext);
+  return <MarkdownPreMermaid {...props} complete={complete} />;
+}
+
 function MarkdownInner({
   children,
   complete = true,
@@ -334,9 +343,8 @@ function MarkdownInner({
 
         if (language === "mermaid") {
           return (
-            <MarkdownPreMermaid
+            <MermaidWhenComplete
               content={content}
-              complete={complete}
               language={language}
               theme={theme}
               onDownloadMermaid={config?.onDownloadMermaid}
@@ -348,7 +356,7 @@ function MarkdownInner({
               expandThreshold={config?.expandThreshold}
             >
               {preChildren}
-            </MarkdownPreMermaid>
+            </MermaidWhenComplete>
           );
         }
 
@@ -476,7 +484,9 @@ function MarkdownInner({
           }
         : {}),
     }),
-    [config, complete, theme],
+    // `complete` is read through context: when a streamed block completes, the
+    // component map keeps its identity, so code blocks are not remounted (20261115-ui §5.2).
+    [config, theme],
   );
 
   const themeClass =
@@ -493,14 +503,16 @@ function MarkdownInner({
         components={components as Record<string, unknown>}
         urlTransform={urlTransform}
       >
-        <ReactMarkdown
-          remarkPlugins={remarkPlugins as never}
-          rehypePlugins={rehypePlugins as never}
-          components={components as never}
-          urlTransform={urlTransform}
-        >
-          {preprocessed}
-        </ReactMarkdown>
+        <MarkdownCompleteContext.Provider value={complete}>
+          <ReactMarkdown
+            remarkPlugins={remarkPlugins as never}
+            rehypePlugins={rehypePlugins as never}
+            components={components as never}
+            urlTransform={urlTransform}
+          >
+            {preprocessed}
+          </ReactMarkdown>
+        </MarkdownCompleteContext.Provider>
       </MarkdownErrorBoundary>
     </div>
   );

@@ -1,4 +1,6 @@
 import { create } from "zustand";
+
+const DRAFTS_KEY = "openbuddy.drafts";
 import type { SessionSummary, SessionStatus } from "@/lib/types";
 import type { WorkspaceInfo } from "@/lib/agent-client";
 
@@ -103,7 +105,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
   query: "",
   filterStatus: null,
   filterDate: null,
-  drafts: {},
+  drafts: loadDrafts(),
 
   setIndependent: (independent) => set({ independent }),
   setWorkspaces: (workspaces) => set({ workspaces }),
@@ -253,3 +255,27 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       };
     }),
 }));
+
+/** Unsent drafts survive restarts (20261115-ui U4.8); written at most every 400ms. */
+function loadDrafts(): Record<string, string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DRAFTS_KEY) ?? "{}");
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    return Object.fromEntries(Object.entries(raw).filter((e): e is [string, string] => typeof e[1] === "string" && !!e[1]));
+  } catch {
+    return {};
+  }
+}
+let draftTimer: ReturnType<typeof setTimeout> | undefined;
+if (typeof window !== "undefined") {
+  useSessionsStore.subscribe((state, prev) => {
+    if (state.drafts === prev.drafts) return;
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      try {
+        const entries = Object.entries(useSessionsStore.getState().drafts).slice(-50);
+        localStorage.setItem(DRAFTS_KEY, JSON.stringify(Object.fromEntries(entries)));
+      } catch { /* quota / private mode */ }
+    }, 400);
+  });
+}

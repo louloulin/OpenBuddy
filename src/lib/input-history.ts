@@ -76,3 +76,16 @@ export function navigateHistory(
   const next = Math.min(hist.items.length, cursor + 1);
   return { text: next >= hist.items.length ? draft : hist.items[next], cursor: next };
 }
+
+/** Prompts survive restarts (20261115-ui U4.8): one global list, like a shell history. */
+const HISTORY_KEY = "openbuddy.prompt-history";
+export function loadInputHistory(limit = 100): InputHistory {
+  try {
+    const raw = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");
+    if (Array.isArray(raw)) return { items: raw.filter((x): x is string => typeof x === "string" && !!x.trim()).slice(-limit), limit };
+  } catch { /* private mode / bad JSON */ }
+  return createInputHistory(limit);
+}
+export function saveInputHistory(hist: InputHistory): void {
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(hist.items.slice(-hist.limit))); } catch { /* quota */ }
+}

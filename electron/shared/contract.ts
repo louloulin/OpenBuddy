@@ -6,7 +6,7 @@ export const COMMANDS = [
   'agent_resolve_permission', 'agent_resolve_question', 'folder_trust_respond',
   'permission_list', 'permission_save', 'permission_mode_get', 'permission_mode_set',
   'providers_list', 'providers_save_provider', 'providers_save_model', 'providers_delete_provider',
-  'providers_delete_model', 'providers_fetch_models', 'account_get_api_key', 'account_set_api_key',
+  'providers_delete_model', 'providers_fetch_models', 'providers_test', 'account_get_api_key', 'account_set_api_key',
   'read_text_file', 'write_text_file', 'read_file_base64', 'export_text_file', 'list_dir',
   'browse_directory', 'path_stat', 'open_path', 'open_url', 'reveal_in_folder',
   'mcp_list', 'mcp_upsert', 'mcp_toggle', 'mcp_delete', 'mcp_config_read', 'mcp_config_save',
@@ -20,6 +20,9 @@ export const COMMANDS = [
   'agent_fork_session', 'agent_extensions_list', 'agent_extensions_add',
   'agent_extensions_remove', 'agent_extensions_set_enabled', 'tasks_list', 'task_kill',
   'rewind_points', 'rewind_execute', 'agent_regenerate', 'agent_compact',
+  'artifacts_list', 'checkpoint_list', 'checkpoint_read', 'checkpoint_restore', 'turn_revert', 'artifact_save',
+  'agent_export_html', 'agent_set_mode', 'agent_abort_retry', 'clipboard_save_image',
+  'notification_prefs_get', 'notification_prefs_set', 'agent_set_queue',
 ] as const;
 export const EVENTS = [
   'agent://update', 'agent://tool', 'agent://complete', 'agent://queue', 'agent://compaction',
@@ -27,11 +30,11 @@ export const EVENTS = [
   'agent://event', 'agent://summary', 'agent://turn-error', 'agent://folder-trust',
   'agent://permission-mode', 'agent://models-update', 'agent://mcp-status', 'window://resized',
   'agent://model-state', 'agent://ui-request', 'agent://ui-dismiss', 'agent://ui-notification', 'agent://ui-state',
-  'agent://session-status', 'agent://permission-dismiss',
+  'agent://session-status', 'agent://permission-dismiss', 'agent://artifacts', 'app://focus-session',
 ] as const;
 export type CommandName = typeof COMMANDS[number];
 export type EventName = typeof EVENTS[number];
-export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export interface ModelIdentity { providerId: string; modelId: string; modelKey: string }
 export interface ModelState extends ModelIdentity { sessionId: string; thinkingLevel: ThinkingLevel; availableThinkingLevels: ThinkingLevel[] }
 export interface UiRequest { sessionId: string; requestId: string; kind: 'select' | 'confirm' | 'input' | 'editor'; title: string; options?: string[]; message?: string; placeholder?: string; initialValue?: string; timeoutMs?: number }
@@ -72,9 +75,38 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   const thinking = (key: string, optional = false) => {
     const value = payload[key];
     if (optional && (value === undefined || value === null)) return;
-    if (!['off', 'minimal', 'low', 'medium', 'high', 'xhigh'].includes(String(value))) throw new Error(`invalid_payload: ${key}`);
+    if (!['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(String(value))) throw new Error(`invalid_payload: ${key}`);
   };
   if (command === 'agent_compact') string('instructions', 4000, true);
+  if (['artifacts_list', 'checkpoint_list', 'checkpoint_read', 'checkpoint_restore', 'turn_revert', 'artifact_save', 'agent_export_html', 'agent_set_mode', 'agent_abort_retry'].includes(command)) string('sessionId', 256);
+  if (command === 'checkpoint_list') string('path', 4096, true);
+  if (command === 'checkpoint_read') { string('hash', 64); if (!/^[a-f0-9]{64}$/.test(String(payload.hash))) throw new Error('invalid_payload: hash'); }
+  if (command === 'checkpoint_restore') {
+    string('path', 4096);
+    if (payload.hash !== null && !/^[a-f0-9]{64}$/.test(String(payload.hash))) throw new Error('invalid_payload: hash');
+  }
+  if (command === 'turn_revert') {
+    const ids = payload.toolCallIds;
+    if (!Array.isArray(ids) || !ids.length || ids.length > 2000 || ids.some(id => typeof id !== 'string' || !id || id.length > 256)) throw new Error('invalid_payload: toolCallIds');
+    if (payload.skip !== undefined && (!Array.isArray(payload.skip) || payload.skip.some(p => typeof p !== 'string'))) throw new Error('invalid_payload: skip');
+    if (payload.force !== undefined && typeof payload.force !== 'boolean') throw new Error('invalid_payload: force');
+  }
+  if (command === 'artifact_save') {
+    string('path', 4096);
+    if (typeof payload.content !== 'string' || payload.content.length > 8 * 1024 * 1024) throw new Error('invalid_payload: content');
+    if (payload.origin !== undefined && payload.origin !== 'apply' && payload.origin !== 'user') throw new Error('invalid_payload: origin');
+  }
+  if (command === 'agent_export_html') string('outputPath', 4096);
+  if (command === 'notification_prefs_set' && typeof payload.system !== 'boolean') throw new Error('invalid_payload: system');
+  if (command === 'agent_set_queue') {
+    string('sessionId', 256);
+    for (const key of ['steering', 'followUp']) {
+      const list = payload[key];
+      if (!Array.isArray(list) || list.length > 50 || list.some((t) => typeof t !== 'string' || !t.trim() || t.length > 200_000)) throw new Error(`invalid_payload: ${key}`);
+    }
+  }
+  if (command === 'agent_set_mode' && !['craft', 'plan', 'ask'].includes(String(payload.mode))) throw new Error('invalid_payload: mode');
+  if (command === 'agent_resolve_permission') string('reason', 500, true);
   if (['rewind_points', 'rewind_execute', 'agent_regenerate', 'agent_compact', 'agent_get_model_state', 'agent_set_model', 'agent_set_thinking_level', 'agent_resolve_ui', 'agent_resolve_question', 'agent_steer', 'agent_follow_up', 'agent_get_queue', 'agent_clear_queue', 'agent_fork_session'].includes(command)) string('sessionId', 256);
   if (command === 'agent_set_model' || command === 'agent_new_session') {
     string('modelId', 4096, command === 'agent_new_session');
@@ -82,6 +114,10 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
     if (command === 'agent_new_session') thinking('thinkingLevel', true);
   }
   if (command === 'providers_delete_model') { string('modelId'); string('providerId', 512, true); }
+  if (command === 'providers_test' || command === 'providers_fetch_models') {
+    string('providerId', 64, true); string('modelId', 512, true); string('providerKind', 64, true);
+    string('apiBackend', 64, true); string('baseUrl', 2048, true); string('apiKey', 4096, true);
+  }
   if (command === 'agent_set_thinking_level') thinking('level');
   if (command === 'agent_resolve_ui' || command === 'agent_resolve_question') {
     string('requestId', 256);

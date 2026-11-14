@@ -139,6 +139,8 @@ export async function agentSend(sessionId: string, text: string, attachments?: {
 export interface AgentQueue { steering: string[]; followUp: string[] }
 export const agentGetQueue = (sessionId: string) => invoke<AgentQueue>("agent_get_queue", { sessionId });
 export const agentClearQueue = (sessionId: string) => invoke<AgentQueue>("agent_clear_queue", { sessionId });
+/** Replace the pending queue (one item withdrawn, moved, or turned into 插话). */
+export const agentSetQueue = (sessionId: string, steering: string[], followUp: string[]) => invoke<AgentQueue>("agent_set_queue", { sessionId, steering, followUp });
 export const agentSteer = (sessionId: string, text: string, attachments?: { path: string }[]) => invoke<AgentQueue>("agent_steer", { sessionId, text, ...(attachments?.length ? { attachments } : {}) });
 export const agentFollowUp = (sessionId: string, text: string, attachments?: { path: string }[]) => invoke<AgentQueue>("agent_follow_up", { sessionId, text, ...(attachments?.length ? { attachments } : {}) });
 export const agentForkSession = (sessionId: string) => invoke<string>("agent_fork_session", { sessionId });
@@ -206,19 +208,20 @@ export async function agentSessionUsage(sessionId: string): Promise<SessionUsage
 
 export async function agentResolvePermission(
   requestId: string,
-  outcome: { optionId?: string; cancelled?: boolean }
+  outcome: { optionId?: string; cancelled?: boolean; reason?: string }
 ): Promise<void> {
   await invoke<void>("agent_resolve_permission", {
     requestId,
     optionId: outcome.optionId ?? null,
     cancelled: outcome.cancelled ?? false,
+    ...(outcome.reason?.trim() ? { reason: outcome.reason.trim().slice(0, 500) } : {}),
   });
 }
 
 export const agentResolveUi = (payload: { requestId: string; sessionId: string; value?: string | boolean; cancelled?: boolean }) => invoke<void>("agent_resolve_ui", payload);
 export type ExtensionUiState =
   | { sessionId: string; kind: "status"; key: string; text?: string }
-  | { sessionId: string; kind: "working"; message?: string; visible?: boolean }
+  | { sessionId: string; kind: "working"; message?: string | null; visible?: boolean }
   | { sessionId: string; kind: "title"; title: string }
   | { sessionId: string; kind: "widget"; key: string; lines?: string[]; placement?: "aboveEditor" | "belowEditor" }
   | { sessionId: string; kind: "editor"; action: "set" | "paste"; text: string };
@@ -277,6 +280,21 @@ export interface ModelProviderEntry {
   contextWindow?: number;
 }
 
+/** Pi thinking levels (`max` only where the model maps it). */
+export type PiThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+export const PI_THINKING_LEVELS: PiThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+export const THINKING_LABELS: Record<string, string> = { off: "关闭", minimal: "最少", low: "低", medium: "中", high: "高", xhigh: "超高", max: "极限" };
+export interface ModelCompat {
+  thinkingFormat?: string;
+  maxTokensField?: "max_tokens" | "max_completion_tokens";
+  supportsReasoningEffort?: boolean;
+  supportsDeveloperRole?: boolean;
+  requiresReasoningContentOnAssistantMessages?: boolean;
+  supportsUsageInStreaming?: boolean;
+  supportsStore?: boolean;
+  supportsStrictMode?: boolean;
+}
+
 /**
  * One model catalog entry — written to `[model.<modelId>]` with a
  * `model_provider = "<providerId>"` reference. Carries only model-specific
@@ -298,7 +316,9 @@ export interface ModelEntry {
   maxTokens?: number;
   cost?: { input: number; output: number; cacheRead: number; cacheWrite: number };
   pricingKnown?: boolean;
-
+  compat?: ModelCompat;
+  /** Provider value per thinking level; null marks a level unsupported. */
+  thinkingLevelMap?: Partial<Record<PiThinkingLevel, string | null>>;
 }
 
 /** Result of providers_list: every provider + every model, joined by providerId. */
@@ -364,11 +384,39 @@ export async function providersDeleteModel(modelId: string, providerId?: string)
   await invoke<void>("providers_delete_model", { modelId, providerId });
 }
 
-/** One model entry returned by a provider's GET /models endpoint. */
+/** One model entry returned by a provider's GET /models endpoint, with reported capabilities. */
 export interface FetchedModel {
   id: string;
   ownedBy?: string;
+  name?: string;
+  contextWindow?: number;
+  maxTokens?: number;
+  reasoning?: boolean;
+  input?: ("text" | "image")[];
+  cost?: ModelEntry["cost"];
+  thinkingLevels?: PiThinkingLevel[];
+  /** Fields to save with the model (capabilities, thinking map, compat). */
+  suggested: Partial<ModelEntry>;
 }
+
+export interface ProviderTestResult {
+  ok: boolean;
+  latencyMs: number;
+  error?: string;
+  reply?: string;
+  modelCount?: number;
+  /** The base URL that answered (e.g. ".../v1" appended) — store this one. */
+  baseUrl?: string;
+  usage?: { input: number; output: number };
+}
+/**
+ * 测试连接: `{ providerId, modelId }` sends one tiny real request through the chat path;
+ * connection fields alone (editor before saving) list the endpoint's models.
+ */
+export async function providersTest(input: { providerId?: string; modelId?: string; providerKind?: ProviderKind; apiBackend?: ApiBackend; baseUrl?: string; apiKey?: string }): Promise<ProviderTestResult> {
+  return invoke<ProviderTestResult>("providers_test", clean(input));
+}
+const clean = <T extends Record<string, unknown>>(o: T) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== "")) as Partial<T>;
 
 /**
  * Fetch the list of available models from a provider's `/models` endpoint.
@@ -380,12 +428,10 @@ export async function providersFetchModels(
   providerKind: ProviderKind,
   apiKey: string,
   baseUrl?: string,
+  more: { providerId?: string; apiBackend?: ApiBackend } = {},
 ): Promise<FetchedModel[]> {
-  return invoke<FetchedModel[]>("providers_fetch_models", {
-    providerKind,
-    apiKey,
-    baseUrl: baseUrl ?? null,
-  });
+  // With providerId and no key, the saved key is used (never sent back to the renderer).
+  return invoke<FetchedModel[]>("providers_fetch_models", clean({ providerKind, apiKey, baseUrl, ...more }));
 }
 
 export interface ExtensionsConfig { enabled: boolean; paths: string[]; projectTrusted: boolean }
@@ -1009,6 +1055,10 @@ export async function notificationMarkAllRead(): Promise<void> {
 }
 
 /** Clear all notifications. */
+/** 系统通知开关 (20261115-ui U6.1): background completions / approvals / failures. */
+export const notificationPrefsGet = () => invoke<{ system: boolean }>("notification_prefs_get");
+export const notificationPrefsSet = (system: boolean) => invoke<{ system: boolean }>("notification_prefs_set", { system });
+
 export async function notificationClear(): Promise<void> {
   await invoke<void>("notification_clear");
 }
@@ -1075,6 +1125,8 @@ export async function subscribeAgentEvents(handlers: {
   onTurnError?: (error: TurnErrorEvent) => void;
   onSessionStatus?: (event: { sessionId: string; status: "running" | "idle" | "failed" }) => void;
   onPermissionDismiss?: (event: { requestId: string; sessionId: string; reason: string; allowed: boolean }) => void;
+  onArtifacts?: (event: { sessionId: string }) => void;
+  onFocusSession?: (event: { sessionId: string }) => void;
 }): Promise<UnlistenFn> {
   const unlisteners: UnlistenFn[] = [];
   const wire = async <T>(event: string, callback: ((payload: T) => void) | undefined) => {
@@ -1100,6 +1152,8 @@ export async function subscribeAgentEvents(handlers: {
     await wire("agent://turn-error", handlers.onTurnError);
     await wire("agent://session-status", handlers.onSessionStatus);
     await wire("agent://permission-dismiss", handlers.onPermissionDismiss);
+    await wire("agent://artifacts", handlers.onArtifacts);
+    await wire("app://focus-session", handlers.onFocusSession);
     await wire<{ sessionId: string; message: string }>("agent://error", handlers.onTurnError
       ? ({ sessionId, message }) => handlers.onTurnError!({ sessionId, kind: "error", detail: message })
       : undefined);
@@ -1108,4 +1162,61 @@ export async function subscribeAgentEvents(handlers: {
     unlisteners.forEach(unlisten => unlisten());
     throw error;
   }
+}
+
+
+// ── 产物 / 文件快照 (20261115-ui U1/U2) ──────────────────────────────────
+
+/** A file the agent created or modified in a session (write/edit only). */
+export interface ArtifactInfo {
+  path: string;
+  status: "created" | "modified";
+  toolCallIds: string[];
+  added: number;
+  removed: number;
+  firstAt: number;
+  lastAt: number;
+  exists: boolean;
+  size?: number;
+  /** Written from an answer's code block with 「应用」. */
+  applied?: boolean;
+}
+
+/** A file's content right before / after one change (sha256 of each; null = absent). */
+export interface CheckpointRecord {
+  id: string;
+  toolCallId?: string;
+  path: string;
+  before: string | null;
+  after: string | null;
+  at: number;
+  source: "tool" | "user" | "restore" | "apply";
+  skipped?: "too_large";
+}
+
+export interface RevertResult {
+  restored: string[];
+  conflicts: { path: string; reason: "changed_since" | "missing_snapshot" }[];
+}
+
+export type AgentMode = "craft" | "plan" | "ask";
+
+export const artifactsList = (sessionId: string) => invoke<ArtifactInfo[]>("artifacts_list", { sessionId });
+export const checkpointList = (sessionId: string, path?: string) => invoke<CheckpointRecord[]>("checkpoint_list", path ? { sessionId, path } : { sessionId });
+export const checkpointRead = (sessionId: string, hash: string) => invoke<{ text?: string; binary: boolean; size: number }>("checkpoint_read", { sessionId, hash });
+export const checkpointRestore = (sessionId: string, path: string, hash: string | null) => invoke<void>("checkpoint_restore", { sessionId, path, hash });
+export const turnRevert = (sessionId: string, toolCallIds: string[], opts: { skip?: string[]; force?: boolean } = {}) =>
+  invoke<RevertResult>("turn_revert", { sessionId, toolCallIds, ...(opts.skip ? { skip: opts.skip } : {}), ...(opts.force ? { force: true } : {}) });
+export const artifactSave = (sessionId: string, path: string, content: string, origin?: "apply") => invoke<void>("artifact_save", { sessionId, path, content, ...(origin ? { origin } : {}) });
+export const agentSetMode = (sessionId: string, mode: AgentMode) => invoke<void>("agent_set_mode", { sessionId, mode });
+export const agentAbortRetry = (sessionId: string) => invoke<void>("agent_abort_retry", { sessionId });
+/** `outputPath` must come from the save dialog in this window. */
+export const agentExportHtml = (sessionId: string, outputPath: string) => invoke<string>("agent_export_html", { sessionId, outputPath });
+/** Saves an image on the clipboard as a granted attachment; null when there is none. */
+export const clipboardSaveImage = () => invoke<{ path: string; name: string; size: number } | null>("clipboard_save_image", {});
+
+/** Isolated-origin URL for previewing a workspace file in a sandboxed iframe. */
+export function previewUrl(absPath: string): string {
+  const segments = absPath.split(/[\\/]/).filter(Boolean).map(encodeURIComponent);
+  return `ob-preview://local/${segments.join("/")}`;
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
+import { DiffBlock } from "./bench/DiffBlock";
 
 /**
  * In-app replacements for window.confirm / window.prompt. Electron does not
@@ -12,25 +13,29 @@ interface DialogRequest {
   title: string;
   message?: string;
   confirmLabel?: string;
+  cancelLabel?: string;
   danger?: boolean;
   defaultValue?: string;
   placeholder?: string;
-  resolve: (value: string | boolean | null) => void;
+  checkbox?: { label: string; checked: boolean; required?: boolean };
+  /** Show what a write would change before confirming (20261115-ui U1.7). */
+  diff?: { before: string; after: string };
+  resolve: (value: string | boolean | null, checked?: boolean) => void;
 }
 
 interface DialogState {
   queue: DialogRequest[];
   push: (request: DialogRequest) => void;
-  settle: (id: number, value: string | boolean | null) => void;
+  settle: (id: number, value: string | boolean | null, checked?: boolean) => void;
 }
 
 const useDialogStore = create<DialogState>((set, get) => ({
   queue: [],
   push: (request) => set({ queue: [...get().queue, request] }),
-  settle: (id, value) => {
+  settle: (id, value, checked) => {
     const request = get().queue.find((r) => r.id === id);
     set({ queue: get().queue.filter((r) => r.id !== id) });
-    request?.resolve(value);
+    request?.resolve(value, checked);
   },
 }));
 
@@ -40,13 +45,29 @@ export interface ConfirmOptions {
   title: string;
   message?: string;
   confirmLabel?: string;
+  cancelLabel?: string;
   danger?: boolean;
+  diff?: { before: string; after: string };
 }
 
 export function appConfirm(options: ConfirmOptions | string): Promise<boolean> {
   const o = typeof options === "string" ? { title: options } : options;
   return new Promise((resolve) => {
     useDialogStore.getState().push({ id: nextId++, kind: "confirm", ...o, resolve: (v) => resolve(v === true) });
+  });
+}
+
+/** Confirm with one extra choice, e.g. "同时还原文件改动" (20261115-ui U2.4). */
+/** `required`: the confirm button stays disabled until the box is ticked (risk acknowledgement). */
+export function appConfirmWithOption(options: ConfirmOptions & { checkbox: { label: string; checked?: boolean; required?: boolean } }): Promise<{ ok: boolean; checked: boolean }> {
+  return new Promise((resolve) => {
+    useDialogStore.getState().push({
+      id: nextId++,
+      kind: "confirm",
+      ...options,
+      checkbox: { label: options.checkbox.label, checked: options.checkbox.checked ?? true, required: options.checkbox.required },
+      resolve: (v, checked) => resolve({ ok: v === true, checked: !!checked }),
+    });
   });
 }
 
@@ -74,10 +95,11 @@ export function appPrompt(options: PromptOptions | string): Promise<string | nul
 function DialogBox({ request }: { request: DialogRequest }) {
   const settle = useDialogStore((s) => s.settle);
   const [value, setValue] = useState(request.defaultValue ?? "");
+  const [checked, setChecked] = useState(request.checkbox?.checked ?? false);
   const inputRef = useRef<HTMLInputElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
-  const cancel = () => settle(request.id, request.kind === "confirm" ? false : null);
-  const ok = () => settle(request.id, request.kind === "confirm" ? true : value);
+  const cancel = () => settle(request.id, request.kind === "confirm" ? false : null, checked);
+  const ok = () => settle(request.id, request.kind === "confirm" ? true : value, checked);
 
   useEffect(() => {
     if (request.kind === "prompt") {
@@ -100,12 +122,19 @@ function DialogBox({ request }: { request: DialogRequest }) {
     return () => window.removeEventListener("keydown", onKey, true);
   });
 
-  const disabled = request.kind === "prompt" && !value.trim();
+  const disabled = (request.kind === "prompt" && !value.trim()) || (!!request.checkbox?.required && !checked);
   return (
     <div className="app-dialog__overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) cancel(); }}>
-      <div className="app-dialog" role={request.kind === "confirm" ? "alertdialog" : "dialog"} aria-modal="true" aria-labelledby={`app-dialog-${request.id}`}>
+      <div className={"app-dialog" + (request.diff ? " app-dialog--wide" : "")} role={request.kind === "confirm" ? "alertdialog" : "dialog"} aria-modal="true" aria-labelledby={`app-dialog-${request.id}`}>
         <div className="app-dialog__title" id={`app-dialog-${request.id}`}>{request.title}</div>
         {request.message && <div className="app-dialog__message">{request.message}</div>}
+        {request.diff && <div className="app-dialog__diff"><DiffBlock before={request.diff.before} after={request.diff.after} empty="内容与当前文件相同" /></div>}
+        {request.checkbox && (
+          <label className="app-dialog__check">
+            <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
+            <span>{request.checkbox.label}</span>
+          </label>
+        )}
         {request.kind === "prompt" && (
           <input
             ref={inputRef}
@@ -122,7 +151,7 @@ function DialogBox({ request }: { request: DialogRequest }) {
           />
         )}
         <div className="app-dialog__actions">
-          <button type="button" className="app-dialog__btn" onClick={cancel}>取消</button>
+          <button type="button" className="app-dialog__btn" onClick={cancel}>{request.cancelLabel ?? "取消"}</button>
           <button
             ref={confirmRef}
             type="button"
