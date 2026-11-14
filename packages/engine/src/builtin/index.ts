@@ -35,3 +35,5 @@ export const BUILTIN_EXTENSIONS: BuiltinExtension[] = [];
 export function builtinFactories(ctx: BuiltinContext, enabled: (id: string) => boolean = () => true): ExtensionFactory[] {
   return BUILTIN_EXTENSIONS.filter((b) => enabled(b.id)).map((b) => b.create(ctx));
 }
+export { readBranchHistory, readBranchState, writeBranchState } from "./session-state.js";
+export type { BranchReader, EntryWriter } from "./session-state.js";
