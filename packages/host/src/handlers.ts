@@ -1,6 +1,6 @@
 import { createSettings } from "@openbuddy/services/settings/settings";
 import { PiEngine } from "@openbuddy/engine/pi-engine";
-import type { Emit } from "@openbuddy/engine/permissions/permissions";
+import type { Emit } from "@openbuddy/kernel";
 import type { EngineOptions, Handler, HostContext } from "./module.js";
 import { HOST_MODULES } from "./modules/index.js";
 export type { EngineOptions, Handler, HostContext, HostModule } from "./module.js";
@@ -13,6 +13,8 @@ export async function createEngineHandlers(options: EngineOptions) {
     emit,
     (url) => options.shell.openExternal(url),
     options.extensionFactories,
+    undefined, // default pool limits
+    options.shell.trash ? (path) => options.shell.trash!(path) : undefined,
   );
   await engine.initialize();
   const update = (fn: (c: ReturnType<typeof settings.config.read>) => void) => {

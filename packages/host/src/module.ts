@@ -1,13 +1,13 @@
-import type { createSettings, SafeStorage } from "@openbuddy/services/settings/settings";
-import type { DesktopShell } from "@openbuddy/services/files/files";
+import type { createSettings } from "@openbuddy/services/settings/settings";
 import type { PiEngine } from "@openbuddy/engine/pi-engine";
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
-import type { Emit } from "@openbuddy/engine/permissions/permissions";
+import type { Emit, HostShell, SafeStorage } from "@openbuddy/kernel";
 export interface EngineOptions {
   userDataDir: string;
   emit: Emit;
   safeStorage: SafeStorage;
-  shell: DesktopShell;
+  /** Host shell port; its optional `trash` is handed to the engine (desktop: Electron `shell.trashItem`). */
+  shell: HostShell;
   /** Trusted host-provided extensions; never accepted in renderer IPC. */
   extensionFactories?: ExtensionFactory[];
   /**
