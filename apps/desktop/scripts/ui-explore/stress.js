@@ -1,5 +1,5 @@
 // 20261115-ui U0.1 — streaming stress run. Body of an async fn(ctx, page, app);
-// run with:  (echo "ctx.stressLabel='after';"; cat scripts/ui-explore/stress.js) | T=300 bash scripts/ui-explore/ev.sh -
+// run with:  (echo "ctx.stressLabel='after';"; cat apps/desktop/scripts/ui-explore/stress.js) | T=300 bash apps/desktop/scripts/ui-explore/ev.sh -
 // Uses the local fixture model only (__STRESS__: 30 tool calls → 1MB write → ~30k-char answer).
 // Report: frame work (CDP TaskDuration per frame, sampled in 250ms windows), long animation
 // frames, keystroke→paint latency (Event Timing) while streaming, DOM writes outside the live

@@ -1,4 +1,4 @@
-// OpenBuddy UI exploration driver (adapted from scripts/electron-ui-check.mjs).
+// OpenBuddy UI exploration driver (adapted from apps/desktop/scripts/electron-ui-check.mjs).
 // - launches real Electron 45 + dist-electron/main.js via a temp bootstrap with an isolated userData profile
 // - runs a local OpenAI-compatible SSE fixture (no real keys)
 // - exposes an HTTP control endpoint: POST /eval with JS body executed as async fn(ctx)

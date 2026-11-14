@@ -11,7 +11,6 @@
     "sourceMap": true
   },
   "include": [
-    "electron/**/*.ts",
     "apps/desktop/src/**/*.ts",
     "packages/protocol/src/**/*.ts",
     "packages/services/src/**/*.ts",

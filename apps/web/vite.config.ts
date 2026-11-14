@@ -27,7 +27,7 @@ export default defineConfig({
     host: HOST,
     port: PORT,
     strictPort: true,
-    watch: { ignored: ["**/electron/**", "**/apps/desktop/**", "**/dist-electron/**", "**/release/**"] },
+    watch: { ignored: ["**/apps/desktop/**", "**/dist-electron/**", "**/release/**"] },
   },
   // Build assets for the packaged Electron renderer.
   build: {

@@ -1,5 +1,5 @@
 // 20261115-ui U0.8 — long-session open time. Body of an async fn(ctx, page, app); run with:
-//   T=600 bash scripts/ui-explore/ev.sh - < scripts/ui-explore/long-session.js
+//   T=600 bash apps/desktop/scripts/ui-explore/ev.sh - < apps/desktop/scripts/ui-explore/long-session.js
 // Builds a 200-turn session through the real engine with the local fixture model (markdown
 // answer with a code block and a table; every 10th turn also runs a bash tool), reloads the
 // window, opens the session from the sidebar and reports first screen / interactive times.

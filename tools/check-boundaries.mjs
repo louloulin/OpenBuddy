@@ -60,8 +60,8 @@ const FEATURE_EDGES = {
 const BRIDGE_OK = ['client', 'platform'];
 
 const isTest = f => /(__tests__|\/test\/|\.test\.|\.spec\.|test-setup)/.test(f);
-// Build/test configs run in Node by design; they are not part of any runtime layer.
-const isConfig = f => /(^|\/)(vite|vitest)\.config\.[cm]?ts$/.test(f);
+// Build/test configs and */scripts/* tooling run in Node by design; they are not part of any runtime layer.
+const isConfig = f => /(^|\/)(vite|vitest)\.config\.[cm]?ts$/.test(f) || /(^|\/)scripts\//.test(f);
 const walk = (dir, out = []) => {
   if (!existsSync(dir)) return out;
   for (const name of readdirSync(dir)) {
@@ -104,7 +104,7 @@ for (const f of files) {
   for (const m of src.matchAll(IMPORT_RE)) {
     const spec = m[1] ?? m[2] ?? m[3] ?? m[4] ?? m[5];
     const r = resolveSpec(f, spec);
-    if (r.unresolved) report.unresolved.push(`${f} -> ${spec}`);
+    if (r.unresolved && !isConfig(f)) report.unresolved.push(`${f} -> ${spec}`);
     deps.push({ spec, ...r, mock: !!m[4] });
   }
   graph.set(f, deps);
@@ -157,7 +157,7 @@ for (const [f, deps] of graph) {
 
 // Reachability from the app entry points.
 {
-  const entries = ['src/main.tsx', 'apps/web/src/app/main.tsx', 'apps/web/src/main.tsx', 'electron/main.ts', 'apps/desktop/src/main/index.ts'].filter(e => fileSet.has(e));
+  const entries = ['src/main.tsx', 'apps/web/src/app/main.tsx', 'apps/web/src/main.tsx', 'electron/main.ts', 'apps/desktop/src/main.ts', 'apps/desktop/src/main/index.ts'].filter(e => fileSet.has(e));
   const seen = new Set(); const todo = [...entries];
   while (todo.length) { const f = todo.pop(); if (seen.has(f)) continue; seen.add(f); for (const d of graph.get(f) ?? []) if (d.file && !d.mock) todo.push(d.file); }
   for (const f of files) {

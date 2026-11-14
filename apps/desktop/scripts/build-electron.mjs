@@ -1,4 +1,4 @@
-// Main-process build (20261115-md M0): esbuild bundles electron/main.ts and every internal
+// Main-process build (20261115-md M0): esbuild bundles apps/desktop/src/main.ts and every internal
 // workspace module into dist-electron/main.js. npm dependencies stay external, so the
 // packaged app still loads Pi, its WASM and dynamic resources from node_modules.
 // Type checking is separate: `tsc --noEmit -p tsconfig.electron.json`.
@@ -27,7 +27,7 @@ await writeFile(new URL('preload.cjs', out), preload.replace('/* COMMANDS */ []'
 const indexURL = new URL('../../../dist/index.html', import.meta.url);
 try {
   let html = await readFile(indexURL, 'utf8');
-  // Same policy as electron/main.ts; only artifact previews (ob-preview://, sandboxed) may be framed.
+  // Same policy as apps/desktop/src/main.ts; only artifact previews (ob-preview://, sandboxed) may be framed.
   const policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src ob-preview:";
   const tag = `<meta http-equiv="Content-Security-Policy" content="${policy}" />`;
   const next = html.includes('http-equiv="Content-Security-Policy"')
