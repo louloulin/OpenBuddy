@@ -1,17 +1,12 @@
 import {
-  createAgentSession,
-  DefaultResourceLoader,
   SessionManager,
-  SettingsManager,
   type AgentSession,
   type AgentSessionEvent,
   type SessionInfo,
   type ExtensionFactory,
 } from "@earendil-works/pi-coding-agent";
-import { mkdir, realpath, rename, unlink } from "node:fs/promises";
-import { existsSync, readFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { basename, dirname, join, relative, resolve as resolvePath, isAbsolute, sep } from "node:path";
+import { mkdir, realpath, rename } from "node:fs/promises";
+import { basename, dirname, join, isAbsolute } from "node:path";
 import { Providers, modelKey } from "@openbuddy/services/providers/providers";
 import { ExtensionUiBridge } from "./extension-ui/bridge.js";
 import { SkillsService } from "@openbuddy/services/skills/skills";
@@ -19,185 +14,17 @@ import { McpService } from "@openbuddy/services/mcp/mcp";
 import type { Settings } from "@openbuddy/services/settings/settings";
 import { Permissions, type Emit } from "./permissions/permissions.js";
 import { CheckpointStore } from "./checkpoints/store.js";
-import { collectArtifacts } from "./artifacts/collect.js";
+import { validateThinkingLevel, type AgentMode, type PoolLimits, type PromptImages, type SessionRunStatus, type Slot, type ThinkingLevel } from "./types.js";
+import { PI_VERSION } from "./version.js";
+import * as pipeline from "./event-pipeline.js";
+import * as runtime from "./session-runtime.js";
+import * as pool from "./session-pool.js";
+import * as catalog from "./session-catalog.js";
+import * as features from "./features/index.js";
 
-/** 做一做 / 想一想 / 问一问 (20261115-ui §5.8): plan and ask only get read-only tools. */
-export type AgentMode = "craft" | "plan" | "ask";
-const READ_ONLY_TOOLS = ["read", "grep", "find", "ls"];
-export type ThinkingLevel = Parameters<AgentSession["setThinkingLevel"]>[0];
-export function validateThinkingLevel(value: unknown): ThinkingLevel {
-  if (
-    typeof value !== "string" ||
-    !["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(value)
-  )
-    throw Error("invalid_thinking_level");
-  return value as ThinkingLevel;
-}
-type PromptImages = NonNullable<
-  Parameters<AgentSession["prompt"]>[1]
->["images"];
-
-/** Renderer-visible lifecycle of one pooled session. */
-export type SessionRunStatus = "running" | "idle" | "failed";
-
-/**
- * Strip the cumulative `message` / `partial` snapshots from streaming events.
- * They grow with the reply, so forwarding them per token makes IPC cost
- * quadratic; the renderer reassembles content from deltas and `message_end`.
- */
-export function slimEvent(event: AgentSessionEvent): unknown {
-  if (event.type === "message_update") {
-    const source = event.assistantMessageEvent as unknown as Record<string, unknown> & {
-      type: string;
-      contentIndex?: number;
-      partial?: { content?: Array<Record<string, unknown>>; usage?: unknown };
-      error?: { errorMessage?: string };
-    };
-    // Raw argument deltas are summarized by the engine instead (see toolArgProgress).
-    if (source.type === "toolcall_delta") return undefined;
-    const slim: Record<string, unknown> = { type: source.type };
-    for (const key of ["contentIndex", "delta", "content", "toolCall", "reason"])
-      if (source[key] !== undefined) slim[key] = source[key];
-    if (source.type === "toolcall_start" && source.contentIndex !== undefined) {
-      const part = source.partial?.content?.[source.contentIndex];
-      if (part?.type === "toolCall")
-        slim.toolCall = { type: "toolCall", id: part.id, name: part.name, arguments: {} };
-    }
-    if (source.type === "error" && source.error?.errorMessage)
-      slim.errorMessage = source.error.errorMessage;
-    // The finished block / arguments arrive again in message_end right after: do not send
-    // them twice (a 1MB write used to cross IPC three times — 20261115-ui §3 budget).
-    if (source.type === "text_end" || source.type === "thinking_end") delete slim.content;
-    if (source.type === "toolcall_end" && slim.toolCall && typeof slim.toolCall === "object") {
-      const call = slim.toolCall as { arguments?: unknown };
-      slim.toolCall = { ...call, arguments: smallArgs(call.arguments) };
-    }
-    // `partial.usage` is cumulative and only message_end's is used.
-    return { type: "message_update", assistantMessageEvent: slim };
-  }
-  // The renderer already holds the arguments from message_end; keep small ones for display.
-  if (event.type === "tool_execution_start" && argsSize(event.args) > MAX_FORWARDED_ARGS) {
-    const { args: _args, ...rest } = event;
-    return rest;
-  }
-  // Both repeat content the renderer already received through message_end.
-  if (event.type === "agent_end") return { type: "agent_end", willRetry: event.willRetry };
-  if (event.type === "turn_end") return { type: "turn_end" };
-  if (event.type === "entry_appended") return undefined;
-  // Updates repeat the arguments and the cumulative output: send the output tail only.
-  if (event.type === "tool_execution_update") {
-    const content = (event.partialResult as { content?: Array<{ type?: string; text?: string }> } | undefined)?.content;
-    return {
-      type: event.type,
-      toolCallId: event.toolCallId,
-      toolName: event.toolName,
-      ...(Array.isArray(content) ? { partialResult: { content: content.map((part) => (part.type === "text" && typeof part.text === "string" && part.text.length > TOOL_OUTPUT_TAIL ? { ...part, text: part.text.slice(-TOOL_OUTPUT_TAIL) } : part)) } } : {}),
-    };
-  }
-  return event;
-}
-const TOOL_OUTPUT_TAIL = 8 * 1024;
-const MAX_FORWARDED_ARGS = 32 * 1024;
-/** Approximate JSON size of tool arguments without serializing megabytes. */
-function argsSize(args: unknown, depth = 0): number {
-  if (typeof args === "string") return args.length + 2;
-  if (!args || typeof args !== "object") return 8;
-  if (depth > 3) return MAX_FORWARDED_ARGS + 1;
-  let n = 2;
-  for (const [k, v] of Object.entries(args)) {
-    n += k.length + 4 + argsSize(v, depth + 1);
-    if (n > MAX_FORWARDED_ARGS) break;
-  }
-  return n;
-}
-/** Arguments for display while the full copy is on its way: large values are left out. */
-export function smallArgs(args: unknown): unknown {
-  if (argsSize(args) <= MAX_FORWARDED_ARGS) return args;
-  if (!args || typeof args !== "object" || Array.isArray(args)) return {};
-  return Object.fromEntries(Object.entries(args).filter(([, v]) => argsSize(v) <= 1024));
-}
-/** Text/thinking deltas are merged for this long before crossing IPC. */
-const DELTA_COALESCE_MS = 16;
-const TOOL_DELTA_INTERVAL_MS = 100;
-/** Best-effort `path` / `command` from the first bytes of streamed tool-call JSON. */
-export function partialToolArgs(head: string, parsed?: unknown): { path?: string; command?: string } {
-  const args = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
-  const out: { path?: string; command?: string } = {};
-  const unescape = (v: string) => { try { return JSON.parse(`"${v}"`) as string; } catch { return v; } };
-  const path = typeof args.path === "string" ? args.path : typeof args.file_path === "string" ? args.file_path : head.match(/"(?:path|file_path)"\s*:\s*"((?:[^"\\]|\\.)*)"/)?.[1];
-  const command = typeof args.command === "string" ? args.command : head.match(/"command"\s*:\s*"((?:[^"\\]|\\.)*)/)?.[1];
-  if (path) out.path = typeof args.path === "string" || typeof args.file_path === "string" ? path : unescape(path);
-  if (command) out.command = (typeof args.command === "string" ? command : unescape(command)).slice(0, 500);
-  return out;
-}
-
-const PERSONA = /<!--EXPERT_PERSONA_BEGIN-->[\s\S]*?<!--EXPERT_PERSONA_END-->/g;
-/** First-turn title shown in the sidebar: the user's own words, without injected context. */
-export function deriveTitle(raw: string): string | undefined {
-  let text = raw.replace(PERSONA, "").replace(/\s*<openbuddy-(plan|ask)-mode>[\s\S]*?<\/openbuddy-\1-mode>\s*/, "");
-  let skill: string | undefined;
-  const block = text.match(/^\s*<skill name="([^"]+)"[^>]*>[\s\S]*?<\/skill>\s*/);
-  if (block) {
-    skill = block[1];
-    text = text.slice(block[0].length);
-  }
-  const attachments = [...text.matchAll(/<attachment name="([^"]*)">/g)].map((m) => m[1]);
-  text = text
-    .replace(/<attachment name=[^>]*>[\s\S]*?<\/attachment>/g, "")
-    .replace(/\n*相关文件:\n(?:- .*(?:\n|$))+/g, "")
-    .replace(/^请查看以下文件:\n(?:- .*(?:\n|$))+/, "")
-    .replace(/^\[项目「[^」]*」背景与规范\][\s\S]*?\[用户消息\]\n/, "")
-    .replace(/^【角色设定 — [^】]*】[\s\S]*?用户的第一个问题：\s*/, "")
-    .replace(/^【[^】]{1,12}】/, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!text) {
-    if (skill) return `技能：${skill}`;
-    if (attachments.length) return `查看 ${attachments[0]}`;
-    return undefined;
-  }
-  return text.length > 30 ? `${text.slice(0, 30)}…` : text;
-}
-function messageText(message: { content?: unknown }): string {
-  const content = message.content;
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .filter((part): part is { type: "text"; text: string } => !!part && part.type === "text" && typeof part.text === "string")
-    .map((part) => part.text)
-    .join("\n");
-}
-
-interface Slot {
-  /** Streaming tool-call arguments per content index (summarized for the renderer). */
-  toolArgs?: Map<number, { bytes: number; head: string; at: number }>;
-  /** Text/thinking delta waiting to be merged with the next ones (see emitEvent). */
-  pendingDelta?: { type: string; contentIndex?: number; delta: string; timer?: ReturnType<typeof setTimeout> };
-  lastDeltaAt?: number;
-  /** Tool set the session was created with (restored by 做一做). */
-  defaultTools: string[];
-  id: string;
-  session: AgentSession;
-  unsubscribe: () => void;
-  busy: boolean;
-  generation: number;
-  cancelledGeneration: number;
-  commandError?: string;
-  /** Configuration changed while running; rebuild once settled. */
-  stale: boolean;
-  lastActive: number;
-  finalError?: string;
-  failed: boolean;
-}
-
-export interface PoolLimits {
-  /** Sessions kept alive (idle ones are evicted LRU beyond this). */
-  maxLive: number;
-  /** Sessions allowed to run a turn at the same time. */
-  maxRunning: number;
-  /** Idle time after which an unfocused, idle session is closed. */
-  idleMs: number;
-}
+export { slimEvent, smallArgs, partialToolArgs } from "./event-pipeline.js";
+export { deriveTitle } from "./titles.js";
+export { validateThinkingLevel, type AgentMode, type ThinkingLevel, type SessionRunStatus, type PoolLimits } from "./types.js";
 
 /**
  * Pi engine with a pool of live sessions. Switching or creating sessions never
@@ -212,23 +39,23 @@ export class PiEngine {
   readonly mcp: McpService;
   readonly checkpoints: CheckpointStore;
   /** Per-session mode, reapplied whenever the session slot is rebuilt. */
-  private modes = new Map<string, AgentMode>();
-  private slots = new Map<string, Slot>();
+  /** @internal */ modes = new Map<string, AgentMode>();
+  /** @internal */ slots = new Map<string, Slot>();
   private opening = new Map<string, Promise<Slot>>();
-  private focusedId?: string;
+  /** @internal */ focusedId?: string;
   /** Sessions closed by a rebuild that could not reopen (e.g. a broken extension); retried on the next reload. */
-  private lost: Array<{ id: string; manager: SessionManager; focused: boolean }> = [];
+  /** @internal */ lost: Array<{ id: string; manager: SessionManager; focused: boolean }> = [];
   private cwd: string;
-  private inbox: string;
-  private sessionDir: string;
-  private listCache?: { at: number; items: Promise<SessionInfo[]> };
-  private modelCache = new Map<string, { mtime: number; model?: { provider: string; modelId: string } }>();
-  private evictTimer?: ReturnType<typeof setInterval>;
+  /** @internal */ inbox: string;
+  /** @internal */ sessionDir: string;
+  /** @internal */ listCache?: { at: number; items: Promise<SessionInfo[]> };
+  /** @internal */ modelCache = new Map<string, { mtime: number; model?: { provider: string; modelId: string } }>();
+  /** @internal */ evictTimer?: ReturnType<typeof setInterval>;
   constructor(
     readonly settings: Settings,
     readonly emit: Emit,
     openUrl: (url: string) => Promise<void>,
-    private extensionFactories: ExtensionFactory[] = [],
+    /** @internal */ public extensionFactories: ExtensionFactory[] = [],
     readonly limits: PoolLimits = { maxLive: 6, maxRunning: 3, idleMs: 15 * 60_000 },
   ) {
     this.cwd = this.inbox = join(settings.dir, "inbox");
@@ -277,7 +104,7 @@ export class PiEngine {
       invalidDefault: defaults.invalidDefault,
     };
   }
-  private async validCwd(path: string) {
+  /** @internal */ async validCwd(path: string) {
     if (!isAbsolute(path)) throw Error("工作区必须为绝对路径");
     const cwd = await realpath(path);
     const { stat } = await import("node:fs/promises");
@@ -285,313 +112,33 @@ export class PiEngine {
     return cwd;
   }
   /** The app-owned inbox is always trusted; other folders need an explicit decision. */
-  private trusted(cwd: string) {
+  /** @internal */ trusted(cwd: string) {
     return cwd === this.inbox || this.settings.config.read().trustedFolders.includes(cwd);
   }
-  private slot(id: string) {
+  /** @internal */ slot(id: string) {
     const slot = this.slots.get(id);
     if (!slot) throw Error("会话未加载");
     return slot;
   }
-  private live(id: string) {
+  /** @internal */ live(id: string) {
     return this.slot(id).session;
   }
   has(id: string) {
     return this.slots.has(id);
   }
-  /**
-   * Forward one renderer event. Consecutive text/thinking deltas of the same block are
-   * merged (leading edge immediately, then at most one IPC message per 16ms); anything
-   * else flushes the pending delta first so ordering is preserved.
-   */
-  private emitEvent(slot: Slot, event: unknown) {
-    const update = (event as { type?: string; assistantMessageEvent?: { type?: string; contentIndex?: number; delta?: unknown } }).type === "message_update"
-      ? (event as { assistantMessageEvent: { type?: string; contentIndex?: number; delta?: unknown } }).assistantMessageEvent
-      : undefined;
-    const mergeable = !!update && (update.type === "text_delta" || update.type === "thinking_delta") && typeof update.delta === "string" && Object.keys(update).every((k) => k === "type" || k === "contentIndex" || k === "delta");
-    if (mergeable) {
-      const pending = slot.pendingDelta;
-      if (pending && pending.type === update!.type && pending.contentIndex === update!.contentIndex) {
-        pending.delta += update!.delta as string;
-        return;
-      }
-      this.flushDelta(slot);
-      const now = Date.now();
-      if (now - (slot.lastDeltaAt ?? 0) >= DELTA_COALESCE_MS) {
-        slot.lastDeltaAt = now;
-        this.emit("agent://event", { sessionId: slot.id, event });
-        return;
-      }
-      const next: NonNullable<Slot["pendingDelta"]> = { type: update!.type!, contentIndex: update!.contentIndex, delta: update!.delta as string };
-      next.timer = setTimeout(() => { if (slot.pendingDelta === next) this.flushDelta(slot); }, DELTA_COALESCE_MS - (now - (slot.lastDeltaAt ?? 0)));
-      slot.pendingDelta = next;
-      return;
-    }
-    this.flushDelta(slot);
-    this.emit("agent://event", { sessionId: slot.id, event });
-  }
-  private flushDelta(slot: Slot) {
-    const pending = slot.pendingDelta;
-    if (!pending) return;
-    slot.pendingDelta = undefined;
-    if (pending.timer) clearTimeout(pending.timer);
-    slot.lastDeltaAt = Date.now();
-    const assistantMessageEvent: Record<string, unknown> = { type: pending.type, delta: pending.delta };
-    if (pending.contentIndex !== undefined) assistantMessageEvent.contentIndex = pending.contentIndex;
-    this.emit("agent://event", { sessionId: slot.id, event: { type: "message_update", assistantMessageEvent } });
-  }
-  private emitStatus(slot: Slot) {
-    this.flushDelta(slot);
-    this.emit("agent://session-status", {
-      sessionId: slot.id,
-      status: this.runStatus(slot),
-    });
-  }
-  private runStatus(slot?: Slot): SessionRunStatus {
-    if (!slot) return "idle";
-    if (slot.busy) return "running";
-    return slot.failed ? "failed" : "idle";
-  }
-  private invalidateList() {
-    this.listCache = undefined;
-  }
-  /** Throttled `toolcall_delta` summary: target path / command and bytes streamed so far. */
-  private toolArgProgress(slot: Slot, source: { contentIndex?: number; delta?: string; partial?: { content?: Array<{ arguments?: unknown }> } }) {
-    const index = source.contentIndex ?? 0;
-    const map = (slot.toolArgs ??= new Map());
-    const state = map.get(index) ?? { bytes: 0, head: "", at: 0 };
-    const delta = typeof source.delta === "string" ? source.delta : "";
-    state.bytes += delta.length;
-    if (state.head.length < 4096) state.head += delta;
-    map.set(index, state);
-    const now = Date.now();
-    if (now - state.at < TOOL_DELTA_INTERVAL_MS) return;
-    state.at = now;
-    this.emitEvent(slot, {
-      type: "message_update", assistantMessageEvent: { type: "toolcall_delta", contentIndex: index, partialArgs: partialToolArgs(state.head, source.partial?.content?.[index]?.arguments), bytes: state.bytes } });
-  }
-  private onEvent(slot: Slot, event: AgentSessionEvent) {
-    const sessionId = slot.id;
-    if (event.type === "message_update") {
-      const source = event.assistantMessageEvent as unknown as { type: string; contentIndex?: number; delta?: string; partial?: { content?: Array<{ arguments?: unknown }> } };
-      if (source.type === "toolcall_delta") this.toolArgProgress(slot, source);
-      else if (source.type === "toolcall_start" || source.type === "toolcall_end") slot.toolArgs?.delete(source.contentIndex ?? 0);
-    }
-    if (event.type === "message_start") slot.toolArgs = undefined;
-    // An extension or /name renamed the session, or the thinking level moved (e.g. clamped after
-    // a model switch): keep the sidebar title and the composer's thinking control in sync (C7/C8).
-    if (event.type === "session_info_changed" && event.name?.trim()) {
-      this.metadata(sessionId, { title: event.name.trim() });
-      this.invalidateList();
-      this.emit("agent://summary", { sessionId, title: event.name.trim() });
-    }
-    if (event.type === "thinking_level_changed") {
-      try { this.emit("agent://model-state", this.modelState(sessionId)); } catch { /* model not resolved yet */ }
-    }
-    const payload = slimEvent(event);
-    if (payload) this.emitEvent(slot, payload);
-    if (event.type === "tool_execution_end") {
-      void this.checkpoints.finish(event.toolCallId).then(
-        (record) => { if (record || event.toolName === "write" || event.toolName === "edit") this.emit("agent://artifacts", { sessionId }); },
-        () => {},
-      );
-    }
-    if (event.type === "agent_start") {
-      slot.finalError = undefined;
-      slot.failed = false;
-      if (!slot.busy) {
-        slot.busy = true;
-        this.emitStatus(slot);
-      }
-    }
-    if (event.type === "message_end" && event.message.role === "assistant") {
-      slot.finalError =
-        event.message.stopReason === "error"
-          ? (event.message.errorMessage ?? "模型请求失败")
-          : undefined;
-    }
-    if (event.type === "message_end" && event.message.role === "user") this.ensureTitle(slot, messageText(event.message));
-    // An errored attempt may still be retried or recovered by compaction.
-    // Report a terminal error only once the SDK has completely settled.
-    if (event.type === "agent_settled") {
-      if (!event.aborted && slot.finalError) {
-        this.emit("agent://turn-error", {
-          sessionId,
-          kind: "error",
-          detail: slot.finalError,
-        });
-        slot.failed = true;
-      }
-      slot.finalError = undefined;
-      // The SDK accepts a new prompt as soon as it settled; don't make the
-      // renderer wait for the outer prompt() promise to unwind.
-      slot.busy = false;
-      slot.lastActive = Date.now();
-      this.invalidateList();
-      this.emitStatus(slot);
-      if (slot.stale) void this.rebuild(slot).catch((error) => this.emit("agent://error", { sessionId, message: String(error instanceof Error ? error.message : error) }));
-    }
-  }
-  private ensureTitle(slot: Slot, text: string) {
-    const meta = this.settings.config.read().sessions[slot.id];
-    if (meta?.title || slot.session.sessionName) return;
-    const title = deriveTitle(text);
-    if (!title) return;
-    this.metadata(slot.id, { title });
-    this.emit("agent://summary", { sessionId: slot.id, title });
-  }
-  /** Create a live session for `manager` without touching any other session. */
-  private async open(
-    manager: SessionManager,
-    modelId?: string,
-    providerId?: string,
-    thinkingLevel?: ThinkingLevel,
-  ): Promise<Slot> {
-    const savedContext = manager.buildSessionContext();
-    const model = modelId
-      ? this.providers.model(modelId, providerId)
-      : savedContext.model
-        ? this.providers.model(
-            savedContext.model.modelId,
-            savedContext.model.provider,
-          )
-        : this.providers.model();
-    if (!model) throw Error("model_not_found: 请先配置提供商和模型");
-    if (!this.providers.runtime.hasConfiguredAuth(model.provider))
-      throw Error("model_auth_missing: 模型提供商尚未认证");
-    const config = this.settings.config.read();
-    const requestedThinking =
-      thinkingLevel ??
-      (manager.getEntries().some((e) => e.type === "thinking_level_change")
-        ? validateThinkingLevel(savedContext.thinkingLevel)
-        : config.defaults.defaultThinkingLevel
-          ? validateThinkingLevel(config.defaults.defaultThinkingLevel)
-          : undefined);
-    const cwd = manager.getCwd();
-    const trusted = this.trusted(cwd);
-    if (!trusted && config.folderTrustDecisions?.[cwd] === undefined)
-      this.emit("agent://folder-trust", { cwd });
-    const sdkSettings = SettingsManager.inMemory({}, { projectTrusted: trusted });
-    const sessionId = manager.getSessionId();
-    const loader = new DefaultResourceLoader({
-      cwd,
-      agentDir: this.settings.dir,
-      settingsManager: sdkSettings,
-      noExtensions: !(config.extensionsEnabled && trusted),
-      additionalExtensionPaths: config.extensionsEnabled
-        ? (config.extensionPaths ?? [])
-        : [],
-      noContextFiles: !trusted,
-      noPromptTemplates: true,
-      noThemes: true,
-      noSkills: true,
-      skillsOverride: () => ({
-        skills: this.skills.active(cwd),
-        diagnostics: [],
-      }),
-      extensionFactories: [
-        this.permissions.extension(sessionId),
-        // After the permission gate: only calls that may run get a snapshot.
-        this.checkpoints.extension(sessionId, () => cwd),
-        this.mcp.extension(),
-        ...this.extensionFactories,
-      ],
-    });
-    await loader.reload();
-    const errors = loader.getExtensions().errors;
-    if (errors.length)
-      throw Error(
-        `extension_load_failed: ${errors.map((e) => `${e.path}: ${e.error}`).join("; ")}`,
-      );
-    const { session } = await createAgentSession({
-      cwd,
-      agentDir: this.settings.dir,
-      modelRuntime: this.providers.runtime,
-      sessionManager: manager,
-      resourceLoader: loader,
-      settingsManager: sdkSettings,
-      model,
-      tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "mcp__*"],
-      thinkingLevel: requestedThinking,
-    });
-    const defaultTools = session.getActiveToolNames();
-    const mode = this.modes.get(session.sessionId) ?? "craft";
-    if (mode !== "craft") session.setActiveToolsByName(defaultTools.filter((name) => READ_ONLY_TOOLS.includes(name)));
-    const slot: Slot = {
-      defaultTools,
-      id: session.sessionId,
-      session,
-      unsubscribe: () => {},
-      busy: false,
-      generation: 0,
-      cancelledGeneration: -1,
-      stale: false,
-      lastActive: Date.now(),
-      failed: false,
-    };
-    slot.unsubscribe = session.subscribe((event) => this.onEvent(slot, event));
-    try {
-      await session.bindExtensions({
-        mode: "rpc",
-        uiContext: this.ui.context(slot.id),
-        onError: (error) => {
-          if (error.event === "command" && this.slots.get(slot.id) === slot && slot.busy)
-            slot.commandError = error.error;
-          else this.emit("agent://error", { sessionId: slot.id, message: error.error });
-        },
-      });
-    } catch (error) {
-      slot.unsubscribe();
-      session.dispose();
-      throw error;
-    }
-    this.slots.set(slot.id, slot);
-    this.invalidateList();
-    this.emit("agent://model-state", this.modelState(slot.id));
-    await this.evictOverflow(slot.id);
-    return slot;
-  }
-  private focus(id: string) {
-    this.focusedId = id;
-    const slot = this.slots.get(id);
-    if (slot) slot.lastActive = Date.now();
-  }
-  async newSession(
-    cwd: string,
-    modelId?: string,
-    providerId?: string,
-    thinkingLevel?: ThinkingLevel,
-  ) {
-    const actual = await this.validCwd(cwd);
-    const slot = await this.open(
-      SessionManager.create(actual, this.sessionDir),
-      modelId,
-      providerId,
-      thinkingLevel,
-    );
-    this.focus(slot.id);
-    return slot.id;
-  }
-  async all() {
-    const now = Date.now();
-    if (!this.listCache || now - this.listCache.at > 1500)
-      this.listCache = { at: now, items: SessionManager.listAll(this.sessionDir) };
-    return this.listCache.items;
-  }
-  async resolve(id: string, cwd?: string): Promise<SessionInfo> {
-    const canonicalCwd = cwd ? await this.validCwd(cwd) : undefined;
-    this.invalidateList();
-    const item = (await this.all()).find(
-      (s) => s.id === id && (!canonicalCwd || s.cwd === canonicalCwd),
-    );
-    if (!item) throw Error("会话不存在");
-    const actual = await realpath(item.path),
-      root = await realpath(this.sessionDir),
-      rel = relative(root, actual);
-    if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel))
-      throw Error("会话路径越界");
-    return { ...item, path: actual };
-  }
+  /** @internal */ emitEvent(slot: Slot, event: unknown) { return pipeline.emitEvent(this, slot, event); }
+  /** @internal */ flushDelta(slot: Slot) { return pipeline.flushDelta(this, slot); }
+  /** @internal */ emitStatus(slot: Slot) { return runtime.emitStatus(this, slot); }
+  /** @internal */ runStatus(slot?: Slot): SessionRunStatus { return runtime.runStatus(slot); }
+  /** @internal */ invalidateList() { return catalog.invalidateList(this); }
+  /** @internal */ toolArgProgress(slot: Slot, source: { contentIndex?: number; delta?: string; partial?: { content?: Array<{ arguments?: unknown }> } }) { return pipeline.toolArgProgress(this, slot, source); }
+  /** @internal */ onEvent(slot: Slot, event: AgentSessionEvent) { return pipeline.onEvent(this, slot, event); }
+  /** @internal */ ensureTitle(slot: Slot, text: string) { return catalog.ensureTitle(this, slot, text); }
+  /** @internal */ open(manager: SessionManager, modelId?: string, providerId?: string, thinkingLevel?: ThinkingLevel): Promise<Slot> { return pool.open(this, manager, modelId, providerId, thinkingLevel); }
+  /** @internal */ focus(id: string) { return pool.focus(this, id); }
+  newSession(cwd: string, modelId?: string, providerId?: string, thinkingLevel?: ThinkingLevel) { return pool.newSession(this, cwd, modelId, providerId, thinkingLevel); }
+  all() { return catalog.all(this); }
+  resolve(id: string, cwd?: string): Promise<SessionInfo> { return catalog.resolve(this, id, cwd); }
   /** Bring a session into the pool (reusing a live one) and return its snapshot. */
   async load(id: string, cwd?: string) {
     let slot = this.slots.get(id);
@@ -621,385 +168,41 @@ export class PiEngine {
       queue: this.queueState(id),
     };
   }
-  private savedModel(item: SessionInfo) {
-    const mtime = item.modified.getTime();
-    const cached = this.modelCache.get(item.path);
-    if (cached && cached.mtime === mtime) return cached.model;
-    const model = SessionManager.open(item.path, this.sessionDir).buildSessionContext().model;
-    const value = model ? { provider: model.provider, modelId: model.modelId } : undefined;
-    this.modelCache.set(item.path, { mtime, model: value });
-    return value;
-  }
-  async list(cwd: string, includeArchived = false) {
-    cwd = await this.validCwd(cwd);
-    const meta = this.settings.config.read().sessions,
-      items = (await this.all()).filter((s) => s.cwd === cwd);
-    const result = items
-      .filter((s) => includeArchived || !meta[s.id]?.archived)
-      .map((s) => {
-        const savedModel = this.savedModel(s);
-        const slot = this.slots.get(s.id);
-        return {
-          sessionId: s.id,
-          title: meta[s.id]?.title ?? s.name ?? deriveTitle(s.firstMessage ?? "") ?? "新任务",
-          updatedAt: s.modified.toISOString(),
-          cwd: s.cwd,
-          pinned: meta[s.id]?.pinned ?? false,
-          archived: meta[s.id]?.archived ?? false,
-          currentModelId: savedModel?.modelId,
-          currentProviderId: savedModel?.provider,
-          currentModelKey: savedModel
-            ? modelKey(savedModel.provider, savedModel.modelId)
-            : undefined,
-          status: listStatus(this.runStatus(slot)),
-        };
-      });
-    // Sessions created in this run are not on disk until their first exchange.
-    for (const slot of this.slots.values()) {
-      if (slot.session.sessionManager.getCwd() !== cwd || result.some((s) => s.sessionId === slot.id)) continue;
-      if (!slot.busy && !meta[slot.id]?.title) continue;
-      const model = slot.session.model;
-      result.unshift({
-        sessionId: slot.id,
-        title: meta[slot.id]?.title ?? "新任务",
-        updatedAt: new Date(slot.lastActive).toISOString(),
-        cwd,
-        pinned: meta[slot.id]?.pinned ?? false,
-        archived: meta[slot.id]?.archived ?? false,
-        currentModelId: model?.id,
-        currentProviderId: model?.provider,
-        currentModelKey: model ? modelKey(model.provider, model.id) : undefined,
-        status: listStatus(this.runStatus(slot)),
-      });
-    }
-    return result;
-  }
-  /** Sessions currently running a turn (the renderer's 任务 view of background work). */
-  running() {
-    const meta = this.settings.config.read().sessions;
-    return [...this.slots.values()]
-      .filter((slot) => slot.busy)
-      .map((slot) => ({
-        taskId: slot.id,
-        sessionId: slot.id,
-        cwd: slot.session.sessionManager.getCwd(),
-        title: meta[slot.id]?.title ?? slot.session.sessionName ?? "新任务",
-        status: "running",
-      }));
-  }
-  private validateImages(session: AgentSession, images?: PromptImages) {
-    if (images?.length && !session.model?.input.includes("image"))
-      throw Error("model_does_not_support_images: 当前模型不支持图片输入");
-  }
-  async send(id: string, prompt: string, images?: PromptImages) {
-    const slot = this.slot(id),
-      session = slot.session;
-    if (slot.busy) throw Error("会话忙碌");
-    const running = [...this.slots.values()].filter((s) => s.busy).length;
-    if (running >= this.limits.maxRunning)
-      throw Error(`too_many_running: 最多同时运行 ${this.limits.maxRunning} 个任务，请等待其中一个完成`);
-    if (
-      !session.model ||
-      !this.providers.model(session.model.id, session.model.provider)
-    )
-      throw Error("model_not_found: 当前模型已删除，请重新选择");
-    this.validateImages(session, images);
-    slot.busy = true;
-    slot.failed = false;
-    slot.commandError = undefined;
-    slot.lastActive = Date.now();
-    const generation = ++slot.generation;
-    this.emitStatus(slot);
-    session.extensionRunner.setUIContext(this.ui.context(id), "rpc");
-    try {
-      let disposition: string | undefined;
-      await session.prompt(prompt, {
-        images,
-        preflightResult: (value) => {
-          disposition = value;
-        },
-      });
-      if (
-        disposition === "handled" &&
-        generation === slot.generation &&
-        slot.commandError
-      )
-        throw Error(slot.commandError);
-      // Extension commands are truly handled without an agent run, so Pi emits no settled.
-      // Complete the host's send lifecycle only after the command handler has finished.
-      if (disposition === "handled" && generation === slot.generation)
-        this.emitEvent(slot, {
-          type: "agent_settled",
-          aborted: slot.cancelledGeneration === generation,
-          commandHandled: true,
-        });
-    } catch (error) {
-      if (generation === slot.generation) slot.failed = true;
-      throw error;
-    } finally {
-      if (generation === slot.generation) {
-        this.permissions.cancel(id);
-        if (slot.busy) {
-          slot.busy = false;
-          this.emitStatus(slot);
-        }
-        if (slot.stale && this.slots.get(id) === slot) void this.rebuild(slot).catch(() => {});
-      }
-    }
-  }
-  /** User prompts on the current branch, newest last (for 历史 / 从这里编辑). */
-  rewindPoints(id: string) {
-    return this.live(id)
-      .getUserMessagesForForking()
-      .map((m, index) => ({ entryId: m.entryId, index, preview: deriveTitle(m.text) ?? m.text.slice(0, 60) }));
-  }
-  /** Move the branch leaf to just before `entryId`; the renderer rebuilds from `session_rewound`. */
-  private async navigateBefore(slot: Slot, entryId: string) {
-    if (slot.busy) throw Error("会话忙碌");
-    const result = await slot.session.navigateTree(entryId, { summarize: false });
-    if (result.cancelled) throw Error("rewind_cancelled: 已取消");
-    this.invalidateList();
-    this.emitEvent(slot, { type: "session_rewound", messages: slot.session.messages });
-    return result.editorText ?? "";
-  }
-  /** 从这里编辑: drop this prompt and everything after it; returns the prompt text. */
-  async rewind(id: string, entryId: string) {
-    const slot = this.slot(id);
-    if (!slot.session.getUserMessagesForForking().some((m) => m.entryId === entryId)) throw Error("rewind_point_not_found: 该消息不在当前分支");
-    return { editorText: await this.navigateBefore(slot, entryId) };
-  }
-  /** 重新生成: branch before the last prompt and send it again (images included). */
-  async regenerate(id: string) {
-    const slot = this.slot(id);
-    const last = slot.session.getUserMessagesForForking().at(-1);
-    if (!last) throw Error("rewind_point_not_found: 没有可重新生成的消息");
-    const entry = slot.session.sessionManager.getEntry(last.entryId) as { message?: { content?: unknown } } | undefined;
-    const content = Array.isArray(entry?.message?.content) ? (entry!.message!.content as Array<{ type?: string; data?: string; mimeType?: string }>) : [];
-    const images = content
-      .filter((part) => part.type === "image" && part.data && part.mimeType)
-      .map((part) => ({ type: "image" as const, data: part.data!, mimeType: part.mimeType! }));
-    const text = (await this.navigateBefore(slot, last.entryId)) || last.text;
-    await this.send(id, text, images.length ? images : undefined);
-  }
-  // ---- 产物 / 快照 (20261115-ui §5.5–5.6) ----
-  /** Files this session created or modified (write/edit), from its full history. */
-  async artifacts(id: string) {
-    const slot = this.slot(id);
-    const entries = slot.session.sessionManager.getEntries() as unknown as Parameters<typeof collectArtifacts>[0];
-    return collectArtifacts(entries, slot.session.sessionManager.getCwd(), await this.checkpoints.list(id));
-  }
-  /** A path this session may write: inside its workspace. */
-  private writablePath(id: string, path: string) {
-    const cwd = this.slot(id).session.sessionManager.getCwd();
-    const target = resolvePath(cwd, path);
-    const rel = relative(resolvePath(cwd), target);
-    if (!isAbsolute(path) || rel === "" || rel.startsWith("..") || isAbsolute(rel)) throw Error("path_outside_workspace: 只能修改工作区内的文件");
-    return target;
-  }
-  checkpointList(id: string, path?: string) { return this.checkpoints.list(id, path); }
-  checkpointRead(id: string, hash: string) { return this.checkpoints.read(id, hash); }
-  async checkpointRestore(id: string, path: string, hash: string | null) {
-    await this.checkpoints.restore(id, this.writablePath(id, path), hash);
-    this.emit("agent://artifacts", { sessionId: id });
-  }
-  async turnRevert(id: string, toolCallIds: string[], opts: { skip?: string[]; force?: boolean } = {}) {
-    if (this.slot(id).busy) throw Error("会话忙碌");
-    const result = await this.checkpoints.revert(id, toolCallIds, opts);
-    if (result.restored.length) this.emit("agent://artifacts", { sessionId: id });
-    return result;
-  }
-  async artifactSave(id: string, path: string, content: string, origin: "user" | "apply" = "user") {
-    await this.checkpoints.userSave(id, this.writablePath(id, path), content, origin);
-    this.emit("agent://artifacts", { sessionId: id });
-  }
-  setMode(id: string, mode: AgentMode) {
-    const slot = this.slot(id);
-    this.modes.set(id, mode);
-    slot.session.setActiveToolsByName(mode === "craft" ? slot.defaultTools : slot.defaultTools.filter((name) => READ_ONLY_TOOLS.includes(name)));
-  }
-  mode(id: string): AgentMode { return this.modes.get(id) ?? "craft"; }
-  abortRetry(id: string) { this.live(id).abortRetry(); }
-  async exportHtml(id: string, outputPath: string) {
-    if (!isAbsolute(outputPath)) throw Error("invalid_payload: outputPath");
-    return this.live(id).exportToHtml(outputPath);
-  }
-  /** Workspaces the preview protocol may serve: live session folders and the inbox. */
-  previewRoots(): string[] {
-    return [this.inbox, ...[...this.slots.values()].map((s) => s.session.sessionManager.getCwd())];
-  }
-  queueState(id: string) {
-    const s = this.live(id);
-    return {
-      steering: [...s.getSteeringMessages()],
-      followUp: [...s.getFollowUpMessages()],
-    };
-  }
-  clearQueue(id: string) {
-    return this.live(id).clearQueue();
-  }
-  /**
-   * Replace the pending queue (撤回一条 / 改成插话 / 调整顺序, 20261115-ui U4.5). Pi only offers
-   * clear + append, so the new order is re-queued; queued images are not kept.
-   */
-  async setQueue(id: string, steering: string[], followUp: string[]) {
-    const slot = this.slot(id),
-      session = slot.session;
-    session.clearQueue();
-    if (slot.busy) {
-      for (const text of steering) await session.steer(text);
-      for (const text of followUp) await session.followUp(text);
-    }
-    return this.queueState(id);
-  }
-  async queue(
-    id: string,
-    kind: "steer" | "followUp",
-    prompt: string,
-    images?: PromptImages,
-  ) {
-    const slot = this.slot(id),
-      session = slot.session;
-    if (!slot.busy)
-      throw Error("queue_unavailable: 当前没有运行中的会话");
-    this.validateImages(session, images);
-    const disposition =
-      kind === "steer"
-        ? await session.steer(prompt, images)
-        : await session.followUp(prompt, images);
-    return { ...this.queueState(id), disposition };
-  }
-  async fork(id: string) {
-    const slot = this.slot(id);
-    if (slot.busy) throw Error("会话忙碌");
-    const file = slot.session.sessionManager.getSessionFile();
-    if (!file || !existsSync(file))
-      throw Error("fork_requires_history: 请先发送消息");
-    const forked = await this.open(
-      SessionManager.forkFrom(
-        file,
-        slot.session.sessionManager.getCwd(),
-        this.sessionDir,
-      ),
-    );
-    this.focus(forked.id);
-    return forked.id;
-  }
-  async cancel(id: string) {
-    const slot = this.slot(id);
-    slot.cancelledGeneration = slot.generation;
-    this.ui.cancel(id, "cancelled");
-    this.mcp.auth.cancel(id);
-    await this.mcp.auth.settle();
-    this.permissions.cancel(id);
-    if (slot.session.isCompacting) slot.session.abortCompaction();
-    await slot.session.abort();
-  }
-  /** /compact: summarise older history into a compaction entry to free context. */
-  async compact(id: string, instructions?: string) {
-    const slot = this.slot(id);
-    if (slot.busy) throw Error("会话忙碌");
-    const generation = slot.generation;
-    slot.busy = true;
-    this.emitStatus(slot);
-    try {
-      const result = await slot.session.compact(instructions?.trim() || undefined);
-      this.invalidateList();
-      return { tokensBefore: result.tokensBefore, tokensAfter: result.estimatedTokensAfter };
-    } finally {
-      if (generation === slot.generation) {
-        slot.busy = false;
-        this.emitStatus(slot);
-        if (slot.stale && this.slots.get(id) === slot) void this.rebuild(slot).catch(() => {});
-      }
-    }
-  }
-  /** Close one live session; its persisted history stays on disk. */
-  async close(id: string) {
-    const slot = this.slots.get(id);
-    if (!slot) return;
-    this.slots.delete(id);
-    if (this.focusedId === id) this.focusedId = undefined;
-    slot.generation++;
-    this.ui.cancel(id, "session_closed");
-    this.mcp.auth.cancel(id);
-    this.permissions.cancel(id);
-    try {
-      await slot.session.abort();
-      await slot.session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
-    } finally {
-      this.flushDelta(slot);
-      slot.unsubscribe();
-      slot.session.dispose();
-      this.invalidateList();
-    }
-  }
-  async shutdown() {
-    clearInterval(this.evictTimer);
-    this.evictTimer = undefined;
-    this.lost = [];
-    this.ui.cancel(undefined, "session_closed");
-    this.mcp.auth.cancel();
-    await this.mcp.auth.settle();
-    this.permissions.cancel();
-    for (const id of [...this.slots.keys()]) await this.close(id);
-  }
-  /** Close idle sessions over the live limit (least recently used first). */
-  private async evictOverflow(keep: string) {
-    const candidates = [...this.slots.values()]
-      .filter((s) => s.id !== keep && s.id !== this.focusedId && !s.busy && !this.permissions.hasPending(s.id) && !this.ui.hasPending(s.id))
-      .sort((a, b) => a.lastActive - b.lastActive);
-    while (this.slots.size > this.limits.maxLive && candidates.length)
-      await this.close(candidates.shift()!.id);
-  }
-  async evictIdle(now = Date.now()) {
-    for (const slot of [...this.slots.values()])
-      if (
-        slot.id !== this.focusedId &&
-        !slot.busy &&
-        !this.permissions.hasPending(slot.id) &&
-        !this.ui.hasPending(slot.id) &&
-        now - slot.lastActive > this.limits.idleMs
-      )
-        await this.close(slot.id);
-  }
-  async rename(id: string, title: string) {
-    const slot = this.slots.get(id);
-    if (slot) slot.session.setSessionName(title);
-    else {
-      const item = await this.resolve(id);
-      SessionManager.open(item.path, this.sessionDir).appendSessionInfo(title);
-    }
-    this.metadata(id, { title });
-    this.invalidateList();
-    this.emit("agent://summary", { sessionId: id, title });
-  }
-  metadata(
-    id: string,
-    patch: { title?: string; pinned?: boolean; archived?: boolean },
-  ) {
-    const c = this.settings.config.read();
-    c.sessions[id] = { ...c.sessions[id], ...patch };
-    this.settings.config.write(c);
-  }
-  async delete(id: string) {
-    this.lost = this.lost.filter((entry) => entry.id !== id);
-    const slot = this.slots.get(id);
-    const file = slot
-      ? slot.session.sessionManager.getSessionFile()
-      : (await this.resolve(id)).path;
-    if (slot) await this.close(id);
-    if (file) {
-      try {
-        await unlink(file);
-      } catch (e) {
-        if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-      }
-    }
-    const c = this.settings.config.read();
-    delete c.sessions[id];
-    this.settings.config.write(c);
-    this.invalidateList();
-  }
+  /** @internal */ savedModel(item: SessionInfo) { return catalog.savedModel(this, item); }
+  list(cwd: string, includeArchived = false) { return catalog.list(this, cwd, includeArchived); }
+  running() { return pool.running(this); }
+  /** @internal */ validateImages(session: AgentSession, images?: PromptImages) { return runtime.validateImages(session, images); }
+  send(id: string, prompt: string, images?: PromptImages) { return runtime.send(this, id, prompt, images); }
+  rewindPoints(id: string) { return features.rewindPoints(this, id); }
+  /** @internal */ navigateBefore(slot: Slot, entryId: string) { return features.navigateBefore(this, slot, entryId); }
+  rewind(id: string, entryId: string) { return features.rewind(this, id, entryId); }
+  regenerate(id: string) { return features.regenerate(this, id); }
+  artifacts(id: string) { return features.artifacts(this, id); }
+  /** @internal */ writablePath(id: string, path: string) { return features.writablePath(this, id, path); }
+  checkpointList(id: string, path?: string) { return features.checkpointList(this, id, path); }
+  checkpointRead(id: string, hash: string) { return features.checkpointRead(this, id, hash); }
+  checkpointRestore(id: string, path: string, hash: string | null) { return features.checkpointRestore(this, id, path, hash); }
+  turnRevert(id: string, toolCallIds: string[], opts: { skip?: string[]; force?: boolean } = {}) { return features.turnRevert(this, id, toolCallIds, opts); }
+  artifactSave(id: string, path: string, content: string, origin: "user" | "apply" = "user") { return features.artifactSave(this, id, path, content, origin); }
+  setMode(id: string, mode: AgentMode) { return features.setMode(this, id, mode); }
+  mode(id: string): AgentMode { return features.mode(this, id); }
+  abortRetry(id: string) { return runtime.abortRetry(this, id); }
+  exportHtml(id: string, outputPath: string) { return features.exportHtml(this, id, outputPath); }
+  previewRoots(): string[] { return pool.previewRoots(this); }
+  queueState(id: string) { return runtime.queueState(this, id); }
+  clearQueue(id: string) { return runtime.clearQueue(this, id); }
+  setQueue(id: string, steering: string[], followUp: string[]) { return runtime.setQueue(this, id, steering, followUp); }
+  queue(id: string, kind: "steer" | "followUp", prompt: string, images?: PromptImages) { return runtime.queue(this, id, kind, prompt, images); }
+  fork(id: string) { return features.fork(this, id); }
+  cancel(id: string) { return runtime.cancel(this, id); }
+  compact(id: string, instructions?: string) { return features.compact(this, id, instructions); }
+  close(id: string) { return pool.close(this, id); }
+  shutdown() { return pool.shutdown(this); }
+  /** @internal */ evictOverflow(keep: string) { return pool.evictOverflow(this, keep); }
+  evictIdle(now = Date.now()) { return pool.evictIdle(this, now); }
+  rename(id: string, title: string) { return catalog.rename(this, id, title); }
+  metadata(id: string, patch: { title?: string; pinned?: boolean; archived?: boolean }) { return catalog.metadata(this, id, patch); }
+  delete(id: string) { return catalog.deleteSession(this, id); }
   modelState(id: string) {
     const s = this.live(id),
       m = s.model;
@@ -1170,69 +373,6 @@ export class PiEngine {
     this.settings.config.write(c);
     await this.reload((slot) => slot.session.sessionManager.getCwd() === cwd);
   }
-  /** Rebuild live sessions after a configuration change; busy ones rebuild when settled. */
-  async reload(filter: (slot: Slot) => boolean = () => true) {
-    let failure: unknown;
-    // Reopen sessions an earlier failed rebuild dropped (the config may have been rolled back since).
-    for (const entry of this.lost.splice(0)) {
-      if (this.slots.has(entry.id)) continue;
-      try {
-        const next = await this.open(entry.manager);
-        if (entry.focused) this.focus(next.id);
-      } catch (error) {
-        this.lost.push(entry);
-        failure ??= error;
-      }
-    }
-    for (const slot of [...this.slots.values()].filter(filter)) {
-      if (slot.busy) {
-        slot.stale = true;
-        continue;
-      }
-      try {
-        await this.rebuild(slot);
-      } catch (error) {
-        failure ??= error;
-      }
-    }
-    if (failure) throw failure;
-  }
-  private async rebuild(slot: Slot) {
-    if (this.slots.get(slot.id) !== slot) return;
-    const focused = this.focusedId === slot.id;
-    const file = slot.session.sessionManager.getSessionFile();
-    const manager =
-      file && existsSync(file)
-        ? SessionManager.open(file, this.sessionDir)
-        : slot.session.sessionManager;
-    await this.close(slot.id);
-    let next: Slot;
-    try {
-      next = await this.open(manager);
-    } catch (error) {
-      this.lost.push({ id: slot.id, manager, focused });
-      throw error;
-    }
-    if (next.id !== slot.id) throw Error("会话重载身份发生变化");
-    if (focused) this.focus(next.id);
-  }
+  reload(filter: (slot: Slot) => boolean = () => true) { return pool.reload(this, filter); }
+  /** @internal */ rebuild(slot: Slot) { return pool.rebuild(this, slot); }
 }
-function listStatus(status: SessionRunStatus) {
-  return status === "running" ? "working" : status === "failed" ? "failed" : "completed";
-}
-/** Version of the bundled Pi SDK, read from its package manifest. */
-const PI_VERSION = (() => {
-  try {
-    const require = createRequire(import.meta.url);
-    let dir = dirname(require.resolve("@earendil-works/pi-coding-agent"));
-    for (let depth = 0; depth < 6; depth++, dir = dirname(dir)) {
-      const manifest = join(dir, "package.json");
-      if (!existsSync(manifest)) continue;
-      const pkg = JSON.parse(readFileSync(manifest, "utf8")) as { name?: string; version?: string };
-      if (pkg.name === "@earendil-works/pi-coding-agent" && pkg.version) return pkg.version;
-    }
-  } catch {
-    /* Fall through to an explicit unknown marker. */
-  }
-  return "unknown";
-})();

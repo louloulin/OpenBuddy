@@ -41,7 +41,6 @@ const SIZE_CEILING = {
   'apps/web/src/features/composer/Composer.tsx': 699,
   'apps/web/src/features/workbench/ToolSidePanel.tsx': 746,
   'packages/client/src/agent-client.ts': 1223,
-  'packages/engine/src/pi-engine.ts': 1239,
   'packages/protocol/src/dto.ts': 938,
   'packages/services/src/providers/providers.ts': 611,
 };
