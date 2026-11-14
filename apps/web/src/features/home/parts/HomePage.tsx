@@ -3,7 +3,7 @@ import { SceneTabs } from "./SceneTabs";
 import { PracticeCases } from "./PracticeCases";
 import { HomeHeader } from "./HomeHeader";
 import { HomeComposer } from "./HomeComposer";
-import type { HomeModeId } from "../../../shared/content/home-scenes";
+import type { HomeModeId } from "../../../shared/content/scenes";
 
 export function HomePage() {
   const [activeMode, setActiveMode] = useState<HomeModeId>("working");

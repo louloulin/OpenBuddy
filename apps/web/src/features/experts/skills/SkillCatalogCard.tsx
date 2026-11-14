@@ -1,7 +1,7 @@
 import type { SkillItem } from "@openbuddy/protocol/dto";
 import { AddIcon, CheckIcon, SparklesIcon } from "@openbuddy/ui/icon/icons/index";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
-import { LetterAvatar } from "../../../shared/ui/LetterAvatar";
+import { LetterAvatar } from "@openbuddy/ui/LetterAvatar";
 
 /** One skill card in the catalog grid. Connector skills show their
  *  connector icon; built-in skills fall back to a letter tile. Clicking the

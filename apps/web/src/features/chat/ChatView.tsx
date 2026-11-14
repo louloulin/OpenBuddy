@@ -34,7 +34,7 @@ import { PromptHistory } from "./PromptHistory";
 import { ArrowDown } from "lucide-react";
 import { FolderIcon, PanelIcon, SearchIcon } from "@openbuddy/ui/icon/icons/index";
 import type { ModelOption } from "../models/ModelSelector";
-import type { HomeModeId } from "../../shared/content/home-scenes";
+import type { HomeModeId } from "../../shared/content/scenes";
 import type { AgentEntry } from "@openbuddy/protocol/dto";
 import type { WorkspaceInfo } from "@openbuddy/client/agent-client";
 

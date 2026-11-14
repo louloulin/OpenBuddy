@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { connectorsIcon } from "@openbuddy/client/agent-client";
-import { LetterAvatar } from "../../../shared/ui/LetterAvatar";
+import { LetterAvatar } from "@openbuddy/ui/LetterAvatar";
 
 /** path -> resolved data URL. Survives across cards / remounts. */
 const cache = new Map<string, string>();

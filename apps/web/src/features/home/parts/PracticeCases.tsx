@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { HomeModeId } from "../../../shared/content/home-scenes";
-import { getMode } from "../../../shared/content/home-scenes";
+import type { HomeModeId } from "../../../shared/content/scenes";
+import { getMode } from "../../../shared/content/scenes";
 import { ChevronDownIcon } from "@openbuddy/ui/icon/icons/index";
 
 interface PracticeCasesProps {

@@ -15,7 +15,7 @@ import {
   type HomeCategory,
   type HomeModeId,
   type HomeTemplate,
-} from "../../shared/content/home-scenes";
+} from "../../shared/content/scenes";
 
 /** 模板 chip 右侧的 ↘ 斜箭头(复刻 WorkBuddy 的 quick-actions-sub 箭头)。 */
 function ArrowRightSubIcon() {

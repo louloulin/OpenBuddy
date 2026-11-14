@@ -1,4 +1,4 @@
-import type { HomeModeId } from "../../../shared/content/home-scenes";
+import type { HomeModeId } from "../../../shared/content/scenes";
 
 interface SceneTabsProps {
   activeMode: HomeModeId;

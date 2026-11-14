@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { expertsThumbnail } from "@openbuddy/client/agent-client";
-import { LetterAvatar } from "./LetterAvatar";
+import { LetterAvatar } from "@openbuddy/ui/LetterAvatar";
 
 /** path -> resolved data URL. Survives across cards / remounts so scrolling back
  *  is instant and each avatar is decoded at most once per session. */

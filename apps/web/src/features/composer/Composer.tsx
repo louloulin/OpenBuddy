@@ -21,7 +21,7 @@ import { InputAddMenu } from "./InputAddMenu";
 import {
   collectDroppedPaths,
 } from "@/shared/lib/files/drop-utils";
-import type { HomeModeId } from "../../shared/content/home-scenes";
+import type { HomeModeId } from "../../shared/content/scenes";
 import type { AgentEntry } from "@openbuddy/protocol/dto";
 import type { WorkspaceInfo } from "@openbuddy/client/agent-client";
 

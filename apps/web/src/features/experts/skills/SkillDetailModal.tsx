@@ -11,7 +11,7 @@ import type { SkillItem, SkillInfo } from "@openbuddy/protocol/dto";
 import { skillsCatalogReadSkill, skillsAdd } from "@openbuddy/client/agent-client";
 import { Markdown } from "@openbuddy/markdown/Markdown";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
-import { LetterAvatar } from "../../../shared/ui/LetterAvatar";
+import { LetterAvatar } from "@openbuddy/ui/LetterAvatar";
 import {
   ChevronLeftIcon, AddIcon, CheckIcon, FileTextIcon, Code2Icon,
 } from "@openbuddy/ui/icon/icons/index";

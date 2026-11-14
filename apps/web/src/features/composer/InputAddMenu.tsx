@@ -5,7 +5,7 @@ import {
   SkillTabIcon,
 } from "@openbuddy/ui/icon/icons/index";
 import { skillsList } from "@openbuddy/client/agent-client";
-import { HOME_MODES, type HomeModeId } from "../../shared/content/home-scenes";
+import { HOME_MODES, type HomeModeId } from "../../shared/content/scenes";
 import { CONNECTOR_LIST } from "../experts/data/connectors-catalog";
 import type { AgentEntry, SkillInfo } from "@openbuddy/protocol/dto";
 
