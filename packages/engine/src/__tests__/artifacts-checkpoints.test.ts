@@ -7,8 +7,8 @@ import { CheckpointStore } from "../checkpoints.js";
 import { collectArtifacts } from "../artifacts.js";
 import { Permissions, destructiveInfo } from "../permissions.js";
 import { PiEngine, partialToolArgs, slimEvent } from "../pi.js";
-import { createSettings } from "../../services/settings.js";
-import { allowedPreviewPath, previewPath, previewResponse, PREVIEW_CSP } from "../../services/preview-protocol.js";
+import { createSettings } from "@openbuddy/services/settings";
+import { allowedPreviewPath, previewPath, previewResponse, PREVIEW_CSP } from "@openbuddy/services/preview-protocol";
 
 const cleanups: Array<() => Promise<unknown>> = [];
 afterEach(async () => { for (const c of cleanups.splice(0).reverse()) await c(); });

@@ -3,9 +3,9 @@ import { afterEach, expect, it } from "vitest";
 import { mkdtemp, mkdir, readFile, rm, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { createEngineHandlers } from "../../ipc/handlers/agent.js";
-import { createSettings } from "../../services/settings.js";
-import { Permissions } from "../permissions.js";
+import { createEngineHandlers } from "@openbuddy/host/handlers/agent";
+import { createSettings } from "../settings.js";
+import { Permissions } from "@openbuddy/engine/permissions";
 const cleanups: Array<() => Promise<unknown>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();

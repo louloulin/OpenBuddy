@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
-import type { Settings } from "../services/settings.js";
+import type { Settings } from "@openbuddy/services/settings";
 export type Emit = (event: string, payload: unknown) => void;
 type Reason = "resolved" | "cancelled" | "timeout";
 type Decision = { allow: boolean; note?: string };
