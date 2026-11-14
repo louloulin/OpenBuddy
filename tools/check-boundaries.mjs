@@ -39,7 +39,6 @@ const SIZE_CEILING = {
   'apps/web/src/features/assistant/AssistantsPanel.tsx': 703,
   'apps/web/src/features/chat/ChatView.tsx': 724,
   'apps/web/src/features/composer/Composer.tsx': 699,
-  'apps/web/src/features/sessions/Sidebar.tsx': 1013,
   'apps/web/src/features/workbench/ToolSidePanel.tsx': 746,
   'packages/client/src/agent-client.ts': 1223,
   'packages/engine/src/pi-engine.ts': 1239,
