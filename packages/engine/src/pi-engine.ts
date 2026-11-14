@@ -13,6 +13,7 @@ import { SkillsService } from "@openbuddy/services/skills/skills";
 import { McpService } from "@openbuddy/services/mcp/mcp";
 import type { Settings } from "@openbuddy/services/settings/settings";
 import { Permissions, type Emit } from "./permissions/permissions.js";
+import type { HostShell } from "@openbuddy/kernel";
 import { CheckpointStore } from "./checkpoints/store.js";
 import { validateThinkingLevel, type AgentMode, type PoolLimits, type PromptImages, type SessionRunStatus, type Slot, type ThinkingLevel } from "./types.js";
 import { PI_VERSION } from "./version.js";
@@ -57,6 +58,8 @@ export class PiEngine {
     openUrl: (url: string) => Promise<void>,
     /** @internal */ public extensionFactories: ExtensionFactory[] = [],
     readonly limits: PoolLimits = { maxLive: 6, maxRunning: 3, idleMs: 15 * 60_000 },
+    /** The host's `HostShell.trash` (desktop: Electron `shell.trashItem`), injected so the engine never imports electron (R2). */
+    private readonly hostTrash?: HostShell["trash"],
   ) {
     this.cwd = this.inbox = join(settings.dir, "inbox");
     this.permissions = new Permissions(settings, emit);
@@ -67,12 +70,11 @@ export class PiEngine {
     this.sessionDir = join(settings.dir, "sessions");
     this.checkpoints = new CheckpointStore(join(settings.dir, "checkpoints"), (path) => this.trash(path));
   }
-  /** Move a file to the OS trash; outside Electron (tests) into `<dir>/trash`. */
+  /** Move a file to the OS trash via the host; without a host trash (tests), or if it fails, into `<dir>/trash`. */
   private async trash(path: string) {
     try {
-      const electron = (await import("electron")) as unknown as { shell?: { trashItem?: (p: string) => Promise<void> } };
-      if (typeof electron.shell?.trashItem === "function") return await electron.shell.trashItem(path);
-    } catch { /* not running inside Electron */ }
+      if (typeof this.hostTrash === "function") return await this.hostTrash(path);
+    } catch { /* the host could not trash it */ }
     const target = join(this.settings.dir, "trash", `${Date.now()}-${basename(path)}`);
     await mkdir(dirname(target), { recursive: true });
     await rename(path, target);

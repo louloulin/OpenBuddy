@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import type { Settings } from "@openbuddy/services/settings/settings";
-export type Emit = (event: string, payload: unknown) => void;
+import type { Emit } from "@openbuddy/kernel";
+// The event port moved to @openbuddy/kernel (20261115-md R2); re-exported for existing importers.
+export type { Emit };
 type Reason = "resolved" | "cancelled" | "timeout";
 type Decision = { allow: boolean; note?: string };
 /** Commands / tools that delete files: the approval card asks harder (20261115-ui §5.4). */

@@ -10,6 +10,7 @@ import { confirmQuit, external } from './window.js';
 import { isEvent } from '@openbuddy/protocol/contract';
 import { WorkspaceAccess } from '@openbuddy/host/security/workspace-access';
 import { createEngineHandlers } from '@openbuddy/host';
+import type { HostShell } from '@openbuddy/kernel';
 import { NATIVE_COMMANDS, DESKTOP_EVENTS } from '../native/index.js';
 import { PREVIEW_SCHEME, previewResponse } from '@openbuddy/services/preview/preview';
 
@@ -41,7 +42,9 @@ async function createWindow(): Promise<void> {
   win.webContents.on('did-fail-load', (_event, code, description) => { console.error('RENDERER_LOAD_FAILED', code, description); });
   let notificationsEnabled = () => true;
   const notify = notifier(win, () => notificationsEnabled());
-  const engine = await createEngineHandlers({ userData: app.getPath('userData'), safeStorage, shell, platform: { kind: 'desktop', commands: NATIVE_COMMANDS, events: DESKTOP_EVENTS }, emit: (event: string, payload: unknown) => { if (isEvent(event) && !win.isDestroyed()) { win.webContents.send(event, payload); notify(event, payload); } } });
+  // The HostShell port (@openbuddy/kernel) is Electron's shell; trash is injected so the engine never imports electron (R2).
+  const hostShell: HostShell = { openPath: path => shell.openPath(path), openExternal: url => shell.openExternal(url), showItemInFolder: path => shell.showItemInFolder(path), trash: path => shell.trashItem(path) };
+  const engine = await createEngineHandlers({ userData: app.getPath('userData'), safeStorage, shell: hostShell, platform: { kind: 'desktop', commands: NATIVE_COMMANDS, events: DESKTOP_EVENTS }, emit: (event: string, payload: unknown) => { if (isEvent(event) && !win.isDestroyed()) { win.webContents.send(event, payload); notify(event, payload); } } });
   previewRoots = engine.previewRoots;
   notificationsEnabled = engine.notificationsEnabled;
   cleanup = undefined;

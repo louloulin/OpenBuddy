@@ -33,6 +33,7 @@ Pi 在主进程运行。配置和会话位于 Electron `userData/pi/`，默认�
 apps/desktop      Electron 宿主：main/、preload/、ipc/register.ts、scripts/（构建、开发、界面检查）
 apps/web          React 渲染层：src/app（外壳、命令面板、路由）、src/features/*、src/shared/*
 packages/protocol IPC 契约（命令、事件）与 DTO 类型
+packages/kernel   宿主实现的端口（事件、shell、密钥、时钟、日志）与参数校验（纯 TS）
 packages/services 配置、模型提供商、MCP、技能、文件、预览（Node）
 packages/engine   Pi 会话引擎、权限、扩展 UI 桥、检查点、产物（Node）
 packages/host     IPC 命令处理与文件/工作区访问校验（Node）

@@ -17,11 +17,9 @@ import {
   sep,
 } from "node:path";
 import { text } from "../settings/settings.js";
-export interface DesktopShell {
-  openPath(path: string): Promise<string>;
-  openExternal(url: string): Promise<void>;
-  showItemInFolder(path: string): void;
-}
+import type { HostShell } from "@openbuddy/kernel";
+/** The host shell port, moved to @openbuddy/kernel as `HostShell` (20261115-md R2); the old name stays an alias. */
+export type DesktopShell = HostShell;
 function pathOf(p: Record<string, unknown>) {
   return resolve(
     typeof p.cwd === "string" ? p.cwd : process.cwd(),
