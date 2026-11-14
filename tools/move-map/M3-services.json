@@ -1,0 +1,6 @@
+{ "step": "M3", "moves": [
+  { "from": "electron/services/", "to": "packages/services/src/" },
+  { "from": "electron/agent/__tests__/providers.test.ts", "to": "packages/services/src/__tests__/providers.test.ts" },
+  { "from": "electron/agent/__tests__/services.test.ts", "to": "packages/services/src/__tests__/services.test.ts" },
+  { "from": "electron/agent/__tests__/mcp-oauth.test.ts", "to": "packages/services/src/__tests__/mcp-oauth.test.ts" }
+] }
