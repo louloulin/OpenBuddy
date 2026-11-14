@@ -1,5 +1,6 @@
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import type { EngineContext } from "../engine-context.js";
+import { todoBuiltin } from "./todo.js";
 
 /**
  * Built-in extension channel (20261116-pii §5, W0.5): trusted, app-provided Pi extensions such as
@@ -30,6 +31,8 @@ export interface BuiltinExtension {
 
 /** Each built-in appends itself here (one file per built-in under `builtin/`). */
 export const BUILTIN_EXTENSIONS: BuiltinExtension[] = [];
+// W3.1 plan / todo (`ob_todo`).
+BUILTIN_EXTENSIONS.push(todoBuiltin);
 
 /** Factories for one session, in registration order, skipping the ones switched off. */
 export function builtinFactories(ctx: BuiltinContext, enabled: (id: string) => boolean = () => true): ExtensionFactory[] {

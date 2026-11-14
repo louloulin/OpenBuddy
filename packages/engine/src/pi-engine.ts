@@ -156,6 +156,8 @@ export class PiEngine {
       slot = await pending;
     }
     this.focus(id);
+    // A live session opened earlier announced its plan then; the renderer may have missed it.
+    pipeline.emitBranchPlan(this, slot);
     return this.snapshot(id);
   }
   /** Everything the renderer needs to rebuild a transcript without replaying events. */
