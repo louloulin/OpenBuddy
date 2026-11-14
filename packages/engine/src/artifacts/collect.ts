@@ -1,6 +1,6 @@
 import { stat } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
-import type { CheckpointRecord } from "./checkpoints.js";
+import type { CheckpointRecord } from "../checkpoints/store.js";
 
 /**
  * 产物 (20261115-ui §5.5): files the agent created or modified in a session —

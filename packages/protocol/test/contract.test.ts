@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { isCommand, isEvent, validatePayload } from './contract.js';
+import { isCommand, isEvent, validatePayload } from '../src/contract.js';
 
 describe('IPC boundary contract', () => {
   it('rejects commands and events outside the finite capabilities', () => {

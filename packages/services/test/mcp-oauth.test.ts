@@ -4,9 +4,9 @@ import { createServer } from "node:http";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createSettings } from "../settings.js";
-import { McpAuthService } from "../mcp-auth.js";
-import { createEngineHandlers } from "@openbuddy/host/handlers/agent";
+import { createSettings } from "../src/settings/settings.js";
+import { McpAuthService } from "../src/mcp/mcp-auth.js";
+import { createEngineHandlers } from "@openbuddy/host/handlers";
 const cleanup: Array<() => Promise<unknown>> = [];
 afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn();

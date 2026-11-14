@@ -25,7 +25,7 @@
     "test:electron-ui": "node apps/desktop/scripts/electron-ui-check.mjs",
     "git:push": "bash scripts/git-push.sh",
     "git:push:tags": "bash scripts/git-push.sh --tags",
-    "typecheck:electron": "tsc --noEmit -p tsconfig.electron.json",
+    "typecheck:electron": "tsc --noEmit -p apps/desktop/tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm typecheck:electron",
     "check:boundaries": "node tools/check-boundaries.mjs --check",
     "verify:e2e": "node tools/verify/e2e-shots.mjs"

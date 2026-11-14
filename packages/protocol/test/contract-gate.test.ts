@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { COMMANDS, EVENTS, validateCommandPayload } from "./contract";
+import { COMMANDS, EVENTS, validateCommandPayload } from "../src/contract";
 
 const ROOT = join(import.meta.dirname, "..", "..", "..");
 function sources(dir: string, out: string[] = []): string[] {

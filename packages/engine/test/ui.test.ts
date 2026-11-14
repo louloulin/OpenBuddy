@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { expect, it } from "vitest";
-import { ExtensionUiBridge } from "../ui.js";
+import { ExtensionUiBridge } from "../src/extension-ui/bridge.js";
 it("validates typed select/input/confirm responses with matching session identity", async () => {
   const events: Array<{ name: string; value: any }> = [];
   const bridge = new ExtensionUiBridge((name, value) =>

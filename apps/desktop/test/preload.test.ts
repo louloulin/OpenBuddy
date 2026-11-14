@@ -6,7 +6,7 @@ async function bridge() {
   const calls: unknown[][] = [];
   let api: any, authorize: (() => void) | undefined;
   const genuine = { nativeFile: true };
-  const code = (await readFile('apps/desktop/src/preload.cjs', 'utf8')).replace('/* COMMANDS */ []', '["agent_send"]');
+  const code = (await readFile('apps/desktop/src/preload/preload.cjs', 'utf8')).replace('/* COMMANDS */ []', '["agent_send"]');
   vm.runInNewContext(code, { require: () => ({
     contextBridge: { exposeInMainWorld: (_name: string, value: unknown) => { api = value; } },
     ipcRenderer: { invoke: (...args: unknown[]) => { calls.push(args); return args[0] === 'openbuddy:grant-file' ? new Promise<void>(resolve => { authorize = resolve; }) : Promise.resolve('sent'); } },

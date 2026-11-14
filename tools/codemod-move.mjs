@@ -111,9 +111,11 @@ const after = before.map(mapPath);
 const afterSet = new Set(after);
 const resolverAfter = makeResolver(afterSet);
 const pkgOf = p => p.match(/^packages\/([^/]+)\/src\//)?.[1];
+// An importer under packages/<pkg>/test/ belongs to <pkg>: its imports of <pkg>/src stay relative.
+const importerPkgOf = p => p.match(/^packages\/([^/]+)\/(?:src|test)\//)?.[1];
 
 function makeSpec(fromNew, targetNew, oldSpec, oldTarget) {
-  const tPkg = pkgOf(targetNew), fPkg = pkgOf(fromNew);
+  const tPkg = pkgOf(targetNew), fPkg = importerPkgOf(fromNew);
   const codeExt = /\.(tsx?|mts|cts)$/;
   if (tPkg && tPkg !== fPkg && CODE.test(targetNew)) {
     const sub = targetNew.slice(`packages/${tPkg}/src/`.length).replace(codeExt, '').replace(/\.(mjs|cjs|js)$/, m => m);

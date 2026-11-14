@@ -3,11 +3,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { registerIpc } from './ipc/register.js';
+import { registerIpc } from '../ipc/register.js';
 import { isEvent } from '@openbuddy/protocol/contract';
 import { WorkspaceAccess } from '@openbuddy/host/security/workspace-access';
-import { createEngineHandlers } from '@openbuddy/host/handlers/index';
-import { PREVIEW_SCHEME, previewResponse } from '@openbuddy/services/preview-protocol';
+import { createEngineHandlers } from '@openbuddy/host';
+import { PREVIEW_SCHEME, previewResponse } from '@openbuddy/services/preview/preview';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const developmentURL = 'http://127.0.0.1:1420/';

@@ -1,0 +1,27 @@
+{ "step": "M12-backend", "moves": [
+  { "from": "packages/protocol/src/contract.test.ts", "to": "packages/protocol/test/contract.test.ts" },
+  { "from": "packages/protocol/src/contract-gate.test.ts", "to": "packages/protocol/test/contract-gate.test.ts" },
+  { "from": "packages/services/src/settings.ts", "to": "packages/services/src/settings/settings.ts" },
+  { "from": "packages/services/src/providers.ts", "to": "packages/services/src/providers/providers.ts" },
+  { "from": "packages/services/src/mcp.ts", "to": "packages/services/src/mcp/mcp.ts" },
+  { "from": "packages/services/src/mcp-auth.ts", "to": "packages/services/src/mcp/mcp-auth.ts" },
+  { "from": "packages/services/src/skills.ts", "to": "packages/services/src/skills/skills.ts" },
+  { "from": "packages/services/src/files.ts", "to": "packages/services/src/files/files.ts" },
+  { "from": "packages/services/src/preview-protocol.ts", "to": "packages/services/src/preview/preview.ts" },
+  { "from": "packages/services/src/__tests__/", "to": "packages/services/test/" },
+  { "from": "packages/engine/src/pi.ts", "to": "packages/engine/src/pi-engine.ts" },
+  { "from": "packages/engine/src/permissions.ts", "to": "packages/engine/src/permissions/permissions.ts" },
+  { "from": "packages/engine/src/ui.ts", "to": "packages/engine/src/extension-ui/bridge.ts" },
+  { "from": "packages/engine/src/checkpoints.ts", "to": "packages/engine/src/checkpoints/store.ts" },
+  { "from": "packages/engine/src/artifacts.ts", "to": "packages/engine/src/artifacts/collect.ts" },
+  { "from": "packages/engine/src/__tests__/", "to": "packages/engine/test/" },
+  { "from": "packages/host/src/handlers/agent.ts", "to": "packages/host/src/handlers.ts" },
+  { "from": "packages/host/src/handlers/index.ts", "to": "packages/host/src/index.ts" },
+  { "from": "apps/desktop/src/main.ts", "to": "apps/desktop/src/main/index.ts" },
+  { "from": "apps/desktop/src/preload.cjs", "to": "apps/desktop/src/preload/preload.cjs" },
+  { "from": "apps/desktop/src/preload.test.ts", "to": "apps/desktop/test/preload.test.ts" }
+],
+  "manual": [
+    { "from": "tsconfig.electron.json", "to": "apps/desktop/tsconfig.json", "note": "not a scanned source file: git mv by hand, relative paths fixed" }
+  ]
+}

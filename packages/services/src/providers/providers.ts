@@ -1,6 +1,6 @@
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { join } from "node:path";
-import { JsonStore, object, text, type Settings } from "./settings.js";
+import { JsonStore, object, text, type Settings } from "../settings/settings.js";
 
 interface Provider {
   id: string;

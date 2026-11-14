@@ -5,12 +5,12 @@ import {
   text,
   unsupported,
   type SafeStorage,
-} from "@openbuddy/services/settings";
-import { fileHandlers, type DesktopShell } from "@openbuddy/services/files";
-import { PiEngine, validateThinkingLevel } from "@openbuddy/engine/pi";
-import { modelKey } from "@openbuddy/services/providers";
+} from "@openbuddy/services/settings/settings";
+import { fileHandlers, type DesktopShell } from "@openbuddy/services/files/files";
+import { PiEngine, validateThinkingLevel } from "@openbuddy/engine/pi-engine";
+import { modelKey } from "@openbuddy/services/providers/providers";
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
-import type { Emit } from "@openbuddy/engine/permissions";
+import type { Emit } from "@openbuddy/engine/permissions/permissions";
 /** A list of non-empty strings (queued prompts). */
 function strings(value: unknown): string[] {
   if (!Array.isArray(value) || value.some((v) => typeof v !== "string" || !v.trim())) throw Error("invalid_payload: list");
