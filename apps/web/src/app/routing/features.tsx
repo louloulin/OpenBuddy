@@ -1,6 +1,6 @@
 import { Bot, Brain, Cpu, HardDrive, HelpCircle, Keyboard, Mail, Palette, Settings2, Shield, SlidersHorizontal, User } from "lucide-react";
 import {
-  LibraryIcon, MoreMenuImaKnowledgeIcon, MoreMenuInspirationIcon, MyFilesIconV2,
+  LibraryIcon, MoreMenuImaKnowledgeIcon, MoreMenuInspirationIcon, MoreMenuTencentDocsIcon, MoreMenuTencentLexiangIcon, MyFilesIconV2,
   WbAssistantNavIcon, WbAutomationNavIcon, WbExpertNavIcon, WbProjectNavIcon,
 } from "@openbuddy/ui/icon/icons/index";
 import type { AgentEntry } from "@openbuddy/protocol/dto";
@@ -105,6 +105,20 @@ export const FEATURES: FeatureEntry<FeatureRouteProps>[] = [
     nav: { label: "我的文件", slot: "more", order: 10, icon: MyFilesIconV2 },
     route: { view: "我的文件", render: (p) => <MyFilesPanel cwd={p.cwd} onToast={p.onToast} /> },
     requires: ["list_dir", "open_path"],
+  },
+  // The old 更多 menu's two toast-only enterprise items (W0.3: no entry may only show a toast). Kept
+  // declared, never rendered (plan D8: disabled, not deleted).
+  {
+    id: "tencent-docs",
+    nav: { label: "腾讯文档", slot: "more", order: 15, icon: MoreMenuTencentDocsIcon },
+    requires: [],
+    offline: "企业版功能，需腾讯内网环境；以前点击只弹 toast",
+  },
+  {
+    id: "lexiang-kb",
+    nav: { label: "乐享知识库", slot: "more", order: 25, icon: MoreMenuTencentLexiangIcon },
+    requires: [],
+    offline: "企业版功能，需腾讯内网环境；以前点击只弹 toast",
   },
   {
     id: "knowledge-base",
