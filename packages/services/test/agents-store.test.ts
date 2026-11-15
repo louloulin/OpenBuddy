@@ -7,12 +7,14 @@ import { ExpertStore } from "../src/agents/store";
 import { parseExpertMarkdown, serializeExpert, slugify } from "../src/agents/expert-file";
 import { SEED_EXPERTS, EXPERT_CATEGORIES, EXPERT_SCENES } from "../src/agents/seeds";
 
+// macOS reports /var/folders/... while realpath resolves to /private/var/...: the
+// store canonicalizes roots, so the temp dir itself must already be canonical.
 const dirs: string[] = [];
 afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 function temp() {
-  const dir = mkdtempSync(join(tmpdir(), "openbuddy-experts-"));
+  const dir = mkdtempSync(join(realpathSync(tmpdir()), "openbuddy-experts-"));
   dirs.push(dir);
   return dir;
 }

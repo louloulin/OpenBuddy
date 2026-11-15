@@ -5,7 +5,7 @@
  * the binding survives a restart and forks, and clearing restores the session.
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
@@ -25,7 +25,9 @@ const shell = { openPath: async () => "", openExternal: async () => {}, showItem
 type Request = { model: string; messages: Array<{ role: string; content?: unknown }>; tools?: Array<{ function?: { name?: string } }>; reasoning_effort?: string };
 
 async function fixture() {
-  const root = await mkdtemp(join(tmpdir(), "openbuddy-persona-"));
+  // Canonical path: on macOS tmpdir() is under the /var symlink while the trust gate
+  // and the expert store compare realpath-resolved paths.
+  const root = await mkdtemp(join(await realpath(tmpdir()), "openbuddy-persona-"));
   cleanups.push(() => rm(root, { recursive: true, force: true }));
   const requests: Request[] = [];
   const server = createServer(async (req, res) => {
