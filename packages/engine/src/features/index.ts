@@ -5,3 +5,4 @@ export * from "./export.js";
 export * from "./fork.js";
 export * from "./mode.js";
 export * from "./rewind.js";
+export * from "./expert.js";

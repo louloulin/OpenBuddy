@@ -168,6 +168,7 @@ export class PiEngine {
       busy: slot.busy,
       status: this.runStatus(slot),
       queue: this.queueState(id),
+      expert: features.sessionExpert(this, id),
     };
   }
   /** @internal */ savedModel(item: SessionInfo) { return catalog.savedModel(this, item); }
