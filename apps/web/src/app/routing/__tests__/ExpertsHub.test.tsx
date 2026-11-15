@@ -32,7 +32,7 @@ describe("专家·技能·连接器 hub (pii W0.3 / U7.6)", () => {
     useCapabilitiesStore.getState().apply({ protocolVersion: 1, platform: "desktop", commands: COMMANDS.filter((c) => !/^(agents_|experts_)/.test(c)), events: [], features: [] });
     render(<ExpertsHub />);
     const tabs = screen.getAllByRole("tab").map((t) => t.textContent);
-    expect(tabs).toEqual(["技能", "连接器", "扩展"]);
+    expect(tabs).toEqual(["技能", "连接器", "我的指令", "扩展"]);
     expect(await screen.findByText("PDF 工具")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "连接器" }));
     expect(await screen.findByText("MCP 配置编辑器")).toBeInTheDocument();
@@ -44,7 +44,7 @@ describe("专家·技能·连接器 hub (pii W0.3 / U7.6)", () => {
   it("shows the 专家 tab once the host serves the experts commands", async () => {
     desktop(["agents_list", "experts_load"]);
     render(<ExpertsHub />);
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["专家", "技能", "连接器", "扩展"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["专家", "技能", "连接器", "我的指令", "扩展"]);
     expect(screen.getByRole("tab", { name: "专家" })).toHaveAttribute("aria-selected", "true");
   });
 

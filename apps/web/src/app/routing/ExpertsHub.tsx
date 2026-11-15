@@ -25,7 +25,7 @@ export function ExpertsHub({ cwd, sessionId, onGoHome, onToast }: { cwd?: string
       onGoHome={onGoHome}
       onToast={onToast}
       initialTab={initialTab}
-      available={{ experts: on("experts-catalog"), mine: on("experts-mine"), skillsCatalog: on("skills-catalog"), connectorsCatalog: on("connectors-catalog") }}
+      available={{ experts: on("experts-catalog"), mine: on("experts-mine"), skillsCatalog: on("skills-catalog"), connectorsCatalog: on("connectors-catalog"), prompts: on("prompts-manage") }}
       renderManagement={(kind, pills) => <AgentResourcesPanel key={kind} cwd={cwd} sessionId={sessionId} onToast={onToast} section={kind} header={pills} />}
     />
   );

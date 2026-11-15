@@ -10,6 +10,7 @@ export const CAPABILITY_FEATURES = [
   { id: "experts-catalog", requires: ["experts_load"] },
   { id: "skills-catalog", requires: ["skills_catalog_load"] },
   { id: "connectors-catalog", requires: ["connectors_load"] },
+  { id: "prompts-manage", requires: ["prompts_list"] },
   { id: "session-search", requires: ["session_search"] },
   { id: "plan-panel", requires: [], requiresEvents: ["agent://plan"] },
 ] as const satisfies readonly FeatureEntry[];

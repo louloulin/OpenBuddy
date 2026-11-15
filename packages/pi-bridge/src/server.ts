@@ -4,10 +4,14 @@
  * unchanged.
  *
  * Endpoints (all behind the gateway on the phone path; locally the loopback):
- *   POST /cmd/:command   validate → scope-check → host handler → JSON reply
+ *   POST /cmd/:command   validate → host handler → JSON reply
  *   GET  /events?since=  SSE stream of `agent://…` events, `id:` = seq
  *   GET  /capabilities   the host_capabilities answer for this surface
  *   GET  /health         readiness
+ *
+ * Every route answers both at the root and under `/api/…`: the gateway's HTTP
+ * tunnel forwards the phone's path verbatim (its upstream owns `/api/*`
+ * itself), so the bridge serves the same surface under both prefixes.
  *
  * Auth: local deployments use the shared bridge token the gateway's agent
  * injects as the upstream bearer (`localAccessToken` in agentCore); every
@@ -17,12 +21,12 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 
-import { isCommand, validateCommandPayload, type Payload } from '@openbuddy/protocol/validate'
+import { isCommand } from '@openbuddy/protocol/commands'
+import { validateCommandPayload, type Payload } from '@openbuddy/protocol/validate'
 import { EVENTS, isEvent, type EventName } from '@openbuddy/protocol/events'
 
-
 import { EventBuffer, type BridgeEvent } from './event-buffer.js'
-import { isAllowedCommand, scopeForCommand } from './scopes.js'
+import { isAllowedCommand } from './scopes.js'
 
 export type HostDispatcher = {
   /** Runs one host-module handler; same dispatch ipcMain.handle uses. */
@@ -49,17 +53,22 @@ export type BridgeServer = {
 
 export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeServerOptions): BridgeServer {
   const buffer = new EventBuffer()
-  const allowed = new Set(dispatcher.servedCommands().filter(isAllowedCommand))
+  // Only commands this desktop actually serves AND the mobile surface allows.
+  const allowed = new Set(
+    dispatcher.servedCommands().filter(command => isAllowedCommand(command) && isCommand(command)),
+  )
   const events = EVENTS.filter((event): event is EventName => isEvent(event))
+  /** Live subscribers of the SSE tail; each holds its own queue. */
+  const streams = new Set<(item: BridgeEvent) => void>()
 
   const authorized = (header: string | null): boolean =>
     options.noAuth || header === `Bearer ${options.token}`
 
   const app = new Hono()
 
-  app.get('/health', (c) => c.json({ ok: true, commands: allowed.size }))
+  app.on(['GET', 'POST'], ['/health', '/api/health'], (c) => c.json({ ok: true, commands: allowed.size }))
 
-  app.get('/capabilities', (c) => {
+  app.on('GET', ['/capabilities', '/api/capabilities'], (c) => {
     if (!authorized(c.req.header('authorization'))) {
       return c.json({ error: 'unauthorized' }, 401)
     }
@@ -70,12 +79,12 @@ export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeSe
     })
   })
 
-  app.post('/cmd/:command', async (c) => {
+  app.on('POST', ['/cmd/:command', '/api/cmd/:command'], async (c) => {
     if (!authorized(c.req.header('authorization'))) {
       return c.json({ error: 'unauthorized' }, 401)
     }
     const command = c.req.param('command')
-    if (!isCommand(command) || !isAllowedCommand(command) || !allowed.has(command)) {
+    if (!allowed.has(command)) {
       return c.json({ error: `not_implemented: ${String(command).slice(0, 128)}` }, 404)
     }
     let input: unknown
@@ -98,7 +107,7 @@ export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeSe
     }
   })
 
-  app.get('/events', (c) => {
+  app.on('GET', ['/events', '/api/events'], (c) => {
     if (!authorized(c.req.header('authorization'))) {
       return c.json({ error: 'unauthorized' }, 401)
     }
@@ -106,63 +115,56 @@ export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeSe
     const since = sinceParam !== undefined && sinceParam !== '' && /^\d+$/.test(sinceParam)
       ? Number(sinceParam)
       : 0
-    let replay: BridgeEvent[] | null = since > 0 ? buffer.since(since) : []
+    const replay = buffer.since(since)
     // A gap means the client is too far behind; replaying nothing would
     // silently skip turns, so the stream tells it to resync instead.
     const resync = replay === null
-    const unlisten = dispatcher.listen((event, payload) => {
-      buffer.push(event, payload)
-    })
 
     return streamSSE(c, async (stream) => {
-      let closed = false
-      const unsubscribe = dispatcher.listen((event, payload) => {
-        // Live events after the buffer write below are delivered via the
-        // SSE writer inside the loop; buffering first keeps one seq source.
-      })
-      void unsubscribe
-
       await stream.writeSSE({ event: 'hello', data: JSON.stringify({ head: buffer.head(), resync }) })
       if (resync) {
         await stream.writeSSE({ event: 'resync', data: JSON.stringify({ head: buffer.head() }) })
-        replay = []
       }
-      for (const item of replay ?? []) {
+      for (const item of resync ? [] : replay ?? []) {
         await stream.writeSSE({ id: String(item.seq), event: item.event, data: JSON.stringify(item.payload) })
       }
 
-      // Live tail: the dispatcher listener above cannot write to the stream
-      // directly (the stream does not exist yet when events fire), so the
-      // queue drains here until the client goes away.
-      const pending: BridgeEvent[] = []
-      const pushLive = (event: string, payload: unknown) => pending.push(buffer.push(event, payload))
-      const offLive = dispatcher.listen(pushLive)
-
+      // Live tail. The queue is the stream's own; the shared fan-out below
+      // hands each buffered event to every connected stream in order.
+      const queue: BridgeEvent[] = []
+      const deliver = (item: BridgeEvent): void => { queue.push(item) }
+      streams.add(deliver)
       try {
-        while (!closed) {
-          while (pending.length > 0) {
-            const item = pending.shift()!
+        while (true) {
+          while (queue.length > 0) {
+            const item = queue.shift()!
             await stream.writeSSE({ id: String(item.seq), event: item.event, data: JSON.stringify(item.payload) })
           }
           await stream.sleep(50)
-          if (c.req.raw.signal.aborted) closed = true
+          if (c.req.raw.signal.aborted) break
         }
-      } catch {
-        closed = true
       } finally {
-        offLive()
-        unlisten()
+        streams.delete(deliver)
       }
     })
+  })
+
+  // Every engine event lands in the buffer exactly once, then fans out to the
+  // connected SSE streams.
+  const offEngine = dispatcher.listen((event, payload) => {
+    const item = buffer.push(event, payload)
+    for (const deliver of streams) deliver(item)
   })
 
   return {
     app,
     emit: (event, payload) => {
-      buffer.push(event, payload)
+      const item = buffer.push(event, payload)
+      for (const deliver of streams) deliver(item)
     },
     close: () => {
-      // The Hono app owns no sockets here; the embedding process closes them.
+      offEngine()
+      streams.clear()
     },
   }
 }

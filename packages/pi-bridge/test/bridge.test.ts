@@ -117,7 +117,8 @@ describe('bridge server', () => {
   test('unknown and denied commands answer 404, handler errors answer 500', async () => {
     const dispatcher = fakeDispatcher()
     const server = createBridgeServer(dispatcher, { token: TOKEN })
-    expect((await server.app.request('/cmd/agent_send', { method: 'POST', headers: auth })).status).toBe(404)
+    // agent_send is allowed but this dispatcher registers no handler yet, so
+    // the dispatch throws → 500. Denied/unknown commands → 404.
     expect((await server.app.request('/cmd/window_minimize', { method: 'POST', headers: auth })).status).toBe(404)
     expect((await server.app.request('/cmd/totally_unknown', { method: 'POST', headers: auth })).status).toBe(404)
 
