@@ -413,7 +413,7 @@ function Shell() {
   };
 
   // 管理连接器 (composer): the 连接器 tab of 专家·技能·连接器 through the registry; no bypass (pii W0.2).
-  const openConnectors = featureView("专家·技能·连接器") ? () => { openHubAt("connectors"); handleNavigate("专家·技能·连接器"); } : undefined;
+  const openConnectors = featureView("专家·技能·连接器") ? (tab: "experts" | "connectors" = "connectors") => { openHubAt(tab); handleNavigate("专家·技能·连接器"); } : undefined;
   // Sidebar project node click → open the Projects panel with that project selected.
   const handleOpenProjectFromSidebar = (projectId: string) => {
     useProjectsStore.getState().setActiveProjectId(projectId);

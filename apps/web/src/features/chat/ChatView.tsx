@@ -73,7 +73,7 @@ export function ChatView({
   onToast?: (msg: string) => void;
   onSelectMode?: (modeId: HomeModeId) => void;
   onSelectExpert?: (agent: AgentEntry) => void;
-  onNavigateConnectors?: () => void;
+  onNavigateConnectors?: (tab?: "experts" | "connectors") => void;
 }) {
   const toast = useStableCallback((msg: string) => onToast?.(msg));
   const messages = useSessionStore((s) => s.messages);

@@ -15,7 +15,7 @@ interface InputAddMenuProps {
   onSelectMode?: (modeId: HomeModeId) => void;
   onSelectExpert?: (agent: AgentEntry) => void;
   onSelectSkill?: (skillName: string) => void;
-  onNavigateConnectors?: () => void;
+  onNavigateConnectors?: (tab?: "experts" | "connectors") => void;
 }
 
 type MenuItemId = "add-files" | "mode" | "experts" | "skills" | "connectors";
@@ -149,7 +149,11 @@ export function InputAddMenu({
 
   const handleSelectConnector = () => {
     close();
-    onNavigateConnectors?.();
+    onNavigateConnectors?.("connectors");
+  };
+  const handleOpenExpertCenter = () => {
+    close();
+    onNavigateConnectors?.("experts");
   };
 
   const renderSubmenu = () => {
@@ -190,7 +194,7 @@ export function InputAddMenu({
       ) : (
         <div className="iam-sub-empty">暂无专家</div>
       )}
-      <div className="iam-sub-footer" onClick={handleSelectConnector}>专家中心 →</div></>);
+      <div className="iam-sub-footer" onClick={handleOpenExpertCenter}>专家中心 →</div></>);
     }
 
     if (hoveredItem === "skills") {

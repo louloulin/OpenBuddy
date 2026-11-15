@@ -346,7 +346,8 @@ try {
     await more.hover();
     await page.locator('.sidebar__more-popover').waitFor({ timeout: 5000 });
     const moreItems = await page.locator('.sidebar__more-popover [role=menuitem]').allTextContents();
-    if (moreItems.some(t => ['策略设置', '灵感', '云存储'].includes(t.trim()))) throw new Error('offline entry offered: ' + moreItems.join(','));
+    // 策略设置 stays until W6 folds it into the security centre (it says it is a local preview); these are offline.
+    if (moreItems.some(t => ['灵感', '云存储'].includes(t.trim()))) throw new Error('offline entry offered: ' + moreItems.join(','));
     await ctx.sleep(400);
     const shot = await ctx.shot('22-sidebar-registry');
     await page.mouse.move(900, 500);

@@ -142,7 +142,7 @@ export function Composer({
   /** 加号菜单:选择技能(插入 /skillName)。 */
   onSelectSkill?: (skillName: string) => void;
   /** 加号菜单:跳转到连接器管理面板。 */
-  onNavigateConnectors?: () => void;
+  onNavigateConnectors?: (tab?: "experts" | "connectors") => void;
   /** 流式时把「发送」改为「加入待发送队列」(对齐 WorkBuddy message-queue)。 */
   onEnqueue?: (text: string, attachments?: { path: string }[], mode?: "steer" | "followUp") => void | Promise<void>;
   /** Name of the expert currently bound to this session (shown as badge in footer). */

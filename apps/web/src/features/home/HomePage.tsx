@@ -72,7 +72,7 @@ export function HomePage({
   onSelectWorkspace?: (cwd: string) => void;
   onSelectMode?: (modeId: HomeModeId) => void;
   onSelectExpert?: (agent: AgentEntry) => void;
-  onNavigateConnectors?: () => void;
+  onNavigateConnectors?: (tab?: "experts" | "connectors") => void;
 }) {
   const [modeId, setModeId] = useState<HomeModeId>("working");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
