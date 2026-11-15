@@ -21,7 +21,7 @@ export async function runBash(engine: EngineContext, id: string, command: string
   const session = slot.session;
   const idle = () => {
     if (slot.busy || session.isStreaming) throw protocolError("session_busy", "会话忙碌：回复完成后再运行命令");
-    if (session.isBashRunning) throw protocolError("bash_running", "上一条命令还在运行");
+    if (session.isBashRunning || slot.userBash) throw protocolError("bash_running", "上一条命令还在运行");
   };
   idle();
   const runId = randomUUID();
@@ -50,6 +50,8 @@ export async function runBash(engine: EngineContext, id: string, command: string
     flush();
     engine.emitEvent(slot, { type: "bash_execution_end", id: runId, command, exitCode: result.exitCode, cancelled: result.cancelled, truncated: result.truncated, output: tail(result.output), excludeFromContext, ...(result.fullOutputPath ? { fullOutputPath: result.fullOutputPath } : {}) });
   };
+  // Until it ends the slot is not evicted and reloads wait (session-pool.ts).
+  slot.userBash = true;
   slot.lastActive = Date.now();
   session.extensionRunner.setUIContext(engine.ui.context(id), "rpc");
   try {
@@ -69,6 +71,10 @@ export async function runBash(engine: EngineContext, id: string, command: string
     throw error;
   } finally {
     if (timer) clearTimeout(timer);
+    slot.userBash = false;
+    slot.lastActive = Date.now();
+    // A reload requested while the command ran (e.g. a built-in switched off) applies now.
+    if (slot.stale && !slot.busy && engine.slots.get(id) === slot) void engine.rebuild(slot).catch(() => {});
   }
 }
 

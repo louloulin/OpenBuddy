@@ -40,6 +40,8 @@ export interface Slot {
   lastActive: number;
   finalError?: string;
   failed: boolean;
+  /** A `!command` is running (W1.2): the slot is never evicted and a reload waits until it ends. */
+  userBash?: boolean;
 }
 
 export interface PoolLimits {

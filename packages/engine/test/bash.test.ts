@@ -1,8 +1,9 @@
 // @vitest-environment node
 // 20261116-pii W1.2: `!command` / `!!command` through the real AgentSession.executeBash.
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { PiEngine } from "@openbuddy/engine/pi-engine";
 import { sdkFixture, until, requestText } from "./helpers/sdk-fixture";
 
 const cleanups: Array<() => Promise<unknown>> = [];
@@ -58,6 +59,55 @@ describe("agent_bash (W1.2)", () => {
     await until(() => bashEvents(f.events).filter((e) => e.type === "bash_execution_start").length === 2);
     await f.call("agent_cancel", { sessionId: f.sid });
     expect((await second).cancelled).toBe(true);
+  });
+
+  it("a reload requested while a command runs (toggling a built-in) waits for it, then applies", async () => {
+    const f = await sdkFixture(() => ({ text: "ok" }), cleanups);
+    const toolCount = async () => ((await f.call("agent_session_info", { sessionId: f.sid })) as any).context.toolDefinitionsCount as number;
+    const before = await toolCount();
+    const run = f.call("agent_bash", { sessionId: f.sid, command: "echo begin; sleep 1; echo finished-marker" }) as Promise<any>;
+    await until(() => bashEvents(f.events).some((e) => e.type === "bash_execution_update" && e.delta.includes("begin")));
+    await f.call("settings_agent_set", { patch: { builtins: { todo: false } } });
+    const result = await run;
+    expect(result).toMatchObject({ cancelled: false, exitCode: 0 });
+    expect(result.output).toContain("finished-marker");
+    // The deferred rebuild follows the command: ob_todo is gone, the command stays in the history.
+    let after = before;
+    for (const end = Date.now() + 10000; after === before && Date.now() < end; await new Promise((r) => setTimeout(r, 20)))
+      after = await toolCount().catch(() => before);
+    expect(after).toBe(before - 1);
+    const snapshot = (await f.call("agent_load_session", { sessionId: f.sid, cwd: f.root })) as any;
+    expect(snapshot.messages.filter((m: any) => m.role === "bashExecution").map((m: any) => m.output)).toEqual([expect.stringContaining("finished-marker")]);
+  });
+
+  it("a session running a command is never evicted (idle sweep, live-session overflow) and counts as active when it ends", async () => {
+    let engine: PiEngine | undefined;
+    const initialize = PiEngine.prototype.initialize;
+    const spy = vi.spyOn(PiEngine.prototype, "initialize").mockImplementation(function (this: PiEngine) {
+      engine = this;
+      return initialize.call(this);
+    });
+    const f = await sdkFixture(() => ({ text: "ok" }), cleanups);
+    spy.mockRestore();
+    const limits = engine!.limits as { maxLive: number; idleMs: number };
+    limits.idleMs = 500;
+    const run = f.call("agent_bash", { sessionId: f.sid, command: "echo begin; sleep 1; echo finished-marker" }) as Promise<any>;
+    await until(() => bashEvents(f.events).some((e) => e.type === "bash_execution_update" && e.delta.includes("begin")));
+    // Another task takes the focus: the command's task is an unfocused, long-idle candidate now.
+    await f.call("agent_new_session", { cwd: f.root, modelId: "fixture" });
+    await engine!.evictIdle(Date.now() + 60 * 60_000);
+    expect(engine!.has(f.sid)).toBe(true);
+    limits.maxLive = 1;
+    await f.call("agent_new_session", { cwd: f.root, modelId: "fixture" });
+    expect(engine!.has(f.sid)).toBe(true);
+    const result = await run;
+    expect(result).toMatchObject({ cancelled: false, exitCode: 0 });
+    expect(result.output).toContain("finished-marker");
+    // Last active when the command ended (not when it started), so the next sweep keeps it; later it goes.
+    await engine!.evictIdle(Date.now());
+    expect(engine!.has(f.sid)).toBe(true);
+    await engine!.evictIdle(Date.now() + 1000);
+    expect(engine!.has(f.sid)).toBe(false);
   });
 
   it("`rm -rf` waits for the strong confirmation, whatever the permission mode; deny rules apply", async () => {

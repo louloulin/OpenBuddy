@@ -196,10 +196,12 @@ export async function shutdown(engine: EngineContext) {
   engine.permissions.cancel();
   for (const id of [...engine.slots.keys()]) await engine.close(id);
 }
+/** Running a turn, or a `!command` (W1.2): such a slot is never evicted, and its rebuild waits. */
+const occupied = (slot: Slot) => slot.busy || slot.userBash === true;
 /** Close idle sessions over the live limit (least recently used first). */
 export async function evictOverflow(engine: EngineContext, keep: string) {
   const candidates = [...engine.slots.values()]
-    .filter((s) => s.id !== keep && s.id !== engine.focusedId && !s.busy && !engine.permissions.hasPending(s.id) && !engine.ui.hasPending(s.id))
+    .filter((s) => s.id !== keep && s.id !== engine.focusedId && !occupied(s) && !engine.permissions.hasPending(s.id) && !engine.ui.hasPending(s.id))
     .sort((a, b) => a.lastActive - b.lastActive);
   while (engine.slots.size > engine.limits.maxLive && candidates.length)
     await engine.close(candidates.shift()!.id);
@@ -208,14 +210,14 @@ export async function evictIdle(engine: EngineContext, now = Date.now()) {
   for (const slot of [...engine.slots.values()])
     if (
       slot.id !== engine.focusedId &&
-      !slot.busy &&
+      !occupied(slot) &&
       !engine.permissions.hasPending(slot.id) &&
       !engine.ui.hasPending(slot.id) &&
       now - slot.lastActive > engine.limits.idleMs
     )
       await engine.close(slot.id);
 }
-/** Rebuild live sessions after a configuration change; busy ones rebuild when settled. */
+/** Rebuild live sessions after a configuration change; busy ones (or ones running a `!command`) rebuild when settled. */
 export async function reload(engine: EngineContext, filter: (slot: Slot) => boolean = () => true) {
   let failure: unknown;
   // Reopen sessions an earlier failed rebuild dropped (the config may have been rolled back since).
@@ -230,7 +232,7 @@ export async function reload(engine: EngineContext, filter: (slot: Slot) => bool
     }
   }
   for (const slot of [...engine.slots.values()].filter(filter)) {
-    if (slot.busy) {
+    if (occupied(slot)) {
       slot.stale = true;
       continue;
     }
@@ -244,6 +246,11 @@ export async function reload(engine: EngineContext, filter: (slot: Slot) => bool
 }
 export async function rebuild(engine: EngineContext, slot: Slot) {
   if (engine.slots.get(slot.id) !== slot) return;
+  // Closing would abort the turn or the `!command`; whichever ends last rebuilds.
+  if (occupied(slot)) {
+    slot.stale = true;
+    return;
+  }
   const focused = engine.focusedId === slot.id;
   const file = slot.session.sessionManager.getSessionFile();
   const manager =
