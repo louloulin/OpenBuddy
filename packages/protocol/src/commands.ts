@@ -35,6 +35,9 @@ export const COMMANDS = [
   'experts_thumbnail', 'experts_image_bytes', 'experts_link_agents',
   // 记忆 (20261116-pii W5.1–W5.3): the memory host module.
   'memory_list', 'memory_get', 'memory_save', 'memory_delete', 'memory_rewrite',
+  // 技能目录 + 我的指令 (20261116-pii W2.7): the skills host module.
+  'skills_catalog_default_root', 'skills_catalog_list_roots', 'skills_catalog_load', 'skills_catalog_read_skill',
+  'prompts_list', 'prompts_get', 'prompts_save', 'prompts_delete',
 ] as const;
 export type CommandName = typeof COMMANDS[number];
 export const isCommand = (value: unknown): value is CommandName => typeof value === 'string' && (COMMANDS as readonly string[]).includes(value);

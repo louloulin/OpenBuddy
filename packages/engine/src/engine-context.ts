@@ -7,6 +7,8 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import type { McpService } from "@openbuddy/services/mcp/mcp";
 import type { MemoryService } from "@openbuddy/services/memory/memory";
+import type { SkillCatalogService } from "@openbuddy/services/skills/catalog";
+import type { PromptsService } from "@openbuddy/services/prompts/prompts";
 import type { Providers } from "@openbuddy/services/providers/providers";
 import type { Settings } from "@openbuddy/services/settings/settings";
 import type { SkillsService } from "@openbuddy/services/skills/skills";
@@ -34,6 +36,8 @@ export interface EngineContext {
   readonly skills: SkillsService;
   readonly mcp: McpService;
   readonly memory: MemoryService;
+  readonly skillCatalog: SkillCatalogService;
+  readonly prompts: PromptsService;
   readonly checkpoints: CheckpointStore;
   extensionFactories: ExtensionFactory[];
   modes: Map<string, AgentMode>;

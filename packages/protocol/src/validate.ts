@@ -113,7 +113,40 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   }
   if (/^(agents_(list|get|save|delete|template)|experts_[a-z_]+|agent_(set|clear)_session_expert)$/.test(command)) expertPayload(command, payload);
   if (command.startsWith('memory_')) memoryPayload(command, payload);
+  if (command.startsWith('skills_catalog_')) skillsCatalogPayload(command, payload);
+  if (command.startsWith('prompts_')) promptsPayload(command, payload);
   return payload;
+}
+
+/** 技能目录 (W2.7): roots and dirs are absolute paths picked through the native dialog. */
+function skillsCatalogPayload(command: CommandName, payload: Payload) {
+  if (command === 'skills_catalog_default_root') return;
+  const key = command === 'skills_catalog_list_roots' ? 'root' : command === 'skills_catalog_read_skill' ? 'dir' : 'root';
+  const value = payload[key];
+  if (command === 'skills_catalog_load' && (value === undefined || value === null)) return;
+  if (typeof value !== 'string' || !value || value.length > 4096 || value.includes('\0')) throw new Error(`invalid_payload: ${key}`);
+  if (command === 'skills_catalog_load' && payload.builtinRoot !== undefined && payload.builtinRoot !== null) {
+    if (typeof payload.builtinRoot !== 'string' || payload.builtinRoot.length > 4096 || payload.builtinRoot.includes('\0')) throw new Error('invalid_payload: builtinRoot');
+  }
+}
+
+/** 我的指令 (W2.7 / S8): template names are file stems, content is bounded. */
+function promptsPayload(command: CommandName, payload: Payload) {
+  if (command === 'prompts_list') {
+    if (payload.cwd !== undefined && payload.cwd !== null && (typeof payload.cwd !== 'string' || !payload.cwd || payload.cwd.length > 4096 || payload.cwd.includes('\0'))) throw new Error('invalid_payload: cwd');
+    return;
+  }
+  if (payload.scope !== undefined && payload.scope !== null && payload.scope !== 'global' && payload.scope !== 'workspace') throw new Error('invalid_payload: scope');
+  if (payload.cwd !== undefined && payload.cwd !== null && (typeof payload.cwd !== 'string' || !payload.cwd || payload.cwd.length > 4096 || payload.cwd.includes('\0'))) throw new Error('invalid_payload: cwd');
+  const name = payload.name;
+  if (typeof name !== 'string' || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) throw new Error('invalid_payload: name');
+  if (command === 'prompts_save') {
+    if (typeof payload.content !== 'string' || !payload.content.trim() || payload.content.length > 512 * 1024) throw new Error('invalid_payload: content');
+    for (const key of ['description', 'argumentHint'] as const) {
+      const value = payload[key];
+      if (value !== undefined && value !== null && (typeof value !== 'string' || value.length > 200)) throw new Error(`invalid_payload: ${key}`);
+    }
+  }
 }
 
 /** Memory commands (20261116-pii W5.1–W5.3): a relative `.md` path inside one scope, bounded text. */

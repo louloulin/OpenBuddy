@@ -55,7 +55,17 @@ export async function open(
       ? (config.extensionPaths ?? [])
       : [],
     noContextFiles: !trusted,
+    // 我的指令 (pii W2.7 / S8): the loader's own scan is replaced by the PromptsService view, so
+    // the `/` menu sees exactly the global + trusted-project templates the settings panel edits.
+    // The override is synchronous (Pi calls it during reload), so read the files with node:fs.
     noPromptTemplates: true,
+    promptsOverride: () => ({
+      prompts: readPromptTemplatesSync([
+        { dir: join(engine.settings.dir, "prompts"), scope: "global" },
+        ...(trusted ? [{ dir: join(cwd, ".pi", "prompts"), scope: "workspace" as const }] : []),
+      ]),
+      diagnostics: [],
+    }),
     noThemes: true,
     noSkills: true,
     skillsOverride: () => ({

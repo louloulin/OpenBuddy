@@ -43,7 +43,6 @@ const PENDING_COMMANDS = [
   "inspiration_generate", "internal_reload", "marketplace_action", "marketplace_list",
   "memory_flush",
   "plugins_action", "plugins_list", "prompt_history", "session_fork",
-  "skills_catalog_default_root", "skills_catalog_list_roots", "skills_catalog_load", "skills_catalog_read_skill",
   "subagents_config_get", "subagents_config_save", "toggle_plan_mode", "web_search_config_get", "web_search_config_save",
 ];
 /** Events the renderer subscribes to that the main process does not emit yet (CLI connector auth, Phase 5). */
@@ -81,7 +80,7 @@ describe("IPC contract gate", () => {
     expect(PENDING_COMMANDS.filter((name) => commands.has(name))).toEqual([]);
     const used = rendererCommands();
     expect(PENDING_COMMANDS.filter((name) => !used.has(name))).toEqual([]);
-    expect(PENDING_COMMANDS.length).toBeLessThanOrEqual(40); // 55 → 40 after pii W1.4 + W2.1–W2.3 (20261116-pii §7: target ≤ 20)
+    expect(PENDING_COMMANDS.length).toBeLessThanOrEqual(36); // 55 → 40 (W1.4 + W2.1–W2.3) → 36 (W5 记忆 + W2.7 技能目录) (20261116-pii §7: target ≤ 20)
     expect(PENDING_EVENTS.filter((name) => events.has(name))).toEqual([]);
   });
 
