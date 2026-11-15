@@ -2,7 +2,9 @@ import { SessionManager, type SessionInfo } from "@earendil-works/pi-coding-agen
 import { realpath, unlink } from "node:fs/promises";
 import { isAbsolute, relative, sep } from "node:path";
 import { modelKey } from "@openbuddy/services/providers/providers";
+import type { SessionSearchHit } from "@openbuddy/protocol/search";
 import type { EngineContext } from "./engine-context.js";
+import type { IndexedSession } from "./session-search.js";
 import { deriveTitle } from "./titles.js";
 import type { SessionRunStatus, Slot } from "./types.js";
 
@@ -128,6 +130,28 @@ export async function deleteSession(engine: EngineContext, id: string) {
   delete c.sessions[id];
   engine.settings.config.write(c);
   engine.invalidateList();
+}
+/**
+ * `session_search` (pii W1.4): every saved session whose title or messages contain all the
+ * terms. Text comes from `SessionManager.listAll()`; the index only re-reads changed files.
+ */
+export async function search(
+  engine: EngineContext,
+  query: string,
+  options: { cwd?: string; limit?: number } = {},
+): Promise<SessionSearchHit[]> {
+  const cwd = options.cwd ? await engine.validCwd(options.cwd) : undefined;
+  const meta = engine.settings.config.read().sessions;
+  const title = (s: IndexedSession) => meta[s.id]?.title ?? s.name ?? deriveTitle(s.firstMessage ?? "") ?? "新任务";
+  const results = await engine.searchIndex.search(query, { cwd, limit: options.limit, title });
+  return results.map(({ session, ...hit }) => ({
+    sessionId: session.id,
+    cwd: session.cwd,
+    title: title(session),
+    ...hit,
+    updatedAt: session.modified.toISOString(),
+    archived: meta[session.id]?.archived ?? false,
+  }));
 }
 function listStatus(status: SessionRunStatus) {
   return status === "running" ? "working" : status === "failed" ? "failed" : "completed";

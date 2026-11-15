@@ -695,6 +695,16 @@ body.bench-resizing iframe { pointer-events: none; }
 .palette__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .palette__meta { flex: none; font-size: 12px; }
 .palette__empty { padding: 14px 10px; color: var(--wb-text-weak); font-size: 13px; }
+/* pii W1.4: the 任务 / 内容 groups of Ctrl/Cmd+K; message-text hits with highlighted snippets. */
+.palette__group { padding: 10px 10px 4px; font-size: 12px; font-weight: 500; color: var(--wb-text-medium); }
+.palette__row--hit { align-items: flex-start; }
+.palette__row--hit .conversation-search-modal__item-title { font-size: 13px; color: var(--wb-text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette__row--hit .conversation-search-modal__item-snippet { font-size: 12px; max-height: 36px; color: var(--wb-text-medium); }
+.palette__row--hit .conversation-search-modal__item-cwd { display: flex; align-items: center; gap: 8px; font-family: inherit; font-size: 11px; color: var(--wb-text-medium); }
+.search-hit__mark { background: color-mix(in srgb, var(--wb-brand) 22%, transparent); color: var(--wb-text-strong); border-radius: 3px; padding: 0 1px; }
+.search-hit__tag { margin-left: 6px; padding: 0 6px; border-radius: 6px; font-size: 11px; font-weight: 400; background: var(--ob-hover); color: var(--wb-text-medium); }
+/* U3.5: in-chat find paints its matches with the CSS Custom Highlight API (find-highlight.ts). */
+::highlight(ob-find) { background-color: rgba(255, 196, 0, .42); }
 /* pii W0.3 / U7.6: the former 技能与 MCP page as tabs of 专家·技能·连接器. */
 .res-panel--embedded .res-panel { height: auto; overflow: visible; padding: 8px 0 24px; margin: 0; max-width: 920px; }
 

@@ -18,7 +18,7 @@ describe("host modules (20261115-md §5.3)", () => {
         owner.set(key, id);
       }
     expect(clashes).toEqual([]);
-    expect(owner.size).toBe(92);
+    expect(owner.size).toBe(93);
   });
 
   it("host_capabilities reports what the host serves plus what the embedding app serves", async () => {

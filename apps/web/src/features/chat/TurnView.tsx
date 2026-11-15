@@ -14,6 +14,8 @@ import { formatDuration } from "@openbuddy/chat-core/tool-summary";
 import { useSmoothText } from "@/features/chat/use-smooth-text";
 import { splitMarkdownBlocks } from "@openbuddy/markdown/markdown-blocks";
 import { useUiPrefs } from "@/app/state/ui-prefs-store";
+import { extractToolCallText } from "@openbuddy/chat-core/extract-text";
+import { selectFindFocus, useFindFocusStore } from "./state/find-focus-store";
 import { splitTurn, turnError, turnMarkdown, turnModel, turnTiming } from "@openbuddy/chat-core/turns";
 import { ErrorCard } from "./ErrorCard";
 import { FeedbackButtons } from "./FeedbackButtons";
@@ -65,8 +67,10 @@ function useThoughtDuration(key: string, live: boolean): number | undefined {
 }
 
 /** A thinking block: one line while folded; the live block previews its last line. */
-function ThoughtRow({ text, live, timingKey, markdownConfig }: { text: string; live: boolean; timingKey: string; markdownConfig?: MarkdownConfig }) {
+function ThoughtRow({ text, live, timingKey, markdownConfig, findHit }: { text: string; live: boolean; timingKey: string; markdownConfig?: MarkdownConfig; findHit?: boolean }) {
   const [open, setOpen] = useState(false);
+  // U3.5: the in-chat find's current hit is in this thinking block — unfold it.
+  useEffect(() => { if (findHit) setOpen(true); }, [findHit]);
   const { theme } = useTheme();
   const took = useThoughtDuration(timingKey, live);
   const preview = text.trim().split("\n").filter(Boolean).at(-1) ?? "";
@@ -146,6 +150,11 @@ function TurnViewInner(props: TurnViewProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const content = useMemo(() => splitTurn(messages), [messages]);
+  // U3.5: when the find bar's current hit lies in the folded steps, unfold them.
+  const findQuery = useFindFocusStore(useMemo(() => selectFindFocus(messages.map((m) => m.id)), [messages])).toLowerCase();
+  const stepHit = (part: (typeof content.process)[number]["part"]) => !!findQuery && (part.kind === "tool_call" ? extractToolCallText(part.toolCall) : part.text).toLowerCase().includes(findQuery);
+  const foldedHit = !!findQuery && content.process.some((item) => stepHit(item.part));
+  useEffect(() => { if (foldedHit) setExpanded(true); }, [foldedHit]);
   const artifactsApi = useArtifacts();
   const turnToolIds = useMemo(() => messages.flatMap((m) => m.parts).flatMap((p) => (p.kind === "tool_call" ? [p.toolCall.toolCallId] : [])), [messages]);
   const turnArtifacts = useMemo(() => (artifactsApi && turnToolIds.length ? filesTouchedBy(artifactsApi.all, turnToolIds) : []), [artifactsApi, turnToolIds]);
@@ -220,7 +229,7 @@ function TurnViewInner(props: TurnViewProps) {
           <div className={"turn__process" + (running ? "" : " turn__process--folded")}>
             {content.process.map((item, index) => {
               const part = item.part;
-              if (part.kind === "thought") return <ThoughtRow key={item.key} timingKey={item.key} text={part.text} live={index === liveThoughtIndex} markdownConfig={markdownConfig} />;
+              if (part.kind === "thought") return <ThoughtRow key={item.key} timingKey={item.key} text={part.text} live={index === liveThoughtIndex} markdownConfig={markdownConfig} findHit={stepHit(part)} />;
               if (part.kind === "tool_call") {
                 const request = pendingByTool.get(part.toolCall.toolCallId);
                 return (

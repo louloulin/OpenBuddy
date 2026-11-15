@@ -11,6 +11,7 @@ import type { Settings } from "@openbuddy/services/settings/settings";
 import type { SkillsService } from "@openbuddy/services/skills/skills";
 import type { CheckpointStore } from "./checkpoints/store.js";
 import type { ExtensionUiBridge } from "./extension-ui/bridge.js";
+import type { SessionSearchIndex } from "./session-search.js";
 import type { Emit, Permissions } from "./permissions/permissions.js";
 import type { AgentMode, PoolLimits, PromptImages, SessionRunStatus, Slot, ThinkingLevel } from "./types.js";
 
@@ -41,6 +42,8 @@ export interface EngineContext {
   sessionDir: string;
   listCache?: { at: number; items: Promise<SessionInfo[]> };
   modelCache: Map<string, { mtime: number; model?: { provider: string; modelId: string } }>;
+  /** Full-text index over the saved sessions (pii W1.4). */
+  readonly searchIndex: SessionSearchIndex;
   evictTimer?: ReturnType<typeof setInterval>;
   validCwd(path: string): Promise<string>;
   trusted(cwd: string): boolean;

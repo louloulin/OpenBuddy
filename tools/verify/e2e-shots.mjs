@@ -123,6 +123,92 @@ try {
       out.push(await ctx.shot('07-settings-' + id));
     }
     return out;`);
+  await step('close settings', `
+    await page.keyboard.press('Escape');
+    await page.locator('.settings-modal').waitFor({ state: 'detached', timeout: 5000 });
+    return true;`);
+  // pii W0.2/W0.3: the sidebar and 更多 only list what the host serves (host_capabilities + FeatureRegistry).
+  await step('sidebar after cleanup', `
+    const nav = await page.locator('.sidebar__nav [data-feature]').evaluateAll(els => els.map(e => e.getAttribute('data-feature') + ':' + e.textContent.trim()));
+    if (await page.locator('.sidebar__nav').getByText('技能与 MCP', { exact: true }).count()) throw new Error('技能与 MCP is still a sidebar entry');
+    const more = page.getByRole('button', { name: /更多.*文件/ });
+    await more.hover();
+    await page.locator('.sidebar__more-popover').waitFor({ timeout: 5000 });
+    const moreItems = await page.locator('.sidebar__more-popover [role=menuitem]').allTextContents();
+    if (moreItems.some(t => ['策略设置', '灵感', '云存储'].includes(t.trim()))) throw new Error('offline entry offered: ' + moreItems.join(','));
+    await ctx.sleep(400);
+    const shot = await ctx.shot('08-sidebar-registry');
+    await page.mouse.move(900, 500);
+    await ctx.sleep(300);
+    return { nav, moreItems, shot };`);
+  // pii W0.3 acceptance: click every entry the registry renders; none may hit not_implemented.
+  await step('click every entry', `
+    const before = (await ctx.audit()).main.length;
+    const visited = [];
+    for (const id of await page.locator('.sidebar__nav > [data-feature]').evaluateAll(els => els.map(e => e.getAttribute('data-feature')))) {
+      await page.locator('.sidebar__nav > [data-feature="' + id + '"]').click();
+      await ctx.sleep(1000);
+      visited.push(id);
+    }
+    const more = page.getByRole('button', { name: /更多.*文件/ });
+    await more.hover();
+    await page.locator('.sidebar__more-popover').waitFor({ timeout: 5000 });
+    const moreIds = await page.locator('.sidebar__more-popover [data-feature]').evaluateAll(els => els.map(e => e.getAttribute('data-feature')));
+    for (const id of moreIds) {
+      await more.hover();
+      await page.locator('.sidebar__more-popover [data-feature="' + id + '"]').click();
+      await ctx.sleep(1000);
+      visited.push(id);
+    }
+    const fresh = (await ctx.audit()).main.slice(before);
+    const notImplemented = fresh.filter(r => /not_implemented/.test(r.error ?? '')).map(r => r.command);
+    if (notImplemented.length) throw new Error('not_implemented while clicking entries: ' + notImplemented.join(','));
+    return { visited, commands: [...new Set(fresh.map(r => r.command))].sort(), rejected: fresh.filter(r => r.status === 'rejected').map(r => r.command + ': ' + r.error), notImplemented };`);
+  // U7.6: 技能与 MCP merged into 专家·技能·连接器 (catalog tabs hidden until their commands exist).
+  await step('experts hub with skills and MCP', `
+    await page.locator('.sidebar__nav > [data-feature="experts-hub"]').click();
+    await page.getByRole('tab', { name: '技能' }).waitFor({ timeout: 10000 });
+    const tabs = await page.locator('.um-pills [role=tab]').allTextContents();
+    await ctx.sleep(800);
+    const skills = await ctx.shot('09-hub-skills');
+    await page.getByRole('tab', { name: '连接器' }).click();
+    await page.getByText('远程服务授权', { exact: true }).waitFor({ timeout: 10000 });
+    await ctx.sleep(900);
+    const mcp = await ctx.shot('10-hub-connectors-mcp');
+    await page.getByRole('tab', { name: '扩展' }).click();
+    await ctx.sleep(800);
+    const extensions = await ctx.shot('11-hub-extensions');
+    return { tabs, shots: [skills, mcp, extensions] };`);
+  await step('second task', `
+    await page.getByRole('button', { name: '新建任务', exact: true }).first().click();
+    const input = page.locator('.wb-composer__input');
+    await input.waitFor({ timeout: 10000 });
+    await input.fill('写一段周报开头');
+    await page.getByRole('button', { name: '发送', exact: true }).click();
+    await page.getByText('本地 fixture', { exact: false }).first().waitFor({ timeout: 30000 });
+    await ctx.sleep(1500);
+    return true;`);
+  // pii W1.4: Ctrl/Cmd+K 内容 group (session_search over saved message text), highlighted snippet, opens the turn.
+  await step('palette content search', `
+    await page.keyboard.press('Control+K');
+    const input = page.locator('.palette__input');
+    await input.waitFor({ timeout: 5000 });
+    await input.fill('统一卡片的圆角');
+    await page.locator('.palette__group', { hasText: '内容' }).waitFor({ timeout: 10000 });
+    await page.locator('mark.search-hit__mark').first().waitFor({ timeout: 10000 });
+    const marks = await page.locator('mark.search-hit__mark').allTextContents();
+    await ctx.sleep(600);
+    const palette = await ctx.shot('12-palette-content-search');
+    await page.locator('.palette__row--hit').first().click();
+    const find = page.getByRole('textbox', { name: '查找' });
+    await find.waitFor({ timeout: 15000 });
+    const findValue = await find.inputValue();
+    if (findValue !== '统一卡片的圆角') throw new Error('find bar got ' + findValue);
+    await ctx.sleep(1500);
+    const opened = await ctx.shot('13-palette-hit-opened');
+    const count = await page.locator('.findbar__count').textContent();
+    const highlights = await page.evaluate(() => (globalThis.CSS && CSS.highlights && CSS.highlights.get('ob-find')) ? CSS.highlights.get('ob-find').size : 0);
+    return { marks, findValue, count, highlights, shots: [palette, opened] };`);
   // R1: the additive host_capabilities command, called through the real renderer → preload → IPC path.
   const caps = await step('host capabilities', `
     const caps = await ctx.call('host_capabilities');

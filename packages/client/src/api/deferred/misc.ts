@@ -1,18 +1,8 @@
-// Deferred (20261115-md Appendix B, 其他): session_search, session_fork, prompt_history, toggle_plan_mode, internal_reload,
+// Deferred (20261115-md Appendix B, 其他): session_fork, prompt_history, toggle_plan_mode, internal_reload,
 // inspiration_generate, web_search_config_get / save. Not in the protocol COMMANDS list.
-import type { InspirationStarted, SearchHit } from "@openbuddy/protocol/dto";
+// session_search is implemented (pii W1.4); its wrapper moved to ../session.ts with the same name and arguments.
+import type { InspirationStarted } from "@openbuddy/protocol/dto";
 import { invoke } from "../../ipc";
-
-// ---------- session search (FTS5) ----------
-
-/** Full-text search across all sessions. */
-export async function sessionSearch(
-  query: string,
-  cwd?: string,
-  limit?: number,
-): Promise<SearchHit[]> {
-  return invoke<SearchHit[]>("session_search", { query, cwd: cwd ?? null, limit: limit ?? null });
-}
 
 // ---------- session fork ----------
 

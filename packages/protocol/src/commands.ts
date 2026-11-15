@@ -23,7 +23,7 @@ export const COMMANDS = [
   'artifacts_list', 'checkpoint_list', 'checkpoint_read', 'checkpoint_restore', 'turn_revert', 'artifact_save',
   'agent_export_html', 'agent_set_mode', 'agent_abort_retry', 'clipboard_save_image',
   'notification_prefs_get', 'notification_prefs_set', 'agent_set_queue',
-  'host_capabilities',
+  'host_capabilities', 'session_search',
 ] as const;
 export type CommandName = typeof COMMANDS[number];
 export const isCommand = (value: unknown): value is CommandName => typeof value === 'string' && (COMMANDS as readonly string[]).includes(value);

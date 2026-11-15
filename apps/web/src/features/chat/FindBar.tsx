@@ -13,6 +13,9 @@ import {
 } from "@openbuddy/ui/icon/icons/index";
 import { matchesQuery, extractPlainText } from "@openbuddy/chat-core/extract-text";
 import type { ChatMessage } from "@/features/chat/state/session-store";
+import { useFindRequestStore } from "@/app/state/find-request-store";
+import { useFindFocusStore } from "./state/find-focus-store";
+import { clearFindHighlight, highlightInMessage } from "./find-highlight";
 
 interface FindBarProps {
   /** 当前对话的全部消息(按时间顺序)。 */
@@ -25,9 +28,13 @@ interface FindBarProps {
   onActiveChange?: (messageId: string | null) => void;
   /** 命中集合变化(供父级高亮命中容器)。 */
   onHitsChange?: (hitIds: string[]) => void;
+  /** 当前会话 id:Ctrl/Cmd+K「内容」命中打开会话时,按它领取待查找的词(pii W1.4)。 */
+  sessionId?: string | null;
+  /** 领取到待查找的词时请求父级打开查找条。 */
+  onRequestOpen?: () => void;
 }
 
-export function FindBar({ messages, open, onClose, onActiveChange, onHitsChange }: FindBarProps) {
+export function FindBar({ messages, open, onClose, onActiveChange, onHitsChange, sessionId, onRequestOpen }: FindBarProps) {
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -58,9 +65,27 @@ export function FindBar({ messages, open, onClose, onActiveChange, onHitsChange 
     onHitsChange?.(hitIds);
   }, [hitIds, onHitsChange]);
 
-  // 打开时聚焦输入框。
+  // U3.5:把当前命中告诉回合(折叠的步骤/思考里命中时自动展开),展开后用 CSS Highlight 标出命中并滚到第一个。
+  useEffect(() => {
+    useFindFocusStore.getState().set(open ? query : "", open ? currentId : null);
+    if (!open || !query || !currentId) { clearFindHighlight(); return; }
+    const t = setTimeout(() => highlightInMessage(document, currentId, query), 80);
+    return () => clearTimeout(t);
+  }, [open, query, currentId, messages]);
+  useEffect(() => () => { useFindFocusStore.getState().set("", null); clearFindHighlight(); }, []);
+
+  // 全文搜索命中后打开会话(pii W1.4):消息到齐后领取关键词,打开查找条并跳到第一个命中。
+  // 打开放到下一个任务里做:同一次提交里父级切换会话时会先把查找条关掉。
+  const pendingQuery = useRef<string | undefined>(undefined);
+  const openRef = useRef(open);
+  openRef.current = open;
+  const requestOpenRef = useRef(onRequestOpen);
+  requestOpenRef.current = onRequestOpen;
+
+  // 打开时聚焦输入框(并填入待查找的词)。
   useEffect(() => {
     if (open) {
+      if (pendingQuery.current) { setQuery(pendingQuery.current); pendingQuery.current = undefined; }
       const t = setTimeout(() => inputRef.current?.focus(), 0);
       return () => clearTimeout(t);
     } else {
@@ -68,6 +93,20 @@ export function FindBar({ messages, open, onClose, onActiveChange, onHitsChange 
       setQuery("");
     }
   }, [open]);
+
+  const pendingFind = useFindRequestStore((s) => (sessionId && s.request?.sessionId === sessionId ? s.request : undefined));
+  useEffect(() => {
+    if (!pendingFind || !sessionId || messages.length === 0) return;
+    const wanted = useFindRequestStore.getState().take(sessionId);
+    if (!wanted) return;
+    pendingQuery.current = wanted;
+    setTimeout(() => {
+      // Same batch as the open request, so the bar never shows an empty query first.
+      setQuery(wanted);
+      if (openRef.current) pendingQuery.current = undefined;
+      else requestOpenRef.current?.();
+    }, 0);
+  }, [pendingFind, sessionId, messages.length]);
 
   const step = useCallback(
     (dir: 1 | -1) => {

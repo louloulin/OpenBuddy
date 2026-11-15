@@ -21,6 +21,7 @@ import * as pipeline from "./event-pipeline.js";
 import * as runtime from "./session-runtime.js";
 import * as pool from "./session-pool.js";
 import * as catalog from "./session-catalog.js";
+import { SessionSearchIndex } from "./session-search.js";
 import * as features from "./features/index.js";
 
 export { slimEvent, smallArgs, partialToolArgs } from "./event-pipeline.js";
@@ -51,6 +52,7 @@ export class PiEngine {
   /** @internal */ sessionDir: string;
   /** @internal */ listCache?: { at: number; items: Promise<SessionInfo[]> };
   /** @internal */ modelCache = new Map<string, { mtime: number; model?: { provider: string; modelId: string } }>();
+  /** @internal */ readonly searchIndex: SessionSearchIndex;
   /** @internal */ evictTimer?: ReturnType<typeof setInterval>;
   constructor(
     readonly settings: Settings,
@@ -68,6 +70,8 @@ export class PiEngine {
     this.skills = new SkillsService(settings);
     this.mcp = new McpService(settings, openUrl, emit);
     this.sessionDir = join(settings.dir, "sessions");
+    // A refresh lists fresh (and shares the result with the sidebar's list cache).
+    this.searchIndex = new SessionSearchIndex(this.sessionDir, () => { this.invalidateList(); return this.all(); });
     this.checkpoints = new CheckpointStore(join(settings.dir, "checkpoints"), (path) => this.trash(path));
   }
   /** Move a file to the OS trash via the host; without a host trash (tests), or if it fails, into `<dir>/trash`. */
@@ -172,6 +176,7 @@ export class PiEngine {
   }
   /** @internal */ savedModel(item: SessionInfo) { return catalog.savedModel(this, item); }
   list(cwd: string, includeArchived = false) { return catalog.list(this, cwd, includeArchived); }
+  searchSessions(query: string, options: { cwd?: string; limit?: number } = {}) { return catalog.search(this, query, options); }
   running() { return pool.running(this); }
   /** @internal */ validateImages(session: AgentSession, images?: PromptImages) { return runtime.validateImages(session, images); }
   send(id: string, prompt: string, images?: PromptImages) { return runtime.send(this, id, prompt, images); }
