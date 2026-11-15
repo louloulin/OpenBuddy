@@ -19,6 +19,8 @@ export default defineConfig({
     // 不让 CSS import 在测试里报错(我们没装 jsdom CSS 处理)。
     css: false,
     // Agent worktrees live under .claude/worktrees; their copies are not this checkout's tests.
-    exclude: [...configDefaults.exclude, ".claude/**"],
+    // `packages/gateway` and `packages/pi-bridge` are Bun-targeted packages: their suites import
+    // `bun:test` and run with `bun test` in those packages, not under vitest.
+    exclude: [...configDefaults.exclude, ".claude/**", "packages/gateway/**", "packages/pi-bridge/**"],
   },
 });

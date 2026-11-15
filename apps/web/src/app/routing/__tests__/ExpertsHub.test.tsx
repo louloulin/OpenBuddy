@@ -18,6 +18,7 @@ vi.mock("@openbuddy/client/agent-client", async (importOriginal) => {
     expertsLoad: record("experts_load", { userDir: "", projectTrusted: false, experts: [], categories: [], scenes: [], roots: [], problems: [] }),
     skillsCatalogDefaultRoot: record("skills_catalog_default_root", ""),
     connectorsDefaultRoot: record("connectors_default_root", ""),
+    promptsList: record("prompts_list", []),
   };
 });
 vi.mock("@/features/experts/connectors/McpConfigEditor", () => ({ McpConfigEditor: () => <div>MCP 配置编辑器</div> }));
@@ -28,11 +29,12 @@ afterEach(() => useCapabilitiesStore.getState().apply(null));
 
 describe("专家·技能·连接器 hub (pii W0.3 / U7.6)", () => {
   it("hides catalogs the host does not serve and shows skills / MCP / extensions management instead", async () => {
-    // A host without the experts module (W2.1–W2.3 commands): the 专家 tab is hidden too.
-    useCapabilitiesStore.getState().apply({ protocolVersion: 1, platform: "desktop", commands: COMMANDS.filter((c) => !/^(agents_|experts_)/.test(c)), events: [], features: [] });
+    // A host without the catalog modules (W2.1–W2.3 experts, W2.7 skills catalog + prompts):
+    // the 专家 / 我的指令 tabs are hidden too, and 技能 falls back to the management view.
+    useCapabilitiesStore.getState().apply({ protocolVersion: 1, platform: "desktop", commands: COMMANDS.filter((c) => !/^(agents_|experts_|skills_catalog_|prompts_)/.test(c)), events: [], features: [] });
     render(<ExpertsHub />);
     const tabs = screen.getAllByRole("tab").map((t) => t.textContent);
-    expect(tabs).toEqual(["技能", "连接器", "我的指令", "扩展"]);
+    expect(tabs).toEqual(["技能", "连接器", "扩展"]);
     expect(await screen.findByText("PDF 工具")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "连接器" }));
     expect(await screen.findByText("MCP 配置编辑器")).toBeInTheDocument();
@@ -54,5 +56,14 @@ describe("专家·技能·连接器 hub (pii W0.3 / U7.6)", () => {
     render(<ExpertsHub />);
     expect(screen.getByRole("tab", { name: "连接器" })).toHaveAttribute("aria-selected", "true");
     expect(await screen.findByText("MCP 配置编辑器")).toBeInTheDocument();
+  });
+
+  it("serves 我的指令 from prompts_list and hides it otherwise (W2.7 / S8)", async () => {
+    desktop();
+    render(<ExpertsHub />);
+    fireEvent.click(screen.getByRole("tab", { name: "我的指令" }));
+    expect(await screen.findByText(/指令保存在/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /新建指令/ })).toBeInTheDocument();
+    expect(invoked).toContain("prompts_list");
   });
 });
