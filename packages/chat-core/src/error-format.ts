@@ -248,6 +248,9 @@ const CODE_COPY: Record<ProtocolErrorCode, Copy> & Record<string, Copy | undefin
   not_found: ["要找的内容不存在或已被删除", "刷新列表后重试", "retry"],
   already_exists: ["同名的项目已经存在", "换一个名字再保存", "retry"],
   session_busy: ["任务正在运行", "等当前回复完成，或点停止后再试", "wait"],
+  entry_not_found: ["这条消息已不在当前对话里", "刷新对话后重试", "retry"],
+  permission_denied: ["这条命令被权限规则拒绝", "在设置 → 安全中调整规则，或换一种做法"],
+  bash_running: ["上一条命令还在运行", "等它结束，或点停止后再试", "wait"],
   // Legacy `code: detail` messages thrown before ProtocolError existed.
   path_outside_workspace: ["路径不在当前工作空间内", "只能访问工作空间里的文件", "retry"],
   rewind_point_not_found: ["找不到要回到的位置", "对话可能已经变化，刷新后重试", "retry"],
