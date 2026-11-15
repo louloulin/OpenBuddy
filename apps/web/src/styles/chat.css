@@ -342,3 +342,48 @@
 .tool-side-panel__nav--collapsed .tool-side-panel__nav-body,
 .tool-side-panel__nav--collapsed .tool-side-panel__nav-header > :not(:last-child) { display: none; }
 .tool-side-panel__nav--collapsed .tool-side-panel__nav-header { justify-content: center; padding-left: 0; padding-right: 0; }
+
+/* ---------- 20261116-pii W1.1 版本切换 ‹1/2› ---------- */
+.turn__actions:has(.branch-switch) { opacity: 1; }
+.branch-switch { display: inline-flex; align-items: center; gap: 0; margin-right: 4px; height: 28px; padding: 0 2px; border-radius: var(--wb-radius-md); color: var(--wb-text-medium); font-size: 12px; font-variant-numeric: tabular-nums; }
+.branch-switch__btn { width: 24px; height: 24px; border: none; background: transparent; color: inherit; border-radius: var(--wb-radius-sm); font-size: 16px; line-height: 1; cursor: pointer; }
+.branch-switch__btn:hover:not(:disabled) { background: var(--wb-bg-hover); color: var(--wb-text-strong); }
+.branch-switch__btn:disabled { opacity: 0.35; cursor: default; }
+.branch-switch__count { min-width: 30px; text-align: center; user-select: none; }
+.branch-switch--busy .branch-switch__count { color: var(--wb-color-text-brand-default); }
+
+/* ---------- 20261116-pii W1.2 `!命令` ---------- */
+.bash-row { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--wb-border-default); border-radius: var(--wb-radius-lg, 12px); background: var(--wb-bg-primary); overflow: hidden; }
+.bash-row__head { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--wb-bg-tertiary); font-size: 12px; min-width: 0; }
+.bash-row__prompt { font-family: var(--wb-font-mono, ui-monospace, monospace); color: var(--wb-color-text-brand-default); font-weight: 600; }
+.bash-row__command { flex: 1; min-width: 0; font-family: var(--wb-font-mono, ui-monospace, monospace); font-size: 12.5px; color: var(--wb-text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: none; padding: 0; }
+.bash-row__status { flex: none; padding: 0 7px; border-radius: 999px; line-height: 18px; font-size: 11px; }
+.bash-row__status--ok { color: var(--wb-color-text-success-default); background: color-mix(in srgb, var(--wb-color-text-success-default) 12%, transparent); }
+.bash-row__status--warn { color: var(--wb-color-text-warning-default); background: color-mix(in srgb, var(--wb-color-text-warning-default) 12%, transparent); }
+.bash-row__status--running { color: var(--wb-color-text-brand-default); background: color-mix(in srgb, var(--wb-color-text-brand-default) 10%, transparent); }
+.bash-row__context { flex: none; font-size: 11px; color: var(--wb-text-weak); }
+.bash-row__btn { flex: none; height: 22px; padding: 0 8px; border: 1px solid var(--wb-border-default); border-radius: var(--wb-radius-sm); background: var(--wb-bg-primary); color: var(--wb-text-medium); font-size: 11px; cursor: pointer; }
+.bash-row__btn:hover:not(:disabled) { color: var(--wb-text-strong); background: var(--wb-bg-hover); }
+.bash-row__output { margin: 0; padding: 8px 12px; max-height: 320px; overflow: auto; font-family: var(--wb-font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; color: var(--wb-text-strong); }
+.bash-row__more-hint { color: var(--wb-text-weak); }
+.bash-row__foot { display: flex; align-items: center; gap: 10px; padding: 4px 12px 8px; font-size: 11px; color: var(--wb-text-weak); }
+.bash-row__link { border: none; background: none; padding: 0; color: var(--wb-color-text-brand-default); font-size: 11px; cursor: pointer; }
+.wb-composer--bash { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--wb-color-text-brand-default) 55%, transparent) !important; }
+.wb-composer--bash .wb-composer__input { font-family: var(--wb-font-mono, ui-monospace, monospace); }
+.bang-hint { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 2px 2px 6px; font-size: 12px; color: var(--wb-text-medium); }
+.bang-hint__tag { padding: 0 8px; line-height: 20px; border-radius: 999px; background: var(--wb-color-text-brand-default); color: var(--wb-bg-primary); font-weight: 500; }
+.bang-hint__risk { padding: 0 6px; border-radius: var(--wb-radius-sm); font-size: 11px; line-height: 18px; }
+.bang-hint__risk--medium { background: var(--wb-badge-warning-bg); color: var(--wb-badge-warning-fg); }
+.bang-hint__risk--high { background: var(--wb-status-error-soft); color: var(--wb-color-text-error-default); }
+
+/* ---------- 20261116-pii W1.3 `@` 引用文件 ---------- */
+.mention-pop { position: absolute; bottom: calc(100% + 4px); left: 0; right: 0; max-height: 320px; display: flex; flex-direction: column; background: var(--wb-bg-primary); border: 1px solid transparent; border-radius: 14px; box-shadow: var(--ob-shadow-pop, 0 10px 40px rgba(0, 0, 0, 0.2)); z-index: 20; padding: 6px; animation: ob-pop-in var(--ob-dur, 0.16s) var(--ob-ease-out, ease-out) both; }
+.mention-pop__header { padding: 6px 10px; font-size: 11px; color: var(--wb-text-weak); }
+.mention-pop__list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.mention-pop__group { padding: 8px 10px 4px; font-size: 11px; color: var(--wb-text-weak); }
+.mention-pop__item { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 7px 10px; border: none; background: transparent; border-radius: 9px; cursor: pointer; text-align: left; min-width: 0; }
+.mention-pop__item--active, .mention-pop__item:hover { background: var(--wb-bg-hover); }
+.mention-pop__name { flex: none; max-width: 55%; font-size: 13px; color: var(--wb-text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mention-pop__dir { flex: 1; min-width: 0; font-size: 12px; color: var(--wb-text-weak); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mention-pop__tag { flex: none; font-size: 10px; color: var(--wb-text-weak); padding: 1px 5px; background: var(--wb-bg-tertiary); border-radius: 3px; }
+.mention-pop__empty { padding: 14px 10px; font-size: 12px; color: var(--wb-text-weak); }

@@ -7,13 +7,10 @@ import { ModelRuntimeContext, ModelSelector, type ModelOption } from "../models/
 import { ThumbImg } from "../../shared/ui/ThumbImg";
 import { ContextUsagePill } from "./ContextUsagePill";
 import { clipboardSaveImage, type AgentMode } from "@openbuddy/client/agent-client";
-import {
-  loadInputHistory,
-  saveInputHistory,
-  pushHistory,
-  navigateHistory,
-  type InputHistory,
-} from "@/features/composer/input-history";
+import { useInputHistoryKeys } from "./useInputHistoryKeys";
+import { useBangCommand } from "./useBangCommand";
+import { BangHint } from "./BangHint";
+import { FileMentionPopover, type FileMentionHandle } from "./FileMentionPopover";
 import { WorkspacePicker } from "./WorkspacePicker";
 import { PermissionPicker } from "../approvals/PermissionPicker";
 import { SlashCommands, slashToken, type SlashCommandsHandle } from "./SlashCommands";
@@ -175,11 +172,6 @@ export function Composer({
   // 发送前成本预估(对齐 WorkBuddy credit-estimate):纯本地 token 估算。
   // ctxUsed/ctxTotal 由 ContextUsagePill 异步获取,这里不耦合;徽章在占比未知时
   // 仍显示 +N(新增 token),有占比信息时叠加(此处保守不取,避免与 pill 抢请求)。
-  // 输入历史(arrow-key recall,对齐 WorkBuddy use-input-history):内存中按发送追加,
-  // ↑/↓ 在输入框回溯。draftRef 暂存「回到输入框」时恢复的草稿。
-  const histRef = useRef<InputHistory>(loadInputHistory(100));
-  const histCursorRef = useRef<number>(histRef.current.items.length);
-  const draftRef = useRef<string>("");
   // Attachments, the scene tag and the expert each have their own chip; no second preview row (20261115-ui U4.1).
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -192,6 +184,11 @@ export function Composer({
       return value;
     });
   };
+  // 输入历史(arrow-key recall,对齐 WorkBuddy use-input-history):内存中按发送追加,↑/↓ 在输入框回溯。
+  const history = useInputHistoryKeys(text, updateText, ref);
+  // `!cmd` / `!!cmd` runs a command in the task (20261116-pii W1.2); `@` mentions a file (W1.3).
+  const bash = useBangCommand({ text, sessionId: usageSessionId, streaming, onError: (message) => { setSendError(message); onToast?.(message); } });
+  const mentionRef = useRef<FileMentionHandle>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -244,6 +241,9 @@ export function Composer({
 
   const send = () => {
     const t = text.trim();
+    // `!command`: run it in the task instead of sending a prompt (attachments stay for the next prompt).
+    const ran = bash.handle();
+    if (ran) { if (ran === "ran") { setSendError(""); history.remember(t); updateText(""); } return; }
     // Nothing to send: no text, no attachments (a bare scene tag is not a prompt).
     if (!t && attachments.length === 0) return;
     if (streaming || disabled || !apiReady || modelControls.busy || modelControls.canSend === false) {
@@ -272,13 +272,7 @@ export function Composer({
         setSendError("发送失败，已保留输入与附件，请检查错误后重试。");
       });
     } catch { setSendError("发送失败，请检查错误后重试。"); return; }
-    // 记入输入历史(arrow-key recall)。
-    if (body && body.trim()) {
-      histRef.current = pushHistory(loadInputHistory(100), body);
-      saveInputHistory(histRef.current);
-      histCursorRef.current = histRef.current.items.length;
-      draftRef.current = "";
-    }
+    history.remember(body); // 记入输入历史(arrow-key recall)。
     updateText(""); // 发送后清空输入框,同时把草稿也清掉(否则切回还会带回来)。
     setAttachments([]);
     onClearSceneTag?.();
@@ -286,7 +280,7 @@ export function Composer({
 
   const enqueue = async (modeOverride?: "steer" | "followUp") => {
     const textToQueue = text.trim();
-    if ((!textToQueue && attachments.length === 0) || disabled || !apiReady || queueBusy || !onEnqueue || !validateAttachments()) return;
+    if ((!textToQueue && attachments.length === 0) || disabled || !apiReady || queueBusy || !onEnqueue || bash.handle() || !validateAttachments()) return;
     setQueueBusy(true); setSendError("");
     const body = sceneTag ? `【${sceneTag.label}】${textToQueue}` : textToQueue;
     try {
@@ -356,6 +350,7 @@ export function Composer({
     "wb-composer",
     !apiReady && "wb-composer--disabled",
     showMeta && "wb-composer--home",
+    bash.bang && "wb-composer--bash",
   ].filter(Boolean).join(" ");
 
   return (
@@ -433,6 +428,7 @@ export function Composer({
           </div>
         )}
 
+        <BangHint bang={bash.bang} risk={bash.risk} available={bash.available} />
         <textarea
           ref={ref}
           className="wb-composer__input"
@@ -449,8 +445,7 @@ export function Composer({
           onChange={(e) => {
             updateText(e.target.value);
             setCursorPos(e.target.selectionStart ?? e.target.value.length);
-            // 手动输入时把历史游标重置回末尾(回到「输入框」态)。
-            histCursorRef.current = histRef.current.items.length;
+            history.resetCursor(); // 手动输入时把历史游标重置回末尾(回到「输入框」态)。
           }}
           onSelect={(e) =>
             setCursorPos((e.target as HTMLTextAreaElement).selectionStart ?? cursorPos)
@@ -473,13 +468,13 @@ export function Composer({
           }}
           onKeyDown={(e) => {
             if (e.nativeEvent.isComposing) return;
-            // The slash menu (when open) owns ↑↓/Enter/Tab/Esc.
-            if (!e.shiftKey && slashRef.current?.handleKey(e)) return;
+            // The slash menu and the `@` file list (when open) own ↑↓/Enter/Tab/Esc.
+            if (!e.shiftKey && (slashRef.current?.handleKey(e) || mentionRef.current?.handleKey(e))) return;
             if (e.key === "Enter" && !e.shiftKey && !(e.altKey && !streaming)) {
               e.preventDefault();
               // While a reply is running, Enter queues the message instead of doing nothing;
-              // Ctrl/Cmd+Enter (or Alt/⌥+Enter) steers the running reply at its next tool step.
-              if (streaming && onEnqueue) void enqueue(e.altKey || e.ctrlKey || e.metaKey ? "steer" : undefined);
+              // Ctrl/Cmd+Enter (or Alt/⌥+Enter) steers the running reply at its next tool step. A `!command` is never queued.
+              if (streaming && onEnqueue && !bash.bang) void enqueue(e.altKey || e.ctrlKey || e.metaKey ? "steer" : undefined);
               else send();
               return;
             }
@@ -490,46 +485,21 @@ export function Composer({
               return;
             }
             // 输入历史 arrow-key recall(对齐 WorkBuddy use-input-history)。
-            {
-              const el = e.target as HTMLTextAreaElement;
-              const atFirstLine = el.selectionStart === 0 || text.length === 0;
-              const atLastLine = el.selectionStart === text.length;
-              // 已在历史导航中(cursor < items.length)时,↑/↓ 持续翻页,不受光标位置约束。
-              const navigating = histCursorRef.current < histRef.current.items.length;
-              if (e.key === "ArrowUp" && (atFirstLine || navigating)) {
-                if (histCursorRef.current === histRef.current.items.length) {
-                  draftRef.current = text; // 进入历史前暂存当前草稿
-                  // Another composer (home / another chat) may have added prompts since.
-                  histRef.current = loadInputHistory(100);
-                  histCursorRef.current = histRef.current.items.length;
-                }
-                const r = navigateHistory(histRef.current, histCursorRef.current, "up", draftRef.current);
-                if (r.text !== text) {
-                  e.preventDefault();
-                  histCursorRef.current = r.cursor;
-                  updateText(r.text);
-                  requestAnimationFrame(() => {
-                    const t = ref.current;
-                    if (t) {
-                      t.selectionStart = t.selectionEnd = r.text.length;
-                    }
-                  });
-                }
-              } else if (e.key === "ArrowDown" && (atLastLine || navigating)) {
-                const r = navigateHistory(histRef.current, histCursorRef.current, "down", draftRef.current);
-                if (r.cursor !== histCursorRef.current) {
-                  e.preventDefault();
-                  histCursorRef.current = r.cursor;
-                  updateText(r.text);
-                  requestAnimationFrame(() => {
-                    const t = ref.current;
-                    if (t) {
-                      t.selectionStart = t.selectionEnd = r.text.length;
-                    }
-                  });
-                }
-              }
-            }
+            history.onKeyDown(e);
+          }}
+        />
+        {/* `@` file mention (W1.3) */}
+        <FileMentionPopover
+          ref={mentionRef}
+          text={text}
+          cursor={cursorPos}
+          cwd={cwd}
+          sessionId={usageSessionId}
+          disabled={!apiReady || !!bash.bang}
+          onInsert={(next, caret) => {
+            updateText(next);
+            setCursorPos(caret);
+            requestAnimationFrame(() => { const el = ref.current; if (el) { el.focus(); el.selectionStart = el.selectionEnd = caret; } });
           }}
         />
         {/* Slash-command autocomplete */}

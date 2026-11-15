@@ -3,6 +3,7 @@
 // tasks_list, task_kill, rewind_points, rewind_execute, agent_regenerate, agent_compact, agent_export_html, agent_set_mode,
 // agent_abort_retry, agent_shutdown.
 import type { ModelState, PiMessage, RewindPoint, RunningTask, SessionInfoResponse, SessionSummary, SessionUsage } from "@openbuddy/protocol/dto";
+import type { BranchTree, NavigateOptions, NavigateResult } from "@openbuddy/protocol/branches";
 import { invoke } from "../ipc";
 import type { AgentQueue } from "./turn";
 
@@ -151,6 +152,15 @@ export async function rewindExecute(sessionId: string, entryId: string): Promise
 export async function agentRegenerate(sessionId: string): Promise<void> {
   await invoke<void>("agent_regenerate", { sessionId });
 }
+
+// ---------- branches ‹1/2› (20261116-pii W1.1) ----------
+
+/** Versions of each user turn on the current path; null while the session is not loaded. */
+export const agentTree = (sessionId: string) => invoke<BranchTree | null>("agent_tree", { sessionId });
+
+/** Show another version (a sibling's `leafId`); optionally summarize the abandoned one and restore files first. */
+export const agentNavigate = (sessionId: string, entryId: string, opts: NavigateOptions = {}) =>
+  invoke<NavigateResult>("agent_navigate", { sessionId, entryId, ...(opts.summarize ? { summarize: true } : {}), ...(opts.restoreFiles ? { restoreFiles: opts.restoreFiles } : {}) });
 
 /** `/compact [instructions]`: summarise older history to free context. */
 export async function agentCompact(sessionId: string, instructions?: string): Promise<{ tokensBefore: number; tokensAfter?: number }> {

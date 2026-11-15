@@ -17,6 +17,7 @@ import { useUiPrefs } from "@/app/state/ui-prefs-store";
 import { splitTurn, turnError, turnMarkdown, turnModel, turnTiming } from "@openbuddy/chat-core/turns";
 import { ErrorCard } from "./ErrorCard";
 import { FeedbackButtons } from "./FeedbackButtons";
+import { BranchMenuItems, BranchSwitcher, useBranchRefresh } from "./BranchSwitcher";
 import { ChevronGlyph, CopyGlyph, MoreGlyph, RetryGlyph } from "../../shared/agent-ui/icons";
 import logoMarkUrl from "@/assets/openbuddy-logo.svg";
 
@@ -163,6 +164,8 @@ function TurnViewInner(props: TurnViewProps) {
   const liveThoughtIndex = running && !content.answer && content.process.at(-1)?.part.kind === "thought" ? content.process.length - 1 : -1;
   const showProcess = running || expanded;
   const hasAnything = content.process.length > 0 || !!content.answer;
+  const userTimestamp = user?.meta?.pending ? undefined : user?.meta?.timestamp;
+  useBranchRefresh(sessionId, isLast && !running, userTimestamp);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -249,6 +252,7 @@ function TurnViewInner(props: TurnViewProps) {
         {inlineError && !running && <ErrorCard error={inlineError} onRetry={isLast ? onRetry : undefined} onToast={onToast} />}
         {!running && hasAnything && (
           <div className="turn__actions">
+            <BranchSwitcher sessionId={sessionId} userTimestamp={userTimestamp} onToast={onToast} />
             <button type="button" className="turn-action" onClick={() => copyText(answerText).then(() => onToast?.("已复制"), () => onToast?.("复制失败"))} aria-label="复制" data-tip="复制"><CopyGlyph /></button>
             {isLast && onRetry && <button type="button" className="turn-action" onClick={onRetry} aria-label="重试" data-tip="重新生成"><RetryGlyph /></button>}
             <FeedbackButtons sessionId={sessionId} turnKey={turnKey} />
@@ -258,6 +262,7 @@ function TurnViewInner(props: TurnViewProps) {
                 <div className="turn-menu" role="menu">
                   <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void copyText(turnMarkdown(messages)).then(() => onToast?.("已复制 Markdown"), () => onToast?.("复制失败")); }}>复制 Markdown</button>
                   {onFork && <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onFork(); }}>分叉为新任务</button>}
+                  <BranchMenuItems sessionId={sessionId} userTimestamp={userTimestamp} onToast={onToast} onDone={() => setMenuOpen(false)} />
                   {artifactsApi && turnArtifacts.length > 0 && (
                     <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); artifactsApi.revert(turnToolIds, turnArtifacts); }}>撤销本轮的文件改动（{turnArtifacts.length}）</button>
                   )}

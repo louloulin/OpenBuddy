@@ -62,6 +62,8 @@ export function slimEvent(event: AgentSessionEvent): unknown {
   if (event.type === "agent_end") return { type: "agent_end", willRetry: event.willRetry };
   if (event.type === "turn_end") return { type: "turn_end" };
   if (event.type === "entry_appended") return undefined;
+  // Raw per-chunk `!command` output: features/bash.ts forwards it coalesced instead.
+  if (event.type === "bash_execution_update") return undefined;
   // Updates repeat the arguments and the cumulative output: send the output tail only.
   if (event.type === "tool_execution_update") {
     const content = (event.partialResult as { content?: Array<{ type?: string; text?: string }> } | undefined)?.content;

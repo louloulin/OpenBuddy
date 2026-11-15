@@ -125,5 +125,8 @@ export async function cancel(engine: EngineContext, id: string) {
   await engine.mcp.auth.settle();
   engine.permissions.cancel(id);
   if (slot.session.isCompacting) slot.session.abortCompaction();
+  // 停止 also stops a `!command` (W1.2) and a branch summary (W1.1) in progress.
+  if (slot.session.isBashRunning) slot.session.abortBash();
+  slot.session.abortBranchSummary();
   await slot.session.abort();
 }
