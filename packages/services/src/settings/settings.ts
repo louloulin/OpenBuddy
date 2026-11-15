@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { SafeStorage } from "@openbuddy/kernel";
+import { PiSettingsStore } from "./pi-settings.js";
 
 // Moved to @openbuddy/kernel (20261115-md R2); re-exported so existing importers keep working.
 export type { SafeStorage };
@@ -111,6 +112,8 @@ export function createSettings(userDataDir: string, safe: SafeStorage) {
   return {
     dir,
     secrets: new SecretStore(dir, safe),
+    /** Session behaviour read by Pi's SettingsManager (pi-settings.json, 20261116-pii W0.4 / §8). */
+    pi: new PiSettingsStore(dir),
     config: new JsonStore<AppSettings>(join(dir, "openbuddy.json"), () => ({
       permissionMode: "ask",
       rules: [],

@@ -2,12 +2,13 @@ import {
   createAgentSession,
   DefaultResourceLoader,
   SessionManager,
-  SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { existsSync } from "node:fs";
 import type { EngineContext } from "./engine-context.js";
-import { READ_ONLY_TOOLS, validateThinkingLevel, type Slot, type ThinkingLevel } from "./types.js";
+import { validateThinkingLevel, type Slot, type ThinkingLevel } from "./types.js";
 import { builtinFactories } from "./builtin/index.js";
+import { restoreMode } from "./features/mode.js";
+import { favoriteScope } from "./features/agent-settings.js";
 
 /** Create a live session for `manager` without touching any other session. */
 export async function open(
@@ -41,7 +42,8 @@ export async function open(
   const trusted = engine.trusted(cwd);
   if (!trusted && config.folderTrustDecisions?.[cwd] === undefined)
     engine.emit("agent://folder-trust", { cwd });
-  const sdkSettings = SettingsManager.inMemory({}, { projectTrusted: trusted });
+  // Persisted Pi settings (pi-settings.json, 20261116-pii W0.4); project settings still need trust.
+  const sdkSettings = engine.settings.pi.manager(trusted);
   const sessionId = manager.getSessionId();
   const loader = new DefaultResourceLoader({
     cwd,
@@ -65,7 +67,7 @@ export async function open(
       engine.checkpoints.extension(sessionId, () => cwd),
       engine.mcp.extension(),
       // Built-in extensions (20261116-pii W0.5): app code, before user extensions.
-      ...builtinFactories({ engine, sessionId, cwd }),
+      ...builtinFactories({ engine, sessionId, cwd }, (id) => engine.settings.pi.builtinEnabled(id)),
       ...engine.extensionFactories,
     ],
   });
@@ -85,10 +87,10 @@ export async function open(
     model,
     tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "mcp__*", "ob_*"],
     thinkingLevel: requestedThinking,
+    // Favourite models, cycled with Ctrl/Cmd+P (W1.6).
+    scopedModels: favoriteScope(engine),
   });
   const defaultTools = session.getActiveToolNames();
-  const mode = engine.modes.get(session.sessionId) ?? "craft";
-  if (mode !== "craft") session.setActiveToolsByName(defaultTools.filter((name) => READ_ONLY_TOOLS.includes(name)));
   const slot: Slot = {
     defaultTools,
     id: session.sessionId,
@@ -101,6 +103,8 @@ export async function open(
     lastActive: Date.now(),
     failed: false,
   };
+  // 做一做 / 想一想 / 问一问 of the branch being opened (W0.5; in-memory when the built-in is off).
+  restoreMode(engine, slot);
   slot.unsubscribe = session.subscribe((event) => engine.onEvent(slot, event));
   try {
     await session.bindExtensions({

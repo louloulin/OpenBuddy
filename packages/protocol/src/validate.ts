@@ -1,5 +1,6 @@
 import type { CommandName } from './commands.js';
 import type { Payload } from './types.js';
+import { validateAgentSettingsPatch } from './agent-settings.js';
 
 /** Bound structured-clone input before dispatch; services validate their domain fields. */
 export function validatePayload(input: unknown): Payload {
@@ -97,5 +98,10 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'rewind_execute') string('entryId', 256);
   if (command === 'agent_list_sessions' && payload.includeArchived !== undefined && typeof payload.includeArchived !== 'boolean') throw new Error('invalid_payload: includeArchived');
   if (command === 'agent_extensions_set_enabled' && typeof payload.enabled !== 'boolean') throw new Error('invalid_payload: enabled');
+  if (command === 'settings_agent_set') validateAgentSettingsPatch(payload.patch);
+  if (command === 'agent_cycle_model') {
+    string('sessionId', 256);
+    if (payload.direction !== undefined && payload.direction !== 'forward' && payload.direction !== 'backward') throw new Error('invalid_payload: direction');
+  }
   return payload;
 }

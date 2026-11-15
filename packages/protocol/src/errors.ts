@@ -10,7 +10,8 @@ export type ProtocolErrorCode =
   | 'model_not_found'
   | 'model_auth_missing'
   | 'extension_load_failed'
-  | 'export_path_not_authorized';
+  | 'export_path_not_authorized'
+  | 'session_busy';
 
 export interface ProtocolError {
   code: ProtocolErrorCode;
