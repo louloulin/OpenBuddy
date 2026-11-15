@@ -15,6 +15,7 @@ export * from "./api/artifacts";
 export * from "./api/files";
 export * from "./api/native";
 export * from "./api/events";
+export * from "./api/host";
 
 // Appendix B: wrappers for commands the main-process contract does not implement (kept, not deleted).
 export * from "./api/deferred/connectors";

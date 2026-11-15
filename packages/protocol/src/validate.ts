@@ -98,6 +98,12 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'agent_list_sessions' && payload.includeArchived !== undefined && typeof payload.includeArchived !== 'boolean') throw new Error('invalid_payload: includeArchived');
   if (command === 'agent_extensions_set_enabled' && typeof payload.enabled !== 'boolean') throw new Error('invalid_payload: enabled');
   validateConversationTools(command, payload, string);
+  if (command === 'session_search') {
+    string('query', 500);
+    string('cwd', 4096, true);
+    const limit = payload.limit;
+    if (limit !== undefined && limit !== null && (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > 100)) throw new Error('invalid_payload: limit');
+  }
   return payload;
 }
 

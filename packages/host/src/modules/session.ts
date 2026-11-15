@@ -1,7 +1,7 @@
 import { bool, text } from "@openbuddy/services/settings/settings";
 import { validateThinkingLevel } from "@openbuddy/engine/pi-engine";
 import type { Handler, HostContext, HostModule } from "../module.js";
-/** §5.3 `session` module. Session lifecycle: create/load/list/fork/delete, metadata, background tasks, rewind, compaction, mode. */
+/** §5.3 `session` module. Session lifecycle: create/load/list/search/fork/delete, metadata, background tasks, rewind, compaction, mode. */
 export function sessionModule(ctx: HostContext): HostModule {
   const { engine } = ctx;
   const commands: Record<string, Handler> = {
@@ -38,6 +38,12 @@ export function sessionModule(ctx: HostContext): HostModule {
       }
       return [...map.values()];
     },
+    // pii W1.4: full-text search over saved sessions (payload bounded in protocol validate.ts).
+    session_search: (p) =>
+      engine.searchSessions(text(p.query, "query"), {
+        cwd: typeof p.cwd === "string" ? p.cwd : undefined,
+        limit: typeof p.limit === "number" ? p.limit : undefined,
+      }),
     agent_fork_session: (p) => engine.fork(text(p.sessionId)),
     agent_shutdown: () => engine.shutdown(),
     agent_delete_session: async (p) => {

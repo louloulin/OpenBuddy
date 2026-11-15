@@ -30,10 +30,12 @@ interface Props {
   /** Navigate back to the home page (after summoning an expert). */
   onGoHome?: () => void;
   onToast?: (message: string) => void;
+  /** Views the host serves (pii W0.2): the 专家中心 catalog (experts_load) and 我的专家 (agents_list). */
+  views?: { center: boolean; my: boolean };
 }
 
-export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
-  const [view, setView] = useState<"center" | "my">("center");
+export function ExpertsTab({ pills, onGoHome, onToast, views = { center: true, my: true } }: Props) {
+  const [view, setView] = useState<"center" | "my">(views.center ? "center" : "my");
   const [listTab, setListTab] = useState<ListTab>("expert");
   const [sort, setSort] = useState<Sort>("popular");
   const [cat, setCat] = useState<string | null>(null);
@@ -74,6 +76,7 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
   useEffect(() => {
     let disposed = false;
     (async () => {
+      if (!views.center) return;
       if (root) { loadCatalog(root); return; }
       try {
         const d = await expertsDefaultRoot();
@@ -289,9 +292,11 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
       <div className="um-page">
         <header className="um-topbar">
           <div className="um-topbar-left">
-            <button type="button" className="um-back" onClick={() => setView("center")}>
-              <ChevronLeftIcon size="sm" /><span>全部专家</span>
-            </button>
+            {views.center ? (
+              <button type="button" className="um-back" onClick={() => setView("center")}>
+                <ChevronLeftIcon size="sm" /><span>全部专家</span>
+              </button>
+            ) : pills}
           </div>
         </header>
         <div className="um-scroll">
@@ -340,9 +345,11 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
             <input className="um-search-input" value={search} placeholder="搜索专家职称或描述"
               onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <button type="button" className="um-btn um-btn--grey" onClick={() => setView("my")}>
-            <MyExpertIcon size="sm" /><span>我的专家</span>
-          </button>
+          {views.my && (
+            <button type="button" className="um-btn um-btn--grey" onClick={() => setView("my")}>
+              <MyExpertIcon size="sm" /><span>我的专家</span>
+            </button>
+          )}
         </div>
       </header>
 

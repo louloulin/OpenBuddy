@@ -510,7 +510,7 @@ export function ChatView({
       {toolbarSlot && createPortal(toolbar, toolbarSlot)}
       <div className="chatview__main">
         <FindBar
-          messages={messages}
+          messages={messages} sessionId={sessionId} onRequestOpen={() => setFindOpen(true)}
           open={findOpen}
           onClose={() => { setFindOpen(false); setFindHits([]); setFindCurrent(null); }}
           onHitsChange={setFindHits}

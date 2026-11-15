@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   User,
   Mail,
@@ -48,6 +48,14 @@ interface NavItem {
   icon: LucideIcon;
 }
 
+/** A section supplied by the app's FeatureRegistry (pii W0.2): only the ones the host can serve. */
+export interface SettingsSection {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  render: (props: { onModelsChanged?: () => void }) => ReactNode;
+}
+
 const NAV: NavItem[] = [
   { id: "account", label: "账户管理", icon: User },
   { id: "agent-mail", label: "智能体邮箱", icon: Mail },
@@ -64,7 +72,10 @@ export function SettingsPanel({
   onClose,
   onModelsChanged,
   initialSection,
+  sections,
 }: {
+  /** Registry sections; without them the built-in list below is used (standalone / legacy). */
+  sections?: SettingsSection[];
   open: boolean;
   onClose: () => void;
   /** Section to show when opened (defaults to 模型). */
@@ -73,12 +84,16 @@ export function SettingsPanel({
    *  model picker without a restart. */
   onModelsChanged?: () => void;
 }) {
-  const [active, setActive] = useState<SectionId>("model");
+  const [active, setActive] = useState<string>("model");
+  const nav: Array<{ id: string; label: string; icon: LucideIcon }> = sections ?? NAV;
+  const ids = nav.map((item) => item.id).join(" ");
 
-  // Open at the requested section (deep link), defaulting to 模型.
+  // Open at the requested section (deep link), defaulting to 模型 (or the first one served).
   useEffect(() => {
-    if (open) setActive(NAV.some((item) => item.id === initialSection) ? (initialSection as SectionId) : "model");
-  }, [open, initialSection]);
+    if (!open) return;
+    const has = (id?: string) => !!id && ids.split(" ").includes(id);
+    setActive(has(initialSection) ? initialSection! : has("model") ? "model" : ids.split(" ")[0] ?? "model");
+  }, [open, initialSection, ids]);
 
   // Esc closes the dialog.
   useEffect(() => {
@@ -106,7 +121,7 @@ export function SettingsPanel({
       <div className="settings-modal">
         <nav className="settings-modal__nav">
           <ul className="settings-navigation">
-            {NAV.map((item) => {
+            {nav.map((item) => {
               const Icon = item.icon;
               return (
                 <li key={item.id}>
@@ -138,7 +153,9 @@ export function SettingsPanel({
             <X size={16} strokeWidth={1.75} />
           </button>
           <div className="settings-modal__panel">
-            {active === "model" ? (
+            {sections ? (
+              sections.find((section) => section.id === active)?.render({ onModelsChanged }) ?? null
+            ) : active === "model" ? (
               <ModelsSettingsPanel onModelsChanged={onModelsChanged} />
             ) : active === "personalize" ? (
               <PersonalizeSettingsPanel />

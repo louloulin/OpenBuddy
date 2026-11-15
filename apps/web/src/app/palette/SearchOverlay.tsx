@@ -2,7 +2,41 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Search, X, Clock, FileText } from "lucide-react";
 import { useSessionsStore } from "@/features/sessions/state/sessions-store";
 import { sessionSearch } from "@openbuddy/client/agent-client";
-import type { SearchHit, SessionSummary } from "@openbuddy/protocol/dto";
+import type { SessionSummary } from "@openbuddy/protocol/dto";
+import type { SearchMatchRange, SessionSearchHit } from "@openbuddy/protocol/search";
+
+/** A search snippet with its matched ranges wrapped in <mark> (pii W1.4; no HTML injection). */
+export function HighlightedSnippet({ snippet, matches, className }: { snippet: string; matches: readonly SearchMatchRange[]; className?: string }) {
+  const parts: React.ReactNode[] = [];
+  let at = 0;
+  for (const [start, end] of matches) {
+    if (start < at || end > snippet.length || end <= start) continue;
+    if (start > at) parts.push(snippet.slice(at, start));
+    parts.push(<mark key={start} className="search-hit__mark">{snippet.slice(start, end)}</mark>);
+    at = end;
+  }
+  if (at < snippet.length) parts.push(snippet.slice(at));
+  return <span className={className}>{parts}</span>;
+}
+
+const baseName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+
+/** One full-text hit: title, highlighted snippet, workspace — shared by this overlay and the Ctrl/Cmd+K palette. */
+export function ContentHitBody({ hit, meta }: { hit: Pick<SessionSearchHit, "title" | "sessionId" | "snippet" | "matches" | "cwd" | "archived">; meta?: React.ReactNode }) {
+  return (
+    <div className="conversation-search-modal__item-body">
+      <div className="conversation-search-modal__item-title">
+        {hit.title || hit.sessionId.slice(0, 8)}
+        {hit.archived && <span className="search-hit__tag">已归档</span>}
+      </div>
+      {hit.snippet && <HighlightedSnippet className="conversation-search-modal__item-snippet" snippet={hit.snippet} matches={hit.matches ?? []} />}
+      <div className="conversation-search-modal__item-cwd">
+        {hit.cwd ? <span title={hit.cwd}>{baseName(hit.cwd)}</span> : null}
+        {meta}
+      </div>
+    </div>
+  );
+}
 
 
 export function SearchOverlay({
@@ -24,7 +58,7 @@ export function SearchOverlay({
     [independent, workspaceSessions],
   );
   const [query, setQuery] = useState("");
-  const [remoteHits, setRemoteHits] = useState<SearchHit[]>([]);
+  const [remoteHits, setRemoteHits] = useState<SessionSearchHit[]>([]);
   const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -176,22 +210,7 @@ export function SearchOverlay({
                         strokeWidth={1.75}
                         className="conversation-search-modal__item-icon"
                       />
-                      <div className="conversation-search-modal__item-body">
-                        <div className="conversation-search-modal__item-title">
-                          {h.title || h.sessionId.slice(0, 8)}
-                        </div>
-                        {h.snippet && (
-                          <div
-                            className="conversation-search-modal__item-snippet"
-                            dangerouslySetInnerHTML={{ __html: escapeHtml(h.snippet) }}
-                          />
-                        )}
-                        {h.cwd && (
-                          <div className="conversation-search-modal__item-cwd">
-                            {h.cwd}
-                          </div>
-                        )}
-                      </div>
+                      <ContentHitBody hit={h} />
                     </button>
                   </li>
                 ))}
@@ -212,19 +231,11 @@ export function SearchOverlay({
             remoteOnly.length === 0 &&
             query.trim().length === 0 && (
               <div className="conversation-search-modal__count">
-                输入关键词搜索会话内容（agent FTS5 全文索引）
+                输入关键词搜索会话内容（全文检索）
               </div>
             )}
         </div>
       </div>
     </div>
   );
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }

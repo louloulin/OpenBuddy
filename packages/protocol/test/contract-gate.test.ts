@@ -44,7 +44,7 @@ const PENDING_COMMANDS = [
   "experts_default_root", "experts_image_bytes", "experts_link_agents", "experts_list_roots", "experts_load", "experts_read_agent_prompt", "experts_thumbnail",
   "inspiration_generate", "internal_reload", "marketplace_action", "marketplace_list",
   "memory_delete", "memory_flush", "memory_get", "memory_list", "memory_rewrite", "memory_save",
-  "plugins_action", "plugins_list", "prompt_history", "session_fork", "session_search",
+  "plugins_action", "plugins_list", "prompt_history", "session_fork",
   "skills_catalog_default_root", "skills_catalog_list_roots", "skills_catalog_load", "skills_catalog_read_skill",
   "subagents_config_get", "subagents_config_save", "toggle_plan_mode", "web_search_config_get", "web_search_config_save",
 ];
@@ -115,5 +115,17 @@ describe("payload validation for new commands", () => {
     expect(() => validateCommandPayload("agent_compact", { sessionId: "s1", instructions: "keep decisions" })).not.toThrow();
     expect(() => validateCommandPayload("agent_compact", {})).toThrow("invalid_payload");
     expect(() => validateCommandPayload("agent_compact", { sessionId: "s1", instructions: "x".repeat(5000) })).toThrow("invalid_payload");
+  });
+
+  it("session_search needs a query and bounds the optional cwd and limit (pii W1.4)", () => {
+    expect(() => validateCommandPayload("session_search", { query: "季度报告" })).not.toThrow();
+    expect(() => validateCommandPayload("session_search", { query: "report", cwd: "/work", limit: 30 })).not.toThrow();
+    expect(() => validateCommandPayload("session_search", { query: "report", cwd: null, limit: null })).not.toThrow();
+    expect(() => validateCommandPayload("session_search", {})).toThrow("invalid_payload: query");
+    expect(() => validateCommandPayload("session_search", { query: "   " })).toThrow("invalid_payload: query");
+    expect(() => validateCommandPayload("session_search", { query: "x".repeat(501) })).toThrow("invalid_payload: query");
+    expect(() => validateCommandPayload("session_search", { query: "a\0b" })).toThrow("invalid_payload: query");
+    expect(() => validateCommandPayload("session_search", { query: "report", cwd: 3 })).toThrow("invalid_payload: cwd");
+    for (const limit of [0, 101, 2.5, "10", true]) expect(() => validateCommandPayload("session_search", { query: "report", limit })).toThrow("invalid_payload: limit");
   });
 });

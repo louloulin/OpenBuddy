@@ -1,9 +1,10 @@
 // §5.3 `session` module: agent_init, agent_new_session, agent_load_session, agent_list_sessions, agent_list_workspaces,
 // agent_delete_session, agent_rename_session, agent_set_session_pinned/archived, agent_session_info/usage, agent_fork_session,
 // tasks_list, task_kill, rewind_points, rewind_execute, agent_regenerate, agent_compact, agent_export_html, agent_set_mode,
-// agent_abort_retry, agent_shutdown.
+// agent_abort_retry, agent_shutdown, session_search.
 import type { ModelState, PiMessage, RewindPoint, RunningTask, SessionInfoResponse, SessionSummary, SessionUsage } from "@openbuddy/protocol/dto";
 import type { BranchTree, NavigateOptions, NavigateResult } from "@openbuddy/protocol/branches";
+import type { SessionSearchHit } from "@openbuddy/protocol/search";
 import { invoke } from "../ipc";
 import type { AgentQueue } from "./turn";
 
@@ -185,3 +186,10 @@ export const agentSetMode = (sessionId: string, mode: AgentMode) => invoke<void>
 export const agentAbortRetry = (sessionId: string) => invoke<void>("agent_abort_retry", { sessionId });
 /** `outputPath` must come from the save dialog in this window. */
 export const agentExportHtml = (sessionId: string, outputPath: string) => invoke<string>("agent_export_html", { sessionId, outputPath });
+
+// ---------- full-text search (pii W1.4) ----------
+
+/** Saved sessions whose title or messages contain every whitespace-separated term, best first. */
+export async function sessionSearch(query: string, cwd?: string, limit?: number): Promise<SessionSearchHit[]> {
+  return invoke<SessionSearchHit[]>("session_search", { query, cwd: cwd ?? null, limit: limit ?? null });
+}

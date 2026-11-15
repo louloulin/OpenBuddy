@@ -66,9 +66,10 @@ import { matchShortcut } from "../shared/lib/shortcuts";
 import { copyText } from "@openbuddy/platform/clipboard";
 import { useUnseenStore } from "./state/unseen-store";
 import { parseUserText, baseName, EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END } from "@openbuddy/chat-core/user-text";
+import { featureView, useFeatureNav } from "./routing/use-feature-nav";
+import { openHubAt } from "./routing/ExpertsHub";
 
 export { EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END };
-
 
 /** Optimistic sidebar title; the engine persists the authoritative one after the first turn. */
 function deriveTitle(text: string): string {
@@ -127,6 +128,8 @@ function Shell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   /** Ctrl/Cmd+K search and the Ctrl/Cmd+/ shortcut list (20261115-ui U8.2). */
   const [palette, setPalette] = useState<"search" | "shortcuts" | null>(null);
+  /** Entry points the host can serve (pii W0.1/W0.2: host_capabilities + FeatureRegistry). */
+  const features = useFeatureNav();
 
   const [toast, setToast] = useState<string | null>(null);
   const focusedModelSession = useSessionStore(state => state.sessionId);
@@ -397,27 +400,20 @@ function Shell() {
     toastTimer.current = setTimeout(() => setToast(null), message.length > 30 ? 4000 : 2400);
   };
   showToastRef.current = showToast;
-  const handlePlaceholder = (label: string) => {
-    // Route a few sidebar shortcut buttons to real panels instead of toasts.
-    if (label === "用户中心") {
-      setSettingsOpen(true);
-      return;
-    }
-    if (label === "通知") {
-      // events are logged.
-      setSettingsOpen(true);
-      return;
-    }
-    showToast(`${label} 即将上线`);
-  };
+  // 用户中心 / 通知 open 设置. Other labels no longer fall back to a "即将上线" toast (pii W0.3: no toast-only entries).
+  const handlePlaceholder = (label: string) => { if (label === "用户中心" || label === "通知") setSettingsOpen(true); };
   const handleNavigate = (label: string) => {
     if (sessionStore.getState().sessionId) resourceSessionRef.current = sessionStore.getState().sessionId ?? undefined;
-    if (["助理", "专家·技能·连接器", "自动化", "资料库", "灵感", "云存储"].includes(label)) { showToast(`${label} 暂未在 Electron MVP 开放`); return; }
-    setPlaceholderView(label);
+    // pii W0.2: the FeatureRegistry decides (was a hard-coded block list, now routing/features.tsx LEGACY_BLOCKED_VIEWS).
+    const view = featureView(label);
+    if (!view) return;
+    setPlaceholderView(view);
     sessionsStore.getState().setCurrent(null);
     sessionStore.getState().reset();
   };
 
+  // 管理连接器 (composer): the 连接器 tab of 专家·技能·连接器 through the registry; no bypass (pii W0.2).
+  const openConnectors = featureView("专家·技能·连接器") ? () => { openHubAt("connectors"); handleNavigate("专家·技能·连接器"); } : undefined;
   // Sidebar project node click → open the Projects panel with that project selected.
   const handleOpenProjectFromSidebar = (projectId: string) => {
     useProjectsStore.getState().setActiveProjectId(projectId);
@@ -888,9 +884,10 @@ function Shell() {
           onOpenProject={handleOpenProjectFromSidebar}
           onStartProjectConversation={handleStartProjectConversation}
           activeNav={activeNav}
+          nav={features.primary}
+          moreItems={features.more}
         />
         <main className="app__main">
-          {}
           {!placeholderView && currentSessionId ? (
             <header className="main-topbar" data-window-drag-region>
               <div className="main-topbar__left">
@@ -1002,7 +999,7 @@ function Shell() {
               onForked={handleForked}
               onToast={showToast}
               onSelectExpert={handleStartWithExpert}
-              onNavigateConnectors={() => setPlaceholderView("专家·技能·连接器")}
+              onNavigateConnectors={openConnectors}
             />
           ) : (
             <HomePage
@@ -1018,7 +1015,7 @@ function Shell() {
               workspaces={workspaces}
               onSelectWorkspace={handleSelectWorkspace}
               onSelectExpert={handleStartWithExpert}
-              onNavigateConnectors={() => setPlaceholderView("专家·技能·连接器")}
+              onNavigateConnectors={openConnectors}
             />
           )}
         </main>
@@ -1028,7 +1025,7 @@ function Shell() {
       {palette === "shortcuts" && <ShortcutsPanel onClose={() => setPalette(null)} />}
       <AppDialogHost />
       <ImageLightboxHost />
-      <SettingsPanel open={settingsOpen} initialSection={settingsSection} onClose={() => { setSettingsOpen(false); setSettingsSection(undefined); }} onModelsChanged={refreshModels} />
+      <SettingsPanel sections={features.sections} open={settingsOpen} initialSection={settingsSection} onClose={() => { setSettingsOpen(false); setSettingsSection(undefined); }} onModelsChanged={refreshModels} />
       <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} init={init} />
       <FolderTrustDialog
         request={trustRequest}

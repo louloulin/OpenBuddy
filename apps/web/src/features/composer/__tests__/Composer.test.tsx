@@ -28,13 +28,14 @@ describe("Composer", () => {
     expect(screen.getByText(/审批模式/)).toBeInTheDocument();
   });
 
-  it("未传 workspaces 时选择工作空间 fallback 触发 onPlaceholder", () => {
-    // When workspaces/onSelectWorkspace are absent, the workspace button falls
-    // back to onPlaceholder("选择工作空间").
+  it("未传 workspaces / models 时不渲染只弹 toast 的兜底按钮 (pii W0.3)", () => {
+    // Without a workspace list or model list there is nothing to pick: no "选择工作空间" / "Auto"
+    // buttons that would only raise a placeholder toast.
     const onPlaceholder = vi.fn();
     render(<Composer {...base} showMeta onPlaceholder={onPlaceholder} />);
-    fireEvent.click(screen.getByText("选择工作空间"));
-    expect(onPlaceholder).toHaveBeenCalledWith("选择工作空间");
+    expect(screen.queryByText("选择工作空间")).toBeNull();
+    expect(screen.queryByText("Auto")).toBeNull();
+    expect(onPlaceholder).not.toHaveBeenCalled();
   });
 
   it("streaming 时显示停止按钮", () => {

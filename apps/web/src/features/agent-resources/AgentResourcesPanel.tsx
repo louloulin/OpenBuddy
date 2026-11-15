@@ -7,8 +7,15 @@ import type { SkillInfo, McpAuthStatusEntry } from "@openbuddy/protocol/dto";
 import { McpConfigEditor } from "../experts/connectors/McpConfigEditor";
 
 /** MVP resources use installed Pi skills and the actual MCP configuration. */
-export function AgentResourcesPanel({ cwd, sessionId, onToast }: { cwd?: string; sessionId?: string; onToast?: (message: string) => void }) {
-  const [tab, setTab] = useState<"skills" | "mcp" | "extensions">("skills");
+export function AgentResourcesPanel({ cwd, sessionId, onToast, section, header }: {
+  cwd?: string; sessionId?: string; onToast?: (message: string) => void;
+  /** Show one section without the title and tabs: the management tabs of 专家·技能·连接器 (pii W0.3 / U7.6). */
+  section?: "skills" | "mcp" | "extensions";
+  /** Rendered in the top bar of an embedded section (the hub's tab pills). */
+  header?: React.ReactNode;
+}) {
+  const [tabState, setTab] = useState<"skills" | "mcp" | "extensions">("skills");
+  const tab = section ?? tabState;
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [auth, setAuth] = useState<McpAuthStatusEntry[]>([]);
   const [authBusy, setAuthBusy] = useState(false);
@@ -52,16 +59,7 @@ export function AgentResourcesPanel({ cwd, sessionId, onToast }: { cwd?: string;
   const tabBtn = (id: typeof tab, label: string) => (
     <button type="button" className={"res-panel__tab" + (tab === id ? " res-panel__tab--on" : "")} onClick={() => setTab(id)} aria-pressed={tab === id}>{label}</button>
   );
-  return <section className="res-panel">
-    <header className="res-panel__head">
-      <h2 className="res-panel__title">技能与 MCP</h2>
-      <p className="res-panel__subtitle">管理已安装的技能、MCP 服务和可信扩展</p>
-    </header>
-    <nav className="res-panel__tabs" aria-label="资源类型">
-      {tabBtn("skills", "已安装技能")}
-      {tabBtn("mcp", "MCP 配置")}
-      {tabBtn("extensions", "可信扩展")}
-    </nav>
+  const body = <>
     {error && <p className="res-panel__error" role="alert">{error}</p>}
     {tab === "extensions" ? <div className="res-panel__body"><TrustedExtensionsPanel /></div> : tab === "mcp" ? <div className="res-panel__body">
       <section className="res-panel__card" aria-label="MCP 授权">
@@ -90,5 +88,22 @@ export function AgentResourcesPanel({ cwd, sessionId, onToast }: { cwd?: string;
         <button type="button" className="res-panel__btn res-panel__btn--danger" disabled={busy || !skill.path} onClick={() => { void run(() => skillsRemove(skill.path!, cwd)); }}>移除</button>
       </div>)}
     </div>}
+  </>;
+  if (section) return <div className="um-page res-panel--embedded">
+    <header className="um-topbar"><div className="um-topbar-left">{header}</div></header>
+    <div className="um-scroll"><section className="res-panel" aria-label={SECTION_LABEL[section]}>{body}</section></div>
+  </div>;
+  return <section className="res-panel">
+    <header className="res-panel__head">
+      <h2 className="res-panel__title">技能与 MCP</h2>
+      <p className="res-panel__subtitle">管理已安装的技能、MCP 服务和可信扩展</p>
+    </header>
+    <nav className="res-panel__tabs" aria-label="资源类型">
+      {tabBtn("skills", "已安装技能")}
+      {tabBtn("mcp", "MCP 配置")}
+      {tabBtn("extensions", "可信扩展")}
+    </nav>
+    {body}
   </section>;
 }
+const SECTION_LABEL = { skills: "已安装技能", mcp: "MCP 配置", extensions: "可信扩展" } as const;

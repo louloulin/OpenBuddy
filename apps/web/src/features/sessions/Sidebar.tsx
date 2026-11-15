@@ -16,7 +16,6 @@ import {
 import type { SessionSummary } from "@openbuddy/protocol/dto";
 import {
   WbNewTaskIcon,
-  WbProjectNavIcon,
   WbExpertNavIcon,
   SearchIcon,
   FilterIcon,
@@ -38,10 +37,13 @@ import { filterSessions, TaskFilterMenu } from "./sidebar-parts/TaskFilterMenu";
 import { SessionContextMenu } from "./sidebar-parts/SessionContextMenu";
 import { MoreDropdown } from "./sidebar-parts/MoreDropdown";
 
-const NAV = [
-  { label: "项目", icon: WbProjectNavIcon },
-  { label: "技能与 MCP", icon: WbExpertNavIcon },
-];
+/** A sidebar / 更多 entry. The app builds the lists from its FeatureRegistry (pii W0.2): the former
+ *  fixed NAV (项目, 技能与 MCP) is now the registry's 项目 and 专家·技能·连接器 entries. */
+export interface SidebarNavItem {
+  id: string;
+  label: string;
+  icon: typeof WbExpertNavIcon;
+}
 
 /**
  * WorkBuddy 风格侧栏:品牌行 / 导航 / 双分组(任务 + 空间) / 底部用户区。
@@ -62,7 +64,13 @@ export function Sidebar({
   onOpenProject,
   onStartProjectConversation,
   activeNav,
+  nav = [],
+  moreItems = [],
 }: {
+  /** Primary entries the host can serve (from the app's FeatureRegistry). */
+  nav?: SidebarNavItem[];
+  /** 更多 menu entries the host can serve. */
+  moreItems?: SidebarNavItem[];
   onNewSession: () => void;
   onSelect: (sessionId: string, cwd?: string) => void;
   onNavigate: (label: string) => void;
@@ -356,9 +364,10 @@ export function Sidebar({
           <WbNewTaskIcon size="md" />
           <span>新建任务</span>
         </button>
-        {NAV.map(({ label, icon: Icon }) => (
+        {nav.map(({ id, label, icon: Icon }) => (
           <button
-            key={label}
+            key={id}
+            data-feature={id}
             className={
               "sidebar__nav-item" +
               (activeNav === label ? " sidebar__nav-item--active" : "")
@@ -369,7 +378,7 @@ export function Sidebar({
             <span>{label}</span>
           </button>
         ))}
-        <MoreDropdown onNavigate={onNavigate} onToast={onToast} activeNav={activeNav} />
+        {moreItems.length > 0 && <MoreDropdown items={moreItems} onNavigate={onNavigate} activeNav={activeNav} />}
       </nav>
 
       <div className="sidebar__content">
