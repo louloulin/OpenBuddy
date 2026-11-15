@@ -31,6 +31,14 @@ export function registerIpc(window: BrowserWindow, handlers: CommandHandlers, tr
       if (typeof payload.cwd !== 'string' || !await workspaces.allows(payload.cwd)) throw new Error('workspace_not_authorized: select a folder using the native dialog');
     }
     if (command === 'agent_extensions_add' && !await fileAccess.allowsNativePath(payload.path as string)) throw new Error('extension_path_not_authorized: select the extension using the native dialog');
+    // Expert library roots (W2.3) feed experts_load / experts_image_bytes: a root being added needs the
+    // same native folder grant as a workspace. Roots already configured stay; removing one needs none.
+    if (workspaces && command === 'experts_set_roots') {
+      const configured = new Set(((await handlers.experts_list_roots?.({}) ?? []) as Array<{ path: string }>).map(root => root.path));
+      for (const root of payload.roots as string[]) {
+        if (!configured.has(root) && !await workspaces.allows(root)) throw new Error('expert_root_not_authorized: select the folder using the native dialog');
+      }
+    }
     if (['agent_send', 'agent_steer', 'agent_follow_up'].includes(command) && payload.attachments !== undefined) {
       const content = await fileAccess.attach(payload.attachments as AttachmentReference[]);
       payload.text = [payload.text, content.text].filter(Boolean).join('\n\n');
