@@ -39,7 +39,8 @@ function listPaths(block: string): string[] {
  */
 const MODE_BLOCK = /\s*<openbuddy-(plan|ask)-mode>[\s\S]*?<\/openbuddy-\1-mode>\s*/;
 const MODE_TEXT: Record<"plan" | "ask", string> = {
-  plan: "本条消息处于「想一想」模式：先调研（只能读取，不能修改文件或执行命令），然后用 ob_todo 工具把执行计划逐条记录为步骤（action add），并在回答里说明要改动的文件和风险。不要开始执行，等用户确认。",
+  // ob_todo is a built-in that can be switched off (设置 · 智能体), so it is only asked for when present.
+  plan: "本条消息处于「想一想」模式：先调研（只能读取，不能修改文件或执行命令），然后给出执行计划：如果有 ob_todo 工具，用它把计划逐条记录为步骤（action add）；没有就在回答里逐条列出步骤。并在回答里说明要改动的文件和风险。不要开始执行，等用户确认。",
   ask: "本条消息处于「问一问」模式：只回答问题或解释，可以读取文件，不要修改任何文件或执行命令。",
 };
 export function withModeInstruction(text: string, mode: "craft" | "plan" | "ask"): string {

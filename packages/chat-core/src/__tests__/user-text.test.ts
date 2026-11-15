@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END, baseName, parseUserText } from "../user-text";
+import { EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END, baseName, parseUserText, withModeInstruction } from "../user-text";
 
 describe("parseUserText: replayed prompts show only what the user typed", () => {
   it("strips inlined attachment bodies and the file list, keeping attachment chips", () => {
@@ -27,5 +27,16 @@ describe("parseUserText: replayed prompts show only what the user typed", () => 
     expect(parseUserText("  见 https://a.com/b 和 src/app  ")).toEqual({ text: "见 https://a.com/b 和 src/app", attachments: [] });
     expect(baseName("C:\\work\\a.txt")).toBe("a.txt");
     expect(baseName("/work/dir/")).toBe("dir");
+  });
+});
+
+describe("withModeInstruction: the hidden 想一想 / 问一问 block", () => {
+  it("asks for ob_todo only if the tool is there (the todo built-in can be switched off), and round-trips", () => {
+    const plan = withModeInstruction("整理 README", "plan");
+    expect(plan).toContain("如果有 ob_todo 工具");
+    expect(plan).not.toMatch(/然后用 ob_todo 工具/);
+    expect(parseUserText(plan)).toEqual({ text: "整理 README", attachments: [], mode: "plan" });
+    expect(withModeInstruction("解释一下", "ask")).not.toContain("ob_todo");
+    expect(withModeInstruction("做吧", "craft")).toBe("做吧");
   });
 });
