@@ -55,7 +55,7 @@ describe("FeatureRegistry (pii W0.2)", () => {
   });
 
   it("only mounts the settings sections the host can serve", () => {
-    expect(settingsSections(FEATURES, desktop).map((s) => s.id)).toEqual(["account", "agent-mail", "shortcuts", "model", "assistant", "personalize", "security", "help"]);
+    expect(settingsSections(FEATURES, desktop).map((s) => s.id)).toEqual(["account", "agent-mail", "shortcuts", "model", "agent-settings", "assistant", "personalize", "security", "help"]);
     // Browser-only preview: no host answer, only sections that need no command.
     expect(settingsSections(FEATURES, snapshot([], [], "unavailable")).map((s) => s.id)).toEqual(["shortcuts", "personalize", "help"]);
   });

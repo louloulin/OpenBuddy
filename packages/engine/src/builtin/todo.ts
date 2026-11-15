@@ -77,6 +77,8 @@ export function createTodoExtension({ engine, sessionId }: TodoBuiltinContext): 
 /** Registered in `BUILTIN_EXTENSIONS` (builtin/index.ts). */
 export const todoBuiltin = {
   id: "todo",
+  label: "任务计划",
+  description: "提供 ob_todo 工具：想一想时把计划步骤记下来，执行中逐步更新，计划面板和任务概览实时显示",
   tools: [PLAN_TOOL] as readonly string[],
   create: (ctx: TodoBuiltinContext): ExtensionFactory => createTodoExtension(ctx),
 };

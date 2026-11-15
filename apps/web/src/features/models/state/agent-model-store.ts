@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ModelState } from "@openbuddy/protocol/dto";
+import type { SessionModelState as ModelState } from "@openbuddy/protocol/agent-settings";
 
 /** Provider-qualified home preference plus authoritative per-session runtime state. */
 export const useAgentModelStore = create<{

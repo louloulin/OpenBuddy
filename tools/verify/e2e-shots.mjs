@@ -238,6 +238,102 @@ try {
       out.push(await ctx.shot('07-settings-' + id));
     }
     return out;`);
+  // 20261116-pii W0.4: 设置 · 智能体 — persisted Pi settings (pi-settings.json), reopened to prove they stuck.
+  await step('agent settings persisted (pii W0.4)', `
+    await page.locator('.settings-navigation__label').getByText('智能体', { exact: true }).first().click();
+    const compaction = page.getByRole('switch', { name: '自动压缩' }).first();
+    await compaction.waitFor({ timeout: 10000 });
+    await ctx.sleep(600);
+    const before = await ctx.shot('15-settings-agent');
+    if (!(await compaction.isChecked())) throw new Error('auto-compaction should start on');
+    // Click the visible track, as a user does (the label toggles its hidden checkbox).
+    await page.locator('label.ob-switch', { has: compaction }).first().click();
+    await page.getByRole('radiogroup', { name: '追加的发送方式' }).getByRole('radio', { name: '合并' }).click();
+    await page.getByText('已保存，已打开的任务立即生效').first().waitFor({ timeout: 10000 });
+    await page.keyboard.press('Escape');
+    await ctx.sleep(500);
+    await page.getByRole('button', { name: '设置', exact: true }).first().click();
+    await page.locator('.settings-navigation__label').getByText('智能体', { exact: true }).first().click();
+    const reopened = page.getByRole('switch', { name: '自动压缩' }).first();
+    await reopened.waitFor({ timeout: 10000 });
+    await ctx.sleep(600);
+    if (await reopened.isChecked()) throw new Error('auto-compaction switch did not persist');
+    const merged = await page.getByRole('radiogroup', { name: '追加的发送方式' }).getByRole('radio', { name: '合并' }).getAttribute('aria-checked');
+    if (merged !== 'true') throw new Error('follow-up mode did not persist');
+    const saved = await ctx.call('settings_agent_get');
+    if (saved.autoCompaction.enabled !== false || saved.followUpMode !== 'all') throw new Error('settings_agent_get: ' + JSON.stringify(saved));
+    const after = await ctx.shot('16-settings-agent-persisted');
+    await page.keyboard.press('Escape');
+    await ctx.sleep(400);
+    return { before, after, autoCompaction: saved.autoCompaction, followUpMode: saved.followUpMode, builtins: saved.builtins.map(b => b.id + ':' + b.enabled) };`);
+  // W1.6: star two models in the model menu (pi-settings enabledModels), then Ctrl+P cycles them in this task.
+  await step('model favourites (pii W1.6)', `
+    await ctx.call('providers_save_model', { model: { providerId: 'fixture', modelId: 'fixture-priced', name: 'Fixture 计费', input: ['text'], contextWindow: 64000, maxTokens: 4096, cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 } } });
+    await ctx.sleep(800);
+    await page.getByRole('button', { name: /^选择模型：/ }).first().click();
+    await page.getByRole('listbox', { name: '可用模型' }).waitFor({ timeout: 10000 });
+    await page.getByRole('button', { name: '收藏 Fixture 模型', exact: true }).click();
+    await page.getByRole('button', { name: '取消收藏 Fixture 模型', exact: true }).waitFor({ timeout: 10000 });
+    await page.getByRole('button', { name: '收藏 Fixture 计费', exact: true }).click();
+    await page.getByRole('button', { name: '取消收藏 Fixture 计费', exact: true }).waitFor({ timeout: 10000 });
+    await page.getByRole('option', { name: /Fixture 计费/ }).hover();
+    await ctx.sleep(500);
+    const menu = await ctx.shot('17-model-menu-favorites');
+    await page.keyboard.press('Escape');
+    const saved = await ctx.call('settings_agent_get');
+    if (saved.favoriteModels.length !== 2) throw new Error('favourites not saved: ' + JSON.stringify(saved.favoriteModels));
+    await page.locator('.wb-composer__input').click();
+    await page.keyboard.press('Control+P');
+    await page.getByRole('button', { name: /^选择模型：Fixture 计费/ }).first().waitFor({ timeout: 10000 });
+    await page.getByText('已切换到 Fixture 计费').first().waitFor({ timeout: 5000 });
+    await page.getByRole('img', { name: '当前模型不支持思考' }).first().waitFor({ timeout: 5000 });
+    await ctx.sleep(300);
+    const cycled = await ctx.shot('18-ctrl-p-cycled');
+    const cycles = (await ctx.audit()).main.filter(r => r.command === 'agent_cycle_model' && r.status === 'resolved').length;
+    if (cycles !== 1) throw new Error('agent_cycle_model calls: ' + cycles);
+    return { menu, cycled, favoriteModels: saved.favoriteModels };`);
+  // W1.5: context popover — this session's cost (priced model), 立即压缩 and the auto-compaction switch.
+  await step('context popover (pii W1.5)', `
+    const requests = ctx.fixture.requests.length;
+    await page.locator('.wb-composer__input').fill('看看这一轮的费用');
+    await page.getByRole('button', { name: '发送', exact: true }).click();
+    await page.getByText('本地 fixture', { exact: false }).first().waitFor({ timeout: 30000 });
+    await ctx.sleep(1500);
+    if (ctx.fixture.requests.length <= requests) throw new Error('no model request');
+    await page.getByRole('button', { name: /上下文已使用/ }).first().click();
+    await page.getByText('本会话费用').first().waitFor({ timeout: 10000 });
+    const auto = page.getByRole('switch', { name: '自动压缩' }).first();
+    if (await auto.isChecked()) throw new Error('popover switch should show the saved (off) setting');
+    await ctx.sleep(400);
+    const popover = await ctx.shot('19-context-popover');
+    await page.locator('label.ob-switch', { has: auto }).first().click();
+    await ctx.sleep(600);
+    const saved = await ctx.call('settings_agent_get');
+    if (saved.autoCompaction.enabled !== true) throw new Error('popover switch did not save');
+    await page.getByRole('button', { name: '立即压缩', exact: true }).click();
+    await page.locator('.context-usage__message').first().waitFor({ timeout: 30000 });
+    await ctx.sleep(400);
+    const compacted = await ctx.shot('20-context-compact');
+    const message = await page.locator('.context-usage__message').first().textContent();
+    const cost = await page.locator('.context-usage__cost .context-usage__footer-value').first().textContent();
+    await page.keyboard.press('Escape');
+    return { popover, compacted, cost, message, autoCompaction: saved.autoCompaction.enabled };`);
+  // W0.5: 问一问 is kept by the host; leaving the task (ChatView unmounts) and coming back shows it again.
+  await step('mode restored after switching sessions (pii W0.5)', `
+    // The mode buttons carry a data-tip tooltip, so match them by their visible text.
+    const ask = () => page.locator('.composer-mode__opt', { hasText: '问一问' }).first();
+    await ask().click();
+    await page.waitForFunction(() => document.querySelector('.composer-mode__opt--on')?.textContent === '问一问');
+    const title = (await page.locator('.sidebar__conv--active .sidebar__conv-title').first().textContent()) ?? '';
+    await page.keyboard.press('Control+N');
+    await ask().waitFor({ state: 'detached', timeout: 10000 });
+    await ctx.sleep(500);
+    await page.locator('.sidebar__conv', { hasText: title }).first().click();
+    await ask().waitFor({ timeout: 10000 });
+    await page.waitForFunction(() => document.querySelector('.composer-mode__opt--on')?.textContent === '问一问', null, { timeout: 10000 });
+    await ctx.sleep(600);
+    const shot = await ctx.shot('21-mode-restored');
+    return { title, shot, checked: await ask().getAttribute('aria-checked') };`);
   await step('close settings', `
     await page.keyboard.press('Escape');
     await page.locator('.settings-modal').waitFor({ state: 'detached', timeout: 5000 });
@@ -252,7 +348,7 @@ try {
     const moreItems = await page.locator('.sidebar__more-popover [role=menuitem]').allTextContents();
     if (moreItems.some(t => ['策略设置', '灵感', '云存储'].includes(t.trim()))) throw new Error('offline entry offered: ' + moreItems.join(','));
     await ctx.sleep(400);
-    const shot = await ctx.shot('08-sidebar-registry');
+    const shot = await ctx.shot('22-sidebar-registry');
     await page.mouse.move(900, 500);
     await ctx.sleep(300);
     return { nav, moreItems, shot };`);
@@ -285,14 +381,14 @@ try {
     await page.getByRole('tab', { name: '技能' }).waitFor({ timeout: 10000 });
     const tabs = await page.locator('.um-pills [role=tab]').allTextContents();
     await ctx.sleep(800);
-    const skills = await ctx.shot('09-hub-skills');
+    const skills = await ctx.shot('23-hub-skills');
     await page.getByRole('tab', { name: '连接器' }).click();
     await page.getByText('远程服务授权', { exact: true }).waitFor({ timeout: 10000 });
     await ctx.sleep(900);
-    const mcp = await ctx.shot('10-hub-connectors-mcp');
+    const mcp = await ctx.shot('24-hub-connectors-mcp');
     await page.getByRole('tab', { name: '扩展' }).click();
     await ctx.sleep(800);
-    const extensions = await ctx.shot('11-hub-extensions');
+    const extensions = await ctx.shot('25-hub-extensions');
     return { tabs, shots: [skills, mcp, extensions] };`);
   await step('second task', `
     await page.getByRole('button', { name: '新建任务', exact: true }).first().click();
@@ -313,14 +409,14 @@ try {
     await page.locator('mark.search-hit__mark').first().waitFor({ timeout: 10000 });
     const marks = await page.locator('mark.search-hit__mark').allTextContents();
     await ctx.sleep(600);
-    const palette = await ctx.shot('12-palette-content-search');
+    const palette = await ctx.shot('26-palette-content-search');
     await page.locator('.palette__row--hit').first().click();
     const find = page.getByRole('textbox', { name: '查找' });
     await find.waitFor({ timeout: 15000 });
     const findValue = await find.inputValue();
     if (findValue !== '统一卡片的圆角') throw new Error('find bar got ' + findValue);
     await ctx.sleep(1500);
-    const opened = await ctx.shot('13-palette-hit-opened');
+    const opened = await ctx.shot('27-palette-hit-opened');
     const count = await page.locator('.findbar__count').textContent();
     const highlights = await page.evaluate(() => (globalThis.CSS && CSS.highlights && CSS.highlights.get('ob-find')) ? CSS.highlights.get('ob-find').size : 0);
     return { marks, findValue, count, highlights, shots: [palette, opened] };`);

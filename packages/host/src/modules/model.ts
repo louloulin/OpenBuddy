@@ -1,8 +1,12 @@
 import { object, text, unsupported } from "@openbuddy/services/settings/settings";
 import { validateThinkingLevel } from "@openbuddy/engine/pi-engine";
 import { modelKey } from "@openbuddy/services/providers/providers";
+import { validateAgentSettingsPatch } from "@openbuddy/protocol/agent-settings";
 import type { Handler, HostContext, HostModule } from "../module.js";
-/** §5.3 `model` module. Per-session model and thinking level; default model settings. */
+/**
+ * §5.3 `model` module. Per-session model and thinking level; default model settings; the agent
+ * behaviour settings in pi-settings.json and favourite-model cycling (20261116-pii W0.4 / W1.6).
+ */
 export function modelModule(ctx: HostContext): HostModule {
   const { emit, engine, update } = ctx;
   const commands: Record<string, Handler> = {
@@ -52,6 +56,10 @@ export function modelModule(ctx: HostContext): HostModule {
       });
       emit("agent://models-update", {});
     },
+    settings_agent_get: () => engine.agentSettings(),
+    settings_agent_set: (p) => engine.setAgentSettings(validateAgentSettingsPatch(p.patch)),
+    agent_cycle_model: (p) =>
+      engine.cycleModel(text(p.sessionId), p.direction === "backward" ? "backward" : "forward"),
   };
   return { id: "model", commands };
 }

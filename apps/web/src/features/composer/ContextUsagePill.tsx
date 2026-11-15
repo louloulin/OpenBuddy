@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { agentSessionInfo, agentSessionUsage } from "@openbuddy/client/agent-client";
 import type { ContextInfo, SessionUsage } from "@openbuddy/protocol/dto";
+import type { SessionUsageExtras } from "@openbuddy/protocol/agent-settings";
+import { ContextUsageActions } from "./ContextUsageActions";
 
 
 
 interface Snapshot {
   ctx: ContextInfo;
-  usage?: SessionUsage;
+  usage?: SessionUsage & SessionUsageExtras;
+  /** Automatic compaction for this session (W1.5); undefined from an older host. */
+  autoCompaction?: boolean;
 }
 
 /** Adaptive token formatting: ≥100万 → 万, else K. */
@@ -68,7 +72,7 @@ export function ContextUsagePill({ sessionId, onRefreshSignal }: { sessionId: st
           agentSessionInfo(sessionId),
           agentSessionUsage(sessionId).catch(() => undefined as SessionUsage | undefined),
         ]);
-        if (info?.context?.total) setSnap({ ctx: info.context, usage });
+        if (info?.context?.total) setSnap({ ctx: info.context, usage, autoCompaction: info.autoCompaction });
       } catch { /* session not live in agent — pill stays hidden */ }
     };
     inflight.current = run();
@@ -175,6 +179,7 @@ export function ContextUsagePill({ sessionId, onRefreshSignal }: { sessionId: st
             <span>平均缓存命中率</span>
             <span className="context-usage__footer-value">{cacheHit}</span>
           </div>
+          <ContextUsageActions sessionId={sessionId} cost={snap.usage?.cost} autoCompaction={snap.autoCompaction} onChanged={() => void refresh()} />
         </div>
       )}
     </div>

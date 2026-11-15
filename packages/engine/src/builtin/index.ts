@@ -1,6 +1,7 @@
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import type { EngineContext } from "../engine-context.js";
 import { todoBuiltin } from "./todo.js";
+import { modeExtension } from "./mode.js";
 
 /**
  * Built-in extension channel (20261116-pii §5, W0.5): trusted, app-provided Pi extensions such as
@@ -24,13 +25,23 @@ export interface BuiltinContext {
 export interface BuiltinExtension {
   /** Stable id; also the key used to switch it off in the agent settings. */
   id: string;
+  /** Name and one-line explanation shown in 设置 · 智能体 (Chinese UI). */
+  label?: string;
+  description?: string;
   /** Tool names it registers (each must start with `ob_`), for documentation and settings UI. */
   tools?: readonly string[];
   create(ctx: BuiltinContext): ExtensionFactory;
 }
 
 /** Each built-in appends itself here (one file per built-in under `builtin/`). */
-export const BUILTIN_EXTENSIONS: BuiltinExtension[] = [];
+export const BUILTIN_EXTENSIONS: BuiltinExtension[] = [
+  {
+    id: "mode",
+    label: "模式记忆",
+    description: "把做一做 / 想一想 / 问一问记在会话里：重新打开、分叉或切换分支后自动恢复",
+    create: (ctx) => modeExtension(ctx),
+  },
+];
 // W3.1 plan / todo (`ob_todo`).
 BUILTIN_EXTENSIONS.push(todoBuiltin);
 

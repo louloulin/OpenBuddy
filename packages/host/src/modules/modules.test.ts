@@ -18,8 +18,8 @@ describe("host modules (20261115-md §5.3)", () => {
         owner.set(key, id);
       }
     expect(clashes).toEqual([]);
-    // 92 + session_search (session, pii W1.4) + agent_tree / agent_navigate (session), agent_bash / agent_bash_abort (turn), files_search (files) — 20261116-pii W1.1–W1.3.
-    expect(owner.size).toBe(98);
+    // 92 + settings_agent_get / settings_agent_set / agent_cycle_model (model, pii W0.4/W1.6) + session_search (session, pii W1.4) + agent_tree / agent_navigate (session), agent_bash / agent_bash_abort (turn), files_search (files) — 20261116-pii W1.1–W1.3.
+    expect(owner.size).toBe(101);
     expect([owner.get("agent_tree"), owner.get("agent_navigate"), owner.get("agent_bash"), owner.get("agent_bash_abort"), owner.get("files_search")]).toEqual(["session", "session", "turn", "turn", "files"]);
   });
 

@@ -15,8 +15,17 @@ import type {
   SlashCommand,
 } from "@openbuddy/protocol/dto";
 import { SectionShell } from "./shared";
+import { AgentBehaviorSettings } from "./AgentBehaviorSettings";
 
 // ---------- 智能体设置 ----------
+
+/**
+ * 子代理深度 / Web 搜索 call `subagents_config_*` / `web_search_config_*`, which the host does not
+ * implement (PENDING_COMMANDS; sub-agents arrive with 20261116-pii W3.4). Now that this section is
+ * reachable from the settings nav, that block is switched off instead of deleted (plan D8) so the
+ * panel makes no not_implemented calls; flip this once the host serves them.
+ */
+const RUNTIME_CONFIG_AVAILABLE = false;
 
 /** AgentSettingsPanel — 汇总显示当前智能体配置（skills + MCP + slash 命令）。
  *  数据来自 agent 的 x.ai/skills/config、x.ai/mcp/list、x.ai/commands/list，
@@ -44,8 +53,8 @@ export function AgentSettingsPanel() {
         skillsList().catch(() => [] as SkillInfo[]),
         mcpList().catch(() => [] as McpServerEntry[]),
         commandsList().catch(() => [] as SlashCommand[]),
-        subagentsConfigGet().catch(() => ({ maxDepth: 1 })),
-        webSearchConfigGet().catch(() => ({ enabled: false, model: "" })),
+        RUNTIME_CONFIG_AVAILABLE ? subagentsConfigGet().catch(() => ({ maxDepth: 1 })) : { maxDepth: 1 },
+        RUNTIME_CONFIG_AVAILABLE ? webSearchConfigGet().catch(() => ({ enabled: false, model: "" })) : { enabled: false, model: "" },
       ]);
       setSkills(sk);
       setServers(mc);
@@ -121,8 +130,11 @@ export function AgentSettingsPanel() {
   return (
     <SectionShell
       title="智能体设置"
-      desc="当前 agent 智能体的配置概览：已加载的技能、MCP 连接器和 slash 命令。数据来自 agent 的 x.ai/skills/config、x.ai/mcp/list、x.ai/commands/list。"
+      desc="智能体在任务中的运行方式（立即生效并自动保存），以及当前加载的技能、MCP 连接器和 slash 命令。"
     >
+      {/* 运行行为 (20261116-pii W0.4): pi-settings.json via settings_agent_get / settings_agent_set. */}
+      <AgentBehaviorSettings />
+      <h3 className="agent-behavior__group-title">技能、连接器与命令</h3>
       <div className="settings-actions">
         <button className="settings-btn" onClick={reload} disabled={loading}>
           <RefreshCw size={14} /> {loading ? "加载中…" : "刷新"}
@@ -253,8 +265,8 @@ export function AgentSettingsPanel() {
         </div>
       </details>
 
-      {/* 运行时配置：子代理深度 + Web 搜索 */}
-      <details className="agent-section" open>
+      {/* 运行时配置：子代理深度 + Web 搜索 (off until the host serves them, see RUNTIME_CONFIG_AVAILABLE) */}
+      {RUNTIME_CONFIG_AVAILABLE && <details className="agent-section" open>
         <summary className="agent-section__title">运行时配置</summary>
         <div className="agent-section__body">
           {/* 子代理嵌套深度 */}
@@ -332,7 +344,7 @@ export function AgentSettingsPanel() {
             <p className="settings-msg settings-msg--info">{runtimeMsg}</p>
           )}
         </div>
-      </details>
+      </details>}
 
       <p className="settings-hint">
         管理（启用/禁用/增删）在主界面「专家·技能·连接器」面板。修改后点刷新查看最新状态。

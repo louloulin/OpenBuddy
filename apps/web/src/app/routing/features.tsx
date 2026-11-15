@@ -171,7 +171,8 @@ export const FEATURES: FeatureEntry<FeatureRouteProps>[] = [
   { id: "settings-model", settingsSections: [{ id: "model", label: "模型", icon: Cpu, order: 40, render: (p) => <ModelsSettingsPanel onModelsChanged={p.onModelsChanged} /> }], requires: ["providers_list"] },
   { id: "settings-memory", settingsSections: [{ id: "memory", label: "记忆", icon: Brain, order: 45, render: () => <MemorySettingsPanel /> }], requires: ["memory_list", "memory_rewrite"] },
   { id: "settings-assistant", settingsSections: [{ id: "assistant", label: "助理设置", icon: Bot, order: 50, render: () => <AssistantSettingsPanel /> }], requires: ["agents_defaults_get"] },
-  { id: "settings-agent", settingsSections: [{ id: "agent-settings", label: "智能体设置", icon: Settings2, order: 55, render: () => <AgentSettingsPanel /> }], requires: ["subagents_config_get", "web_search_config_get"] },
+  // pii W0.4: 智能体 = persisted Pi settings (settings_agent_*); its old sub-agent / web-search block stays switched off inside the panel.
+  { id: "settings-agent", settingsSections: [{ id: "agent-settings", label: "智能体", icon: Settings2, order: 42, render: () => <AgentSettingsPanel /> }], requires: ["settings_agent_get", "settings_agent_set"] },
   { id: "settings-personalize", settingsSections: [{ id: "personalize", label: "个性化", icon: Palette, order: 60, render: () => <PersonalizeSettingsPanel /> }], requires: [] },
   { id: "settings-security", settingsSections: [{ id: "security", label: "安全中心", icon: Shield, order: 70, render: () => <SecuritySettingsPanel /> }], requires: ["permission_list"] },
   {

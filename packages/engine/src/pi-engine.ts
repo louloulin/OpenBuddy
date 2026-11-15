@@ -17,6 +17,7 @@ import type { HostShell } from "@openbuddy/kernel";
 import { CheckpointStore } from "./checkpoints/store.js";
 import { validateThinkingLevel, type AgentMode, type PoolLimits, type PromptImages, type SessionRunStatus, type Slot, type ThinkingLevel } from "./types.js";
 import { PI_VERSION } from "./version.js";
+import type { AgentSettingsPatch } from "@openbuddy/protocol/agent-settings";
 import * as pipeline from "./event-pipeline.js";
 import * as runtime from "./session-runtime.js";
 import * as pool from "./session-pool.js";
@@ -211,6 +212,11 @@ export class PiEngine {
   fork(id: string) { return features.fork(this, id); }
   cancel(id: string) { return runtime.cancel(this, id); }
   compact(id: string, instructions?: string) { return features.compact(this, id, instructions); }
+  /** 设置 · 智能体 (pi-settings.json, 20261116-pii W0.4). */
+  agentSettings() { return features.agentSettings(this); }
+  setAgentSettings(patch: AgentSettingsPatch) { return features.setAgentSettings(this, patch); }
+  /** Ctrl/Cmd+P over the favourite models (W1.6). */
+  cycleModel(id: string, direction?: "forward" | "backward") { return features.cycleModel(this, id, direction); }
   close(id: string) { return pool.close(this, id); }
   shutdown() { return pool.shutdown(this); }
   /** @internal */ evictOverflow(keep: string) { return pool.evictOverflow(this, keep); }
@@ -229,6 +235,8 @@ export class PiEngine {
       modelKey: modelKey(m.provider, m.id),
       thinkingLevel: s.thinkingLevel,
       availableThinkingLevels: s.getAvailableThinkingLevels(),
+      supportsThinking: s.supportsThinking(),
+      mode: this.mode(id),
     };
   }
   async setModel(id: string, modelId: string, providerId?: string) {
@@ -268,8 +276,9 @@ export class PiEngine {
     const messageTokens = Math.max(0, used - systemPromptTokens - toolDefinitionsTokens);
     return {
       cwd: session.sessionManager.getCwd(),
-      mode: this.mode(id),
+      // `mode` comes with the model state below (W0.5).
       cost: stats.cost,
+      autoCompaction: session.autoCompactionEnabled,
       model: session.model?.id,
       modelDisplayName: session.model?.name,
       ...this.modelState(id),
@@ -293,8 +302,10 @@ export class PiEngine {
     };
   }
   usage(id: string) {
-    const stats = this.live(id).getSessionStats();
+    const session = this.live(id),
+      stats = session.getSessionStats();
     return {
+      cost: features.sessionCost(session),
       usage: {
         inputTokens: stats.tokens.input + stats.tokens.cacheRead,
         outputTokens: stats.tokens.output,

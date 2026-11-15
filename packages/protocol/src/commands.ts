@@ -26,6 +26,8 @@ export const COMMANDS = [
   'host_capabilities', 'session_search',
   // 20261116-pii W1.1 branch switcher, W1.2 `!command`, W1.3 `@` file mention.
   'agent_tree', 'agent_navigate', 'agent_bash', 'agent_bash_abort', 'files_search',
+  // 20261116-pii W0.4 / W1.6 (host module `model`).
+  'settings_agent_get', 'settings_agent_set', 'agent_cycle_model',
 ] as const;
 export type CommandName = typeof COMMANDS[number];
 export const isCommand = (value: unknown): value is CommandName => typeof value === 'string' && (COMMANDS as readonly string[]).includes(value);

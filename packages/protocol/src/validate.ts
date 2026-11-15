@@ -1,5 +1,6 @@
 import type { CommandName } from './commands.js';
 import type { Payload } from './types.js';
+import { validateAgentSettingsPatch } from './agent-settings.js';
 
 /** Bound structured-clone input before dispatch; services validate their domain fields. */
 export function validatePayload(input: unknown): Payload {
@@ -103,6 +104,11 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
     string('cwd', 4096, true);
     const limit = payload.limit;
     if (limit !== undefined && limit !== null && (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > 100)) throw new Error('invalid_payload: limit');
+  }
+  if (command === 'settings_agent_set') validateAgentSettingsPatch(payload.patch);
+  if (command === 'agent_cycle_model') {
+    string('sessionId', 256);
+    if (payload.direction !== undefined && payload.direction !== 'forward' && payload.direction !== 'backward') throw new Error('invalid_payload: direction');
   }
   return payload;
 }

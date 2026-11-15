@@ -70,6 +70,7 @@ export interface EngineContext {
   close(id: string): Promise<void>;
   evictOverflow(keep: string): Promise<void>;
   rebuild(slot: Slot): Promise<void>;
+  reload(filter?: (slot: Slot) => boolean): Promise<void>;
   metadata(id: string, patch: { title?: string; pinned?: boolean; archived?: boolean }): void;
   /** Only forwarded as an event payload by the split-out modules. */
   modelState(id: string): unknown;

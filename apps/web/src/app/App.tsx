@@ -863,7 +863,7 @@ function Shell() {
   const activeNav = placeholderView ?? (currentSessionId ? "" : "新建任务");
 
   return (
-    <ModelRuntimeContext.Provider value={{ busy: modelBusy, unavailableReason: !focusedModelSession && invalidDefault ? "默认模型不可用，请重新选择模型" : undefined, canSend: !!currentModelId && models.some(model => model.id === currentModelId), thinkingLevel: focusedModelSession ? activeModelState?.thinkingLevel : clampThinking(homeThinking, homeLevels), thinkingLevels: focusedModelSession ? activeModelState?.availableThinkingLevels ?? [] : homeLevels, onThinkingChange: focusedModelSession ? (activeModelState ? handleThinkingChange : undefined) : homeLevels.length > 1 ? handleHomeThinkingChange : undefined }}>
+    <ModelRuntimeContext.Provider value={{ busy: modelBusy, unavailableReason: !focusedModelSession && invalidDefault ? "默认模型不可用，请重新选择模型" : undefined, canSend: !!currentModelId && models.some(model => model.id === currentModelId), thinkingLevel: focusedModelSession ? activeModelState?.thinkingLevel : clampThinking(homeThinking, homeLevels), thinkingLevels: focusedModelSession ? activeModelState?.availableThinkingLevels ?? [] : homeLevels, onThinkingChange: focusedModelSession ? (activeModelState ? handleThinkingChange : undefined) : homeLevels.length > 1 ? handleHomeThinkingChange : undefined, sessionId: focusedModelSession ?? undefined, supportsThinking: focusedModelSession ? activeModelState?.supportsThinking : undefined }}>
     <div className={"app" + (IS_MACOS ? " app--macos" : "")}>
       {/* macOS 使用系统原生 Overlay 标题栏(红绿灯 + 原生菜单栏),
           不再渲染自绘 TitleBar;Windows/Linux 保持自绘。 */}
