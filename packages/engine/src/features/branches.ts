@@ -3,6 +3,7 @@ import type { BranchSibling, BranchTree, BranchTurn, NavigateFileConflict, Navig
 import { protocolError } from "@openbuddy/protocol/errors";
 import type { EngineContext } from "../engine-context.js";
 import { deriveTitle, messageText } from "../titles.js";
+import type { SwitchPlan } from "../checkpoints/store.js";
 import { moveLeaf } from "./branch-state.js";
 
 /**
@@ -146,42 +147,48 @@ function switchSegments(tree: TreeIndex, fromLeaf: string | null, toLeaf: string
 
 /**
  * Show another version (`entryId`, normally a sibling's `leafId`). With `restoreFiles` the files
- * are first put back to that version's state (all or nothing: changes made since need `force` or
+ * are put back to that version's state (all or nothing: changes made since need `force` or
  * `skip`); with `summarize` Pi writes a summary of the abandoned branch at the target.
+ *
+ * Files and conversation move together: the conflict check runs first and writes nothing, the
+ * files are written only once the conversation is on the target (a cancelled or failed summary,
+ * or an extension cancelling `session_before_tree`, leaves both where they were), and the session
+ * is held for the whole switch so no prompt or command starts in between.
  */
 export async function navigate(engine: EngineContext, id: string, entryId: string, opts: NavigateOptions = {}): Promise<NavigateResult> {
   const slot = engine.slot(id);
   const session = slot.session;
   if (slot.busy || session.isStreaming) throw protocolError("session_busy", "会话忙碌：回复完成后再切换版本");
-  if (session.isBashRunning) throw protocolError("bash_running", "命令还在运行，结束后再切换版本");
+  if (session.isBashRunning || slot.userBash) throw protocolError("bash_running", "命令还在运行，结束后再切换版本");
   const target = session.sessionManager.getEntry(entryId);
   if (!target) throw protocolError("entry_not_found", "该版本不存在");
-  let restored: string[] = [];
-  let conflicts: NavigateFileConflict[] = [];
-  if (opts.restoreFiles) {
-    const restore = typeof opts.restoreFiles === "object" ? opts.restoreFiles : {};
-    const { undo, redo } = switchSegments(indexTree(session.sessionManager.getEntries()), session.sessionManager.getLeafId(), entryId);
-    const result = await engine.checkpoints.switchBranch(id, undo, redo, restore);
-    if (!restore.force && result.conflicts.some((c) => c.reason === "changed_since")) return { navigated: false, restored: [], conflicts: result.conflicts };
-    ({ restored, conflicts } = result);
-    if (restored.length) engine.emit("agent://artifacts", { sessionId: id });
-  }
-  // Summarizing calls the model: hold the session like /compact does.
   const generation = slot.generation;
-  if (opts.summarize) {
-    slot.busy = true;
-    engine.emitStatus(slot);
-  }
+  slot.busy = true;
+  // Summarizing calls the model: show the session as running, like /compact does.
+  if (opts.summarize) engine.emitStatus(slot);
   try {
+    const restore = typeof opts.restoreFiles === "object" ? opts.restoreFiles : {};
+    let plan: SwitchPlan | undefined;
+    if (opts.restoreFiles) {
+      const { undo, redo } = switchSegments(indexTree(session.sessionManager.getEntries()), session.sessionManager.getLeafId(), entryId);
+      plan = await engine.checkpoints.planSwitch(id, undo, redo, restore);
+      if (!restore.force && plan.conflicts.some((c) => c.reason === "changed_since")) return { navigated: false, restored: [], conflicts: plan.conflicts };
+    }
     const result = await moveLeaf(engine, slot, entryId, "restore", { summarize: opts.summarize === true });
-    if (result.cancelled) return { navigated: false, restored, conflicts };
+    if (result.cancelled) return { navigated: false, restored: [], conflicts: plan?.conflicts ?? [] };
+    let restored: string[] = [];
+    let conflicts: NavigateFileConflict[] = [];
+    if (plan) {
+      ({ restored, conflicts } = await engine.checkpoints.applySwitch(id, plan, restore));
+      if (restored.length) engine.emit("agent://artifacts", { sessionId: id });
+    }
     engine.invalidateList();
     engine.emitEvent(slot, { type: "session_rewound", messages: session.messages });
     return { navigated: true, restored, conflicts, ...(result.editorText !== undefined ? { editorText: result.editorText } : {}), ...(result.summaryEntry ? { summarized: true } : {}) };
   } finally {
-    if (opts.summarize && generation === slot.generation) {
+    if (generation === slot.generation) {
       slot.busy = false;
-      engine.emitStatus(slot);
+      if (opts.summarize) engine.emitStatus(slot);
       if (slot.stale && engine.slots.get(id) === slot) void engine.rebuild(slot).catch(() => {});
     }
   }

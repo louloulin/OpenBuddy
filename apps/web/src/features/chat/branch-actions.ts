@@ -39,9 +39,12 @@ export async function switchVersion(sessionId: string, turn: BranchTurn, targetI
     }
     if (!result.navigated) { opts.onToast?.("没有切换版本"); return false; }
     const missing = result.conflicts.filter((c) => c.reason === "missing_snapshot").length;
+    // Files written to while the old version was being summarized are left alone.
+    const changed = result.conflicts.filter((c) => c.reason === "changed_since").length;
     const notes = [
       result.restored.length ? `还原了 ${result.restored.length} 个文件` : "",
       missing ? `${missing} 个文件没有快照无法还原` : "",
+      changed ? `${changed} 个文件在切换期间被改动，未还原` : "",
       result.summarized ? "已总结原来的版本" : "",
       result.editorText !== undefined ? "这个版本还没有回答" : "",
     ].filter(Boolean);

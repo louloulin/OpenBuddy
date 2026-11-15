@@ -1,7 +1,7 @@
 // @vitest-environment node
 // 20261116-pii W1.1: branch switcher ‹1/2› on real Pi sessions (SessionManager tree + navigateTree).
 import { afterEach, describe, expect, it } from "vitest";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { sdkFixture, until, type FixtureRequest } from "./helpers/sdk-fixture";
 
@@ -136,5 +136,65 @@ describe("agent_tree / agent_navigate (W1.1)", () => {
     // The overwritten content was kept as a version first.
     const versions = (await f.call("checkpoint_list", { sessionId: f.sid, path: out })) as any[];
     expect(versions.some((v) => v.source === "restore")).toBe(true);
+  });
+
+  it("restores files only once the conversation has moved: a cancelled summary leaves both where they were", async () => {
+    let writes = 0;
+    let holdSummary = false;
+    let summaryStarted = false;
+    const f = await sdkFixture((r) => {
+      if (holdSummary) {
+        summaryStarted = true;
+        return new Promise<never>(() => {}); // until 停止 aborts the summary request
+      }
+      return lastRole(r) === "tool" ? { text: "done" } : { toolCalls: [{ id: `w${writes}`, name: "write", arguments: { path: join(f.root, "out.txt"), content: `v${++writes}` } }] };
+    }, cleanups);
+    await f.call("permission_mode_set", { mode: "always-approve" });
+    await f.call("agent_send", { sessionId: f.sid, text: "make the file" });
+    await f.call("agent_regenerate", { sessionId: f.sid });
+    const out = join(f.root, "out.txt");
+    await until(() => f.events.filter((e) => e.name === "agent://artifacts").length >= 2);
+    expect(await readFile(out, "utf8")).toBe("v2");
+    const tree = (await f.call("agent_tree", { sessionId: f.sid })) as any;
+    holdSummary = true;
+    const switching = f.call("agent_navigate", { sessionId: f.sid, entryId: tree.turns[0].siblings[0].leafId, restoreFiles: true, summarize: true });
+    await until(() => summaryStarted);
+    // While the old version is being summarized its files stay, and no prompt can start.
+    expect(await readFile(out, "utf8")).toBe("v2");
+    await expect(f.call("agent_send", { sessionId: f.sid, text: "mid-switch" })).rejects.toThrow("会话忙碌");
+    await f.call("agent_cancel", { sessionId: f.sid });
+    await expect(switching).resolves.toEqual({ navigated: false, restored: [], conflicts: [] });
+    expect(await readFile(out, "utf8")).toBe("v2");
+    expect(((await f.call("agent_tree", { sessionId: f.sid })) as any).turns[0].index).toBe(1);
+  });
+
+  it("holds the session for the whole switch: a prompt sent while files are restored is rejected", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let trashing = false;
+    const f = await sdkFixture((r, index) => (index === 0 || lastRole(r) === "tool" ? { text: `answer ${index}` } : { toolCalls: [{ id: `w${index}`, name: "write", arguments: { path: join(f.root, "new.txt"), content: "created" } }] }), cleanups, {
+      trash: async (path) => {
+        trashing = true;
+        await gate;
+        await rm(path);
+      },
+    });
+    await f.call("permission_mode_set", { mode: "always-approve" });
+    await f.call("agent_send", { sessionId: f.sid, text: "question" });
+    await f.call("agent_regenerate", { sessionId: f.sid });
+    const created = join(f.root, "new.txt");
+    await until(() => f.events.some((e) => e.name === "agent://artifacts"));
+    expect(await readFile(created, "utf8")).toBe("created");
+    const tree = (await f.call("agent_tree", { sessionId: f.sid })) as any;
+    const requests = f.requests.length;
+    // Back to the version that never created the file: restoring it moves the file to the trash.
+    const switching = f.call("agent_navigate", { sessionId: f.sid, entryId: tree.turns[0].siblings[0].leafId, restoreFiles: true });
+    await until(() => trashing);
+    await expect(f.call("agent_send", { sessionId: f.sid, text: "mid-restore" })).rejects.toThrow("会话忙碌");
+    await expect(f.call("agent_bash", { sessionId: f.sid, command: "echo hi" })).rejects.toThrow("session_busy");
+    release();
+    await expect(switching).resolves.toMatchObject({ navigated: true, restored: [created] });
+    await expect(readFile(created, "utf8")).rejects.toThrow();
+    expect(f.requests.length).toBe(requests);
   });
 });
