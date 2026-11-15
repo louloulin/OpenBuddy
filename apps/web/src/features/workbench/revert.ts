@@ -10,6 +10,17 @@ export function filesTouchedBy(artifacts: ArtifactInfo[], toolCallIds: Iterable<
   return artifacts.filter((a) => a.toolCallIds.some((id) => ids.has(id)));
 }
 
+/** U2.3: files changed again since — 覆盖 (true) or 跳过 (false). Also used when switching branches (W1.1). */
+export function confirmOverwrite(changed: string[]): Promise<boolean> {
+  return appConfirm({
+    title: `${changed.length} 个文件在之后又被修改过`,
+    message: `${changed.map(name).join("、")}\n覆盖会丢掉之后的修改（覆盖前同样会留存一个版本，可以再还原回来）。`,
+    confirmLabel: "覆盖",
+    cancelLabel: "跳过",
+    danger: true,
+  });
+}
+
 /**
  * Put files back to before the given tool calls (20261115-ui §5.6). Files
  * changed again afterwards are listed once with 覆盖 / 跳过; files without a
@@ -23,13 +34,7 @@ export async function revertToolCalls(sessionId: string, toolCallIds: string[], 
     let conflicts = first.conflicts;
     const changed = conflicts.filter((c) => c.reason === "changed_since").map((c) => c.path);
     if (changed.length) {
-      const overwrite = await appConfirm({
-        title: `${changed.length} 个文件在之后又被修改过`,
-        message: `${changed.map(name).join("、")}\n覆盖会丢掉之后的修改（覆盖前同样会留存一个版本，可以再还原回来）。`,
-        confirmLabel: "覆盖",
-        cancelLabel: "跳过",
-        danger: true,
-      });
+      const overwrite = await confirmOverwrite(changed);
       if (overwrite) {
         const again = await turnRevert(sessionId, toolCallIds, { force: true, skip: restored });
         restored = [...restored, ...again.restored];

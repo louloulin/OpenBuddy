@@ -18,7 +18,9 @@ describe("host modules (20261115-md §5.3)", () => {
         owner.set(key, id);
       }
     expect(clashes).toEqual([]);
-    expect(owner.size).toBe(92);
+    // 92 + agent_tree / agent_navigate (session), agent_bash / agent_bash_abort (turn), files_search (files) — 20261116-pii W1.1–W1.3.
+    expect(owner.size).toBe(97);
+    expect([owner.get("agent_tree"), owner.get("agent_navigate"), owner.get("agent_bash"), owner.get("agent_bash_abort"), owner.get("files_search")]).toEqual(["session", "session", "turn", "turn", "files"]);
   });
 
   it("host_capabilities reports what the host serves plus what the embedding app serves", async () => {

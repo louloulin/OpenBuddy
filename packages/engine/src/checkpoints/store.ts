@@ -156,6 +156,43 @@ export class CheckpointStore {
     return result;
   }
 
+  /**
+   * Switch files from one conversation branch to another (20261116-pii W1.1): undo what the
+   * abandoned branch's tool calls did, then redo what the target branch's tool calls did, so each
+   * file ends where the target branch left it. A file changed since (outside these calls) is a
+   * `changed_since` conflict; unless `force`, any such conflict means nothing is written at all.
+   */
+  async switchBranch(sessionId: string, undoIds: string[], redoIds: string[], opts: { skip?: string[]; force?: boolean } = {}): Promise<RevertResult> {
+    const index = await this.index(sessionId);
+    const pick = (ids: string[]) => {
+      const set = new Set(ids);
+      const byPath = new Map<string, CheckpointRecord[]>();
+      for (const r of index.filter((r) => r.source === "tool" && r.toolCallId && set.has(r.toolCallId)).sort((a, b) => a.at - b.at)) byPath.set(r.path, [...(byPath.get(r.path) ?? []), r]);
+      return byPath;
+    };
+    const undo = pick(undoIds), redo = pick(redoIds);
+    const result: RevertResult = { restored: [], conflicts: [] };
+    const writes: Array<{ path: string; hash: string | null }> = [];
+    for (const path of new Set([...undo.keys(), ...redo.keys()])) {
+      if (opts.skip?.includes(path)) continue;
+      const a = undo.get(path), b = redo.get(path);
+      if ([...(a ?? []), ...(b ?? [])].some((r) => r.skipped)) { result.conflicts.push({ path, reason: "missing_snapshot" }); continue; }
+      // Where the file should end up, and where it should be now if nothing else touched it.
+      const desired = b ? b[b.length - 1].after : a![0].before;
+      const expected = a ? a[a.length - 1].after : b![0].before;
+      const current = (await this.capture(sessionId, path, false)).hash;
+      if (current === desired) continue;
+      if (!opts.force && current !== expected) { result.conflicts.push({ path, reason: "changed_since" }); continue; }
+      writes.push({ path, hash: desired });
+    }
+    if (!opts.force && result.conflicts.some((c) => c.reason === "changed_since")) return result;
+    for (const { path, hash } of writes) {
+      await this.restore(sessionId, path, hash);
+      result.restored.push(path);
+    }
+    return result;
+  }
+
   private dir(sessionId: string) {
     if (!/^[\w.-]+$/.test(sessionId)) throw Error("invalid_payload: sessionId");
     return join(this.root, sessionId);

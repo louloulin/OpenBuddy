@@ -26,7 +26,8 @@ export function registerIpc(window: BrowserWindow, handlers: CommandHandlers, tr
     assertSender(event);
     if (!isCommand(command)) throw new Error(`not_implemented: ${String(command).slice(0, 128)}`);
     const payload = validateCommandPayload(command, input);
-    if (workspaces && ['agent_init', 'agent_new_session'].includes(command) && payload.cwd != null) {
+    // files_search (`@` mention, W1.3) lists a workspace: the same native grant as opening one.
+    if (workspaces && ['agent_init', 'agent_new_session', 'files_search'].includes(command) && payload.cwd != null) {
       if (typeof payload.cwd !== 'string' || !await workspaces.allows(payload.cwd)) throw new Error('workspace_not_authorized: select a folder using the native dialog');
     }
     if (command === 'agent_extensions_add' && !await fileAccess.allowsNativePath(payload.path as string)) throw new Error('extension_path_not_authorized: select the extension using the native dialog');

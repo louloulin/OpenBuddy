@@ -97,5 +97,36 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'rewind_execute') string('entryId', 256);
   if (command === 'agent_list_sessions' && payload.includeArchived !== undefined && typeof payload.includeArchived !== 'boolean') throw new Error('invalid_payload: includeArchived');
   if (command === 'agent_extensions_set_enabled' && typeof payload.enabled !== 'boolean') throw new Error('invalid_payload: enabled');
+  validateConversationTools(command, payload, string);
   return payload;
+}
+
+/** 20261116-pii W1.1 branches, W1.2 `!command`, W1.3 `@` file search. */
+function validateConversationTools(command: CommandName, payload: Payload, string: (key: string, max?: number, optional?: boolean) => void) {
+  const fail = (key: string) => { throw new Error(`invalid_payload: ${key}`); };
+  const optionalBool = (key: string) => { if (payload[key] !== undefined && typeof payload[key] !== 'boolean') fail(key); };
+  if (['agent_tree', 'agent_navigate', 'agent_bash', 'agent_bash_abort'].includes(command)) string('sessionId', 256);
+  if (command === 'agent_navigate') {
+    string('entryId', 256);
+    optionalBool('summarize');
+    const restore = payload.restoreFiles;
+    if (restore !== undefined && typeof restore !== 'boolean') {
+      if (!restore || typeof restore !== 'object' || Array.isArray(restore) || Object.keys(restore).some((key) => key !== 'force' && key !== 'skip')) fail('restoreFiles');
+      const { force, skip } = restore as { force?: unknown; skip?: unknown };
+      if (force !== undefined && typeof force !== 'boolean') fail('restoreFiles.force');
+      if (skip !== undefined && (!Array.isArray(skip) || skip.length > 2000 || skip.some((p) => typeof p !== 'string' || !p || p.length > 4096 || p.includes('\0')))) fail('restoreFiles.skip');
+    }
+  }
+  if (command === 'agent_bash') {
+    string('command', 64 * 1024);
+    optionalBool('excludeFromContext');
+    if (payload.risk !== undefined && !['low', 'medium', 'high'].includes(String(payload.risk))) fail('risk');
+  }
+  if (command === 'files_search') {
+    string('cwd', 4096);
+    const query = payload.query;
+    if (query !== undefined && (typeof query !== 'string' || query.length > 256 || query.includes('\0'))) fail('query');
+    const limit = payload.limit;
+    if (limit !== undefined && (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > 200)) fail('limit');
+  }
 }

@@ -24,6 +24,8 @@ export const COMMANDS = [
   'agent_export_html', 'agent_set_mode', 'agent_abort_retry', 'clipboard_save_image',
   'notification_prefs_get', 'notification_prefs_set', 'agent_set_queue',
   'host_capabilities',
+  // 20261116-pii W1.1 branch switcher, W1.2 `!command`, W1.3 `@` file mention.
+  'agent_tree', 'agent_navigate', 'agent_bash', 'agent_bash_abort', 'files_search',
 ] as const;
 export type CommandName = typeof COMMANDS[number];
 export const isCommand = (value: unknown): value is CommandName => typeof value === 'string' && (COMMANDS as readonly string[]).includes(value);

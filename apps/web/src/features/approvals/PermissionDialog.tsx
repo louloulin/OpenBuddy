@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePermissionStore, selectPermissionForSession } from "@/features/approvals/state/permission-store";
 import { agentResolvePermission } from "@openbuddy/client/agent-client";
 import type { PermissionRequest } from "@openbuddy/protocol/dto";
+import { isUserBashRequest } from "@openbuddy/protocol/bash";
 import { checkCommandRisk, riskLabel } from "@openbuddy/chat-core/command-risk";
 import { permissionObjectLabel, permissionTitle, toolCategory, toolSubject } from "@openbuddy/chat-core/tool-summary";
 import { ShieldAlertIcon } from "@openbuddy/ui/icon/icons/index";
@@ -31,6 +32,9 @@ export function PermissionCard({ request, cwd }: { request: PermissionRequest; c
   const risk = toolCategory(tool) === "command" ? checkCommandRisk(subject) : undefined;
   const fullInput = request.rawInput != null ? JSON.stringify(request.rawInput, null, 2) : "";
   const destructive = request.destructive;
+  // A command the user typed (`!cmd`, W1.2) that needs the strong confirmation.
+  const typed = isUserBashRequest(request);
+  const title = typed ? (destructive?.paths?.length ? "这条命令会删除文件，确定要执行吗？" : "这条命令有风险，确定要执行吗？") : destructive ? "Buddy 想删除文件，需要你确认" : permissionTitle(tool);
 
   const resolve = async (optionId: string, note?: string) => {
     setBusy(true);
@@ -75,8 +79,8 @@ export function PermissionCard({ request, cwd }: { request: PermissionRequest; c
     <div ref={rootRef} className={"perm-card" + (destructive ? " perm-card--danger" : "")} role="group" aria-label={permissionTitle(tool)} onKeyDown={onKeyDown}>
       <div className="perm-card__head">
         <ShieldAlertIcon size={16} className="perm-card__icon" />
-        <span className="perm-card__title">{destructive ? "Buddy 想删除文件，需要你确认" : permissionTitle(tool)}</span>
-        {!destructive && risk && risk.level !== "low" && (
+        <span className="perm-card__title">{title}</span>
+        {(!destructive || typed) && risk && risk.level !== "low" && (
           <span className={"perm-card__risk perm-card__risk--" + risk.level} title={risk.reasons.join("；")}>{riskLabel(risk.level)}</span>
         )}
         <button type="button" className="perm-card__rules" onClick={openSecurityCenter}>查看拦截规则</button>
@@ -116,9 +120,9 @@ export function PermissionCard({ request, cwd }: { request: PermissionRequest; c
         </div>
       ) : (
         <div className="perm-card__actions">
-          <button type="button" className="perm-card__btn perm-card__btn--quiet" disabled={busy} onClick={() => setDenying(true)} title="拒绝并告诉 Buddy 原因，它会换一种做法">拒绝并说明…</button>
+          {!typed && <button type="button" className="perm-card__btn perm-card__btn--quiet" disabled={busy} onClick={() => setDenying(true)} title="拒绝并告诉 Buddy 原因，它会换一种做法">拒绝并说明…</button>}
           <span className="perm-card__spacer" />
-          <button type="button" className="perm-card__btn" disabled={busy} onClick={() => resolve(option("deny")?.optionId ?? "deny")} title="Esc">拒绝</button>
+          <button type="button" className="perm-card__btn" disabled={busy} onClick={() => resolve(option("deny")?.optionId ?? "deny")} title="Esc">{typed ? "取消" : "拒绝"}</button>
           {option("allow_session") && (
             <button type="button" className="perm-card__btn" disabled={busy} onClick={() => resolve("allow_session")}>本任务允许</button>
           )}
@@ -126,7 +130,7 @@ export function PermissionCard({ request, cwd }: { request: PermissionRequest; c
             <button type="button" className="perm-card__btn" disabled={busy} onClick={() => resolve("allow_always")} title="记为一条允许规则，可在 设置·安全中心 修改">始终允许</button>
           )}
           <button ref={primaryRef} type="button" className={"perm-card__btn perm-card__btn--primary" + (destructive ? " perm-card__btn--danger" : "")} disabled={busy} onClick={() => resolve(option("allow")?.optionId ?? "allow")} title="Enter">
-            {destructive ? "允许删除" : "允许本次"}
+            {typed ? "仍要执行" : destructive ? "允许删除" : "允许本次"}
           </button>
         </div>
       )}

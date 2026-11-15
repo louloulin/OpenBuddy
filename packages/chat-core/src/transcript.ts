@@ -25,7 +25,10 @@ export interface MessageMeta {
   pending?: boolean;
   /** Non-chat history entries rendered as dividers. */
   notice?: "compaction" | "branch" | "custom" | "bash";
+  /** `!command` rows (20261116-pii W1.2); `running` while its output streams. */
+  bash?: BashMeta;
 }
+export interface BashMeta { id?: string; command: string; exitCode?: number; cancelled?: boolean; truncated?: boolean; excluded?: boolean; running?: boolean }
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "notice";

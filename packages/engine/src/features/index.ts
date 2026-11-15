@@ -5,3 +5,5 @@ export * from "./export.js";
 export * from "./fork.js";
 export * from "./mode.js";
 export * from "./rewind.js";
+export * from "./branches.js";
+export * from "./bash.js";

@@ -1,5 +1,6 @@
 // §5.3 `files` module: open_url, list_dir, plus the ob-preview:// URL helper. (read_text_file, write_text_file, read_file_base64,
 // path_stat, open_path, reveal_in_folder and browse_directory have no wrapper yet; callers still use ipc.invoke directly.)
+import type { FileSearchResult } from "@openbuddy/protocol/files-search";
 import { invoke } from "../ipc";
 
 /** Open a URL in the system browser (scheme-whitelisted backend command). */
@@ -37,6 +38,10 @@ export async function listDir(
     maxEntries: maxEntries ?? null,
   });
 }
+
+/** `@` mention (20261116-pii W1.3): fuzzy-ranked files of a task's workspace (gitignore-aware, ≤200). */
+export const filesSearch = (cwd: string, query: string, limit?: number) =>
+  invoke<FileSearchResult>("files_search", { cwd, query, ...(limit ? { limit } : {}) });
 
 /** Isolated-origin URL for previewing a workspace file in a sandboxed iframe. */
 export function previewUrl(absPath: string): string {

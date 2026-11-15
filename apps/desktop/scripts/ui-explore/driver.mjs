@@ -253,6 +253,13 @@ const fixtureServer = createServer(async (req, res) => {
     await streamText(chunk, ANSWER.slice(160), 20);
     finish(); return;
   }
+  if (lastUserText.includes('__BRANCH__')) {
+    // 20261116-pii W1.1: every (re)generation answers differently, so ‹1/2› visibly switches the transcript.
+    fixture.branchCount = (fixture.branchCount ?? 0) + 1;
+    const slogans = ['让每一次对话都算数', '把想法变成可交付的成果', '少一点等待，多一点完成'];
+    await streamText(chunk, `口号版本 ${fixture.branchCount}：${slogans[(fixture.branchCount - 1) % slogans.length]}`, fixture.delayMs / 3);
+    finish(); return;
+  }
   if (lastUserText.includes('__APPLY__')) {
     // 20261115-ui U1.7: 「应用」 only on a block that names a whole file; an excerpt keeps its line range.
     await streamText(chunk, APPLY_ANSWER, fixture.delayMs / 6);

@@ -179,6 +179,12 @@ export class PiEngine {
   /** @internal */ navigateBefore(slot: Slot, entryId: string) { return features.navigateBefore(this, slot, entryId); }
   rewind(id: string, entryId: string) { return features.rewind(this, id, entryId); }
   regenerate(id: string) { return features.regenerate(this, id); }
+  /** 20261116-pii W1.1: versions of each user turn, and switching between them. */
+  tree(id: string) { return features.tree(this, id); }
+  navigate(id: string, entryId: string, opts?: Parameters<typeof features.navigate>[3]) { return features.navigate(this, id, entryId, opts); }
+  /** 20261116-pii W1.2: `!command` / `!!command`. */
+  bash(id: string, command: string, opts?: Parameters<typeof features.runBash>[3]) { return features.runBash(this, id, command, opts); }
+  abortBash(id: string) { return features.abortBash(this, id); }
   artifacts(id: string) { return features.artifacts(this, id); }
   /** @internal */ writablePath(id: string, path: string) { return features.writablePath(this, id, path); }
   checkpointList(id: string, path?: string) { return features.checkpointList(this, id, path); }

@@ -43,6 +43,9 @@ describe('Electron IPC dispatch', () => {
     expect(send).not.toHaveBeenCalled();
     await expect(dispatch(event, 'agent_init', { cwd: '/selected' })).resolves.toBe('ok');
     expect(send).toHaveBeenCalledOnce();
+    // `@` file search (W1.3) lists only a natively granted workspace.
+    await expect(dispatch(event, 'files_search', { cwd: '/', query: '' })).rejects.toThrow('workspace_not_authorized');
+    await expect(dispatch(event, 'files_search', { cwd: '/selected', query: '' })).rejects.toThrow('not_implemented: files_search');
   });
   it('dispatches provider-scoped model state and rejects malformed Pi UI responses', async () => {
     const { dispatch, event } = setup();

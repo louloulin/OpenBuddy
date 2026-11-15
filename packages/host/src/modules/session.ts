@@ -49,6 +49,13 @@ export function sessionModule(ctx: HostContext): HostModule {
     rewind_points: (p) => engine.rewindPoints(text(p.sessionId)),
     rewind_execute: (p) => engine.rewind(text(p.sessionId), text(p.entryId)),
     agent_regenerate: (p) => engine.regenerate(text(p.sessionId)),
+    // 20261116-pii W1.1: versions ‹1/2› of each user turn (null while the session is not loaded, like agent_session_info).
+    agent_tree: (p) => (engine.has(text(p.sessionId)) ? engine.tree(text(p.sessionId)) : null),
+    agent_navigate: (p) =>
+      engine.navigate(text(p.sessionId), text(p.entryId), {
+        summarize: p.summarize === true,
+        restoreFiles: restoreOption(p.restoreFiles),
+      }),
     agent_compact: (p) => engine.compact(text(p.sessionId), typeof p.instructions === "string" ? p.instructions : undefined),
     agent_set_mode: (p) => engine.setMode(text(p.sessionId), p.mode as "craft" | "plan" | "ask"),
     agent_abort_retry: (p) => engine.abortRetry(text(p.sessionId)),
@@ -75,4 +82,11 @@ export function sessionModule(ctx: HostContext): HostModule {
     agent_session_usage: (p) => (engine.has(text(p.sessionId)) ? engine.usage(text(p.sessionId)) : null),
   };
   return { id: "session", commands };
+}
+/** `agent_navigate`'s `restoreFiles` (shape checked by validateCommandPayload). */
+function restoreOption(value: unknown): boolean | { force?: boolean; skip?: string[] } | undefined {
+  if (value === true) return true;
+  if (!value || typeof value !== "object") return undefined;
+  const { force, skip } = value as { force?: unknown; skip?: unknown };
+  return { ...(force === true ? { force: true } : {}), ...(Array.isArray(skip) ? { skip: skip.filter((p): p is string => typeof p === "string") } : {}) };
 }

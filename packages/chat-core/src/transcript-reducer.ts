@@ -5,6 +5,7 @@
  */
 import type { PiContent, PiMessage, SessionUpdate, ToolCallContent } from "@openbuddy/protocol/dto";
 import { parseUserText } from "./user-text";
+import { bashMetaOf, reduceBash } from "./bash-transcript";
 import type { ChatMessage, MessageMeta, MessagePart, SessionTranscript, ToolCallView, Usage } from "./transcript";
 
 let seq = 0;
@@ -70,10 +71,11 @@ function noticeMessage(message: PiMessage): ChatMessage | undefined {
   const notice = kinds[message.role];
   if (!notice) return undefined;
   if (notice === "custom" && message.display === false) return undefined;
+  // `!command` rows keep the command in meta.bash and only the output as text (W1.2).
   const text = notice === "bash"
-    ? `$ ${message.command ?? ""}\n${message.output ?? ""}`.trim()
+    ? (message.output ?? "").replace(/\s+$/, "")
     : typeof message.summary === "string" ? message.summary : contentOf(message).map(part => part.text ?? "").join("\n");
-  return { id: nextId(), role: "notice", complete: true, parts: text ? [{ kind: "text", text }] : [], meta: { notice, timestamp: message.timestamp } };
+  return { id: nextId(), role: "notice", complete: true, parts: text ? [{ kind: "text", text }] : [], meta: { notice, timestamp: message.timestamp, ...(notice === "bash" ? { bash: bashMetaOf(message) } : {}) } };
 }
 export function finish(t: SessionTranscript): SessionTranscript {
   return {
@@ -183,6 +185,8 @@ function applyDelta(t: SessionTranscript, delta: NonNullable<SessionUpdate["assi
   return { ...t, messages, streamingMessageId: id, busy: true };
 }
 export function reduce(t: SessionTranscript, event: SessionUpdate): SessionTranscript {
+  const bash = reduceBash(t, event);
+  if (bash) return bash;
   switch (event.type) {
     case "agent_settled": return finish(t);
     // History branch moved (重新生成 / 从这里编辑): rebuild from the engine's messages.

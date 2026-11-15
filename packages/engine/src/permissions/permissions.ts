@@ -30,7 +30,7 @@ function subject(toolName: string, input: unknown): string {
 export class Permissions {
   private pending = new Map<
     string,
-    { sessionId: string; toolName: string; input: unknown; finish: (allow: boolean, reason: Reason, note?: string) => void }
+    { sessionId: string; toolName: string; input: unknown; finish: (allow: boolean, reason: Reason, note?: string) => void; userCommand?: boolean }
   >();
   /** Tools the user allowed for the rest of a session ("本会话允许"). */
   private sessionAllow = new Map<string, Set<string>>();
@@ -58,14 +58,7 @@ export class Permissions {
   /** Whether a rule, mode or session grant decides the call without asking. */
   decide(sessionId: string, toolName: string, input: unknown): boolean | undefined {
     const config = this.settings.config.read();
-    const target = subject(toolName, input);
-    const rule = config.rules.find(
-      (r) =>
-        (r.tool === "any" ||
-          r.tool === toolName ||
-          (r.tool === "mcp" && toolName.startsWith("mcp__"))) &&
-        (!r.pattern || target.includes(r.pattern)),
-    );
+    const rule = this.rule(toolName, input);
     if (rule?.action === "deny") return false;
     if (rule?.action === "allow" || config.permissionMode === "always-approve")
       return true;
@@ -85,8 +78,34 @@ export class Permissions {
   ): Promise<Decision> {
     const decided = this.decide(sessionId, toolName, input);
     if (decided !== undefined) return { allow: decided };
+    return this.ask(sessionId, toolCallId, toolName, input, destructiveInfo(toolName, input));
+  }
+  /** The first rule matching this call (rules are checked in order). */
+  private rule(toolName: string, input: unknown) {
+    const target = subject(toolName, input);
+    return this.settings.config.read().rules.find(
+      (r) =>
+        (r.tool === "any" ||
+          r.tool === toolName ||
+          (r.tool === "mcp" && toolName.startsWith("mcp__"))) &&
+        (!r.pattern || target.includes(r.pattern)),
+    );
+  }
+  /**
+   * A command the user typed in the composer (`!cmd`, 20261116-pii W1.2). Deny rules still apply;
+   * a command that deletes files (or that the renderer rates risky, `strong`) always needs the
+   * strong confirmation, whatever the mode or grants; any other command was approved by the
+   * user's own Enter. The request's `toolCallId` is `requestKey` (prefixed `user-bash:`).
+   */
+  async userCommand(sessionId: string, requestKey: string, command: string, opts: { strong?: boolean } = {}): Promise<Decision & { rule?: boolean }> {
+    const input = { command };
+    if (this.rule("bash", input)?.action === "deny") return { allow: false, rule: true };
+    const destructive = destructiveInfo("bash", input);
+    if (!destructive && !opts.strong) return { allow: true };
+    return this.ask(sessionId, requestKey, "bash", input, destructive ?? { command, paths: [] }, true);
+  }
+  private ask(sessionId: string, toolCallId: string, toolName: string, input: unknown, destructive: ReturnType<typeof destructiveInfo>, userCommand = false): Promise<Decision> {
     const requestId = randomUUID();
-    const destructive = destructiveInfo(toolName, input);
     return new Promise((resolve) => {
       const timer = this.timeoutMs > 0 ? setTimeout(() => finish(false, "timeout"), this.timeoutMs) : undefined;
       timer?.unref?.();
@@ -97,7 +116,7 @@ export class Permissions {
         this.emit("agent://permission-dismiss", { requestId, sessionId, reason, allowed: allow });
         resolve({ allow, ...(note ? { note } : {}) });
       };
-      this.pending.set(requestId, { sessionId, toolName, input, finish });
+      this.pending.set(requestId, { sessionId, toolName, input, finish, userCommand });
       this.emit("agent://permission", {
         requestId,
         sessionId,
@@ -106,7 +125,11 @@ export class Permissions {
         title: toolName,
         rawInput: input,
         ...(destructive ? { destructive } : {}),
-        options: [
+        // A command the user typed is confirmed once, never granted for later.
+        options: userCommand ? [
+          { optionId: "allow", kind: "allow_once", title: "仍要执行" },
+          { optionId: "deny", kind: "reject_once", title: "取消" },
+        ] : [
           { optionId: "allow", kind: "allow_once", title: "允许本次" },
           { optionId: "allow_session", kind: "allow_always", title: "本任务允许" },
           ...(destructive ? [] : [{ optionId: "allow_always", kind: "allow_always", title: "始终允许" }]),
@@ -118,7 +141,7 @@ export class Permissions {
   resolve(id: string, optionId: unknown, cancelled: unknown, reason?: unknown) {
     const pending = this.pending.get(id);
     if (!pending) throw Error("权限请求不存在或已过期");
-    if (!cancelled && !["allow", "allow_session", "allow_always", "deny"].includes(String(optionId)))
+    if (!cancelled && !(pending.userCommand ? ["allow", "deny"] : ["allow", "allow_session", "allow_always", "deny"]).includes(String(optionId)))
       throw Error("无效的权限选项");
     if (!cancelled && optionId === "allow_session") {
       const tools = this.sessionAllow.get(pending.sessionId) ?? new Set<string>();

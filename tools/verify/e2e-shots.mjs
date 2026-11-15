@@ -109,6 +109,70 @@ try {
     if (await toggle.isVisible()) await toggle.click();
     await ctx.sleep(1500);
     return await ctx.shot('05-workbench');`);
+  // 20261116-pii W1.1: regenerate → ‹ 2/2 ›, then switch back and forth; the transcript must change.
+  await step('branch switcher', `
+    const panel = page.getByRole('button', { name: '收起右侧栏', exact: true });
+    if (await panel.isVisible()) await panel.click();
+    const input = page.locator('.wb-composer__input');
+    await input.fill('__BRANCH__ 给这个工作台写一句口号');
+    await page.getByRole('button', { name: '发送', exact: true }).click();
+    await page.getByText('口号版本 1', { exact: false }).first().waitFor({ timeout: 30000 });
+    await ctx.sleep(800);
+    await page.locator('.turn--last').getByRole('button', { name: '重试', exact: true }).click();
+    await page.getByText('口号版本 2', { exact: false }).first().waitFor({ timeout: 30000 });
+    await page.getByRole('group', { name: '回答版本 2/2' }).waitFor({ timeout: 15000 });
+    await ctx.sleep(800);
+    const transcript = () => page.locator('.chatview__inner').innerText();
+    if ((await transcript()).includes('口号版本 1')) throw new Error('regenerate kept the old answer on screen');
+    const two = await ctx.shot('08-branch-2of2');
+    await page.getByRole('button', { name: '上一版本', exact: true }).click();
+    await page.getByRole('group', { name: '回答版本 1/2' }).waitFor({ timeout: 15000 });
+    await page.getByText('口号版本 1', { exact: false }).first().waitFor({ timeout: 15000 });
+    let text = await transcript();
+    if (!text.includes('口号版本 1') || text.includes('口号版本 2')) throw new Error('version 1 not shown: ' + text.slice(-300));
+    await ctx.sleep(600);
+    const one = await ctx.shot('08-branch-1of2');
+    await page.getByRole('button', { name: '下一版本', exact: true }).click();
+    await page.getByRole('group', { name: '回答版本 2/2' }).waitFor({ timeout: 15000 });
+    await page.getByText('口号版本 2', { exact: false }).first().waitFor({ timeout: 15000 });
+    text = await transcript();
+    if (!text.includes('口号版本 2') || text.includes('口号版本 1')) throw new Error('version 2 not shown again: ' + text.slice(-300));
+    return [two, one];`);
+  // W1.2: \`!echo hello\` runs in the task; the output row streams in (and reaches the model next turn).
+  await step('bang command', `
+    const input = page.locator('.wb-composer__input');
+    await input.fill('!echo hello');
+    await page.locator('.bang-hint').waitFor({ timeout: 5000 });
+    await ctx.sleep(300);
+    const hint = await ctx.shot('09-bash-mode');
+    await input.press('Enter');
+    const row = page.locator('.bash-row').last();
+    await row.waitFor({ timeout: 15000 });
+    await row.locator('.bash-row__status--ok').waitFor({ timeout: 15000 });
+    const output = await row.locator('.bash-row__output').innerText();
+    if (!output.includes('hello')) throw new Error('bash output missing: ' + output);
+    await ctx.sleep(600);
+    return [hint, await ctx.shot('09-bash-output'), output.trim()];`);
+  // W1.3: typing @ in a workspace task lists its files (this task's artifacts first) and inserts the pick.
+  await step('@ file mention', `
+    const input = page.locator('.wb-composer__input');
+    await input.fill('看看 @');
+    const list = page.getByRole('listbox', { name: '引用文件' });
+    await list.waitFor({ timeout: 10000 });
+    await list.getByRole('option').first().waitFor({ timeout: 10000 });
+    await ctx.sleep(600);
+    const all = await ctx.shot('10-file-mention-all');
+    const groups = await list.locator('.mention-pop__group').allInnerTexts().catch(() => []);
+    await input.fill('看看 @rep');
+    await list.getByRole('option').filter({ hasText: 'report.md' }).first().waitFor({ timeout: 10000 });
+    await ctx.sleep(600);
+    const shot = await ctx.shot('10-file-mention');
+    const items = await list.getByRole('option').allInnerTexts();
+    await input.press('Enter');
+    const value = await input.inputValue();
+    if (!value.includes('@docs/report.md ')) throw new Error('mention not inserted: ' + value);
+    await input.fill('');
+    return { all, groups, shot, items: items.slice(0, 6), value };`);
   await step('settings', `
     await page.getByRole('button', { name: '设置', exact: true }).first().click();
     await ctx.sleep(1200);
