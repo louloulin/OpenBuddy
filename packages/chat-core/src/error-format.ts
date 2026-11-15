@@ -1,4 +1,4 @@
-
+import { parseProtocolError, stripErrorWrappers, type ProtocolErrorCode } from "@openbuddy/protocol/errors";
 
 interface PromptUsage {
   inputTokens?: number;
@@ -228,10 +228,36 @@ export interface ErrorDescription {
 
 /** Strip IPC wrappers ("Error invoking remote method …: Error: …"). */
 export function rawErrorText(e: unknown): string {
-  return String(e instanceof Error ? e.message : e)
-    .replace(/^(?:Error:\s*)?Error invoking remote method '[^']+':\s*(?:Error:\s*)?/, "")
-    .replace(/^Error:\s*/, "")
-    .trim();
+  return stripErrorWrappers(String(e instanceof Error ? e.message : e));
+}
+
+type Copy = readonly [title: string, hint?: string, action?: ErrorDescription["action"]];
+/**
+ * Copy for protocol error codes (pii W0.6). Host modules throw `ProtocolError` (or legacy
+ * `code: detail` messages); the code survives IPC as the message prefix (protocol errors.ts).
+ */
+const CODE_COPY: Record<ProtocolErrorCode, Copy> & Record<string, Copy | undefined> = {
+  not_implemented: ["当前版本还不支持这个功能", "这个入口需要的后端能力还没有提供，请更新应用后再试"],
+  invalid_payload: ["请求内容无效", "检查输入后重试；如果反复出现，请在「帮助与反馈」中反馈"],
+  session_not_loaded: ["任务已关闭或不存在", "从侧栏重新打开该任务", "retry"],
+  workspace_not_authorized: ["工作空间未授权", "通过「选择工作空间 → 打开本地文件夹」重新选择", "retry"],
+  model_not_found: ["当前模型已不可用", "重新选择一个模型", "model"],
+  model_auth_missing: ["模型服务商还没有配置 API Key", "在设置 → 模型中填写 API Key", "settings"],
+  extension_load_failed: ["扩展加载失败", "在 专家·技能·连接器 → 扩展 中检查或停用该扩展", "settings"],
+  export_path_not_authorized: ["导出位置未授权", "通过保存对话框重新选择导出位置", "retry"],
+  not_found: ["要找的内容不存在或已被删除", "刷新列表后重试", "retry"],
+  already_exists: ["同名的项目已经存在", "换一个名字再保存", "retry"],
+  session_busy: ["任务正在运行", "等当前回复完成，或点停止后再试", "wait"],
+  // Legacy `code: detail` messages thrown before ProtocolError existed.
+  path_outside_workspace: ["路径不在当前工作空间内", "只能访问工作空间里的文件", "retry"],
+  rewind_point_not_found: ["找不到要回到的位置", "对话可能已经变化，刷新后重试", "retry"],
+  extension_path_not_authorized: ["扩展文件未授权", "通过文件选择对话框重新选择扩展", "retry"],
+  fork_requires_history: ["还没有可以分叉的对话", "先发送一条消息再分叉", "retry"],
+};
+
+/** The protocol code behind an error, when it carries one (`invalid_payload: query` → "invalid_payload"). */
+export function errorCode(e: unknown): string | undefined {
+  return parseProtocolError(e)?.code;
 }
 
 /** Map engine, provider and host error codes to a friendly description. */
@@ -239,6 +265,11 @@ export function describeError(e: unknown): ErrorDescription {
   const raw = rawErrorText(e);
   const lower = raw.toLowerCase();
   const d = (title: string, hint?: string, action?: ErrorDescription["action"]): ErrorDescription => ({ title, hint, action, raw });
+  const coded = parseProtocolError(e);
+  const copy = coded ? CODE_COPY[coded.code] : undefined;
+  if (copy) return d(copy[0], coded!.code === "invalid_payload" && coded!.message ? `${copy[1]}（字段：${coded!.message}）` : copy[1], copy[2]);
+  // The renderer bridge reports a missing handler with this sentence (client ipc.ts).
+  if (raw.includes("暂不可用")) return d(CODE_COPY.not_implemented[0], CODE_COPY.not_implemented[1]);
   if (/too_many_running/.test(raw)) return d("同时运行的任务已达上限", "等其中一个任务完成后再发送", "wait");
   if (raw.includes("会话忙碌") || lower.includes("already processing")) return d("上一条消息还在处理中", "等待回复完成，或点停止后再发送", "wait");
   if (raw.includes("queue_unavailable")) return d("当前没有正在运行的回复，无法插入消息", "直接发送即可", "retry");
