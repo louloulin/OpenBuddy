@@ -28,7 +28,8 @@ afterEach(() => useCapabilitiesStore.getState().apply(null));
 
 describe("专家·技能·连接器 hub (pii W0.3 / U7.6)", () => {
   it("hides catalogs the host does not serve and shows skills / MCP / extensions management instead", async () => {
-    desktop();
+    // A host without the experts module (W2.1–W2.3 commands): the 专家 tab is hidden too.
+    useCapabilitiesStore.getState().apply({ protocolVersion: 1, platform: "desktop", commands: COMMANDS.filter((c) => !/^(agents_|experts_)/.test(c)), events: [], features: [] });
     render(<ExpertsHub />);
     const tabs = screen.getAllByRole("tab").map((t) => t.textContent);
     expect(tabs).toEqual(["技能", "连接器", "扩展"]);
