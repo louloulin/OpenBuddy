@@ -15,7 +15,7 @@ vi.mock("@openbuddy/client/agent-client", async (importOriginal) => {
     agentExtensionsList: record("agent_extensions_list", { enabled: false, paths: [], projectTrusted: true }),
     agentsList: record("agents_list", []),
     expertsDefaultRoot: record("experts_default_root", ""),
-    expertsLoad: record("experts_load", { root: "", experts: [], categories: [] }),
+    expertsLoad: record("experts_load", { root: "", experts: [], categories: [], scenes: [], roots: [], problems: [] }),
     skillsCatalogDefaultRoot: record("skills_catalog_default_root", ""),
     connectorsDefaultRoot: record("connectors_default_root", ""),
   };
