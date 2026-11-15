@@ -425,6 +425,88 @@ try {
     const caps = await ctx.call('host_capabilities');
     return { protocolVersion: caps.protocolVersion, platform: caps.platform, commands: caps.commands.length, events: caps.events.length, includesSelf: caps.commands.includes('host_capabilities'), includesNative: caps.commands.includes('dialog_open') && caps.events.includes('window://resized'), features: caps.features };`);
   if (caps.protocolVersion !== 1 || caps.platform !== 'desktop' || !caps.includesSelf || !caps.includesNative) throw new Error(`unexpected host_capabilities: ${JSON.stringify(caps)}`);
+  // 20261116-pii W2.1–W2.3: 专家中心 → 我的专家 → 新建 → 召唤（只预填，不发送）→ 发送 → 模型收到的系统提示词带人设 → 解绑。
+  await step('experts center', `
+    await page.keyboard.press('Escape');
+    await page.locator('button[aria-label="关闭设置"]').waitFor({ state: 'hidden', timeout: 5000 });
+    await page.locator('.sidebar__nav-item', { hasText: '新建任务' }).first().click();
+    await page.locator('.wb-composer__input').waitFor({ state: 'visible', timeout: 10000 });
+    await page.locator('.wb-composer__add').first().click();
+    await page.locator('.iam-item', { hasText: '专家' }).first().hover();
+    const footer = page.locator('.iam-sub-footer', { hasText: '专家中心' });
+    await footer.waitFor({ timeout: 5000 });
+    await footer.click();
+    await page.getByText('精选场景', { exact: true }).waitFor({ timeout: 15000 });
+    await page.locator('.ec-grid [data-expert-id="data-analyst"]').waitFor({ timeout: 10000 });
+    const count = await page.locator('.ec-grid .ec-card').count();
+    if (count < 8) throw new Error('expected at least 8 built-in experts, got ' + count);
+    await ctx.sleep(600);
+    return { cards: count, shot: await ctx.shot('28-experts-center') };`);
+  await step('experts detail', `
+    await page.locator('.ec-grid [data-expert-id="data-analyst"]').click();
+    const dialog = page.getByRole('dialog', { name: '专家：数据分析师' });
+    await dialog.waitFor({ timeout: 5000 });
+    await ctx.sleep(400);
+    const shot = await ctx.shot('29-expert-detail');
+    await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+    await dialog.waitFor({ state: 'hidden', timeout: 5000 });
+    return shot;`);
+  await step('my experts (empty)', `
+    await page.getByRole('button', { name: '我的专家' }).click();
+    await page.getByText('还没有创建任何专家', { exact: true }).waitFor({ timeout: 5000 });
+    await ctx.sleep(400);
+    return await ctx.shot('30-my-experts-empty');`);
+  await step('expert editor: create', `
+    await page.getByRole('button', { name: '+ 创建专家' }).first().click();
+    const editor = page.getByRole('dialog', { name: '创建专家' });
+    await editor.waitFor({ timeout: 5000 });
+    await editor.getByRole('button', { name: '头像 🌱' }).click();
+    await editor.getByLabel('专家名称').fill('旅行规划师');
+    await editor.getByLabel('类别').selectOption('office');
+    await editor.getByLabel('简介').fill('按预算和兴趣规划行程，给出每天的路线、交通和备选方案。');
+    await editor.getByLabel('人设').fill('你是一名细致的旅行规划师。先确认出发地、天数、预算和兴趣，再给出按天拆分的行程：每段写清交通方式、时长和费用估算，并为雨天准备备选方案。');
+    await editor.getByLabel('示例任务').fill('帮我规划一个三天两晚的杭州周末行程，预算 2000 元\\n周末带父母去苏州，安排轻松一点的路线');
+    await editor.getByLabel('标签').fill('行程规划，预算');
+    await ctx.sleep(400);
+    const shot = await ctx.shot('31-expert-editor');
+    await editor.getByRole('button', { name: '创建', exact: true }).click();
+    await editor.waitFor({ state: 'hidden', timeout: 5000 });
+    await page.locator('.ec-my-card', { hasText: '旅行规划师' }).waitFor({ timeout: 5000 });
+    await ctx.sleep(500);
+    const list = await ctx.call('agents_list', {});
+    if (!list.some(e => e.name === '旅行规划师' && e.scope === 'user')) throw new Error('agents_list does not contain the new expert');
+    return [shot, await ctx.shot('32-my-experts')];`);
+  await step('summon → composer prefilled (not sent)', `
+    const before = ctx.fixture.requests.length;
+    await page.locator('.ec-my-card', { hasText: '旅行规划师' }).getByRole('button', { name: '召唤' }).click();
+    const input = page.locator('.wb-composer__input');
+    await input.waitFor({ state: 'visible', timeout: 10000 });
+    await page.locator('[data-testid="composer-expert"]', { hasText: '旅行规划师' }).waitFor({ timeout: 5000 });
+    // The chip renders first; the sample task lands in a follow-up render (HomePage effect), so poll.
+    await page.waitForFunction(() => document.querySelector('.wb-composer__input')?.value.includes('杭州'), null, { timeout: 5000 }).catch(() => {});
+    const value = await input.inputValue();
+    if (!value.includes('杭州')) throw new Error('composer was not pre-filled with the sample task: ' + value);
+    await ctx.sleep(1500);
+    if (ctx.fixture.requests.length !== before) throw new Error('summon must not send anything');
+    return { prefilled: value, shot: await ctx.shot('33-summon-prefilled') };`);
+  await step('send → persona reaches the model', `
+    await page.getByRole('button', { name: '发送', exact: true }).click();
+    await page.getByText('人设已生效：旅行规划师', { exact: false }).first().waitFor({ timeout: 30000 });
+    const last = ctx.fixture.requests.at(-1);
+    if (last.persona !== '旅行规划师') throw new Error('system prompt did not carry the persona: ' + JSON.stringify(last));
+    await page.locator('[data-testid="bound-expert"]', { hasText: '旅行规划师' }).waitFor({ timeout: 5000 });
+    await ctx.sleep(1200);
+    return { persona: last.persona, shot: await ctx.shot('34-persona-answer') };`);
+  await step('unbind expert', `
+    await page.getByRole('button', { name: '移除专家 旅行规划师' }).click();
+    await page.locator('[data-testid="bound-expert"]').waitFor({ state: 'hidden', timeout: 5000 });
+    await page.locator('.wb-composer__input').fill('谢谢，再确认一下行程');
+    await page.getByRole('button', { name: '发送', exact: true }).click();
+    await page.getByText('以上内容由本地测试服务器生成', { exact: false }).first().waitFor({ timeout: 30000 });
+    await ctx.sleep(1000);
+    const last = ctx.fixture.requests.at(-1);
+    if (last.persona) throw new Error('persona still sent after unbinding');
+    return await ctx.shot('35-expert-unbound');`);
   const audit = await step('audit', `
     const a = await ctx.audit();
     const rejected = a.main.filter(r => r.status === 'rejected');

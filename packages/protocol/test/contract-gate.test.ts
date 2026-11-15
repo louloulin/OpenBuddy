@@ -37,11 +37,9 @@ const main = read(
 
 /** Renderer wrappers whose main-process side is still pending (plan §10.1 / Phase 5). Remove entries as they land. */
 const PENDING_COMMANDS = [
-  "agent_clear_session_expert", "agent_set_session_expert", "agents_delete", "agents_get", "agents_list", "agents_save", "agents_template",
   "automation_records_archive", "automation_records_delete", "automations_delete", "automations_run", "automations_save", "automations_set_status", "automations_snapshot",
   "connectors_cli_auth", "connectors_cli_auth_cancel", "connectors_cli_skills_dir", "connectors_cli_status", "connectors_cli_unauth", "connectors_default_root",
   "connectors_icon", "connectors_list_roots", "connectors_load", "connectors_read_mcp_config",
-  "experts_default_root", "experts_image_bytes", "experts_link_agents", "experts_list_roots", "experts_load", "experts_read_agent_prompt", "experts_thumbnail",
   "inspiration_generate", "internal_reload", "marketplace_action", "marketplace_list",
   "memory_delete", "memory_flush", "memory_get", "memory_list", "memory_rewrite", "memory_save",
   "plugins_action", "plugins_list", "prompt_history", "session_fork",
@@ -110,6 +108,54 @@ describe("IPC contract gate", () => {
 });
 
 describe("payload validation for new commands", () => {
+  it("experts commands (pii W2.1–W2.3): ids are never paths, drafts and lists are bounded", () => {
+    const ok = (command: Parameters<typeof validateCommandPayload>[0], payload: Record<string, unknown>) => expect(() => validateCommandPayload(command, payload)).not.toThrow();
+    const bad = (command: Parameters<typeof validateCommandPayload>[0], payload: Record<string, unknown>) => expect(() => validateCommandPayload(command, payload)).toThrow("invalid_payload");
+    const expert = { name: "数据分析师", avatar: "📊", category: "data", thinking: "high", tools: ["read", "mcp__*"], examples: ["分析 sales.csv"], prompt: "你是一名数据分析师。" };
+    ok("agents_list", {});
+    ok("agents_list", { cwd: null });
+    ok("agents_get", { id: "data-analyst" });
+    ok("agents_get", { path: "/home/u/.pi/agents/x.md" });
+    bad("agents_get", { id: "../etc/passwd" });
+    bad("agents_get", { id: "Data Analyst" });
+    bad("agents_get", {});
+    ok("agents_save", { expert, mode: "create" });
+    ok("agents_save", { expert: { ...expert, id: "my-analyst" }, mode: "update" });
+    ok("agents_save", { name: "legacy", raw: "---\nname: legacy\n---\nbody" });
+    bad("agents_save", { expert: { ...expert, id: "../x" } });
+    bad("agents_save", { expert: { ...expert, name: " " } });
+    bad("agents_save", { expert: { ...expert, prompt: "" } });
+    bad("agents_save", { expert: { ...expert, thinking: "huge" } });
+    bad("agents_save", { expert: { ...expert, tools: ["rm -rf /"] } });
+    bad("agents_save", { expert: { ...expert, examples: Array.from({ length: 9 }, () => "x") } });
+    bad("agents_save", { expert, mode: "replace" });
+    bad("agents_save", { expert: "nope" });
+    ok("agents_delete", { id: "my-analyst" });
+    bad("agents_delete", { id: "a/b" });
+    ok("agents_template", { expert: { name: "草稿" } });
+    ok("agents_template", { name: "legacy", description: "d", systemPrompt: "p" });
+    bad("agents_template", { name: "" });
+    ok("agent_set_session_expert", { sessionId: "s1", expertId: "data-analyst", expertName: "数据分析师", source: "builtin", avatarLocal: null });
+    bad("agent_set_session_expert", { sessionId: "s1", expertId: "../../x" });
+    bad("agent_set_session_expert", { expertId: "data-analyst" });
+    ok("agent_clear_session_expert", { sessionId: "s1" });
+    bad("agent_clear_session_expert", {});
+    ok("experts_set_roots", { roots: ["/data/experts"] });
+    ok("experts_set_roots", { roots: [] });
+    bad("experts_set_roots", { roots: "/data" });
+    bad("experts_set_roots", { roots: Array.from({ length: 21 }, (_, i) => `/r${i}`) });
+    ok("experts_read_agent_prompt", { id: "translator" });
+    bad("experts_read_agent_prompt", { root: "/x", plugin: "p", agentName: "a" });
+    ok("experts_thumbnail", { path: "/x/a.png" });
+    bad("experts_image_bytes", { path: "" });
+    ok("experts_link_agents", { root: "/data/experts", ids: ["a", "b-2"] });
+    bad("experts_link_agents", { root: "/data/experts", ids: ["../a"] });
+    bad("experts_load", { cwd: 42 });
+    ok("experts_load", { cwd: "/work" });
+    // agents_defaults_* are not expert commands and keep their own rules.
+    ok("agents_defaults_save", { defaults: {}, cwd: 1 });
+  });
+
   it("agent_compact needs a session id and bounds optional instructions", () => {
     expect(() => validateCommandPayload("agent_compact", { sessionId: "s1" })).not.toThrow();
     expect(() => validateCommandPayload("agent_compact", { sessionId: "s1", instructions: "keep decisions" })).not.toThrow();

@@ -1,61 +1,9 @@
-// Deferred (20261115-md Appendix B, 助理 / 子代理): agents_*, agent_set/clear_session_expert, subagents_config_*.
-// Not in the protocol COMMANDS list.
-import type { AgentEntry } from "@openbuddy/protocol/dto";
+// Deferred (20261115-md Appendix B, 子代理): subagents_config_* are not in the protocol COMMANDS list yet.
 import { invoke } from "../../ipc";
 
-/** Bind an expert to a session (OpenBuddy-only state). */
-export async function agentSetSessionExpert(
-  sessionId: string,
-  expertId: string,
-  expertName: string,
-  source: string,
-  avatarLocal?: string,
-): Promise<boolean> {
-  return invoke<boolean>("agent_set_session_expert", { sessionId, expertId, expertName, source, avatarLocal: avatarLocal ?? null });
-}
-
-/** Remove the expert binding from a session. */
-export async function agentClearSessionExpert(sessionId: string): Promise<boolean> {
-  return invoke<boolean>("agent_clear_session_expert", { sessionId });
-}
-
-/** List all agent definitions visible to OpenBuddy. */
-export async function agentsList(cwd?: string): Promise<AgentEntry[]> {
-  return invoke<AgentEntry[]>("agents_list", { cwd: cwd ?? null });
-}
-
-/** Fetch a single agent file's full contents. */
-export async function agentsGet(path: string): Promise<string> {
-  return invoke<string>("agents_get", { path });
-}
-
-
-export async function agentsSave(name: string, raw: string): Promise<AgentEntry> {
-  return invoke<AgentEntry>("agents_save", { name, raw });
-}
-
-/** Delete an agent file by path. */
-export async function agentsDelete(path: string): Promise<void> {
-  await invoke<void>("agents_delete", { path });
-}
-
-/** Render a starter agent markdown body from name/description/system prompt.
- *  Optional avatar (1-20) and modelTags are written to frontmatter. */
-export async function agentsTemplate(
-  name: string,
-  description: string,
-  systemPrompt: string,
-  avatar?: number,
-  modelTags?: string[],
-): Promise<string> {
-  return invoke<string>("agents_template", {
-    name,
-    description,
-    systemPrompt,
-    avatar: avatar ?? null,
-    modelTags: modelTags ?? null,
-  });
-}
+// agents_* and agent_set/clear_session_expert are implemented (20261116-pii W2.1–W2.2, host module
+// `experts`); their wrappers moved to `api/experts.ts` and are re-exported for existing importers.
+export { agentSetSessionExpert, agentClearSessionExpert, agentsList, agentsGet, agentsSave, agentsDelete, agentsTemplate } from "../experts";
 
 /** `[subagents]` config — currently exposes `max_depth` (nesting depth). */
 export interface SubagentsConfig {

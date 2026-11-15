@@ -251,6 +251,10 @@ const CODE_COPY: Record<ProtocolErrorCode, Copy> & Record<string, Copy | undefin
   entry_not_found: ["这条消息已不在当前对话里", "刷新对话后重试", "retry"],
   permission_denied: ["这条命令被权限规则拒绝", "在设置 → 安全中调整规则，或换一种做法"],
   bash_running: ["上一条命令还在运行", "等它结束，或点停止后再试", "wait"],
+  path_not_authorized: ["这个位置不在允许访问的目录里", "把它放进专家库目录或已授权的工作空间后再试"],
+  expert_not_found: ["找不到这个专家", "它可能已被删除，刷新专家列表后重试", "retry"],
+  expert_invalid: ["专家内容不完整或格式有误", "检查名称和人设后再保存"],
+  expert_readonly: ["内置专家不能直接修改", "先「复制」一份到我的专家，再编辑副本"],
   // Legacy `code: detail` messages thrown before ProtocolError existed.
   path_outside_workspace: ["路径不在当前工作空间内", "只能访问工作空间里的文件", "retry"],
   rewind_point_not_found: ["找不到要回到的位置", "对话可能已经变化，刷新后重试", "retry"],

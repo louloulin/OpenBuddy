@@ -28,6 +28,11 @@ export const COMMANDS = [
   'agent_tree', 'agent_navigate', 'agent_bash', 'agent_bash_abort', 'files_search',
   // 20261116-pii W0.4 / W1.6 (host module `model`).
   'settings_agent_get', 'settings_agent_set', 'agent_cycle_model',
+  // 专家 (20261116-pii W2.1–W2.3): the experts host module.
+  'agents_list', 'agents_get', 'agents_save', 'agents_delete', 'agents_template',
+  'agent_set_session_expert', 'agent_clear_session_expert',
+  'experts_default_root', 'experts_list_roots', 'experts_set_roots', 'experts_load', 'experts_read_agent_prompt',
+  'experts_thumbnail', 'experts_image_bytes', 'experts_link_agents',
 ] as const;
 export type CommandName = typeof COMMANDS[number];
 export const isCommand = (value: unknown): value is CommandName => typeof value === 'string' && (COMMANDS as readonly string[]).includes(value);

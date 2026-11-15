@@ -92,7 +92,7 @@ export function HomePage({
 
   // When a pending expert arrives with a quickPrompt, pre-fill the composer.
   useEffect(() => {
-    if (!pendingExpert) return;
+    if (!pendingExpert) { pendingHandledRef.current = null; return; } // summoning the same expert again re-fills
     // Only auto-fill once per expert (avoid re-filling if user clears it).
     if (pendingHandledRef.current === pendingExpert.expertId) return;
     pendingHandledRef.current = pendingExpert.expertId;
@@ -332,6 +332,7 @@ export function HomePage({
             onNavigateConnectors={onNavigateConnectors}
             activeExpertName={pendingExpert?.name}
             activeExpertAvatar={pendingExpert?.avatarLocal}
+            onClearExpert={pendingExpert ? () => usePendingExpertStore.getState().clear() : undefined}
           />
         </section>
       </div>

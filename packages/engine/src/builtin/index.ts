@@ -2,6 +2,7 @@ import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import type { EngineContext } from "../engine-context.js";
 import { todoBuiltin } from "./todo.js";
 import { modeExtension } from "./mode.js";
+import { persona } from "./persona.js";
 
 /**
  * Built-in extension channel (20261116-pii §5, W0.5): trusted, app-provided Pi extensions such as
@@ -41,6 +42,7 @@ export const BUILTIN_EXTENSIONS: BuiltinExtension[] = [
     description: "把做一做 / 想一想 / 问一问记在会话里：重新打开、分叉或切换分支后自动恢复",
     create: (ctx) => modeExtension(ctx),
   },
+  persona, // 专家人设 (W2.2)
 ];
 // W3.1 plan / todo (`ob_todo`).
 BUILTIN_EXTENSIONS.push(todoBuiltin);

@@ -19,6 +19,8 @@ export interface MarketAvailability {
   /** 连接器 catalog (connectors_load). */
   connectorsCatalog: boolean;
 }
+export { BoundExpertBadge } from "./experts/BoundExpertBadge";
+export { usePendingExpertStore, type PendingExpert } from "./state/pending-expert-store";
 
 interface Props {
   /** Navigate to the home page (after summoning an expert). */

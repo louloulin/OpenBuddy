@@ -1,6 +1,7 @@
 import type { CommandName } from './commands.js';
 import type { Payload } from './types.js';
 import { validateAgentSettingsPatch } from './agent-settings.js';
+import { EXPERT_LIMITS, isExpertId } from './experts.js';
 
 /** Bound structured-clone input before dispatch; services validate their domain fields. */
 export function validatePayload(input: unknown): Payload {
@@ -110,6 +111,7 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
     string('sessionId', 256);
     if (payload.direction !== undefined && payload.direction !== 'forward' && payload.direction !== 'backward') throw new Error('invalid_payload: direction');
   }
+  if (/^(agents_(list|get|save|delete|template)|experts_[a-z_]+|agent_(set|clear)_session_expert)$/.test(command)) expertPayload(command, payload);
   return payload;
 }
 
@@ -140,5 +142,77 @@ function validateConversationTools(command: CommandName, payload: Payload, strin
     if (query !== undefined && (typeof query !== 'string' || query.length > 256 || query.includes('\0'))) fail('query');
     const limit = payload.limit;
     if (limit !== undefined && (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > 200)) fail('limit');
+  }
+}
+
+const THINKING = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+const TOOL_NAME = /^[A-Za-z0-9_.*-]+$/;
+/** 专家 commands (20261116-pii W2.1–W2.3): ids are never paths, lists and texts are bounded. */
+function expertPayload(command: CommandName, payload: Payload) {
+  const fail = (key: string): never => { throw new Error(`invalid_payload: ${key}`); };
+  const text = (value: unknown, max: number, key: string, optional = true) => {
+    if (optional && (value === undefined || value === null)) return;
+    if (typeof value !== 'string' || value.length > max || value.includes('\0') || (!optional && !value.trim())) fail(key);
+  };
+  const list = (value: unknown, maxItems: number, maxItem: number, key: string, pattern?: RegExp) => {
+    if (value === undefined || value === null) return;
+    if (!Array.isArray(value) || value.length > maxItems || value.some((v) => typeof v !== 'string' || !v.trim() || v.length > maxItem || (pattern && !pattern.test(v)))) fail(key);
+  };
+  const id = (key: string, optional = false) => {
+    const value = payload[key];
+    if (optional && (value === undefined || value === null)) return;
+    if (!isExpertId(value)) fail(key);
+  };
+  const L = EXPERT_LIMITS;
+  const draft = (value: unknown) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) fail('expert');
+    const d = value as Record<string, unknown>;
+    if (d.id !== undefined && d.id !== null && !isExpertId(d.id)) fail('expert.id');
+    text(d.name, L.name, 'expert.name', false);
+    text(d.prompt, L.prompt, 'expert.prompt', command === 'agents_template');
+    text(d.avatar, L.avatar, 'expert.avatar');
+    text(d.description, L.description, 'expert.description');
+    if (d.category !== undefined && d.category !== null && (typeof d.category !== 'string' || !/^[a-z0-9-]{0,32}$/.test(d.category))) fail('expert.category');
+    text(d.model, L.model, 'expert.model');
+    if (d.thinking !== undefined && d.thinking !== null && !THINKING.includes(String(d.thinking))) fail('expert.thinking');
+    list(d.tools, L.list, L.item, 'expert.tools', TOOL_NAME);
+    list(d.skills, L.list, L.item, 'expert.skills');
+    list(d.connectors, L.list, L.item, 'expert.connectors');
+    list(d.examples, L.examples, L.example, 'expert.examples');
+    list(d.tags, L.tags, L.tag, 'expert.tags');
+  };
+  text(payload.cwd, 4096, 'cwd');
+  switch (command) {
+    case 'agents_get': case 'experts_read_agent_prompt': case 'agents_delete':
+      if (payload.path !== undefined && command !== 'experts_read_agent_prompt') text(payload.path, 4096, 'path', false);
+      else id('id');
+      break;
+    case 'agents_save':
+      if (payload.expert !== undefined) {
+        draft(payload.expert);
+        if (payload.mode !== undefined && payload.mode !== 'create' && payload.mode !== 'update') fail('mode');
+      } else { text(payload.name, L.name, 'name', false); text(payload.raw, 256 * 1024, 'raw', false); }
+      break;
+    case 'agents_template':
+      if (payload.expert !== undefined) draft(payload.expert);
+      else { text(payload.name, L.name, 'name', false); text(payload.description, L.description, 'description'); text(payload.systemPrompt, L.prompt, 'systemPrompt'); }
+      break;
+    case 'agent_set_session_expert':
+      text(payload.sessionId, 256, 'sessionId', false); id('expertId');
+      break;
+    case 'agent_clear_session_expert':
+      text(payload.sessionId, 256, 'sessionId', false);
+      break;
+    case 'experts_set_roots':
+      list(payload.roots, 20, 4096, 'roots');
+      if (!Array.isArray(payload.roots)) fail('roots');
+      break;
+    case 'experts_thumbnail': case 'experts_image_bytes':
+      text(payload.path, 4096, 'path', false);
+      break;
+    case 'experts_link_agents':
+      text(payload.root, 4096, 'root', false);
+      if (payload.ids !== undefined && payload.ids !== null && (!Array.isArray(payload.ids) || payload.ids.length > 200 || !payload.ids.every(isExpertId))) fail('ids');
+      break;
   }
 }

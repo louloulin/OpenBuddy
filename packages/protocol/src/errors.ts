@@ -23,6 +23,11 @@ export const PROTOCOL_ERROR_CODES = [
   'entry_not_found',
   'permission_denied',
   'bash_running',
+  // 20261116-pii W2.1–W2.3
+  'path_not_authorized',
+  'expert_not_found',
+  'expert_invalid',
+  'expert_readonly',
 ] as const;
 export type ProtocolErrorCode = typeof PROTOCOL_ERROR_CODES[number];
 

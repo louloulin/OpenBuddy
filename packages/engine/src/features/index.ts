@@ -8,3 +8,4 @@ export * from "./mode.js";
 export * from "./rewind.js";
 export * from "./branches.js";
 export * from "./bash.js";
+export * from "./expert.js";
