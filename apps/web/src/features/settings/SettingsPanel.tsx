@@ -8,6 +8,7 @@ import {
   Palette,
   Shield,
   HelpCircle,
+  SlidersHorizontal,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -53,6 +54,7 @@ const NAV: NavItem[] = [
   { id: "agent-mail", label: "智能体邮箱", icon: Mail },
   { id: "shortcuts", label: "快捷键", icon: Keyboard },
   { id: "model", label: "模型", icon: Cpu },
+  { id: "agent-settings", label: "智能体", icon: SlidersHorizontal },
   { id: "assistant", label: "助理设置", icon: Bot },
   { id: "personalize", label: "个性化", icon: Palette },
   { id: "security", label: "安全中心", icon: Shield },

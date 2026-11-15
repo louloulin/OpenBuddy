@@ -7,7 +7,7 @@ export type ShortcutScope = "全局" | "对话" | "输入框" | "工作台";
 export type ShortcutId =
   | "newTask" | "search" | "settings" | "toggleSidebar" | "shortcuts"
   | "find" | "copyLast" | "togglePanel"
-  | "send" | "newline" | "steer" | "stop" | "history" | "slash"
+  | "send" | "newline" | "steer" | "stop" | "history" | "slash" | "cycleModel"
   | "save";
 export interface Shortcut {
   id: ShortcutId;
@@ -32,6 +32,7 @@ export const SHORTCUTS: Shortcut[] = [
   { id: "stop", keys: ["Esc"], label: "停止回复", scope: "输入框" },
   { id: "history", keys: ["↑"], label: "调出上一条提问（光标在开头时）", scope: "输入框" },
   { id: "slash", keys: ["/"], label: "技能与命令", scope: "输入框" },
+  { id: "cycleModel", keys: ["Mod", "P"], label: "在收藏的模型间切换", scope: "输入框" },
   { id: "save", keys: ["Mod", "S"], label: "保存正在编辑的文件", scope: "工作台" },
 ];
 

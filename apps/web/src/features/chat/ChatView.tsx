@@ -6,7 +6,7 @@ import { useSessionsStore } from "@/features/sessions/state/sessions-store";
 import { createMarkdownHostConfig } from "@openbuddy/markdown/markdown-host";
 import { agentForkSession, agentRegenerate, rewindExecute, rewindPoints, agentSteer, agentFollowUp } from "@openbuddy/client/agent-client";
 import { findToolCall } from "@openbuddy/chat-core/session-artifacts";
-import { agentSetMode, type AgentMode, type ArtifactInfo } from "@openbuddy/client/agent-client";
+import type { ArtifactInfo } from "@openbuddy/client/agent-client";
 import { useArtifactsStore, selectArtifacts, selectArtifactsVersion } from "@/features/workbench/state/artifacts-store";
 import { Workbench, type BenchTarget } from "../workbench/Workbench";
 import { filesTouchedBy, revertToolCalls } from "../workbench/revert";
@@ -18,6 +18,7 @@ import { parseUserText, baseName, withModeInstruction } from "@openbuddy/chat-co
 import { Composer } from "../composer/Composer";
 import { UserNode, NoticeRow } from "./chat-view/rows";
 import { useStableCallback, useTopbarSlot } from "./chat-view/hooks";
+import { useSessionMode } from "./chat-view/use-session-mode";
 import { STICK_THRESHOLD, ANCHOR_GAP, RENDER_WINDOW, charsOf, blocksOf, nodeIds } from "./chat-view/transcript-metrics";
 import { PermissionInlineCard } from "../approvals/PermissionDialog";
 import { QuestionInlineCard } from "../approvals/QuestionInlineCard";
@@ -236,17 +237,10 @@ export function ChatView({
     if (choice.checked) await revertToolCalls(sessionId, ids, { onToast: toast, onChanged: refreshArtifacts });
     return true;
   };
-  // ---- 做一做 / 想一想 / 问一问 (§5.3, D6) ----
-  const [modes, setModes] = useState<Record<string, AgentMode>>({});
-  const mode: AgentMode = (sessionId && modes[sessionId]) || "craft";
-  const changeMode = useStableCallback(async (next: AgentMode) => {
-    if (!sessionId) return;
-    const id = sessionId;
-    try {
-      await agentSetMode(id, next);
-      setModes((m) => ({ ...m, [id]: next }));
-    } catch (e) { toast(`切换失败：${friendlyError(e)}`); }
-  });
+  // ---- 做一做 / 想一想 / 问一问 (§5.3, D6): the host keeps and restores it per branch (pii W0.5) ----
+  const sessionMode = useSessionMode(sessionId, toast);
+  const mode = sessionMode.mode;
+  const changeMode = useStableCallback(sessionMode.changeMode);
   // Slash commands (/compact, /skill:…) are interpreted by the app, never wrapped.
   const sendWithMode = useStableCallback((text: string, attachments?: { path: string }[]) => onSend(text.trimStart().startsWith("/") ? text : withModeInstruction(text, mode), attachments));
   const lastUser = useMemo(() => messages.findLast((m) => m.role === "user"), [messages]);

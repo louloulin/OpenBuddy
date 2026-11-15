@@ -1,5 +1,6 @@
 // Event subscription: agent://… and app://… events from the host, fanned out to typed handlers.
 import type { ModelState, PermissionRequest, PromptComplete, SessionSummaryEvent, SessionUpdate, TurnErrorEvent } from "@openbuddy/protocol/dto";
+import type { SessionModelState } from "@openbuddy/protocol/agent-settings";
 import { listen, type UnlistenFn } from "../ipc";
 import type { QuestionRequest, UiDismissReason } from "../types";
 import type { ExtensionUiState } from "./approvals";
@@ -62,4 +63,12 @@ export async function subscribeAgentEvents(handlers: {
     unlisteners.forEach(unlisten => unlisten());
     throw error;
   }
+}
+
+/**
+ * Model state of any session (`agent://model-state`): model, thinking level and — since W0.5 — the
+ * session's 做一做 / 想一想 / 问一问 mode, restored by the host when a session opens or switches branch.
+ */
+export async function onSessionModelState(callback: (state: SessionModelState) => void): Promise<UnlistenFn> {
+  return listen<SessionModelState>("agent://model-state", (event) => callback(event.payload));
 }

@@ -3,6 +3,7 @@
 // tasks_list, task_kill, rewind_points, rewind_execute, agent_regenerate, agent_compact, agent_export_html, agent_set_mode,
 // agent_abort_retry, agent_shutdown.
 import type { ModelState, PiMessage, RewindPoint, RunningTask, SessionInfoResponse, SessionSummary, SessionUsage } from "@openbuddy/protocol/dto";
+import type { SessionInfoExtras, SessionUsageExtras } from "@openbuddy/protocol/agent-settings";
 import { invoke } from "../ipc";
 import type { AgentQueue } from "./turn";
 
@@ -121,8 +122,8 @@ export async function agentSetSessionArchived(
  * in the agent (e.g. an old session never loaded this launch) — callers
  * should treat that as "no data" and hide the pill.
  */
-export async function agentSessionInfo(sessionId: string): Promise<SessionInfoResponse> {
-  return invoke<SessionInfoResponse>("agent_session_info", { sessionId });
+export async function agentSessionInfo(sessionId: string): Promise<SessionInfoResponse & SessionInfoExtras> {
+  return invoke<SessionInfoResponse & SessionInfoExtras>("agent_session_info", { sessionId });
 }
 
 /**
@@ -130,9 +131,10 @@ export async function agentSessionInfo(sessionId: string): Promise<SessionInfoRe
  * response wraps `PromptUsage` totals; we return the inner `usage` object.
  * Used by the context-usage popover for the average cache hit rate.
  */
-export async function agentSessionUsage(sessionId: string): Promise<SessionUsage> {
-  const resp = await invoke<{ usage: SessionUsage }>("agent_session_usage", { sessionId });
-  return resp.usage;
+export async function agentSessionUsage(sessionId: string): Promise<SessionUsage & SessionUsageExtras> {
+  const resp = await invoke<{ usage: SessionUsage } & SessionUsageExtras>("agent_session_usage", { sessionId });
+  // The session cost (W1.5) rides along with the token totals.
+  return resp.cost ? { ...resp.usage, cost: resp.cost } : resp.usage;
 }
 
 // ---------- rewind ----------
