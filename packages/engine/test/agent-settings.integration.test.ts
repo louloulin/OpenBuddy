@@ -193,14 +193,14 @@ describe("mode persistence as the first built-in (pii W0.5)", () => {
     await f.call("agent_set_mode", { sessionId: f.sid, mode: "ask" });
     expect(f.events.findLast((e) => e.name === "agent://model-state")?.payload).toMatchObject({ sessionId: f.sid, mode: "ask" });
     await f.call("agent_send", { sessionId: f.sid, text: "second in ask" });
-    expect(toolNames(f.requests.at(-1)!)).toEqual(["find", "grep", "ls", "read"]);
+    expect(toolNames(f.requests.at(-1)!)).toEqual(["find", "grep", "ls", "ob_todo", "read"]);
 
     // Close every live session and reopen from disk.
     await f.call("agent_shutdown");
     const snapshot = await f.call("agent_load_session", { sessionId: f.sid, cwd: f.root });
     expect(snapshot.mode).toBe("ask");
     await f.call("agent_send", { sessionId: f.sid, text: "third after reopen" });
-    expect(toolNames(f.requests.at(-1)!)).toEqual(["find", "grep", "ls", "read"]);
+    expect(toolNames(f.requests.at(-1)!)).toEqual(["find", "grep", "ls", "ob_todo", "read"]);
 
     const fork = await f.call("agent_fork_session", { sessionId: f.sid });
     expect(await f.call("agent_get_model_state", { sessionId: fork })).toMatchObject({ mode: "ask" });
