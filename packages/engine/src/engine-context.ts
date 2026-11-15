@@ -6,6 +6,7 @@ import type {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import type { McpService } from "@openbuddy/services/mcp/mcp";
+import type { MemoryService } from "@openbuddy/services/memory/memory";
 import type { Providers } from "@openbuddy/services/providers/providers";
 import type { Settings } from "@openbuddy/services/settings/settings";
 import type { SkillsService } from "@openbuddy/services/skills/skills";
@@ -32,6 +33,7 @@ export interface EngineContext {
   readonly providers: Providers;
   readonly skills: SkillsService;
   readonly mcp: McpService;
+  readonly memory: MemoryService;
   readonly checkpoints: CheckpointStore;
   extensionFactories: ExtensionFactory[];
   modes: Map<string, AgentMode>;

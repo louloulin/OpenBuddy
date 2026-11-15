@@ -11,7 +11,7 @@ const cleanups: Array<() => Promise<unknown>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 });
-const READ_ONLY = ["find", "grep", "ls", "ob_todo", "read"];
+const READ_ONLY = ["find", "grep", "ls", "ob_remember", "ob_todo", "read"];
 const toolsOf = (request: FixtureRequest | undefined) => ((request?.tools as Array<{ function?: { name?: string } }> | undefined) ?? []).map((t) => t.function?.name).sort();
 const text = (content: unknown) => (typeof content === "string" ? content : Array.isArray(content) ? content.map((p: { text?: string }) => p.text ?? "").join("") : "");
 const systemOf = (request: FixtureRequest | undefined) => text(request?.messages.find((m) => m.role === "system" || m.role === "developer")?.content);
@@ -117,12 +117,12 @@ describe("expert binding across branches (pii W2.2)", () => {
     await f.call("agent_send", { sessionId: f.sid, text: "back on the expert version" });
     expect(systemOf(f.requests.at(-1))).toContain("BRANCH-PERSONA-MARKER");
     expect(f.requests.at(-1)!.model).toBe("reasoning");
-    expect(toolsOf(f.requests.at(-1))).toEqual(["grep", "ob_todo", "read"]);
+    expect(toolsOf(f.requests.at(-1))).toEqual(["grep", "ob_remember", "ob_todo", "read"]);
 
     // 重新生成 keeps the bound expert.
     await f.call("agent_regenerate", { sessionId: f.sid });
     expect(systemOf(f.requests.at(-1))).toContain("BRANCH-PERSONA-MARKER");
-    expect(toolsOf(f.requests.at(-1))).toEqual(["grep", "ob_todo", "read"]);
+    expect(toolsOf(f.requests.at(-1))).toEqual(["grep", "ob_remember", "ob_todo", "read"]);
 
     // 从这里编辑 on the first prompt goes back before the binding; the expert the user has bound stays.
     turns = ((await f.call("agent_tree", { sessionId: f.sid })) as any).turns;
@@ -131,7 +131,7 @@ describe("expert binding across branches (pii W2.2)", () => {
     await f.call("agent_send", { sessionId: f.sid, text: "plain question, edited" });
     expect(systemOf(f.requests.at(-1))).toContain("BRANCH-PERSONA-MARKER");
     expect(f.requests.at(-1)!.model).toBe("reasoning");
-    expect(toolsOf(f.requests.at(-1))).toEqual(["grep", "ob_todo", "read"]);
+    expect(toolsOf(f.requests.at(-1))).toEqual(["grep", "ob_remember", "ob_todo", "read"]);
     // The re-asserted binding is on the new branch: it survives a reopen.
     await f.call("agent_shutdown");
     expect((await f.call("agent_load_session", { sessionId: f.sid, cwd: f.root })).expert).toMatchObject({ id: expert.id });

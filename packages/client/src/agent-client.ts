@@ -17,13 +17,16 @@ export * from "./api/native";
 export * from "./api/events";
 export * from "./api/host";
 export * from "./api/experts";
+export * from "./api/memory";
 
 // Appendix B: wrappers for commands the main-process contract does not implement (kept, not deleted).
 export * from "./api/deferred/connectors";
 export * from "./api/deferred/skills-catalog";
 export * from "./api/deferred/experts";
 export * from "./api/deferred/assistants";
-export * from "./api/deferred/memory";
 export * from "./api/deferred/automations";
 export * from "./api/deferred/marketplace";
 export * from "./api/deferred/misc";
+
+/** `memory_flush` is the only memory command left deferred (pii §3.3). */
+export { memoryFlush } from "./api/deferred/memory-only";

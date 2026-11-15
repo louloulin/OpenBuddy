@@ -127,8 +127,8 @@ function memoryPayload(command: CommandName, payload: Payload) {
   if (scope !== 'global' && scope !== 'workspace') fail('scope');
   const path = payload.path;
   if (typeof path !== 'string' || !path || path.length > 512 || path.includes('\0')) fail('path');
-  const parts = path.split(/[\\/]+/);
-  if (path.startsWith('/') || /^[A-Za-z]:/.test(path) || parts.includes('..') || !/\.md$/i.test(path) || parts.some((p) => !/^[A-Za-z0-9._-]+$/.test(p))) fail('path');
+  const parts = (path as string).split(/[\\/]+/);
+  if ((path as string).startsWith('/') || /^[A-Za-z]:/.test(path as string) || parts.includes('..') || !/\.md$/i.test(path as string) || parts.some((p) => !/^[A-Za-z0-9._-]+$/.test(p))) fail('path');
   if (command === 'memory_save') {
     if (typeof payload.content !== 'string' || payload.content.length > 512 * 1024) fail('content');
   }

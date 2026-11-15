@@ -9,7 +9,7 @@ const ctx = { options: { shell: {} }, settings: {}, emit: () => {}, engine: {}, 
 describe("host modules (20261115-md §5.3)", () => {
   it("are the §5.3 modules and no two of them define the same command", () => {
     const modules = HOST_MODULES.map((create) => create(ctx));
-    expect(modules.map((m) => m.id)).toEqual(["session", "turn", "model", "providers", "approvals", "extensions", "skills", "mcp", "notifications", "artifacts", "experts", "host", "files"]);
+    expect(modules.map((m) => m.id)).toEqual(["session", "turn", "model", "providers", "approvals", "extensions", "skills", "mcp", "notifications", "artifacts", "experts", "memory", "host", "files"]);
     const owner = new Map<string, string>();
     const clashes: string[] = [];
     for (const { id, commands } of modules)
@@ -19,7 +19,7 @@ describe("host modules (20261115-md §5.3)", () => {
       }
     expect(clashes).toEqual([]);
     // 92 + 15 experts commands (experts module, pii W2.1–W2.3) + settings_agent_get / settings_agent_set / agent_cycle_model (model, pii W0.4/W1.6) + session_search (session, pii W1.4) + agent_tree / agent_navigate (session), agent_bash / agent_bash_abort (turn), files_search (files) — 20261116-pii W1.1–W1.3.
-    expect(owner.size).toBe(116);
+    expect(owner.size).toBe(121); // +5 memory commands (pii W5.1–W5.3)
     expect([owner.get("agent_tree"), owner.get("agent_navigate"), owner.get("agent_bash"), owner.get("agent_bash_abort"), owner.get("files_search")]).toEqual(["session", "session", "turn", "turn", "files"]);
   });
 

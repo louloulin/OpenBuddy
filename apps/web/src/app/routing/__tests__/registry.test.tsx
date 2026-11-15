@@ -19,11 +19,11 @@ describe("FeatureRegistry (pii W0.2)", () => {
   it("entries whose requires are unmet do not render in the sidebar or the 更多 menu", async () => {
     const primary = navItems(FEATURES, desktop, "primary");
     const more = navItems(FEATURES, desktop, "more");
-    expect(labels(primary)).toEqual(["专家·技能·连接器", "项目"]);
+    expect(labels(primary)).toEqual(["专家·技能·连接器", "资料库", "项目"]); // 资料库 lights up: memory_list is a contract command since W5.1
     expect(labels(more)).toEqual(["我的文件", "知识库", "用量统计", "通知渠道", "策略设置"]);
     const user = userEvent.setup();
     render(<Sidebar onNewSession={vi.fn()} onSelect={vi.fn()} onNavigate={vi.fn()} onOpenSettings={vi.fn()} onToggleCollapse={vi.fn()} onToggleWorkspace={vi.fn()} onOpenSearch={vi.fn()} onPlaceholder={vi.fn()} activeNav="" nav={primary} moreItems={more} />);
-    for (const label of ["自动化", "资料库", "助理", "技能与 MCP"]) expect(screen.queryByText(label)).toBeNull();
+    for (const label of ["自动化", "助理", "技能与 MCP"]) expect(screen.queryByText(label)).toBeNull();
     await user.hover(screen.getByText("更多"));
     await screen.findByRole("menu");
     for (const label of ["灵感", "云存储", "网页预览"]) expect(screen.queryByText(label)).toBeNull();
@@ -55,7 +55,7 @@ describe("FeatureRegistry (pii W0.2)", () => {
   });
 
   it("only mounts the settings sections the host can serve", () => {
-    expect(settingsSections(FEATURES, desktop).map((s) => s.id)).toEqual(["account", "agent-mail", "shortcuts", "model", "agent-settings", "assistant", "personalize", "security", "help"]);
+    expect(settingsSections(FEATURES, desktop).map((s) => s.id)).toEqual(["account", "agent-mail", "shortcuts", "model", "agent-settings", "memory", "assistant", "personalize", "security", "help"]); // memory lights up: memory_list / memory_rewrite are contract commands since W5.1
     // Browser-only preview: no host answer, only sections that need no command.
     expect(settingsSections(FEATURES, snapshot([], [], "unavailable")).map((s) => s.id)).toEqual(["shortcuts", "personalize", "help"]);
   });
@@ -74,7 +74,7 @@ describe("FeatureRegistry (pii W0.2)", () => {
     expect(resolveView(FEATURES, desktop, "技能与 MCP")).toBe("专家·技能·连接器");
     expect(resolveView(FEATURES, desktop, "自动化")).toBeUndefined();
     expect(resolveView(FEATURES, desktop, "不存在的入口")).toBeUndefined();
-    expect(LEGACY_BLOCKED_VIEWS.filter((label) => resolveView(FEATURES, desktop, label))).toEqual(["专家·技能·连接器"]);
+    expect(LEGACY_BLOCKED_VIEWS.filter((label) => resolveView(FEATURES, desktop, label))).toEqual(["专家·技能·连接器", "资料库"]); // 资料库 is served since W5.1 (memory_list)
     expect(LEGACY_BLOCKED_VIEWS.every((label) => routeEntry(FEATURES, label))).toBe(true);
   });
 

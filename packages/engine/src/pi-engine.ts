@@ -11,6 +11,7 @@ import { Providers, modelKey } from "@openbuddy/services/providers/providers";
 import { ExtensionUiBridge } from "./extension-ui/bridge.js";
 import { SkillsService } from "@openbuddy/services/skills/skills";
 import { McpService } from "@openbuddy/services/mcp/mcp";
+import { MemoryService } from "@openbuddy/services/memory/memory";
 import type { Settings } from "@openbuddy/services/settings/settings";
 import { Permissions, type Emit } from "./permissions/permissions.js";
 import { isBuiltinToolDefinition } from "./builtin/reserved-tools.js";
@@ -41,6 +42,8 @@ export class PiEngine {
   readonly providers: Providers;
   readonly skills: SkillsService;
   readonly mcp: McpService;
+  /** Cross-session memory notes (20261116-pii W5.1). */
+  readonly memory: MemoryService;
   readonly checkpoints: CheckpointStore;
   /** Per-session mode, reapplied whenever the session slot is rebuilt. */
   /** @internal */ modes = new Map<string, AgentMode>();
@@ -72,6 +75,7 @@ export class PiEngine {
     this.providers = new Providers(settings);
     this.skills = new SkillsService(settings);
     this.mcp = new McpService(settings, openUrl, emit);
+    this.memory = new MemoryService(settings, (cwd) => this.trusted(cwd));
     this.sessionDir = join(settings.dir, "sessions");
     // A refresh parses only new or changed session files and leaves the sidebar's list cache alone.
     this.searchIndex = new SessionSearchIndex(this.sessionDir);

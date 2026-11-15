@@ -3,6 +3,7 @@ import type { EngineContext } from "../engine-context.js";
 import { todoBuiltin } from "./todo.js";
 import { modeExtension } from "./mode.js";
 import { persona } from "./persona.js";
+import { memoryBuiltin } from "./memory.js";
 import { trackBuiltinTools } from "./reserved-tools.js";
 
 /**
@@ -49,6 +50,8 @@ export const BUILTIN_EXTENSIONS: BuiltinExtension[] = [
 ];
 // W3.1 plan / todo (`ob_todo`).
 BUILTIN_EXTENSIONS.push(todoBuiltin);
+// W5.2 / W5.3 memory injection and `ob_remember`.
+BUILTIN_EXTENSIONS.push(memoryBuiltin);
 
 /**
  * Factories for one session, in registration order, skipping the ones switched off. Their tool

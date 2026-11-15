@@ -2,8 +2,12 @@ import type { AgentSession } from "@earendil-works/pi-coding-agent";
 
 /** 做一做 / 想一想 / 问一问 (20261115-ui §5.8): plan and ask only get read-only tools. */
 export type AgentMode = "craft" | "plan" | "ask";
-/** `ob_todo` only records the session's plan (pii W3.1): 想一想 needs it to write the steps down. */
-export const READ_ONLY_TOOLS = ["read", "grep", "find", "ls", "ob_todo"];
+/**
+ * Read-only tools kept in 想一想 / 问一问: `ob_todo` records the plan (W3.1); `ob_remember`
+ * writes a memory note the user confirms at the permission gate (W5.3), so ask mode keeps it
+ * available but never silently approved.
+ */
+export const READ_ONLY_TOOLS = ["read", "grep", "find", "ls", "ob_todo", "ob_remember"];
 export type ThinkingLevel = Parameters<AgentSession["setThinkingLevel"]>[0];
 export function validateThinkingLevel(value: unknown): ThinkingLevel {
   if (

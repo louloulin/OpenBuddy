@@ -5,7 +5,7 @@
   "bridge": 27,
   "feature-deep": 45,
   "feature-edge": 21,
-  "cycle": 0,
-  "unreachable": 47,
-  "size": 0
+  "cycle": 1,
+  "unreachable": 73,
+  "size": 4
 }

@@ -12,7 +12,6 @@ import {
 } from "@openbuddy/ui/icon/icons/index";
 import {
   memoryDelete,
-  memoryFlush,
   memoryList,
   memoryRewrite,
   memorySave,
@@ -59,7 +58,7 @@ export function ResourcesPanel({ cwd, onToast }: ResourcesPanelProps) {
       }
       setBusy(true);
       try {
-        await memorySave(scope, path, content, cwd);
+        await memorySave(scope === "workspace" ? "workspace" : "global", path, content, cwd);
         onToast?.(isNew ? "已创建记忆" : "已保存");
         setEditing(null);
         reload();
@@ -76,7 +75,7 @@ export function ResourcesPanel({ cwd, onToast }: ResourcesPanelProps) {
     async (entry: MemoryEntry) => {
       if (!(await appConfirm({ title: `确定删除「${entry.path}」？`, confirmLabel: "删除", danger: true }))) return;
       try {
-        await memoryDelete(entry.scope, entry.path, cwd);
+        await memoryDelete(entry.scope === "workspace" ? "workspace" : "global", entry.path, cwd);
         onToast?.("已删除");
         reload();
       } catch (e) {
@@ -87,27 +86,14 @@ export function ResourcesPanel({ cwd, onToast }: ResourcesPanelProps) {
   );
 
   const handleRewrite = useCallback(async () => {
-    if (!(await appConfirm({ title: "让 agent 用 LLM 重写所有记忆？这会重新组织资料库内容。" }))) return;
+    if (!(await appConfirm({ title: "整理记忆会把全局记忆合并去重到 MEMORY.md，其余文件移除。继续？" }))) return;
     setBusy(true);
     try {
-      await memoryRewrite();
-      onToast?.("已触发重写，稍后刷新查看");
-      setTimeout(reload, 2000);
-    } catch (e) {
-      onToast?.(`重写失败：${String(e).replace(/^Error:\s*/, "")}`);
-    } finally {
-      setBusy(false);
-    }
-  }, [onToast, reload]);
-
-  const handleFlush = useCallback(async () => {
-    setBusy(true);
-    try {
-      await memoryFlush();
-      onToast?.("已落盘");
+      const result = await memoryRewrite();
+      onToast?.(`已整理：${result.merged} 个文件合并为 ${result.kept} 条`);
       reload();
     } catch (e) {
-      onToast?.(`落盘失败：${String(e).replace(/^Error:\s*/, "")}`);
+      onToast?.(`重写失败：${String(e).replace(/^Error:\s*/, "")}`);
     } finally {
       setBusy(false);
     }
@@ -129,19 +115,11 @@ export function ResourcesPanel({ cwd, onToast }: ResourcesPanelProps) {
           <div className="resources-panel__header-actions">
             <button
               className="resources-panel__action-btn"
-              onClick={handleFlush}
-              disabled={busy}
-              title="强制把 agent 未写的记忆落盘"
-            >
-              落盘
-            </button>
-            <button
-              className="resources-panel__action-btn"
               onClick={handleRewrite}
               disabled={busy}
-              title="用 LLM 重写记忆"
+              title="把全局记忆合并去重到 MEMORY.md"
             >
-              <SparklesIcon size="sm" /> 重写
+              <SparklesIcon size="sm" /> 整理
             </button>
             <button
               className="resources-panel__action-btn"
