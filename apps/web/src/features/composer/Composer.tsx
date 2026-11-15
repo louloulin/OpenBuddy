@@ -2,7 +2,6 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { ArrowUp, X, type LucideIcon } from "lucide-react";
 import { open as openDialog } from "@openbuddy/client/ipc";
 import { getPathForFile } from "@openbuddy/client/ipc";
-import { ChevronDownIcon } from "@openbuddy/ui/icon/icons/index";
 import { ModelRuntimeContext, ModelSelector, type ModelOption } from "../models/ModelSelector";
 import { ThumbImg } from "../../shared/ui/ThumbImg";
 import { ContextUsagePill } from "./ContextUsagePill";
@@ -45,7 +44,6 @@ export function Composer({
   placeholder,
   apiReady = true,
   onOpenSettings,
-  onPlaceholder,
   onToast,
   showMeta = false,
   showDisclaimer = false,
@@ -96,6 +94,7 @@ export function Composer({
   placeholder?: string;
   apiReady?: boolean;
   onOpenSettings?: () => void;
+  /** Unused since pii W0.3 (the toast-only fallbacks are gone); kept so callers need not change. */
   onPlaceholder?: (label: string) => void;
   /** Surface transient feedback (permission rule save errors, etc.). */
   onToast?: (msg: string) => void;
@@ -323,8 +322,6 @@ export function Composer({
       onToast?.(`无法添加文件：${String(error)}`);
     }
   };
-
-  const ph = (label: string) => onPlaceholder?.(label);
 
   // Cursor tracking for slash-command autocomplete.
   const [cursorPos, setCursorPos] = useState(0);
@@ -593,17 +590,7 @@ export function Composer({
               models={models!}
               onModelChange={onModelChange!}
             />
-          ) : (
-            <button
-              className="wb-composer__model"
-              onClick={(e) => {
-                e.stopPropagation();
-                ph("模型选择");
-              }}
-            >
-              Auto <ChevronDownIcon size="sm" />
-            </button>
-          )}
+          ) : null /* pii W0.3: no toast-only "Auto" fallback without a model list */}
           {streaming ? (
             <>
               {/* 流式时可加入待发送队列(对齐 WorkBuddy message-queue)。 */}
@@ -680,11 +667,7 @@ export function Composer({
               workspaces={workspaces!}
               onSelectWorkspace={onSelectWorkspace!}
             />
-          ) : (
-            <button className="wb-composer-meta__btn" onClick={() => ph("选择工作空间")}>
-              选择工作空间 <ChevronDownIcon size="sm" />
-            </button>
-          )}
+          ) : null /* pii W0.3: no toast-only workspace fallback without a workspace list */}
           <PermissionPicker onToast={onToast} />
         </div>
       )}

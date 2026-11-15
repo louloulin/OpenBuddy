@@ -20,6 +20,7 @@ describe("Electron first launch", () => {
           case "agent_list_sessions": case "agent_list_workspaces": case "commands_list": return [];
           case "providers_list": return { providers: [], models: [] };
           case "permission_mode_get": return "ask";
+          case "host_capabilities": return { protocolVersion: 1, platform: "desktop", commands: ["host_capabilities"], events: [], features: [] };
           default: throw new Error(`Unexpected startup request: ${command}`);
         }
       },
@@ -34,6 +35,8 @@ describe("Electron first launch", () => {
     expect(screen.getByRole("textbox")).toBeDisabled();
     await waitFor(() => expect(requests).toContain("providers_list"));
     expect(requests.filter(command => /experts|automations|agents_list|tasks|team_|marketplace|plugins|memory|prompt_history/.test(command))).toEqual([]);
+    // pii W0.1: capabilities are read once at startup.
+    expect(requests.filter(command => command === "host_capabilities")).toEqual(["host_capabilities"]);
     expect(screen.queryByText(/未就绪/)).toBeNull();
     expect(screen.getByRole("textbox")).toHaveAttribute("placeholder", "");
     fireEvent.click(screen.getByRole("button", { name: "请先配置 API Key 开始使用" }));

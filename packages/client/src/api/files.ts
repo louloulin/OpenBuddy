@@ -1,10 +1,15 @@
-// §5.3 `files` module: open_url, list_dir, plus the ob-preview:// URL helper. (read_text_file, write_text_file, read_file_base64,
-// path_stat, open_path, reveal_in_folder and browse_directory have no wrapper yet; callers still use ipc.invoke directly.)
+// §5.3 `files` module: open_url, open_path, list_dir, plus the ob-preview:// URL helper. (read_text_file, write_text_file,
+// read_file_base64, path_stat, reveal_in_folder and browse_directory have no wrapper yet; callers still use ipc.invoke directly.)
 import { invoke } from "../ipc";
 
 /** Open a URL in the system browser (scheme-whitelisted backend command). */
 export async function openUrl(url: string): Promise<void> {
   await invoke<void>("open_url", { url });
+}
+
+/** Open a local file with the system default app (the host checks the path is granted). */
+export async function openPath(path: string): Promise<void> {
+  await invoke<void>("open_path", { path });
 }
 
 // ---------- filesystem: directory listing (file-tree sidebar) ----------

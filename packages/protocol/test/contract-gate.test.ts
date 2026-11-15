@@ -48,8 +48,12 @@ const PENDING_COMMANDS = [
   "skills_catalog_default_root", "skills_catalog_list_roots", "skills_catalog_load", "skills_catalog_read_skill",
   "subagents_config_get", "subagents_config_save", "toggle_plan_mode", "web_search_config_get", "web_search_config_save",
 ];
-/** Events the renderer subscribes to that the main process does not emit yet (CLI connector auth, Phase 5). */
-const PENDING_EVENTS = ["connector://cli-auth-done", "connector://cli-auth-log", "connector://cli-auth-url"];
+/**
+ * Events the renderer subscribes to that the main process does not emit yet (CLI connector auth, Phase 5).
+ * `agent://plan` (pii W3.1) is named by the FeatureRegistry's 计划面板 entry (`requiresEvents`), so the entry
+ * lights up once the event joins EVENTS; remove it here when it lands.
+ */
+const PENDING_EVENTS = ["agent://plan", "connector://cli-auth-done", "connector://cli-auth-log", "connector://cli-auth-url"];
 /** Legacy contract events from the pre-Pi engine; nothing emits them. Remove from EVENTS together with their last listener. */
 const UNEMITTED_EVENTS = ["agent://compaction", "agent://complete", "agent://queue", "agent://retry", "agent://session-info", "agent://tool", "agent://update"];
 

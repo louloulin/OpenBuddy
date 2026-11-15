@@ -3,6 +3,14 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Sidebar } from "../Sidebar";
 import { useSessionsStore } from "@/features/sessions/state/sessions-store";
+import { MyFilesIconV2, WbExpertNavIcon, WbProjectNavIcon } from "@openbuddy/ui/icon/icons/index";
+
+// The app passes these from its FeatureRegistry (pii W0.2); see app/routing/__tests__/registry.test.tsx.
+const nav = [
+  { id: "experts-hub", label: "专家·技能·连接器", icon: WbExpertNavIcon },
+  { id: "projects", label: "项目", icon: WbProjectNavIcon },
+];
+const moreItems = [{ id: "my-files", label: "我的文件", icon: MyFilesIconV2 }];
 
 const base = {
   onNewSession: vi.fn(),
@@ -17,18 +25,27 @@ const base = {
 };
 
 describe("Sidebar", () => {
-  it("渲染导航项", () => {
-    render(<Sidebar {...base} />);
-    for (const label of ["新建任务", "项目", "技能与 MCP", "更多"]) {
+  it("渲染注册表给出的导航项", () => {
+    render(<Sidebar {...base} nav={nav} moreItems={moreItems} />);
+    for (const label of ["新建任务", "专家·技能·连接器", "项目", "更多"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    // 技能与 MCP is a tab of 专家·技能·连接器 now (U7.6), not a sidebar entry.
+    expect(screen.queryByText("技能与 MCP")).toBeNull();
   });
 
-  it("点击占位导航触发 onNavigate", () => {
+  it("没有可用入口时只剩新建任务", () => {
+    render(<Sidebar {...base} />);
+    expect(screen.getByText("新建任务")).toBeInTheDocument();
+    expect(screen.queryByText("项目")).toBeNull();
+    expect(screen.queryByText("更多")).toBeNull();
+  });
+
+  it("点击导航触发 onNavigate", () => {
     const onNavigate = vi.fn();
-    render(<Sidebar {...base} onNavigate={onNavigate} />);
-    fireEvent.click(screen.getByText("技能与 MCP"));
-    expect(onNavigate).toHaveBeenCalledWith("技能与 MCP");
+    render(<Sidebar {...base} nav={nav} onNavigate={onNavigate} />);
+    fireEvent.click(screen.getByText("专家·技能·连接器"));
+    expect(onNavigate).toHaveBeenCalledWith("专家·技能·连接器");
   });
 
   it("渲染会话列表并可选中", () => {
@@ -60,13 +77,13 @@ describe("Sidebar", () => {
     expect(onToggleCollapse).toHaveBeenCalled();
   });
 
-  it("更多菜单隐藏暂缓功能并保留文件入口", async () => {
+  it("更多菜单只列注册表给出的入口", async () => {
     const onNavigate = vi.fn();
     const user = userEvent.setup();
-    render(<Sidebar {...base} onNavigate={onNavigate} />);
+    render(<Sidebar {...base} nav={nav} moreItems={moreItems} onNavigate={onNavigate} />);
     await user.hover(screen.getByText("更多"));
     expect(await screen.findByRole("menu")).toBeInTheDocument();
-    for (const label of ["灵感", "云存储", "专家·技能·连接器", "自动化", "腾讯文档"]) {
+    for (const label of ["灵感", "云存储", "自动化", "腾讯文档", "策略设置"]) {
       expect(screen.queryByText(label)).toBeNull();
     }
     fireEvent.click(screen.getByText("我的文件"));

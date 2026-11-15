@@ -14,6 +14,7 @@ import { Buffer } from "node:buffer";
 import { deflateRawSync } from "node:zlib";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MoreMenuImaKnowledgeIcon } from "@openbuddy/ui/icon/icons/index";
 
 const openDialog = vi.fn();
 vi.mock("@openbuddy/client/ipc", () => ({ open: (...a: unknown[]) => openDialog(...a), invoke: vi.fn() }));
@@ -81,7 +82,7 @@ describe("知识库端到端冒烟", () => {
   it("Sidebar「更多」→「知识库」触发 onNavigate(\"知识库\")", async () => {
     const onNavigate = vi.fn();
     const user = userEvent.setup();
-    render(<Sidebar {...base} onNavigate={onNavigate} onToast={vi.fn()} />);
+    render(<Sidebar {...base} onNavigate={onNavigate} onToast={vi.fn()} moreItems={[{ id: "knowledge-base", label: "知识库", icon: MoreMenuImaKnowledgeIcon }]} />);
     await user.hover(screen.getByText("更多"));
     const menu = await screen.findByRole("menu");
     expect(menu).toBeInTheDocument();

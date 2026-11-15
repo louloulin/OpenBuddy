@@ -695,6 +695,8 @@ body.bench-resizing iframe { pointer-events: none; }
 .palette__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .palette__meta { flex: none; font-size: 12px; }
 .palette__empty { padding: 14px 10px; color: var(--wb-text-weak); font-size: 13px; }
+/* pii W0.3 / U7.6: the former 技能与 MCP page as tabs of 专家·技能·连接器. */
+.res-panel--embedded .res-panel { height: auto; overflow: visible; padding: 8px 0 24px; margin: 0; max-width: 920px; }
 
 /* Invisible tooltip boxes near the right edge widened .app__main; with `overflow: hidden` a focus /
  * scrollIntoView could then scroll the whole main area sideways (seen after picking an attachment).
