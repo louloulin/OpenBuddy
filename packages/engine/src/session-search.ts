@@ -1,14 +1,68 @@
-import type { SessionInfo } from "@earendil-works/pi-coding-agent";
-import { readdir, stat } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { parseSessionEntries, type SessionInfo } from "@earendil-works/pi-coding-agent";
+import { readdir, readFile, stat } from "node:fs/promises";
+import { join } from "node:path";
 import type { SearchMatchRange } from "@openbuddy/protocol/search";
 
 /**
- * Full-text session search (pii W1.4). The text comes from Pi's `SessionManager.listAll()`
- * (`SessionInfo.allMessagesText`: user + assistant text). The index keeps the normalized text
- * per session file and only rebuilds files whose mtime/size changed; a search over an unchanged
- * directory costs one readdir + stat per file, no parsing.
+ * Full-text session search (pii W1.4). The index keeps the normalized message text (user +
+ * assistant text, as Pi's `SessionManager.listAll()` reports it in `allMessagesText`) per session
+ * file. A refresh stats every file and parses only the new or changed ones (mtime/size), so a
+ * search over an unchanged directory costs one readdir + stat per file, and one changed session
+ * costs one parse. It never touches the sidebar's list cache.
  */
+
+type MessageLike = { role?: unknown; content?: unknown; timestamp?: unknown };
+const textOf = (message: MessageLike) =>
+  typeof message.content === "string"
+    ? message.content
+    : Array.isArray(message.content)
+      ? message.content.filter((b: { type?: string }) => b?.type === "text").map((b: { text?: string }) => b.text ?? "").join(" ")
+      : "";
+
+/**
+ * One session file as Pi's `listAll()` describes it (same header check, name, first message,
+ * message text and activity time), read on its own. Null when it is not a session file.
+ */
+export async function readSessionInfo(path: string): Promise<SessionInfo | null> {
+  try {
+    const [content, stats] = await Promise.all([readFile(path, "utf8"), stat(path)]);
+    const [header, ...entries] = parseSessionEntries(content) as Array<Record<string, any>>;
+    if (header?.type !== "session") return null;
+    let name: string | undefined;
+    let firstMessage = "";
+    let messageCount = 0;
+    let lastActivity: number | undefined;
+    const texts: string[] = [];
+    for (const entry of entries) {
+      if (entry.type === "session_info") name = (entry.name as string | undefined)?.trim() || undefined;
+      if (entry.type !== "message") continue;
+      messageCount++;
+      const message = (entry.message ?? {}) as MessageLike;
+      if ((message.role !== "user" && message.role !== "assistant") || !("content" in message)) continue;
+      const at = typeof message.timestamp === "number" ? message.timestamp : new Date(entry.timestamp).getTime();
+      if (!Number.isNaN(at)) lastActivity = Math.max(lastActivity ?? 0, at);
+      const text = textOf(message);
+      if (!text) continue;
+      texts.push(text);
+      if (!firstMessage && message.role === "user") firstMessage = text;
+    }
+    const headerTime = typeof header.timestamp === "string" ? new Date(header.timestamp).getTime() : NaN;
+    return {
+      path,
+      id: header.id,
+      cwd: typeof header.cwd === "string" ? header.cwd : "",
+      name,
+      parentSessionPath: header.parentSession,
+      created: new Date(header.timestamp),
+      modified: lastActivity ? new Date(lastActivity) : !Number.isNaN(headerTime) ? new Date(headerTime) : stats.mtime,
+      messageCount,
+      firstMessage: firstMessage || "(no messages)",
+      allMessagesText: texts.join(" "),
+    };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Wrappers the host and renderer put into prompts before Pi records them (see chat-core
@@ -132,8 +186,8 @@ export class SessionSearchIndex {
   lastRefresh = { rebuilt: 0, total: 0, skipped: true };
   constructor(
     private readonly dir: string,
-    /** Fresh `SessionManager.listAll(dir)` results. */
-    private readonly list: () => Promise<SessionInfo[]>,
+    /** Reads one session file (tests count the calls). */
+    private readonly read: (path: string) => Promise<SessionInfo | null> = readSessionInfo,
   ) {}
 
   /** `mtimeMs:size` per session file name in the directory. */
@@ -167,20 +221,24 @@ export class SessionSearchIndex {
       this.lastRefresh = { rebuilt: 0, total: this.docs.size, skipped: true };
       return;
     }
-    const infos = await this.list();
     const next = new Map<string, Doc>();
     let rebuilt = 0;
-    for (const info of infos) {
-      const stamp = stamps.get(basename(info.path)) ?? `modified:${info.modified.getTime()}`;
-      const meta = { id: info.id, path: info.path, cwd: info.cwd, name: info.name, firstMessage: info.firstMessage, modified: info.modified };
-      const previous = this.docs.get(info.path);
-      if (previous && previous.stamp === stamp) {
-        next.set(info.path, { ...previous, ...meta });
-        continue;
-      }
-      rebuilt++;
-      const text = searchableText(info.allMessagesText ?? "");
-      next.set(info.path, { ...meta, stamp, text, lower: text.toLowerCase() });
+    const changed: Array<[string, string]> = [];
+    for (const [name, stamp] of stamps) {
+      const path = join(this.dir, name);
+      const previous = this.docs.get(path);
+      if (previous && previous.stamp === stamp) next.set(path, previous);
+      else changed.push([path, stamp]);
+    }
+    // Parse the new and changed files only, a few at a time.
+    for (let i = 0; i < changed.length; i += 16) {
+      await Promise.all(changed.slice(i, i + 16).map(async ([path, stamp]) => {
+        const info = await this.read(path);
+        if (!info) return;
+        rebuilt++;
+        const text = searchableText(info.allMessagesText ?? "");
+        next.set(path, { id: info.id, path, cwd: info.cwd, name: info.name, firstMessage: info.firstMessage, modified: info.modified, stamp, text, lower: text.toLowerCase() });
+      }));
     }
     this.docs = next;
     this.signature = signature;

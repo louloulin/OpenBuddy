@@ -133,7 +133,7 @@ export async function deleteSession(engine: EngineContext, id: string) {
 }
 /**
  * `session_search` (pii W1.4): every saved session whose title or messages contain all the
- * terms. Text comes from `SessionManager.listAll()`; the index only re-reads changed files.
+ * terms. The index (session-search.ts) holds each file's message text and re-reads only changed files.
  */
 export async function search(
   engine: EngineContext,
