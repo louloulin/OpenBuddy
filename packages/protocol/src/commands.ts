@@ -33,6 +33,8 @@ export const COMMANDS = [
   'agent_set_session_expert', 'agent_clear_session_expert',
   'experts_default_root', 'experts_list_roots', 'experts_set_roots', 'experts_load', 'experts_read_agent_prompt',
   'experts_thumbnail', 'experts_image_bytes', 'experts_link_agents',
+  // 记忆 (20261116-pii W5.1–W5.3): the memory host module.
+  'memory_list', 'memory_get', 'memory_save', 'memory_delete', 'memory_rewrite',
 ] as const;
 export type CommandName = typeof COMMANDS[number];
 export const isCommand = (value: unknown): value is CommandName => typeof value === 'string' && (COMMANDS as readonly string[]).includes(value);

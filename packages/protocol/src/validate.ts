@@ -112,7 +112,26 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
     if (payload.direction !== undefined && payload.direction !== 'forward' && payload.direction !== 'backward') throw new Error('invalid_payload: direction');
   }
   if (/^(agents_(list|get|save|delete|template)|experts_[a-z_]+|agent_(set|clear)_session_expert)$/.test(command)) expertPayload(command, payload);
+  if (command.startsWith('memory_')) memoryPayload(command, payload);
   return payload;
+}
+
+/** Memory commands (20261116-pii W5.1–W5.3): a relative `.md` path inside one scope, bounded text. */
+function memoryPayload(command: CommandName, payload: Payload) {
+  const fail = (key: string): never => { throw new Error(`invalid_payload: ${key}`); };
+  if (payload.cwd !== undefined && payload.cwd !== null) {
+    if (typeof payload.cwd !== 'string' || !payload.cwd || payload.cwd.length > 4096 || payload.cwd.includes('\0')) fail('cwd');
+  }
+  if (command === 'memory_list' || command === 'memory_rewrite') return;
+  const scope = payload.scope;
+  if (scope !== 'global' && scope !== 'workspace') fail('scope');
+  const path = payload.path;
+  if (typeof path !== 'string' || !path || path.length > 512 || path.includes('\0')) fail('path');
+  const parts = path.split(/[\\/]+/);
+  if (path.startsWith('/') || /^[A-Za-z]:/.test(path) || parts.includes('..') || !/\.md$/i.test(path) || parts.some((p) => !/^[A-Za-z0-9._-]+$/.test(p))) fail('path');
+  if (command === 'memory_save') {
+    if (typeof payload.content !== 'string' || payload.content.length > 512 * 1024) fail('content');
+  }
 }
 
 /** 20261116-pii W1.1 branches, W1.2 `!command`, W1.3 `@` file search. */

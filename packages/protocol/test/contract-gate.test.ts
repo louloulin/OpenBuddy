@@ -41,7 +41,7 @@ const PENDING_COMMANDS = [
   "connectors_cli_auth", "connectors_cli_auth_cancel", "connectors_cli_skills_dir", "connectors_cli_status", "connectors_cli_unauth", "connectors_default_root",
   "connectors_icon", "connectors_list_roots", "connectors_load", "connectors_read_mcp_config",
   "inspiration_generate", "internal_reload", "marketplace_action", "marketplace_list",
-  "memory_delete", "memory_flush", "memory_get", "memory_list", "memory_rewrite", "memory_save",
+  "memory_flush",
   "plugins_action", "plugins_list", "prompt_history", "session_fork",
   "skills_catalog_default_root", "skills_catalog_list_roots", "skills_catalog_load", "skills_catalog_read_skill",
   "subagents_config_get", "subagents_config_save", "toggle_plan_mode", "web_search_config_get", "web_search_config_save",
