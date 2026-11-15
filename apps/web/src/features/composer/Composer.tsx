@@ -83,8 +83,8 @@ export function Composer({
   onEnqueue,
   /** Name of the expert currently bound to this session (shown as badge in footer). */
   activeExpertName,
-  /** Local avatar path for the expert badge. */
-  activeExpertAvatar,
+  /** Local avatar path (or emoji) for the expert badge; onClearExpert adds its × (pending expert on home). */
+  activeExpertAvatar, onClearExpert,
   /** Session id powering the context-usage pill (omit on the home page). */
   usageSessionId,
   usageMsgCount,
@@ -152,7 +152,7 @@ export function Composer({
   /** Name of the expert currently bound to this session (shown as badge in footer). */
   activeExpertName?: string;
   /** Local avatar path for the expert badge. */
-  activeExpertAvatar?: string;
+  activeExpertAvatar?: string; onClearExpert?: () => void;
   /** Session id powering the context-usage pill (omit on the home page). */
   usageSessionId?: string;
   /** Triggers pill re-fetch when messages change. */
@@ -557,12 +557,8 @@ export function Composer({
             }}
             onNavigateConnectors={onNavigateConnectors}
           />
-          {activeExpertName && (
-            <span className="wb-composer__expert-badge" title={`当前专家：${activeExpertName}`}>
-              <ThumbImg name={activeExpertName} local={activeExpertAvatar} size={18} shape="circle" />
-              {activeExpertName}
-            </span>
-          )}
+          {activeExpertName && (<span className="wb-composer__expert-badge" title={`当前专家：${activeExpertName}`} data-testid="composer-expert"><ThumbImg name={activeExpertName} local={activeExpertAvatar} size={18} shape="circle" />{activeExpertName}
+            {onClearExpert && <button type="button" className="wb-composer__expert-x" aria-label={`取消专家 ${activeExpertName}`} onClick={onClearExpert}>×</button>}</span>)}
           {permissionInline && (
             <PermissionPicker onToast={onToast} />
           )}

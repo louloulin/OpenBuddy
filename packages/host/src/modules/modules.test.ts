@@ -9,7 +9,7 @@ const ctx = { options: { shell: {} }, settings: {}, emit: () => {}, engine: {}, 
 describe("host modules (20261115-md §5.3)", () => {
   it("are the §5.3 modules and no two of them define the same command", () => {
     const modules = HOST_MODULES.map((create) => create(ctx));
-    expect(modules.map((m) => m.id)).toEqual(["session", "turn", "model", "providers", "approvals", "extensions", "skills", "mcp", "notifications", "artifacts", "host", "files"]);
+    expect(modules.map((m) => m.id)).toEqual(["session", "turn", "model", "providers", "approvals", "extensions", "skills", "mcp", "notifications", "artifacts", "experts", "host", "files"]);
     const owner = new Map<string, string>();
     const clashes: string[] = [];
     for (const { id, commands } of modules)
@@ -18,7 +18,7 @@ describe("host modules (20261115-md §5.3)", () => {
         owner.set(key, id);
       }
     expect(clashes).toEqual([]);
-    expect(owner.size).toBe(92);
+    expect(owner.size).toBe(107);
   });
 
   it("host_capabilities reports what the host serves plus what the embedding app serves", async () => {

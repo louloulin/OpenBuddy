@@ -5,6 +5,7 @@
 import type { ModelState, PiMessage, RewindPoint, RunningTask, SessionInfoResponse, SessionSummary, SessionUsage } from "@openbuddy/protocol/dto";
 import { invoke } from "../ipc";
 import type { AgentQueue } from "./turn";
+import type { SessionExpertInfo } from "@openbuddy/protocol/experts";
 
 // ---------- commands ----------
 
@@ -58,6 +59,8 @@ export interface SessionSnapshot extends ModelState {
   busy: boolean;
   status: "running" | "idle" | "failed";
   queue: AgentQueue;
+  /** Expert bound on the session's current branch (pii W2.2). */
+  expert?: SessionExpertInfo | null;
 }
 export async function agentLoadSession(sessionId: string, cwd: string): Promise<SessionSnapshot> {
   return invoke<SessionSnapshot>("agent_load_session", { sessionId, cwd });

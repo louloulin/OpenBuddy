@@ -4,6 +4,9 @@ import { ExpertsTab } from "./experts/ExpertsTab";
 import { SkillsTab } from "./skills/SkillsTab";
 import { ConnectorsTab } from "./connectors/ConnectorsTab";
 
+export { BoundExpertBadge } from "./experts/BoundExpertBadge";
+export { usePendingExpertStore, type PendingExpert } from "./state/pending-expert-store";
+
 interface Props {
   /** Navigate to the home page (after summoning an expert). */
   onGoHome?: () => void;

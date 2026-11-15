@@ -49,7 +49,15 @@ interface ThumbImgProps {
  *  element scrolls near the viewport) and falls back to a remote URL, then to a
  *  colored letter. This keeps the ~100 MB of full-res source avatars from ever
  *  loading wholesale — only the visible cards decode. */
-export function ThumbImg({
+export function ThumbImg(props: ThumbImgProps) {
+  // An expert avatar can be an emoji instead of a file path (20261116-pii W2.3): show the glyph, never thumbnail it.
+  const { local, size = 40, shape = "square", className } = props;
+  if (local && !/[\\/]/.test(local))
+    return <LetterAvatar name={local} size={size} shape={shape} color="var(--wb-bg-tertiary)" className={className} />;
+  return <FileThumb {...props} />;
+}
+
+function FileThumb({
   local, url, name, size = 40, shape = "square", color, className,
 }: ThumbImgProps) {
   const [src, setSrc] = useState<string | undefined>(() =>

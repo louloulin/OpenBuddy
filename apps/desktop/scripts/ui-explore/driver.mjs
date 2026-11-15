@@ -180,7 +180,11 @@ const fixtureServer = createServer(async (req, res) => {
   const last = messages.at(-1);
   const lastUser = messages.findLast(m => m.role === 'user')?.content;
   const lastUserText = typeof lastUser === 'string' ? lastUser : Array.isArray(lastUser) ? lastUser.filter(p => p.type === 'text').map(p => p.text).join('\n') : '';
-  fixture.requests.push({ url: req.url, model: input.model, lastRole: last?.role, lastUserText: lastUserText.slice(0, 200), tools: (input.tools ?? []).map(t => t.function?.name), reasoning_effort: input.reasoning_effort, at: Date.now() });
+  // 专家人设 (20261116-pii W2.2): the persona built-in appends "## 专家人设：<name>" to the system prompt.
+  const systemContent = messages.find(m => m.role === 'system' || m.role === 'developer')?.content;
+  const systemText = typeof systemContent === 'string' ? systemContent : Array.isArray(systemContent) ? systemContent.map(p => p.text ?? '').join('') : '';
+  const persona = systemText.match(/## 专家人设：([^\n]+)/)?.[1]?.trim();
+  fixture.requests.push({ url: req.url, model: input.model, lastRole: last?.role, lastUserText: lastUserText.slice(0, 200), tools: (input.tools ?? []).map(t => t.function?.name), reasoning_effort: input.reasoning_effort, persona, at: Date.now() });
   const forced = fixture.nextStatus.shift();
   if (forced || lastUserText.includes('__ERR429__') || lastUserText.includes('__ERR500__')) {
     const status = forced ?? (lastUserText.includes('__ERR429__') ? 429 : 500);
@@ -261,6 +265,10 @@ const fixtureServer = createServer(async (req, res) => {
   if (lastUserText.includes('__LONG__')) {
     for (const t of ['先读一下现有结构。', '列出可以拆分的部分。', '按影响面排序。', '确认每一步都能单独验证。', '写成表格方便跟踪。']) { chunk({ reasoning_content: t }); await sleep(350); }
     await streamText(chunk, LONG_ANSWER, fixture.delayMs / 6);
+    finish(); return;
+  }
+  if (persona) {
+    await streamText(chunk, `人设已生效：${persona}\n\n我会以「${persona}」的身份处理这个任务（本地 fixture 根据系统提示词里的专家人设作答）。`, fixture.delayMs / 3);
     finish(); return;
   }
   if (lastUserText.includes('__THINK__')) {

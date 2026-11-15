@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Paperclip, ChevronRight, Wand2 } from "lucide-react";
 import {
   AddIcon,
+  ExpertTabIcon,
   SkillTabIcon,
 } from "@openbuddy/ui/icon/icons/index";
-import { skillsList } from "@openbuddy/client/agent-client";
+import { expertsLoad, skillsList } from "@openbuddy/client/agent-client";
 import { HOME_MODES, type HomeModeId } from "../../shared/content/scenes";
 import { CONNECTOR_LIST } from "../experts/data/connectors-catalog";
 import type { AgentEntry, SkillInfo } from "@openbuddy/protocol/dto";
@@ -31,6 +32,7 @@ const MENU_GROUPS: MenuItem[][] = [
   ],
   [
     { id: "mode", label: "模式", icon: <Wand2 size={16} /> },
+    { id: "experts", label: "专家", icon: <ExpertTabIcon size="md" /> },
     { id: "skills", label: "技能", icon: <SkillTabIcon size="md" /> },
   ],
 ];
@@ -57,7 +59,8 @@ export function InputAddMenu({
     setDataLoaded(true);
     try {
       const [e, s] = await Promise.all([
-        Promise.resolve([] as AgentEntry[]),
+        // 专家中心 catalog (pii W2.3): 我的专家 first, then built-in / library / project experts.
+        expertsLoad().then((c) => c.experts as AgentEntry[]).catch(() => [] as AgentEntry[]),
         skillsList().catch(() => [] as SkillInfo[]),
       ]);
       setExperts(e);
@@ -169,15 +172,15 @@ export function InputAddMenu({
     }
 
     if (hoveredItem === "experts") {
-      items = experts.length > 0 ? (
-        experts.map((e) => (
+      items = (<>{experts.length > 0 ? (
+        experts.slice(0, 12).map((e) => (
           <button
             key={e.path || e.name}
             type="button"
             className="iam-sub-item"
             onClick={() => handleSelectExpert(e)}
           >
-            <span className="iam-sub-avatar">{(e.name || "?")[0]}</span>
+            <span className="iam-sub-avatar">{"emoji" in e && typeof e.emoji === "string" ? e.emoji : Array.from(e.name || "?")[0]}</span>
             <span className="iam-sub-text">
               <span className="iam-sub-name">{e.name}</span>
               {e.description && <span className="iam-sub-desc">{e.description.slice(0, 40)}</span>}
@@ -185,8 +188,9 @@ export function InputAddMenu({
           </button>
         ))
       ) : (
-        <div className="iam-sub-empty">暂无已安装专家</div>
-      );
+        <div className="iam-sub-empty">暂无专家</div>
+      )}
+      <div className="iam-sub-footer" onClick={handleSelectConnector}>专家中心 →</div></>);
     }
 
     if (hoveredItem === "skills") {

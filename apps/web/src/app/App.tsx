@@ -20,9 +20,9 @@ import { useArtifactsStore } from "../features/workbench/state/artifacts-store";
 import { useSessionsStore } from "../features/sessions/state/sessions-store";
 import { usePermissionStore } from "../features/approvals/state/permission-store";
 import { useQuestionStore } from "../features/approvals/state/question-store";
-import { usePendingExpertStore } from "../features/experts/state/pending-expert-store";
+import { BoundExpertBadge } from "../features/experts";
+import { bindPendingExpert, clearSessionExpert, selectExpert, showSessionExpert } from "./expert-session";
 import { TopbarTitle } from "./shell/TopbarTitle";
-import { ThumbImg } from "../shared/ui/ThumbImg";
 import {
   agentInit,
   agentNewSession,
@@ -446,22 +446,14 @@ function Shell() {
       sessionsStore.getState().upsert({ sessionId, title: deriveTitle(text), cwd, status: "working", updatedAt: new Date().toISOString() });
       sessionStore.getState().setSession(sessionId);
 
-      // Check for pending expert — inject persona invisibly.
-      const pending = usePendingExpertStore.getState().expert;
-      let textForAgent = text;
-      if (pending && pending.prompt) {
-        // parseUserText strips it from display on history replay.
-        textForAgent = `${EXPERT_PERSONA_BEGIN}\n${pending.prompt}\n${EXPERT_PERSONA_END}\n\n${text}`;
-        // Bind expert to session for persistence + UI badge.
-
-        sessionsStore.getState().upsert({ sessionId, expertId: pending.expertId, expertName: pending.name, expertAvatar: pending.avatarLocal });
-        usePendingExpertStore.getState().clear();
-      }
+      // A summoned expert is bound to the new task (persona, model, tools) before its first prompt (pii W2.2).
+      const expertNotice = await bindPendingExpert(sessionId);
+      if (expertNotice) showToast(expertNotice);
 
       // UI shows only the user's visible text.
       sessionStore.getState().pushUser(text, attachments?.map(a => a.path), sessionId);
       sessionStore.getState().startStreaming(sessionId);
-      await agentSend(sessionId, textForAgent, attachments);
+      await agentSend(sessionId, text, attachments);
       refreshWorkspaces(cwd);
     } catch (e) {
       console.error('[OpenBuddy] handleSendNew error:', e);
@@ -652,6 +644,7 @@ function Shell() {
     useAgentModelStore.getState().apply(snapshot);
     sessionStore.getState().hydrate(sessionId, snapshot.messages, snapshot.busy, force);
     usePiQueueStore.getState().apply(sessionId, snapshot.queue);
+    showSessionExpert(sessionId, snapshot.expert);
     sessionsStore.getState().upsert({ sessionId, status: sessionStatusOf(snapshot.status) });
     // Artifacts need the loaded session; ChatView's own request may have raced the load.
     void useArtifactsStore.getState().refresh(sessionId);
@@ -701,24 +694,12 @@ function Shell() {
     }
   };
 
-  // Select an expert from the + menu (chat or home composer). Instead of
-  // immediately creating a session, set the pending expert and go home so the
-  // user can type their message with the expert badge visible.
-  const handleStartWithExpert = (
-    agent: AgentEntry,
-    _meta?: { expertId?: string; source?: string },
-  ) => {
-    const promptBody = agent.raw
-      ? extractMarkdownBody(agent.raw)
-      : agent.description ?? "";
-    usePendingExpertStore.getState().set({
-      name: agent.name,
-      prompt: promptBody,
-      description: agent.description ?? agent.name,
-      expertId: _meta?.expertId ?? agent.name,
-      source: _meta?.source ?? agent.scope ?? "local",
-    });
-    handleGoHome();
+  // An expert picked from the + menu: an open task switches to it now; on the home page it becomes
+  // the pending expert, bound when the new task is sent (the user types the message first).
+  const handleStartWithExpert = (agent: AgentEntry) => {
+    const sessionId = !placeholderView ? currentSessionId ?? undefined : undefined;
+    void selectExpert(agent, sessionId).then((message) => { if (message) showToast(message); });
+    if (!sessionId) handleGoHome();
   };
 
   // Discover launcher: open a new session and send the wizard's prompt. If an
@@ -915,12 +896,7 @@ function Shell() {
                   </>
                 )}
                 <TopbarTitle title={currentTitle} onRename={handleRenameTitle} />
-                {currentEntry?.expertName && (
-                  <span className="expert-badge" data-tip={`专家：${currentEntry.expertName}`}>
-                    <ThumbImg name={currentEntry.expertName} local={currentEntry.expertAvatar} size={18} shape="circle" />
-                    {currentEntry.expertName}
-                  </span>
-                )}
+                {currentEntry?.expertName && <BoundExpertBadge name={currentEntry.expertName} avatar={currentEntry.expertAvatar} onClear={() => void clearSessionExpert(currentSessionId).then(showToast)} />}
                 {currentSessionId && (
                   <TopbarActions
                     sessionId={currentSessionId}

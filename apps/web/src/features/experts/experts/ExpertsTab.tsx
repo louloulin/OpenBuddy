@@ -1,29 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { open as openDialog } from "@openbuddy/client/ipc";
-import {
-  SearchIcon, MyExpertIcon, ChevronLeftIcon, DeleteIcon, SparklesIcon,
-  FolderOpenIcon, RefreshCwIcon,
-} from "@openbuddy/ui/icon/icons/index";
-import {
-  agentsDelete, agentsList, expertsDefaultRoot, expertsLoad, expertsReadAgentPrompt, expertsLinkAgents,
-} from "@openbuddy/client/agent-client";
-import type { AgentEntry, ExpertCatalog, ExpertItem, FeaturedScene } from "@openbuddy/protocol/dto";
+import { SearchIcon, MyExpertIcon, SparklesIcon, FolderOpenIcon, RefreshCwIcon } from "@openbuddy/ui/icon/icons/index";
+import { agentsDelete, agentsGet, agentsList, expertsLinkAgents, expertsLoad, expertsSetRoots } from "@openbuddy/client/agent-client";
+import type { ExpertCenterCatalog, ExpertDraft, ExpertEntry, ExpertSceneInfo } from "@openbuddy/protocol/experts";
+import { appConfirm } from "../../../shared/ui/AppDialog";
 import { FEATURED_SCENES } from "../data/featured-scenes";
-import { Chip, SegmentTabs } from "../shared/ui";
-import { ThumbImg } from "../../../shared/ui/ThumbImg";
+import { Chip } from "../shared/ui";
+import { usePendingExpertStore } from "@/features/experts/state/pending-expert-store";
 import { ExpertCard } from "./ExpertCard";
 import { ExpertDetailModal } from "./ExpertDetailModal";
+import { ExpertEditor } from "./ExpertEditor";
+import { ExpertSources } from "./ExpertSources";
 import { FeaturedScenes } from "./FeaturedScenes";
-import { MyExpertsEmpty } from "./MyExpertsEmpty";
-import { usePendingExpertStore } from "@/features/experts/state/pending-expert-store";
-
-type ListTab = "expert" | "team";
-type Sort = "popular" | "newest";
-const OPC_ID = "00-OPC";
-const LS_ROOT = "expertsRoot";
-/** Manifest label overrides to match the target UI exactly. */
-const LABEL_OVERRIDE: Record<string, string> = { "13-TencentZone": "腾讯专家" };
-const DEFAULT_PICK = "";
+import { MyExperts } from "./MyExperts";
+import { draftOf, emptyDraft, errorText, matches, toPending } from "./expert-model";
+import "./experts.css";
 
 interface Props {
   pills: React.ReactNode;
@@ -32,304 +23,136 @@ interface Props {
   onToast?: (message: string) => void;
 }
 
+/** Scenes from the catalog; the old gradient strip is the fallback (it only shows experts the catalog has). */
+const fallbackScenes = (): ExpertSceneInfo[] =>
+  FEATURED_SCENES.map((s) => ({ id: s.id, title: s.zh, description: "", expertIds: s.expertIds, from: s.from ?? "#eef2f7", to: s.to ?? "#f7f7f7" }));
+
+/** The tab before W2.3 kept one chosen directory in localStorage; carry it over once as a library root. */
+const LEGACY_ROOT_KEY = "expertsRoot";
+async function migrateLegacyRoot(catalog: ExpertCenterCatalog): Promise<boolean> {
+  let old = "";
+  try { old = localStorage.getItem(LEGACY_ROOT_KEY) ?? ""; localStorage.removeItem(LEGACY_ROOT_KEY); } catch { return false; }
+  if (!old || old === catalog.userDir || catalog.roots.some((r) => r.path === old)) return false;
+  try { await expertsSetRoots([...catalog.roots.map((r) => r.path), old]); return true; } catch { return false; }
+}
+
+/**
+ * 专家中心 (20261116-pii W2.3): the merged catalog (built-in seeds, 我的专家, trusted project
+ * experts, library directories) with scenes, categories and search; 我的专家 with create / edit /
+ * duplicate / delete; 召唤 pre-fills the home composer and binds the expert to the new task when
+ * it is sent — it never sends by itself.
+ */
 export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
   const [view, setView] = useState<"center" | "my">("center");
-  const [listTab, setListTab] = useState<ListTab>("expert");
-  const [sort, setSort] = useState<Sort>("popular");
-  const [cat, setCat] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  /** Expert whose detail modal is currently open. */
-  const [modalExpert, setModalExpert] = useState<ExpertItem | null>(null);
-  const setPendingExpert = usePendingExpertStore((s) => s.set);
-
-  const [root, setRoot] = useState<string>(() => {
-    try { return localStorage.getItem(LS_ROOT) || ""; } catch { return ""; }
-  });
-  const [catalog, setCatalog] = useState<ExpertCatalog | null>(null);
+  const [catalog, setCatalog] = useState<ExpertCenterCatalog | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [needPick, setNeedPick] = useState(false);
+  const [mine, setMine] = useState<ExpertEntry[]>([]);
+  const [mineLoading, setMineLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [cat, setCat] = useState<string | null>(null);
+  const [detail, setDetail] = useState<ExpertEntry | null>(null);
+  const [editing, setEditing] = useState<ExpertDraft | null>(null);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const setPending = usePendingExpertStore((s) => s.set);
 
-  const [locals, setLocals] = useState<AgentEntry[]>([]);
-  const [localsLoading, setLocalsLoading] = useState(false);
-
-  const persist = (r: string) => { try { localStorage.setItem(LS_ROOT, r); } catch { /* ignore */ } };
-
-  const loadCatalog = useCallback(async (r: string) => {
-    setLoading(true); setError(""); setNeedPick(false);
+  const loadCatalog = useCallback(async () => {
+    setLoading(true);
+    setError("");
     try {
-      const c = await expertsLoad(r);
-      setCatalog(c);
-      setRoot(c.root || r);
-      persist(c.root || r);
-    } catch (e) {
-      setError(String(e).replace(/^Error:\s*/, ""));
-      setCatalog(null);
-    } finally {
-      setLoading(false);
+      const loaded = await expertsLoad();
+      setCatalog((await migrateLegacyRoot(loaded)) ? await expertsLoad() : loaded);
     }
+    catch (e) { setError(errorText(e)); }
+    finally { setLoading(false); }
   }, []);
-
-  // Resolve the data root on first mount.
-  useEffect(() => {
-    let disposed = false;
-    (async () => {
-      if (root) { loadCatalog(root); return; }
-      try {
-        const d = await expertsDefaultRoot();
-        if (disposed) return;
-        if (d) loadCatalog(d);
-        else setNeedPick(true);
-      } catch {
-        if (!disposed) setNeedPick(true);
-      }
-    })();
-    return () => { disposed = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const reloadLocals = useCallback(async () => {
-    setLocalsLoading(true);
-    try { setLocals(await agentsList()); }
-    catch (e) { onToast?.(`加载我的专家失败：${String(e).replace(/^Error:\s*/, "")}`); }
-    finally { setLocalsLoading(false); }
+  const loadMine = useCallback(async () => {
+    setMineLoading(true);
+    try { setMine(await agentsList()); }
+    catch (e) { onToast?.(`加载我的专家失败：${errorText(e)}`); }
+    finally { setMineLoading(false); }
   }, [onToast]);
-  useEffect(() => { if (view === "my") reloadLocals(); }, [view, reloadLocals]);
+  const reload = useCallback(() => { void loadCatalog(); void loadMine(); }, [loadCatalog, loadMine]);
 
-  const expertById = useMemo(
-    () => new Map((catalog?.experts ?? []).map((e) => [e.id, e])),
-    [catalog],
-  );
+  useEffect(() => { void loadCatalog(); }, [loadCatalog]);
+  useEffect(() => { if (view === "my") void loadMine(); }, [view, loadMine]);
 
-  // Scenes: prefer the catalog's local featuredScenes.json; fall back to the
-  // curated gradient scenes. Drop any scene with no resolvable expert.
-  const scenes = useMemo<FeaturedScene[]>(() => {
-    const fromCatalog = (catalog?.featuredScenes ?? []).map((s) => ({
-      id: s.id,
-      zh: s.zh,
-      expertIds: s.expertIds,
-      imageLocal: s.imageLocal,
-      image: s.imageUrl,
-    } as FeaturedScene));
-    const pool = fromCatalog.length > 0 ? fromCatalog : FEATURED_SCENES;
-    return pool.filter((s) => s.expertIds.some((id) => expertById.has(id)));
-  }, [catalog, expertById]);
-
-  const byType = useMemo(
-    () => (catalog?.experts ?? []).filter((e) => {
-      // "expert" tab shows single agents; "team" tab shows teams.
-      const targetType = listTab === "expert" ? "agent" : "team";
-      return e.type === targetType;
-    }),
-    [catalog, listTab],
-  );
-
-  // 全部 + OPC (if any) + categories present in this type set; counts hidden.
+  const categories = catalog?.categories ?? [];
+  const experts = catalog?.experts ?? [];
+  const expertById = useMemo(() => new Map(experts.map((e) => [e.id, e])), [experts]);
+  const scenes = catalog?.scenes.length ? catalog.scenes : fallbackScenes();
   const chips = useMemo(() => {
-    const present = new Set(byType.map((e) => e.cat));
-    const opc = byType.some((e) => e.opc);
-    const out: { id: string | null; label: string }[] = [{ id: null, label: "全部" }];
-    if (opc) out.push({ id: OPC_ID, label: "OPC 一人公司" });
-    for (const c of catalog?.categories ?? []) {
-      if (present.has(c.id)) {
-        out.push({ id: c.id, label: LABEL_OVERRIDE[c.id] || c.zh || c.id });
-      }
-    }
-    return out;
-  }, [byType, catalog]);
+    const present = new Set(experts.map((e) => e.category ?? "custom"));
+    return [{ id: null as string | null, label: "全部" }, ...categories.filter((c) => present.has(c.id)).map((c) => ({ id: c.id as string | null, label: `${c.emoji} ${c.label}` }))];
+  }, [experts, categories]);
+  const visible = useMemo(() => experts.filter((e) => (!cat || (e.category ?? "custom") === cat) && matches(e, search)), [experts, cat, search]);
 
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const list = byType.filter((e) => {
-      if (cat === OPC_ID) return !!e.opc;
-      if (cat && e.cat !== cat) return false;
-      if (!q) return true;
-      return (
-        (e.title || "").toLowerCase().includes(q) ||
-        (e.name || "").toLowerCase().includes(q) ||
-        (e.desc || "").toLowerCase().includes(q) ||
-        e.tags.some((t) => t.toLowerCase().includes(q))
-      );
-    });
-    return [...list].sort((a, b) => {
-      if (sort === "newest") return (b.updated || "").localeCompare(a.updated || "");
-      const ap = a.pos ?? Number.MAX_SAFE_INTEGER;
-      const bp = b.pos ?? Number.MAX_SAFE_INTEGER;
-      return ap - bp;
-    });
-  }, [byType, cat, search, sort]);
-
-  const chooseDir = useCallback(async () => {
+  const summon = useCallback((expert: ExpertEntry, example?: string) => {
+    setDetail(null);
+    setPending(toPending(expert, example));
+    onToast?.(`已召唤「${expert.name}」，在输入框确认任务后发送`);
+    onGoHome?.();
+  }, [setPending, onGoHome, onToast]);
+  const duplicate = (expert: ExpertEntry) => { setDetail(null); setEditing(draftOf(expert, true)); };
+  const edit = async (expert: ExpertEntry) => {
+    setDetail(null);
+    // Re-read the file first: it may have been edited outside the app since the list was loaded.
+    setEditing(draftOf(await agentsGet(expert.id).catch(() => expert)));
+  };
+  const remove = useCallback(async (expert: ExpertEntry) => {
+    if (!(await appConfirm({ title: `删除专家「${expert.name}」？`, message: "将删除对应的 Markdown 文件；已绑定这位专家的任务不受影响。", confirmLabel: "删除", danger: true }))) return;
+    try { await agentsDelete(expert.id); onToast?.(`已删除「${expert.name}」`); reload(); }
+    catch (e) { onToast?.(`删除失败：${errorText(e)}`); }
+  }, [onToast, reload]);
+  const importExpert = useCallback(async (expert: ExpertEntry) => {
+    if (!expert.origin) return;
     try {
-      const sel = await openDialog({
-        directory: true, multiple: false, title: "选择专家数据目录",
-        defaultPath: root || DEFAULT_PICK,
-      });
-      const pick = Array.isArray(sel) ? sel[0] : sel;
-      if (!pick) return;
-      await loadCatalog(pick);
-      if (!error) onToast?.(`已切换专家数据目录：${pick}`);
-    } catch { /* cancelled */ }
-  }, [root, loadCatalog, onToast, error]);
+      const n = await expertsLinkAgents(expert.origin, [expert.id]);
+      onToast?.(n ? `已导入「${expert.name}」到我的专家` : "我的专家里已经是最新版本");
+      setDetail(null);
+      reload();
+    } catch (e) { onToast?.(`导入失败：${errorText(e)}`); }
+  }, [onToast, reload]);
+  const onSaved = (expert: ExpertEntry, created: boolean) => {
+    setEditing(null);
+    onToast?.(created ? `已创建专家「${expert.name}」` : `已保存「${expert.name}」`);
+    if (created) setView("my");
+    reload();
+  };
+  const pickDir = async () => {
+    try {
+      const sel = await openDialog({ directory: true, multiple: false, title: "选择专家目录" });
+      return (Array.isArray(sel) ? sel[0] : sel) || undefined;
+    } catch { return undefined; }
+  };
 
-  const handleCreate = () =>
-    onToast?.("在 应用数据目录/pi/agents/ 新建 .md 文件即可创建专家（后续将接入创建向导）");
+  const overlays = (
+    <>
+      {detail && (
+        <ExpertDetailModal expert={detail} categories={categories} onClose={() => setDetail(null)} onSummon={summon}
+          onDuplicate={duplicate} onEdit={edit} onImport={importExpert} />
+      )}
+      {editing && (
+        <ExpertEditor draft={editing} categories={categories} templates={experts.filter((e) => e.readonly)}
+          onCancel={() => setEditing(null)} onSaved={onSaved} />
+      )}
+      {sourcesOpen && catalog && (
+        <ExpertSources catalog={catalog} onPickDir={pickDir} onChanged={reload} onClose={() => setSourcesOpen(false)} onToast={onToast} />
+      )}
+    </>
+  );
 
-  const handleDeleteLocal = useCallback(async (a: AgentEntry) => {
-    if (!confirm(`确定删除专家「${a.name}」？`)) return;
-    try { await agentsDelete(a.path); onToast?.("已删除"); reloadLocals(); }
-    catch (e) { onToast?.(`删除失败：${String(e).replace(/^Error:\s*/, "")}`); }
-  }, [onToast, reloadLocals]);
-
-  /** Read the full prompt, set pending expert, navigate home. */
-  const handleSummonFromModal = useCallback(async (expert: ExpertItem, promptOverride?: string) => {
-    setModalExpert(null);
-
-    // Read the full agent prompt from disk.
-    let fullPrompt = "";
-    if (expert.plugin && expert.agentName && root) {
-      try {
-        const raw = await expertsReadAgentPrompt(root, expert.plugin, expert.agentName);
-        // Strip frontmatter to get just the body.
-        const trimmed = raw.trimStart();
-        if (trimmed.startsWith("---")) {
-          const afterOpen = trimmed.indexOf("\n");
-          if (afterOpen !== -1) {
-            const rest = trimmed.slice(afterOpen + 1);
-            const closeMatch = rest.match(/\n---\s*(\n|$)/);
-            if (closeMatch && closeMatch.index !== undefined) {
-              // Body starts AFTER the closing --- fence (index + full match length).
-              fullPrompt = rest.slice(closeMatch.index + closeMatch[0].length).trim();
-            } else {
-              fullPrompt = raw.trim();
-            }
-          } else {
-            fullPrompt = raw.trim();
-          }
-        } else {
-          fullPrompt = raw.trim();
-        }
-      } catch { /* fallback: empty prompt */ }
-    }
-
-    // Task tool can spawn them by bare name during multi-agent orchestration.
-    // copy hasn't finished when the user sends their first message, the member
-    // agents won't be discoverable.
-    if (expert.type === "team" && expert.plugin && root) {
-      try {
-        const linked = await expertsLinkAgents(root, expert.plugin);
-        onToast?.(`专家团已就绪：${linked} 名成员已链接`);
-      } catch (e) {
-        onToast?.(`专家团成员链接失败：${String(e).replace(/^Error:\s*/, "")}`);
-      }
-    }
-
-    const name = expert.title || expert.name;
-    setPendingExpert({
-      name,
-      prompt: fullPrompt,
-      description: expert.desc || name,
-      quickPrompt: promptOverride || expert.init || undefined,
-      expertId: expert.id,
-      source: "marketplace",
-      avatarLocal: expert.avatarLocal,
-    });
-
-    // Navigate to home page.
-    onGoHome?.();
-  }, [root, setPendingExpert, onGoHome]);
-
-  /** For local agents: set pending + go home. */
-  const handleUseLocal = useCallback((a: AgentEntry) => {
-    // Extract body from raw.
-    let body = a.raw || a.description || "";
-    const trimmed = body.trimStart();
-    if (trimmed.startsWith("---")) {
-      const afterOpen = trimmed.indexOf("\n");
-      if (afterOpen !== -1) {
-        const rest = trimmed.slice(afterOpen + 1);
-        const closeMatch = rest.match(/\n---\s*(\n|$)/);
-        if (closeMatch && closeMatch.index !== undefined) {
-          body = rest.slice(closeMatch.index + closeMatch[0].length).trim();
-        }
-      }
-    }
-    setPendingExpert({
-      name: a.name,
-      prompt: body,
-      description: a.description || a.name,
-      expertId: a.name,
-      source: "local",
-    });
-    onGoHome?.();
-  }, [setPendingExpert, onGoHome]);
-
-  // ---- no data dir yet ----
-  if (needPick && !catalog) {
-    return (
-      <div className="um-page">
-        <header className="um-topbar"><div className="um-topbar-left">{pills}</div></header>
-        <div className="um-scroll">
-          <div className="ec-empty">
-            <FolderOpenIcon size="xl" className="ec-empty-icon" />
-            <p>未找到专家数据目录</p>
-            <p className="ec-empty-hint">请选择包含 <code>_meta/_expert_center.json</code> 的 WorkBuddy 数据目录（如 <code>本地资料目录</code>）</p>
-            <button type="button" className="um-btn um-btn--primary" onClick={chooseDir}>
-              <FolderOpenIcon size="sm" /><span>选择来源目录</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ---- 我的专家 sub-page ----
   if (view === "my") {
     return (
-      <div className="um-page">
-        <header className="um-topbar">
-          <div className="um-topbar-left">
-            <button type="button" className="um-back" onClick={() => setView("center")}>
-              <ChevronLeftIcon size="sm" /><span>全部专家</span>
-            </button>
-          </div>
-        </header>
-        <div className="um-scroll">
-          {localsLoading ? (
-            <div className="ec-loading">加载中…</div>
-          ) : locals.length === 0 ? (
-            <MyExpertsEmpty onCreate={handleCreate} />
-          ) : (
-            <div className="ec-my-grid">
-              {locals.map((a) => (
-                <article key={a.path} className="ec-my-card">
-                  <div className="ec-card-head">
-                    <ThumbImg name={a.name} size={44} shape="square" />
-                    <div className="ec-card-titles">
-                      <div className="ec-card-title">{a.name}</div>
-                      <div className="ec-card-sub">{a.scope === "user" ? "用户级" : "项目级"}</div>
-                    </div>
-                  </div>
-                  <p className="ec-card-desc">{a.description || "（无描述）"}</p>
-                  <div className="ec-my-card-foot">
-                    <button type="button" className="ec-card-tag ec-card-tag--btn"
-                      onClick={() => handleUseLocal(a)}>使用</button>
-                    <button type="button" className="ec-my-del" title="删除"
-                      onClick={() => handleDeleteLocal(a)}><DeleteIcon size="sm" /></button>
-                  </div>
-                </article>
-              ))}
-              <button type="button" className="ec-create-tile" onClick={handleCreate}>
-                <span className="ec-create-plus">+</span><span>创建专家</span>
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      <>
+        <MyExperts experts={mine} categories={categories} loading={mineLoading} userDir={catalog?.userDir}
+          onBack={() => setView("center")} onCreate={() => setEditing(emptyDraft())} onOpen={setDetail}
+          onSummon={(e) => summon(e)} onEdit={edit} onDuplicate={duplicate} onDelete={remove} />
+        {overlays}
+      </>
     );
   }
 
-  // ---- expert center ----
   return (
     <div className="um-page">
       <header className="um-topbar">
@@ -337,9 +160,12 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
         <div className="um-topbar-right">
           <div className="um-search">
             <SearchIcon size="sm" className="um-search-icon" />
-            <input className="um-search-input" value={search} placeholder="搜索专家职称或描述"
+            <input className="um-search-input" value={search} placeholder="搜索专家、擅长领域或示例任务" aria-label="搜索专家"
               onChange={(e) => setSearch(e.target.value)} />
           </div>
+          <button type="button" className="um-btn um-btn--grey" title="专家来源" onClick={() => setSourcesOpen(true)} disabled={!catalog}>
+            <FolderOpenIcon size="sm" /><span>来源</span>
+          </button>
           <button type="button" className="um-btn um-btn--grey" onClick={() => setView("my")}>
             <MyExpertIcon size="sm" /><span>我的专家</span>
           </button>
@@ -347,75 +173,43 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
       </header>
 
       <div className="um-scroll">
-        <div className="ec-source-bar">
-          <span className="ec-source-label" title={root}>来源：{root || "—"}</span>
-          <button type="button" className="ec-source-btn" onClick={chooseDir} title="切换来源目录">
-            <FolderOpenIcon size="sm" /><span>选择目录</span>
-          </button>
-          <button type="button" className="ec-source-btn" onClick={() => root && loadCatalog(root)}
-            disabled={loading} title="重新加载">
-            <RefreshCwIcon size="sm" />
-          </button>
-        </div>
-
-        {loading && !catalog && <div className="ec-loading">加载专家数据…</div>}
+        {loading && !catalog && <div className="ec-loading">加载专家…</div>}
         {error && (
           <div className="ec-error">
             加载失败：{error}
-            <button type="button" className="ec-source-btn" onClick={chooseDir}>选择目录</button>
+            <button type="button" className="ec-source-btn" onClick={() => void loadCatalog()}><RefreshCwIcon size="sm" /><span>重试</span></button>
           </div>
         )}
-
+        {catalog && catalog.problems.length > 0 && (
+          <button type="button" className="ex-problem-bar" onClick={() => setSourcesOpen(true)}>有 {catalog.problems.length} 个专家文件无法读取，点击查看</button>
+        )}
         {catalog && (
           <>
-            <FeaturedScenes scenes={scenes} expertById={expertById} onSummon={(e) => setModalExpert(e)} />
-
+            {!search && !cat && <FeaturedScenes scenes={scenes} expertById={expertById} onOpen={setDetail} />}
             <div className="ec-list-head">
-              <SegmentTabs<ListTab>
-                className="ec-list-tabs"
-                items={[{ key: "expert", label: "专家" }, { key: "team", label: "专家团" }]}
-                value={listTab}
-                onChange={(k) => { setListTab(k); setCat(null); }}
-              />
-              <SegmentTabs<Sort>
-                className="ec-sort"
-                items={[{ key: "popular", label: "最热" }, { key: "newest", label: "最新" }]}
-                value={sort}
-                onChange={setSort}
-              />
+              <h3 className="ec-section-title ex-list-title">全部专家<span className="ex-count">{visible.length}</span></h3>
+              <button type="button" className="ec-source-btn" onClick={() => void loadCatalog()} disabled={loading} title="刷新" aria-label="刷新专家">
+                <RefreshCwIcon size="sm" />
+              </button>
             </div>
-
             <div className="ec-chips">
-              {chips.map((c) => (
-                <Chip key={c.id ?? "all"} label={c.label}
-                  active={cat === c.id} onClick={() => setCat(c.id)} />
-              ))}
+              {chips.map((c) => <Chip key={c.id ?? "all"} label={c.label} active={cat === c.id} onClick={() => setCat(c.id)} />)}
             </div>
-
             {visible.length === 0 ? (
               <div className="ec-empty">
                 <SparklesIcon size="xl" className="ec-empty-icon" />
-                <p>{search ? `没有找到与「${search}」匹配的专家` : "暂无该分类的专家"}</p>
+                <p>{search ? `没有找到与「${search}」匹配的专家` : "这个分类下还没有专家"}</p>
+                <button type="button" className="um-btn" onClick={() => setEditing({ ...emptyDraft(), name: search.trim(), category: cat ?? "custom" })}>+ 创建专家</button>
               </div>
             ) : (
               <div className="ec-grid">
-                {visible.map((e) => (
-                  <ExpertCard key={e.id} expert={e} onSummon={() => setModalExpert(e)} />
-                ))}
+                {visible.map((e) => <ExpertCard key={e.id} expert={e} categories={categories} onOpen={setDetail} onSummon={(x) => summon(x)} />)}
               </div>
             )}
           </>
         )}
       </div>
-
-      {/* Detail modal */}
-      {modalExpert && (
-        <ExpertDetailModal
-          expert={modalExpert}
-          onClose={() => setModalExpert(null)}
-          onSummon={handleSummonFromModal}
-        />
-      )}
+      {overlays}
     </div>
   );
 }
