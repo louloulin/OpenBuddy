@@ -13,6 +13,7 @@ import { SkillsService } from "@openbuddy/services/skills/skills";
 import { McpService } from "@openbuddy/services/mcp/mcp";
 import type { Settings } from "@openbuddy/services/settings/settings";
 import { Permissions, type Emit } from "./permissions/permissions.js";
+import { isBuiltinToolDefinition } from "./builtin/reserved-tools.js";
 import type { HostShell } from "@openbuddy/kernel";
 import { CheckpointStore } from "./checkpoints/store.js";
 import { validateThinkingLevel, type AgentMode, type PoolLimits, type PromptImages, type SessionRunStatus, type Slot, type ThinkingLevel } from "./types.js";
@@ -65,7 +66,8 @@ export class PiEngine {
     private readonly hostTrash?: HostShell["trash"],
   ) {
     this.cwd = this.inbox = join(settings.dir, "inbox");
-    this.permissions = new Permissions(settings, emit);
+    // Auto-approval of built-in bookkeeping tools (`ob_todo`) needs the session's tool to be the built-in's own.
+    this.permissions = new Permissions(settings, emit, 0, (sessionId, tool) => isBuiltinToolDefinition(this.slots.get(sessionId)?.session.getToolDefinition(tool)));
     this.ui = new ExtensionUiBridge(emit);
     this.providers = new Providers(settings);
     this.skills = new SkillsService(settings);

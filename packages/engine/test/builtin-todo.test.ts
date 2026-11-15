@@ -86,7 +86,8 @@ describe("ob_todo plan state (pure)", () => {
     const root = join(tmpdir(), `ob-todo-perm-${process.pid}-${Date.now()}`);
     cleanups.push(() => rm(root, { recursive: true, force: true }));
     const settings = createSettings(root, secure);
-    const permissions = new Permissions(settings, () => {});
+    // The session's ob_todo is the built-in's own (builtin-tools.test.ts covers look-alikes).
+    const permissions = new Permissions(settings, () => {}, 0, (_session, tool) => tool === "ob_todo");
     expect(settings.config.read().permissionMode).toBe("ask");
     expect(permissions.decide("s", "ob_todo", { action: "add", items: ["x"] })).toBe(true);
     expect(permissions.decide("s", "read", { path: "a" })).toBeUndefined();

@@ -7,13 +7,13 @@ import { registerIpc } from './register.js';
 import type { BrowserWindow } from 'electron';
 
 const url = 'file:///app/dist/index.html';
-function setup(workspaces?: { grant(path: string): Promise<void>; allows(path: string): Promise<boolean> }) {
+function setup(workspaces?: { grant(path: string): Promise<void>; allows(path: string): Promise<boolean> }, extra: Record<string, (payload: Record<string, unknown>) => unknown> = {}) {
   const mainFrame = { url };
   const webContents = { mainFrame };
   const window = { webContents } as unknown as BrowserWindow;
   const send = vi.fn(() => 'ok');
   const capabilities = Object.fromEntries(['agent_get_model_state', 'agent_set_model', 'agent_set_thinking_level', 'agent_resolve_ui', 'agent_resolve_question', 'agent_steer', 'agent_follow_up', 'agent_get_queue', 'agent_clear_queue', 'agent_fork_session', 'agent_extensions_list', 'agent_extensions_add', 'agent_extensions_remove', 'agent_extensions_set_enabled'].map(command => [command, (payload: Record<string, unknown>) => payload]));
-  const unregister = registerIpc(window, { ...capabilities, agent_send: send, agent_init: send }, url, workspaces);
+  const unregister = registerIpc(window, { ...capabilities, agent_send: send, agent_init: send, ...extra }, url, workspaces);
   const dispatch = mocks.handle.mock.calls[0][1];
   return { dispatch, send, unregister, event: { sender: webContents, senderFrame: mainFrame } };
 }
@@ -46,6 +46,23 @@ describe('Electron IPC dispatch', () => {
     // `@` file search (W1.3) lists only a natively granted workspace.
     await expect(dispatch(event, 'files_search', { cwd: '/', query: '' })).rejects.toThrow('workspace_not_authorized');
     await expect(dispatch(event, 'files_search', { cwd: '/selected', query: '' })).rejects.toThrow('not_implemented: files_search');
+  });
+  it('adds an expert library root only with a native folder grant; configured roots stay and removal needs none', async () => {
+    // A compromised renderer must not register e.g. the home folder: experts_load would list its *.md
+    // and experts_image_bytes read its images. The 来源 UI picks folders with dialog_open (granted).
+    let configured = ['/libs/old'];
+    const setRoots = vi.fn((payload: Record<string, unknown>) => { configured = payload.roots as string[]; return configured; });
+    const allows = vi.fn(async (path: string) => path === '/picked');
+    const { dispatch, event } = setup({ grant: vi.fn(), allows }, { experts_list_roots: () => configured.map(path => ({ path, exists: true, count: 0 })), experts_set_roots: setRoots });
+    await expect(dispatch(event, 'experts_set_roots', { roots: ['/libs/old', '/home/u'] })).rejects.toThrow('expert_root_not_authorized');
+    await expect(dispatch(event, 'experts_set_roots', { roots: ['/home/u/'] })).rejects.toThrow('expert_root_not_authorized');
+    expect(setRoots).not.toHaveBeenCalled();
+    await expect(dispatch(event, 'experts_set_roots', { roots: ['/libs/old', '/picked'] })).resolves.toEqual(['/libs/old', '/picked']);
+    expect(allows).not.toHaveBeenCalledWith('/libs/old');
+    // Removing one keeps the other configured root, which was never granted in this window.
+    await expect(dispatch(event, 'experts_set_roots', { roots: ['/libs/old'] })).resolves.toEqual(['/libs/old']);
+    await expect(dispatch(event, 'experts_set_roots', { roots: [] })).resolves.toEqual([]);
+    expect(setRoots).toHaveBeenCalledTimes(3);
   });
   it('dispatches provider-scoped model state and rejects malformed Pi UI responses', async () => {
     const { dispatch, event } = setup();

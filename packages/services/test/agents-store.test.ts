@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ExpertStore } from "../src/agents/store";
@@ -164,6 +164,20 @@ describe("expert store (pii W2.1)", () => {
     expect(store.importFrom(library, ["translator"])).toBe(0);
     expect(store.get("translator")).toMatchObject({ scope: "user", name: "库里的翻译" });
     expect(() => store.importFrom(temp())).toThrow(/path_not_authorized/);
+  });
+
+  it("lists library roots exactly as stored (canonical), so re-sending them adds nothing new", () => {
+    // The desktop IPC boundary lets a root through without a native grant only when it is already
+    // configured (register.ts): the paths experts_list_roots returns must be the ones setRoots keeps.
+    const library = realpathSync(temp());
+    const alias = join(temp(), "alias");
+    symlinkSync(library, alias);
+    const { store } = setup();
+    expect(store.setRoots([alias]).map((r) => r.path)).toEqual([library]);
+    const listed = store.listRoots().map((r) => r.path);
+    expect(listed).toEqual([library]);
+    expect(store.setRoots(listed).map((r) => r.path)).toEqual(listed);
+    expect(store.setRoots([])).toEqual([]);
   });
 
   it("serves images only from allowed roots, never through symlinks out of them", () => {
