@@ -141,6 +141,8 @@ export interface AppSettings {
     defaultThinkingLevel?: string;
   };
   extensionPaths?: string[];
+  /** Paths switched off in 扩展中心 (pii W2.6): still configured, just not loaded. */
+  extensionDisabled?: string[];
   extensionsEnabled?: boolean;
   skillPaths: string[];
   disabledSkills: string[];

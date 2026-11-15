@@ -9,3 +9,4 @@ export * from "./rewind.js";
 export * from "./branches.js";
 export * from "./bash.js";
 export * from "./expert.js";
+export * from "./extensions.js";

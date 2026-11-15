@@ -54,7 +54,7 @@ export async function open(
     settingsManager: sdkSettings,
     noExtensions: !(config.extensionsEnabled && trusted),
     additionalExtensionPaths: config.extensionsEnabled
-      ? (config.extensionPaths ?? [])
+      ? (config.extensionPaths ?? []).filter((p) => !(config.extensionDisabled ?? []).includes(p))
       : [],
     noContextFiles: !trusted,
     // 我的指令 (pii W2.7 / S8): the loader's own scan is replaced by the PromptsService view, so
@@ -87,11 +87,18 @@ export async function open(
     extensionsOverride: reserveBuiltinToolNames,
   });
   await loader.reload();
-  const errors = loader.getExtensions().errors;
-  if (errors.length)
-    throw Error(
-      `extension_load_failed: ${errors.map((e) => `${e.path}: ${e.error}`).join("; ")}`,
-    );
+  // Pi keeps a process-wide extension-module cache and only clears it when a *loaded* loader reloads.
+  // A config change (added / removed / toggled path) must pick up new file contents, so reload once
+  // more to invalidate that cache (W2.6).
+  if (engine.extensionsDirty) {
+    engine.extensionsDirty = false;
+    await loader.reload();
+  }
+  // 扩展中心 (W2.6): a broken extension is skipped and recorded per path — it must not fail the whole
+  // session, and 扩展 needs to name the offending path.
+  engine.extensionErrors = loader.getExtensions().errors.slice();
+  for (const entry of engine.extensionErrors)
+    engine.emit("agent://error", { message: `扩展加载失败：${entry.path}: ${entry.error}` });
   const { session } = await createAgentSession({
     cwd,
     agentDir: engine.settings.dir,

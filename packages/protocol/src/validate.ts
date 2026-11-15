@@ -95,10 +95,20 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
     }
   }
   if (command === 'agent_extensions_add' || command === 'agent_extensions_remove') string('path');
+  // 扩展中心 (W2.6): preview one path in an isolated loader; cwd scopes project extensions.
+  if (command === 'agent_extensions_inspect') {
+    string('path');
+    if (payload.cwd !== undefined && payload.cwd !== null) string('cwd', 4096, true);
+  }
+  if (command === 'agent_extensions_list' && payload.cwd !== undefined && payload.cwd !== null) string('cwd', 4096, true);
   if (command === 'task_kill') string('taskId', 256);
   if (command === 'rewind_execute') string('entryId', 256);
   if (command === 'agent_list_sessions' && payload.includeArchived !== undefined && typeof payload.includeArchived !== 'boolean') throw new Error('invalid_payload: includeArchived');
   if (command === 'agent_extensions_set_enabled' && typeof payload.enabled !== 'boolean') throw new Error('invalid_payload: enabled');
+  if (command === 'agent_extensions_set_path_enabled') {
+    if (typeof payload.path !== 'string' || !payload.path || payload.path.length > 4096 || payload.path.includes('\0')) throw new Error('invalid_payload: path');
+    if (typeof payload.enabled !== 'boolean') throw new Error('invalid_payload: enabled');
+  }
   validateConversationTools(command, payload, string);
   if (command === 'session_search') {
     string('query', 500);

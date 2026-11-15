@@ -58,6 +58,10 @@ export class PiEngine {
   /** @internal */ focusedId?: string;
   /** Sessions closed by a rebuild that could not reopen (e.g. a broken extension); retried on the next reload. */
   /** @internal */ lost: Array<{ id: string; manager: SessionManager; focused: boolean }> = [];
+  /** Per-path extension load failures of the last opened session (W2.6): a bad one never breaks a session. */
+  /** @internal */ extensionErrors: Array<{ path: string; error: string }> = [];
+  /** The extension configuration changed: the next session open must reload modules from disk (W2.6). */
+  /** @internal */ extensionsDirty = false;
   private cwd: string;
   /** @internal */ inbox: string;
   /** @internal */ sessionDir: string;
@@ -358,8 +362,24 @@ export class PiEngine {
     return {
       enabled: c.extensionsEnabled ?? false,
       paths: c.extensionPaths ?? [],
+      disabled: c.extensionDisabled ?? [],
       projectTrusted: this.trusted(this.currentCwd),
     };
+  }
+  /** 扩展中心 (W2.6): the configured paths plus what each one registers and why it failed. */
+  async extensionsList(cwd?: string) {
+    const cfg = this.extensionsConfig();
+    const items = await features.inspectExtensions(this, cfg.paths, cwd ?? this.currentCwd);
+    return {
+      ...cfg,
+      items: items.map((item) => ({ ...item, enabled: !cfg.disabled.includes(item.path) })),
+      errors: this.extensionErrors,
+    };
+  }
+  /** Preview one path in an isolated loader before it is added (W2.6). */
+  async extensionsInspect(path: string, cwd?: string) {
+    const [report] = await features.inspectExtensions(this, [path], cwd ?? this.currentCwd);
+    return report;
   }
   async configureExtensions(
     action: "add" | "remove" | "enabled",
@@ -376,13 +396,20 @@ export class PiEngine {
         const s = await stat(path);
         if (!s.isDirectory() && !/\.(ts|js|mjs|cjs)$/.test(path))
           throw Error("invalid_extension_path");
+        // Load it alone first: a broken extension is refused here, instead of breaking every session
+        // that is opened (or rebuilt) afterwards (W2.6).
+        const report = await this.extensionsInspect(path);
+        if (!report.ok) throw Error(`extension_load_failed: ${report.error}`);
       }
       next.extensionPaths = (next.extensionPaths ?? []).filter(
         (p) => p !== path,
       );
       if (action === "add") next.extensionPaths.push(path);
+      // A removed path also leaves the disabled list; a re-added one starts enabled again.
+      next.extensionDisabled = (next.extensionDisabled ?? []).filter((p) => p !== path);
     }
     this.settings.config.write(next);
+    this.extensionsDirty = true;
     try {
       await this.reload();
     } catch (error) {
@@ -395,6 +422,30 @@ export class PiEngine {
       throw error;
     }
     return this.extensionsConfig();
+  }
+  /** 开关单个扩展（W2.6）：禁用只写入 extensionDisabled，不改动已配置的路径。 */
+  async setExtensionPathEnabled(path: string, enabled: boolean) {
+    // Configured paths are canonical (`configureExtensions` realpaths on add); match them.
+    try { path = await realpath(path); } catch { /* already gone: keep the given path */ }
+    const previous = this.settings.config.read(),
+      next = structuredClone(previous);
+    const disabled = (next.extensionDisabled ?? []).filter((p) => p !== path);
+    if (!enabled) disabled.push(path);
+    next.extensionDisabled = disabled;
+    this.settings.config.write(next);
+    this.extensionsDirty = true;
+    try {
+      await this.reload();
+    } catch (error) {
+      this.settings.config.write(previous);
+      try {
+        await this.reload();
+      } catch {
+        /* Preserve the original load failure. */
+      }
+      throw error;
+    }
+    return this.extensionsList();
   }
   get currentCwd() {
     const focused = this.focusedId ? this.slots.get(this.focusedId) : undefined;

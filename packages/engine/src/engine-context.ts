@@ -44,6 +44,10 @@ export interface EngineContext {
   slots: Map<string, Slot>;
   focusedId?: string;
   lost: Array<{ id: string; manager: SessionManager; focused: boolean }>;
+  /** Per-path extension load failures recorded instead of failing a session (W2.6). */
+  extensionErrors: Array<{ path: string; error: string }>;
+  /** Set when the extension configuration changed; the next open reloads modules from disk (W2.6). */
+  extensionsDirty: boolean;
   inbox: string;
   sessionDir: string;
   listCache?: { at: number; items: Promise<SessionInfo[]> };

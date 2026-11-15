@@ -19,7 +19,7 @@ describe("host modules (20261115-md §5.3)", () => {
       }
     expect(clashes).toEqual([]);
     // 92 + 15 experts commands (experts module, pii W2.1–W2.3) + settings_agent_get / settings_agent_set / agent_cycle_model (model, pii W0.4/W1.6) + session_search (session, pii W1.4) + agent_tree / agent_navigate (session), agent_bash / agent_bash_abort (turn), files_search (files) — 20261116-pii W1.1–W1.3.
-    expect(owner.size).toBe(129); // +5 memory (pii W5) +4 skills_catalog +4 prompts (pii W2.7)
+    expect(owner.size).toBe(131); // +5 memory (W5) +4 skills_catalog +4 prompts (W2.7) +2 extensions center (W2.6)
     expect([owner.get("agent_tree"), owner.get("agent_navigate"), owner.get("agent_bash"), owner.get("agent_bash_abort"), owner.get("files_search")]).toEqual(["session", "session", "turn", "turn", "files"]);
   });
 
