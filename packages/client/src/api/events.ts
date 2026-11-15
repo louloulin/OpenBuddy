@@ -1,5 +1,5 @@
 // Event subscription: agent://… and app://… events from the host, fanned out to typed handlers.
-import type { ModelState, PermissionRequest, PromptComplete, SessionSummaryEvent, SessionUpdate, TurnErrorEvent } from "@openbuddy/protocol/dto";
+import type { PermissionRequest, PromptComplete, SessionSummaryEvent, SessionUpdate, TurnErrorEvent } from "@openbuddy/protocol/dto";
 import type { SessionModelState } from "@openbuddy/protocol/agent-settings";
 import { listen, type UnlistenFn } from "../ipc";
 import type { QuestionRequest, UiDismissReason } from "../types";
@@ -9,7 +9,8 @@ import type { ExtensionUiState } from "./approvals";
 
 export interface AgentEventListeners { unlisten: UnlistenFn }
 export async function subscribeAgentEvents(handlers: {
-  onModelState?: (state: ModelState) => void;
+  /** Model, thinking level, mode and bound expert of a session (`agent://model-state`). */
+  onModelState?: (state: SessionModelState) => void;
   onUpdate?: (event: SessionUpdate) => void;
   onPermission?: (request: PermissionRequest) => void;
   onComplete?: (complete: PromptComplete) => void;

@@ -22,7 +22,7 @@ import { useSessionsStore } from "../features/sessions/state/sessions-store";
 import { usePermissionStore } from "../features/approvals/state/permission-store";
 import { useQuestionStore } from "../features/approvals/state/question-store";
 import { BoundExpertBadge } from "../features/experts";
-import { bindPendingExpert, clearSessionExpert, selectExpert, showSessionExpert } from "./expert-session";
+import { bindPendingExpert, clearSessionExpert, selectExpert, showLoadedExpert, showSessionExpert } from "./expert-session";
 import { TopbarTitle } from "./shell/TopbarTitle";
 import {
   agentInit,
@@ -218,7 +218,8 @@ function Shell() {
         setInvalidDefault(!!result.invalidDefault);
 
         unlisten = await subscribeAgentEvents({
-          onModelState: state => useAgentModelStore.getState().apply(state),
+          // The bound expert rides along, so the badge follows ‹1/2› switches, 重新生成 and 从这里编辑 (pii W2.2).
+          onModelState: state => { useAgentModelStore.getState().apply(state); if (state.expert !== undefined) showSessionExpert(state.sessionId, state.expert); },
           onUpdate: (u) => {
             sessionStore.getState().queueUpdate(u);
             if (u.type === "queue_update" && u.sessionId && Array.isArray(u.steering) && Array.isArray(u.followUp)) {
@@ -640,7 +641,7 @@ function Shell() {
     useAgentModelStore.getState().apply(snapshot);
     sessionStore.getState().hydrate(sessionId, snapshot.messages, snapshot.busy, force);
     usePiQueueStore.getState().apply(sessionId, snapshot.queue);
-    showSessionExpert(sessionId, snapshot.expert);
+    showLoadedExpert(sessionId, snapshot);
     sessionsStore.getState().upsert({ sessionId, status: sessionStatusOf(snapshot.status) });
     // Artifacts need the loaded session; ChatView's own request may have raced the load.
     void useArtifactsStore.getState().refresh(sessionId);

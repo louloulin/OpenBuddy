@@ -1,6 +1,7 @@
 import type { EngineContext } from "../engine-context.js";
 import { deriveTitle } from "../titles.js";
 import type { Slot } from "../types.js";
+import { moveLeaf } from "./branch-state.js";
 
 /** User prompts on the current branch, newest last (for 历史 / 从这里编辑). */
 export function rewindPoints(engine: EngineContext, id: string) {
@@ -8,10 +9,13 @@ export function rewindPoints(engine: EngineContext, id: string) {
     .getUserMessagesForForking()
     .map((m, index) => ({ entryId: m.entryId, index, preview: deriveTitle(m.text) ?? m.text.slice(0, 60) }));
 }
-/** Move the branch leaf to just before `entryId`; the renderer rebuilds from `session_rewound`. */
+/**
+ * Move the branch leaf to just before `entryId`; the renderer rebuilds from `session_rewound`.
+ * The prompt is about to be sent again, so the mode and expert selected now stay (`keep`).
+ */
 export async function navigateBefore(engine: EngineContext, slot: Slot, entryId: string) {
   if (slot.busy) throw Error("会话忙碌");
-  const result = await slot.session.navigateTree(entryId, { summarize: false });
+  const result = await moveLeaf(engine, slot, entryId, "keep");
   if (result.cancelled) throw Error("rewind_cancelled: 已取消");
   engine.invalidateList();
   engine.emitEvent(slot, { type: "session_rewound", messages: slot.session.messages });

@@ -238,6 +238,8 @@ export class PiEngine {
       availableThinkingLevels: s.getAvailableThinkingLevels(),
       supportsThinking: s.supportsThinking(),
       mode: this.mode(id),
+      // The expert bound on the current branch (W2.2): the header badge follows branch moves.
+      expert: features.sessionExpert(this, id),
     };
   }
   async setModel(id: string, modelId: string, providerId?: string) {

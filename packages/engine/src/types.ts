@@ -17,6 +17,13 @@ export type PromptImages = NonNullable<
   Parameters<AgentSession["prompt"]>[1]
 >["images"];
 
+/**
+ * How per-branch state (mode, bound expert) follows a move of the session leaf (20261116-pii §5):
+ * `restore` (switching versions ‹1/2›) applies the target branch's own state; `keep` (重新生成,
+ * 从这里编辑) keeps what the user has selected now and writes it onto the new branch.
+ */
+export type TreeMove = "restore" | "keep";
+
 /** Renderer-visible lifecycle of one pooled session. */
 export type SessionRunStatus = "running" | "idle" | "failed";
 
@@ -42,6 +49,8 @@ export interface Slot {
   failed: boolean;
   /** A `!command` is running (W1.2): the slot is never evicted and a reload waits until it ends. */
   userBash?: boolean;
+  /** Set while the engine moves the leaf, until the branch state has followed (features/branch-state.ts). */
+  tree?: { move: TreeMove; oldLeafId: string | null };
 }
 
 export interface PoolLimits {

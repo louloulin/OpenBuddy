@@ -3,6 +3,7 @@ import type { BranchSibling, BranchTree, BranchTurn, NavigateFileConflict, Navig
 import { protocolError } from "@openbuddy/protocol/errors";
 import type { EngineContext } from "../engine-context.js";
 import { deriveTitle, messageText } from "../titles.js";
+import { moveLeaf } from "./branch-state.js";
 
 /**
  * Branch switcher ‹1/2› (20261116-pii W1.1, Pi S1). Regenerating or editing a prompt moves the
@@ -22,10 +23,12 @@ interface TreeIndex {
 const isUser = (entry: Entry) => entry.type === "message" && (entry.message as { role?: string }).role === "user";
 /**
  * Entries that carry conversation content. Everything else (model / thinking changes, labels,
- * session info, built-in extension state) is transparent: it can sit between a reply and the
+ * session info, built-in extension state, and Pi's `system` messages recording a changed prompt
+ * or tool loadout, e.g. after a mode switch) is transparent: it can sit between a reply and the
  * next prompt without making two versions of that prompt look unrelated.
  */
-const isAnchor = (entry: Entry) => entry.type === "message" || entry.type === "branch_summary" || entry.type === "compaction" || entry.type === "custom_message";
+const isAnchor = (entry: Entry) =>
+  (entry.type === "message" && (entry.message as { role?: string }).role !== "system") || entry.type === "branch_summary" || entry.type === "compaction" || entry.type === "custom_message";
 
 function indexTree(entries: Entry[]): TreeIndex {
   const byId = new Map(entries.map((entry) => [entry.id, entry] as const));
@@ -170,7 +173,7 @@ export async function navigate(engine: EngineContext, id: string, entryId: strin
     engine.emitStatus(slot);
   }
   try {
-    const result = await session.navigateTree(entryId, { summarize: opts.summarize === true });
+    const result = await moveLeaf(engine, slot, entryId, "restore", { summarize: opts.summarize === true });
     if (result.cancelled) return { navigated: false, restored, conflicts };
     engine.invalidateList();
     engine.emitEvent(slot, { type: "session_rewound", messages: session.messages });

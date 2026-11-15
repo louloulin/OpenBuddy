@@ -3,7 +3,7 @@ import { modelKey } from "@openbuddy/services/providers/providers";
 import type { EngineContext } from "../engine-context.js";
 import { writeBranchState } from "../builtin/session-state.js";
 import { currentBinding, EXPERT_ENTRY, toolFilter, type ExpertBinding } from "../builtin/persona.js";
-import type { Slot, ThinkingLevel } from "../types.js";
+import type { Slot, ThinkingLevel, TreeMove } from "../types.js";
 import { mode as currentMode, setMode } from "./mode.js";
 
 /**
@@ -77,6 +77,42 @@ async function undo(engine: EngineContext, slot: Slot, binding: ExpertBinding) {
   const thinking = binding.restore.thinking;
   if (binding.applied.thinking && thinking && session.thinkingLevel === binding.applied.thinking && session.getAvailableThinkingLevels().includes(thinking))
     session.setThinkingLevel(thinking);
+}
+
+/** Apply a binding's model and thinking level again (back on a version where it is bound). */
+async function reapply(engine: EngineContext, slot: Slot, binding: ExpertBinding) {
+  const session = slot.session;
+  const model = binding.applied.model ? resolveModel(engine, binding.applied.model) : undefined;
+  if (model && engine.providers.runtime.hasConfiguredAuth(model.provider) && (session.model?.provider !== model.provider || session.model?.id !== model.id))
+    await session.setModel(model);
+  const thinking = binding.applied.thinking;
+  if (thinking && session.thinkingLevel !== thinking && session.getAvailableThinkingLevels().includes(thinking)) session.setThinkingLevel(thinking);
+}
+
+const sameBinding = (a?: ExpertBinding, b?: ExpertBinding) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/**
+ * After the leaf moved from `oldLeafId` (features/branch-state.ts; the mode's tools are already
+ * applied). `restore` (‹1/2›): the target version's own binding applies — the expert's model and
+ * thinking where it is bound, the task's own (as clearing restores them) where it is not. `keep`
+ * (重新生成 / 从这里编辑): the expert bound before the move stays bound and is written onto the new
+ * branch. Either way the tools are narrowed to the binding's allowlist.
+ */
+export async function followExpert(engine: EngineContext, slot: Slot, move: TreeMove, oldLeafId: string | null) {
+  const sm = slot.session.sessionManager;
+  const before = oldLeafId === null ? undefined : currentBinding(sm, oldLeafId);
+  let binding = currentBinding(sm);
+  if (!sameBinding(before, binding)) {
+    if (move === "keep") {
+      writeBranchState(sm, EXPERT_ENTRY, before ?? null);
+      binding = before;
+    } else {
+      if (before) await undo(engine, slot, before);
+      if (binding) await reapply(engine, slot, binding);
+    }
+  }
+  const filter = binding && toolFilter(binding);
+  if (filter) slot.session.setActiveToolsByName(slot.session.getActiveToolNames().filter(filter));
 }
 
 /** Reset the tools to the mode's set, then narrow them to the expert's allowlist. */
