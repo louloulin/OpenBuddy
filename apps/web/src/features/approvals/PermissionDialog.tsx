@@ -26,7 +26,11 @@ export function PermissionCard({ request, cwd }: { request: PermissionRequest; c
   const [reason, setReason] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
   const primaryRef = useRef<HTMLButtonElement>(null);
+  const safeRef = useRef<HTMLButtonElement>(null);
   const reasonRef = useRef<HTMLInputElement>(null);
+  /** The last key pressed anywhere was Tab, and the danger button was reached that way. */
+  const tabbedRef = useRef(false);
+  const armedRef = useRef(false);
   const tool = request.toolKind ?? request.title ?? "";
   const subject = toolSubject(tool, request.rawInput, cwd) || (request.rawInput != null ? JSON.stringify(request.rawInput) : "");
   const risk = toolCategory(tool) === "command" ? checkCommandRisk(subject) : undefined;
@@ -35,6 +39,10 @@ export function PermissionCard({ request, cwd }: { request: PermissionRequest; c
   // A command the user typed (`!cmd`, W1.2) that needs the strong confirmation.
   const typed = isUserBashRequest(request);
   const title = typed ? (destructive?.paths?.length ? "这条命令会删除文件，确定要执行吗？" : "这条命令有风险，确定要执行吗？") : destructive ? "Buddy 想删除文件，需要你确认" : permissionTitle(tool);
+  // Deletions and typed commands' strong confirmation: the keyboard lands on the safe action, and
+  // the danger action answers Enter / Space only after the user moved to it with Tab (or clicks it),
+  // so a repeated Enter (`!rm -rf build` ⏎ ⏎) cancels instead of running.
+  const strong = !!destructive;
 
   const resolve = async (optionId: string, note?: string) => {
     setBusy(true);
@@ -57,9 +65,25 @@ export function PermissionCard({ request, cwd }: { request: PermissionRequest; c
   useEffect(() => {
     const active = document.activeElement as HTMLElement | null;
     const idle = !active || active === document.body || ((active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement) && !active.value);
-    if (idle) primaryRef.current?.focus({ preventScroll: true });
+    if (idle) (strong ? safeRef : primaryRef).current?.focus({ preventScroll: true });
   }, [request.requestId]);
-  useEffect(() => { if (denying) reasonRef.current?.focus(); }, [denying]);
+  // Into the reason field, and back to the card's default action once the buttons are mounted again.
+  const refocusRef = useRef(false);
+  useEffect(() => {
+    if (denying) reasonRef.current?.focus();
+    else if (refocusRef.current) (strong ? safeRef : primaryRef).current?.focus();
+    refocusRef.current = false;
+  }, [denying]);
+  useEffect(() => {
+    if (!strong) return;
+    const onKey = (e: KeyboardEvent) => { tabbedRef.current = e.key === "Tab"; };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [strong]);
+  /** Swallow keyboard activation of the danger button unless it was reached with Tab. */
+  const guardKey = (e: React.KeyboardEvent) => {
+    if (strong && !armedRef.current && (e.key === "Enter" || e.key === " ")) e.preventDefault();
+  };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (busy || e.nativeEvent.isComposing) return;
@@ -67,7 +91,7 @@ export function PermissionCard({ request, cwd }: { request: PermissionRequest; c
     if (e.key === "Escape") {
       e.preventDefault();
       e.stopPropagation();
-      if (denying) { setDenying(false); setReason(""); primaryRef.current?.focus(); }
+      if (denying) { refocusRef.current = true; setDenying(false); setReason(""); }
       else void resolve(option("deny")?.optionId ?? "deny");
     } else if (e.key === "Enter" && inReason) {
       e.preventDefault();
@@ -122,14 +146,15 @@ export function PermissionCard({ request, cwd }: { request: PermissionRequest; c
         <div className="perm-card__actions">
           {!typed && <button type="button" className="perm-card__btn perm-card__btn--quiet" disabled={busy} onClick={() => setDenying(true)} title="拒绝并告诉 Buddy 原因，它会换一种做法">拒绝并说明…</button>}
           <span className="perm-card__spacer" />
-          <button type="button" className="perm-card__btn" disabled={busy} onClick={() => resolve(option("deny")?.optionId ?? "deny")} title="Esc">{typed ? "取消" : "拒绝"}</button>
+          <button ref={safeRef} type="button" className="perm-card__btn" disabled={busy} onClick={() => resolve(option("deny")?.optionId ?? "deny")} title={strong ? "Enter / Esc" : "Esc"}>{typed ? "取消" : "拒绝"}</button>
           {option("allow_session") && (
             <button type="button" className="perm-card__btn" disabled={busy} onClick={() => resolve("allow_session")}>本任务允许</button>
           )}
           {option("allow_always") && (
             <button type="button" className="perm-card__btn" disabled={busy} onClick={() => resolve("allow_always")} title="记为一条允许规则，可在 设置·安全中心 修改">始终允许</button>
           )}
-          <button ref={primaryRef} type="button" className={"perm-card__btn perm-card__btn--primary" + (destructive ? " perm-card__btn--danger" : "")} disabled={busy} onClick={() => resolve(option("allow")?.optionId ?? "allow")} title="Enter">
+          <button ref={primaryRef} type="button" className={"perm-card__btn perm-card__btn--primary" + (destructive ? " perm-card__btn--danger" : "")} disabled={busy} onClick={() => resolve(option("allow")?.optionId ?? "allow")}
+            title={strong ? "点击，或用 Tab 选中后按 Enter" : "Enter"} onFocus={() => { armedRef.current = tabbedRef.current; }} onBlur={() => { armedRef.current = false; }} onKeyDown={guardKey} onKeyUp={guardKey}>
             {typed ? "仍要执行" : destructive ? "允许删除" : "允许本次"}
           </button>
         </div>
