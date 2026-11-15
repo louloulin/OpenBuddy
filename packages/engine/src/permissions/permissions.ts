@@ -2,11 +2,15 @@ import { randomUUID } from "node:crypto";
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import type { Settings } from "@openbuddy/services/settings/settings";
 import type { Emit } from "@openbuddy/kernel";
+import { assessCommand } from "./command-risk.js";
 // The event port moved to @openbuddy/kernel (20261115-md R2); re-exported for existing importers.
 export type { Emit };
 type Reason = "resolved" | "cancelled" | "timeout";
 type Decision = { allow: boolean; note?: string };
-/** Commands / tools that delete files: the approval card asks harder (20261115-ui §5.4). */
+/**
+ * Commands / tools that delete files: the approval card asks harder (20261115-ui §5.4). Shell
+ * commands are read by the main process's own classifier (command-risk.ts).
+ */
 export function destructiveInfo(toolName: string, input: unknown): { command?: string; paths?: string[] } | undefined {
   const value = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
   if (/delete|remove/i.test(toolName)) {
@@ -14,11 +18,8 @@ export function destructiveInfo(toolName: string, input: unknown): { command?: s
     return { paths: path ? [path] : [] };
   }
   if (toolName !== "bash" || typeof value.command !== "string") return undefined;
-  const command = value.command;
-  const match = command.match(/(?:^|[;&|]\s*|\s)(rm|rmdir|unlink|del|Remove-Item)\s+([^;&|]*)/);
-  if (!match) return undefined;
-  const paths = match[2].split(/\s+/).filter((part) => part && !part.startsWith("-")).slice(0, 20);
-  return { command, paths };
+  const { deletes } = assessCommand(value.command);
+  return deletes ? { command: value.command, paths: deletes } : undefined;
 }
 const READ_ONLY = ["read", "grep", "find", "ls"];
 /**
@@ -99,16 +100,17 @@ export class Permissions {
   }
   /**
    * A command the user typed in the composer (`!cmd`, 20261116-pii W1.2). Deny rules still apply;
-   * a command that deletes files (or that the renderer rates risky, `strong`) always needs the
-   * strong confirmation, whatever the mode or grants; any other command was approved by the
-   * user's own Enter. The request's `toolCallId` is `requestKey` (prefixed `user-bash:`).
+   * a command the main process rates risky (command-risk.ts: deleting, overwriting, discarding
+   * work, unparseable …) always needs the strong confirmation, whatever the mode or grants. The
+   * renderer's reading (`strong`) can only add to that, never waive it. Any other command was
+   * approved by the user's own Enter. The request's `toolCallId` is `requestKey` (prefixed `user-bash:`).
    */
   async userCommand(sessionId: string, requestKey: string, command: string, opts: { strong?: boolean } = {}): Promise<Decision & { rule?: boolean }> {
     const input = { command };
     if (this.rule("bash", input)?.action === "deny") return { allow: false, rule: true };
-    const destructive = destructiveInfo("bash", input);
-    if (!destructive && !opts.strong) return { allow: true };
-    return this.ask(sessionId, requestKey, "bash", input, destructive ?? { command, paths: [] }, true);
+    const risk = assessCommand(command);
+    if (risk.level === "low" && !opts.strong) return { allow: true };
+    return this.ask(sessionId, requestKey, "bash", input, { command, paths: risk.deletes ?? [] }, true);
   }
   private ask(sessionId: string, toolCallId: string, toolName: string, input: unknown, destructive: ReturnType<typeof destructiveInfo>, userCommand = false): Promise<Decision> {
     const requestId = randomUUID();
