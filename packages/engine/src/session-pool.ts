@@ -4,9 +4,11 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { EngineContext } from "./engine-context.js";
 import { validateThinkingLevel, type Slot, type ThinkingLevel } from "./types.js";
 import { builtinFactories, builtinToolNames, reserveBuiltinToolNames } from "./builtin/index.js";
+import { readPromptTemplatesSync } from "./builtin/prompts-sync.js";
 import { restoreMode } from "./features/mode.js";
 import { favoriteScope } from "./features/agent-settings.js";
 

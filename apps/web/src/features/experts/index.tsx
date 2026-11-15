@@ -3,6 +3,7 @@ import { MarketPills, type MarketTab } from "./MarketHeader";
 import { ExpertsTab } from "./experts/ExpertsTab";
 import { SkillsTab } from "./skills/SkillsTab";
 import { ConnectorsTab } from "./connectors/ConnectorsTab";
+import { PromptsTab } from "./prompts/PromptsTab";
 
 export type { MarketTab };
 /** A management view the app supplies for a tab whose catalog the host does not serve. */
@@ -18,6 +19,8 @@ export interface MarketAvailability {
   skillsCatalog: boolean;
   /** 连接器 catalog (connectors_load). */
   connectorsCatalog: boolean;
+  /** 我的指令 (prompts_list, pii W2.7 / S8). */
+  prompts: boolean;
 }
 export { BoundExpertBadge } from "./experts/BoundExpertBadge";
 export { usePendingExpertStore, type PendingExpert } from "./state/pending-expert-store";
@@ -44,10 +47,11 @@ export function marketTabs(available: MarketAvailability, management: boolean): 
   if (available.skillsCatalog || management) tabs.push("skills");
   if (available.connectorsCatalog || management) tabs.push("connectors");
   if (management) tabs.push("extensions");
+  if (available.prompts) tabs.push("prompts");
   return tabs;
 }
 
-const ALL: MarketAvailability = { experts: true, mine: true, skillsCatalog: true, connectorsCatalog: true };
+const ALL: MarketAvailability = { experts: true, mine: true, skillsCatalog: true, connectorsCatalog: true, prompts: true };
 
 /** 专家·技能·连接器 — WorkBuddy-style unified market page.
  *  The pill group is rendered once here and passed into each tab's topbar
@@ -67,6 +71,7 @@ export function ExpertsPanel({ onGoHome, onToast, available = ALL, renderManagem
       {tab === "skills" && (available.skillsCatalog ? <SkillsTab pills={pills} onToast={onToast} /> : renderManagement?.("skills", pills))}
       {tab === "connectors" && (available.connectorsCatalog ? <ConnectorsTab pills={pills} onToast={onToast} /> : renderManagement?.("mcp", pills))}
       {tab === "extensions" && renderManagement?.("extensions", pills)}
+      {tab === "prompts" && <PromptsTab pills={pills} onToast={onToast} />}
     </div>
   );
 }

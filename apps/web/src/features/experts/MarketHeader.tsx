@@ -1,13 +1,14 @@
 import {
-  ExpertTabIcon, SkillTabIcon, ConnectorTabIcon, PuzzlePieceIcon,
+  ExpertTabIcon, SkillTabIcon, ConnectorTabIcon, PuzzlePieceIcon, UserPromptListIcon as PromptTabIcon,
 } from "@openbuddy/ui/icon/icons/index";
 
-export type MarketTab = "experts" | "skills" | "connectors" | "extensions";
+export type MarketTab = "experts" | "skills" | "connectors" | "extensions" | "prompts";
 
 const TABS: { key: MarketTab; label: string; Icon: typeof ExpertTabIcon }[] = [
   { key: "experts", label: "专家", Icon: ExpertTabIcon },
   { key: "skills", label: "技能", Icon: SkillTabIcon },
   { key: "connectors", label: "连接器", Icon: ConnectorTabIcon },
+  { key: "prompts", label: "我的指令", Icon: PromptTabIcon },
   { key: "extensions", label: "扩展", Icon: PuzzlePieceIcon },
 ];
 
