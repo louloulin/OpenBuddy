@@ -1,8 +1,10 @@
 import type { ToolCallView } from "./transcript";
 import type { DiffLine } from "./unified-diff";
+import { todoCallSummary } from "./plan-utils";
 
 /** Pi built-in tools and MCP tools in plain words. */
 const LABELS: Record<string, string> = {
+  ob_todo: "更新计划",
   bash: "执行命令",
   powershell: "执行命令",
   read: "读取文件",
@@ -61,6 +63,7 @@ export function toolSubject(name: string, input: unknown, cwd?: string): string 
     return `${str(a.pattern) ?? ""}${where}`;
   }
   if (name === "find") return str(a.pattern) ?? "";
+  if (name === "ob_todo") return todoCallSummary(input).subject;
   const first = Object.values(a).find((value) => typeof value === "string");
   return typeof first === "string" ? first.split("\n")[0] : "";
 }

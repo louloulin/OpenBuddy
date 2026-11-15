@@ -109,6 +109,57 @@ try {
     if (await toggle.isVisible()) await toggle.click();
     await ctx.sleep(1500);
     return await ctx.shot('05-workbench');`);
+  // 20261116-pii W3.1–W3.3: 想一想 records the plan with the built-in ob_todo tool (auto-allowed even in
+  // "ask" mode), 按此计划执行 works through it, the transcript shows compact plan rows, the top bar the overview.
+  await step('plan: 想一想 records steps with ob_todo', `
+    await ctx.call('permission_mode_set', { mode: 'ask' });
+    const collapse = page.getByRole('button', { name: '收起右侧栏', exact: true });
+    if (await collapse.isVisible()) await collapse.click();
+    // The tooltip (CSS ::after from data-tip) is part of the accessible name, so match the label text.
+    await page.locator('.composer-mode__opt', { hasText: '想一想' }).click();
+    const input = page.locator('.wb-composer__input');
+    await input.fill('__PLAN__ 把季度销售数据整理成分析报告和看板');
+    await page.getByRole('button', { name: '发送', exact: true }).click();
+    await page.getByRole('button', { name: '按此计划执行', exact: true }).waitFor({ timeout: 30000 });
+    const card = page.getByRole('region', { name: '任务计划' });
+    await card.getByText('0/4', { exact: true }).waitFor({ timeout: 10000 });
+    if (await page.getByRole('button', { name: '允许本次', exact: true }).count()) throw new Error('ob_todo asked for approval');
+    await ctx.sleep(800);
+    return await ctx.shot('08-plan-ready');`);
+  await step('plan: 按此计划执行 updates the steps', `
+    await page.getByRole('button', { name: '按此计划执行', exact: true }).click();
+    await page.getByText('需要你确认统计口径', { exact: false }).first().waitFor({ timeout: 60000 });
+    const card = page.getByRole('region', { name: '任务计划' });
+    await card.getByText('2/4', { exact: true }).waitFor({ timeout: 10000 });
+    await card.getByLabel('第 3 步 进行中：撰写分析报告 docs/report.md').waitFor({ timeout: 5000 });
+    if (await page.locator('.composer-mode__opt', { hasText: '做一做' }).getAttribute('aria-checked') !== 'true') throw new Error('mode did not switch to 做一做');
+    if (await page.getByRole('button', { name: '允许本次', exact: true }).count()) throw new Error('ob_todo asked for approval');
+    await ctx.sleep(800);
+    return await ctx.shot('09-plan-progress');`);
+  await step('plan: ob_todo rows in the transcript', `
+    const fold = page.locator('.turn--last .turn__fold');
+    if ((await fold.getAttribute('aria-expanded')) !== 'true') await fold.click();
+    const row = page.locator('.turn--last .toolrow', { hasText: '完成 #2' }).first();
+    await row.waitFor({ timeout: 10000 });
+    await row.scrollIntoViewIfNeeded();
+    const rows = await page.locator('.turn--last .toolrow').allInnerTexts();
+    if (!rows.some(t => t.includes('更新计划') && t.includes('开始 #3'))) throw new Error('missing compact ob_todo rows: ' + rows.join(' | '));
+    if (rows.some(t => t.includes('"action"'))) throw new Error('raw ob_todo JSON in transcript');
+    await ctx.sleep(600);
+    return [await ctx.shot('10-plan-transcript'), rows.filter(t => t.includes('更新计划')).map(t => t.replace(/\\s+/g, ' '))];`);
+  await step('plan: task overview popover', `
+    const button = page.getByRole('button', { name: '任务概览', exact: true });
+    await button.waitFor({ timeout: 10000 });
+    const label = (await button.innerText()).replace(/\\s+/g, ' ');
+    if (!label.includes('步骤 2/4') || !/产物 \\d+/.test(label)) throw new Error('unexpected overview label: ' + label);
+    await button.click();
+    const pop = page.getByRole('dialog', { name: '任务概览' });
+    await pop.waitFor({ timeout: 5000 });
+    for (const text of ['任务进度', '产物 ·', '任务进程 ·', 'report.md']) await pop.getByText(text, { exact: false }).first().waitFor({ timeout: 5000 });
+    await ctx.sleep(600);
+    const shot = await ctx.shot('11-task-overview');
+    await page.keyboard.press('Escape');
+    return [shot, label];`);
   await step('settings', `
     await page.getByRole('button', { name: '设置', exact: true }).first().click();
     await ctx.sleep(1200);

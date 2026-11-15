@@ -1,12 +1,14 @@
-
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSessionStore } from "@/features/chat/state/session-store";
-import { togglePlanMode } from "@openbuddy/client/agent-client";
-import type { PlanEntry, PlanEntryPriority, PlanEntryStatus } from "@openbuddy/protocol/dto";
+import { usePlan } from "@/features/chat/state/plan-store";
+import { planProgress, type PlanItem } from "@openbuddy/client/api/plan";
+import type { Plan, PlanEntry, PlanEntryPriority, PlanEntryStatus } from "@openbuddy/protocol/dto";
 import {
   reorderPlan,
   addPlanEntry,
   cycleEntryStatus,
+  itemsToPlan,
+  planItemsToText,
+  planToText,
 } from "@openbuddy/chat-core/plan-utils";
 import {
   CheckIcon,
@@ -17,8 +19,8 @@ import {
   ArrowUpIcon,
   ChevronDownIcon,
   AddIcon,
-  XCloseIcon,
 } from "@openbuddy/ui/icon/icons/index";
+import { ChevronGlyph, EditGlyph } from "../../shared/agent-ui/icons";
 
 const STATUS_LABEL: Record<PlanEntryStatus, string> = {
   pending: "待处理",
@@ -34,131 +36,188 @@ const PRIORITY_LABEL: Record<PlanEntryPriority, string> = {
 
 const PRIORITY_CYCLE: PlanEntryPriority[] = ["high", "medium", "low"];
 
+const formatElapsed = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`);
+
 interface PlanPanelProps {
-  sessionId?: string;
-  onSend?: (text: string, attachments?: { path: string }[]) => void | Promise<void>;
+  sessionId: string;
+  /** 想一想 answered with a plan: show 按此计划执行 / 修改计划…. */
+  ready?: boolean;
+  /** A turn is running (the current step animates and shows its elapsed time). */
+  running?: boolean;
+  /** 按此计划执行: switch to 做一做 and ask Buddy to carry the plan out. */
+  onExecute?: () => void;
+  /** Put text into the composer (修改计划… / 编辑步骤). */
+  onModify?: (text: string) => void;
+  /** Hide the action bar for this answer (继续完善 / after 修改计划…). */
+  onDismiss?: () => void;
+}
+
+/**
+ * Task plan above the composer (20261116-pii W3.2). The steps come from the engine's
+ * `agent://plan` event (the `ob_todo` results on the current branch), so the panel always shows
+ * the plan of the branch on screen. Collapsible to one line; collapses itself once every step
+ * is done. In 想一想 it carries the plan action bar.
+ */
+export function PlanPanel({ sessionId, ready, running, onExecute, onModify, onDismiss }: PlanPanelProps) {
+  const items = usePlan(sessionId);
+  const { done, total, current } = planProgress(items);
+  const allDone = total > 0 && done === total;
+  // null = follow the plan (open while unfinished); a boolean = the user's choice.
+  const [userOpen, setUserOpen] = useState<boolean | null>(null);
+  const [draft, setDraft] = useState<Plan | null>(null);
+  const elapsed = useStepElapsed(sessionId, current, !!running);
+  const signature = items.map((i) => i.id).join(",");
+  useEffect(() => { setUserOpen(null); setDraft(null); }, [sessionId, signature]);
+  useEffect(() => { if (allDone) setUserOpen(null); }, [allDone]);
+
+  const modify = () => {
+    onDismiss?.();
+    onModify?.(total ? `请按下面的意见调整计划，先不要执行：\n${planItemsToText(items)}\n\n修改意见：` : "我想调整上面的计划：");
+  };
+  const actionBar = ready ? (
+    <div className="plan-bar" role="region" aria-label="计划已就绪">
+      <span className="plan-bar__text">{total ? `计划共 ${total} 步，` : "计划已就绪，"}确认后 Buddy 会切换到「做一做」开始执行。</span>
+      <button type="button" className="bench-btn" onClick={modify}>修改计划…</button>
+      <button type="button" className="bench-btn bench-btn--primary" onClick={() => onExecute?.()}>按此计划执行</button>
+    </div>
+  ) : null;
+  if (!total) return actionBar;
+  if (draft) {
+    return (
+      <PlanEditor
+        initial={draft}
+        onCancel={() => setDraft(null)}
+        onSubmit={(plan) => {
+          setDraft(null);
+          onDismiss?.();
+          onModify?.(`请按下面调整后的计划更新步骤（用 ob_todo 同步），先不要执行：\n${planToText(plan)}\n\n补充说明：`);
+        }}
+      />
+    );
+  }
+  const open = userOpen ?? !allDone;
+  const next = items.find((i) => i.status === "pending");
+  const headline = allDone ? "计划已完成" : open ? "任务计划" : current ? `正在：${current.text}` : next ? `下一步：${next.text}` : "任务计划";
+  return (
+    <section className={"plan-card" + (open ? " plan-card--open" : "") + (allDone ? " plan-card--done" : "")} aria-label="任务计划">
+      <div className="plan-card__head">
+        <button type="button" className="plan-card__toggle" onClick={() => setUserOpen(!open)} aria-expanded={open} aria-label={`${open ? "收起" : "展开"}任务计划（已完成 ${done}/${total}）`}>
+          <span className="plan-card__icon" aria-hidden>{allDone ? <CheckIcon size={14} /> : <TaskListIcon size={14} />}</span>
+          <span className="plan-card__title">{headline}</span>
+          <span className="plan-card__count">{done}/{total}</span>
+          <ChevronGlyph open={open} />
+        </button>
+        {!running && onModify && (
+          <button type="button" className="plan-card__edit" onClick={() => setDraft(itemsToPlan(items))} aria-label="编辑步骤" data-tip="编辑步骤">
+            <EditGlyph />
+          </button>
+        )}
+      </div>
+      <div className="plan-panel__progress-bar" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} aria-label="计划进度">
+        <div className="plan-panel__progress-fill" style={{ width: `${Math.round((done / total) * 100)}%` }} />
+      </div>
+      {open && (
+        <ol className="plan-card__list">
+          {items.map((item) => <PlanStep key={item.id} item={item} live={!!running} elapsed={item.id === current?.id ? elapsed : undefined} />)}
+        </ol>
+      )}
+      {actionBar}
+    </section>
+  );
+}
+
+/** One step, read-only: status mark · text · note · elapsed. */
+function PlanStep({ item, live, elapsed }: { item: PlanItem; live: boolean; elapsed?: number }) {
+  const label = item.status === "done" ? "已完成" : item.status === "in_progress" ? "进行中" : "待处理";
+  return (
+    <li className={`plan-step plan-step--${item.status}`} aria-label={`第 ${item.id} 步 ${label}：${item.text}`}>
+      <span className={"plan-step__mark" + (live && item.status === "in_progress" ? " plan-step__mark--live" : "")} aria-hidden>
+        {item.status === "done" ? <CheckIcon size={12} strokeWidth={2.5} /> : item.status === "in_progress" ? <LoaderIcon size={12} /> : null}
+      </span>
+      <span className="plan-step__body">
+        <span className="plan-step__text">{item.text}</span>
+        {item.note && <span className="plan-step__note">{item.note}</span>}
+      </span>
+      {item.status === "in_progress" && <span className="plan-step__state">{elapsed !== undefined && elapsed >= 1 ? formatElapsed(elapsed) : "进行中"}</span>}
+    </li>
+  );
+}
+
+/** Seconds the current step has been in progress while a turn runs (measured locally). */
+function useStepElapsed(sessionId: string, current: PlanItem | undefined, running: boolean): number | undefined {
+  const starts = useRef(new Map<string, number>());
+  const [now, setNow] = useState(() => Date.now());
+  const key = current ? `${sessionId}:${current.id}` : "";
+  if (key && running && !starts.current.has(key)) starts.current.set(key, Date.now());
+  useEffect(() => {
+    if (!key || !running) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [key, running]);
+  const start = key ? starts.current.get(key) : undefined;
+  return running && start ? Math.max(0, Math.round((now - start) / 1000)) : undefined;
+}
+
+interface PlanEditorProps {
+  initial: Plan;
+  onCancel: () => void;
+  /** 放入输入框: the edited plan goes to Buddy as a message, never straight into the engine. */
+  onSubmit: (plan: Plan) => void;
   onToast?: (msg: string) => void;
 }
 
-export function PlanPanel({ sessionId, onSend, onToast }: PlanPanelProps) {
-  const plan = useSessionStore((s) => s.plan);
-  const planMode = useSessionStore((s) => s.planMode);
-  const setPlanMode = useSessionStore((s) => s.setPlanMode);
-  const setPlan = useSessionStore((s) => s.setPlan);
+/**
+ * 编辑步骤 (对齐 WorkBuddy plan-editor): reorder, rewrite, skip, delete and add steps on a local
+ * draft of the plan; the result is put into the composer for Buddy to apply with ob_todo.
+ */
+export function PlanEditor({ initial, onCancel, onSubmit, onToast }: PlanEditorProps) {
+  const [plan, setPlan] = useState<Plan>(initial);
 
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
-  const [elapsed, setElapsed] = useState<Record<number, number>>({});
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Track when each task started (for elapsed time display).
-  const startTimesRef = useRef<Record<number, number>>({});
-
-  // Elapsed timer: tick every second while there are in_progress tasks.
-  useEffect(() => {
-    if (!plan) return;
-    const hasActive = plan.entries.some((e) => e.status === "in_progress");
-    if (hasActive && !timerRef.current) {
-      timerRef.current = setInterval(() => {
-        const now = Date.now();
-        const next: Record<number, number> = {};
-        plan.entries.forEach((e, i) => {
-          if (e.status === "in_progress") {
-            if (!startTimesRef.current[i]) startTimesRef.current[i] = now;
-            next[i] = Math.round((now - startTimesRef.current[i]) / 1000);
-          }
-        });
-        setElapsed(next);
-      }, 1000);
-    } else if (!hasActive && timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-      setElapsed({});
-    }
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, [plan]);
-
-  // Reset start times when plan changes structurally.
-  useEffect(() => {
-    startTimesRef.current = {};
-    setElapsed({});
-  }, [plan?.entries.length]);
-
-  const handleTogglePlanMode = useCallback(async () => {
-    if (!sessionId) return;
-    try {
-      await togglePlanMode(sessionId, !planMode);
-      setPlanMode(!planMode);
-      onToast?.(planMode ? "已退出计划模式" : "已进入计划模式");
-    } catch (e) {
-      onToast?.(`切换失败：${String(e).replace(/^Error:\s*/, "")}`);
-    }
-  }, [sessionId, planMode, setPlanMode, onToast]);
-
-  const handleApprove = useCallback(() => {
-    if (!onSend) return;
-    onSend("请执行以上计划。");
-    onToast?.("已批准计划，开始执行");
-  }, [onSend, onToast]);
-
-  const handleReject = useCallback(() => {
-    if (!onSend) return;
-    onSend("我不满意这个计划，请重新规划。");
-    onToast?.("已拒绝计划");
-  }, [onSend, onToast]);
 
   const handleSkip = useCallback(
     (idx: number) => {
-      if (!plan) return;
       const entries = plan.entries.map((e, i) =>
         i === idx ? { ...e, status: "completed" as PlanEntryStatus } : e
       );
       setPlan({ ...plan, entries });
       onToast?.(`已跳过 #${idx + 1}`);
     },
-    [plan, setPlan, onToast],
+    [plan, onToast],
   );
 
   const handleDeleteEntry = useCallback(
     (idx: number) => {
-      if (!plan) return;
       const entries = plan.entries.filter((_, i) => i !== idx);
       setPlan({ ...plan, entries });
       onToast?.(`已删除 #${idx + 1}`);
     },
-    [plan, setPlan, onToast],
+    [plan, onToast],
   );
 
   // 计划编辑器(对齐 WorkBuddy plan-editor):上移/下移/状态循环/新增步骤。
   const handleMove = useCallback(
     (idx: number, dir: -1 | 1) => {
-      if (!plan) return;
       setPlan(reorderPlan(plan, idx, idx + dir));
     },
-    [plan, setPlan],
+    [plan],
   );
   const handleCycleStatus = useCallback(
     (idx: number) => {
-      if (!plan) return;
       setPlan(cycleEntryStatus(plan, idx));
     },
-    [plan, setPlan],
+    [plan],
   );
   const [newStep, setNewStep] = useState("");
   const handleAddStep = useCallback(() => {
-    if (!plan || !newStep.trim()) return;
+    if (!newStep.trim()) return;
     setPlan(addPlanEntry(plan, newStep));
     setNewStep("");
-    onToast?.("已新增步骤");
-  }, [plan, newStep, setPlan, onToast]);
+  }, [plan, newStep]);
 
   const handleCyclePriority = useCallback(
     (idx: number) => {
-      if (!plan) return;
       const entries = plan.entries.map((e, i) => {
         if (i !== idx) return e;
         const cur = PRIORITY_CYCLE.indexOf(e.priority);
@@ -167,12 +226,12 @@ export function PlanPanel({ sessionId, onSend, onToast }: PlanPanelProps) {
       });
       setPlan({ ...plan, entries });
     },
-    [plan, setPlan],
+    [plan],
   );
 
   const handleSaveEdit = useCallback(
     (idx: number) => {
-      if (!plan || !editText.trim()) {
+      if (!editText.trim()) {
         setEditingIdx(null);
         return;
       }
@@ -182,98 +241,17 @@ export function PlanPanel({ sessionId, onSend, onToast }: PlanPanelProps) {
       setPlan({ ...plan, entries });
       setEditingIdx(null);
     },
-    [plan, editText, setPlan],
+    [plan, editText],
   );
 
-  // Empty states
-  if (planMode && (!plan || plan.entries.length === 0)) {
-    return (
-      <div className="plan-panel plan-panel--empty">
-        <TaskListIcon size="xl" color="var(--wb-text-tertiary)" />
-        <p>计划模式已开启</p>
-        <p className="plan-panel__hint">
-          发送一个任务，agent 会先制定计划再执行。
-        </p>
-        <button className="plan-panel__mode-btn" onClick={handleTogglePlanMode}>
-          退出计划模式
-        </button>
-      </div>
-    );
-  }
-
-  if (!plan || plan.entries.length === 0) {
-    return (
-      <div className="plan-panel plan-panel--empty">
-        <TaskListIcon size="xl" color="var(--wb-text-tertiary)" />
-        <p>暂无任务计划</p>
-        <p className="plan-panel__hint">
-          agent 在处理复杂任务时会自动制定计划。
-        </p>
-      </div>
-    );
-  }
-
-  const completed = plan.entries.filter((e) => e.status === "completed").length;
-  const inProgress = plan.entries.filter((e) => e.status === "in_progress").length;
-  const total = plan.entries.length;
-  const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
-  const allDone = completed === total;
-  // Plan is awaiting approval when planMode is on and no task has started yet.
-  const awaitingApproval = planMode && inProgress === 0 && completed === 0;
-
   return (
-    <div className="plan-panel">
+    <section className="plan-panel plan-card plan-card--open plan-card--editing" aria-label="编辑计划步骤">
       <div className="plan-panel__header">
         <h3 className="plan-panel__title">
-          <TaskListIcon size="sm" /> 执行计划
+          <TaskListIcon size="sm" /> 编辑步骤
         </h3>
-        <div className="plan-panel__header-actions">
-          <span className="plan-panel__progress-text">
-            {completed}/{total}
-          </span>
-          <button
-            className={`plan-panel__mode-toggle ${planMode ? "plan-panel__mode-toggle--active" : ""}`}
-            onClick={handleTogglePlanMode}
-            title={planMode ? "退出计划模式" : "进入计划模式"}
-          >
-            计划模式
-          </button>
-        </div>
+        <span className="plan-panel__progress-text">{plan.entries.length} 步</span>
       </div>
-
-      {/* Progress bar */}
-      <div className="plan-panel__progress-bar">
-        <div
-          className="plan-panel__progress-fill"
-          style={{ width: `${progressPct}%` }}
-        />
-      </div>
-
-      {/* Status hints */}
-      {inProgress > 0 && (
-        <div className="plan-panel__active-hint">
-          <LoaderIcon size="sm" /> {inProgress} 项进行中
-        </div>
-      )}
-
-      {/* Approval buttons (shown when plan is awaiting user confirmation) */}
-      {awaitingApproval && (
-        <div className="plan-panel__approval">
-          <button className="plan-panel__approve-btn" onClick={handleApprove}>
-            <CheckIcon size="sm" /> 批准执行
-          </button>
-          <button className="plan-panel__reject-btn" onClick={handleReject}>
-            <XCloseIcon size="sm" /> 重新规划
-          </button>
-        </div>
-      )}
-
-      {/* Completion banner */}
-      {allDone && (
-        <div className="plan-panel__done-banner">
-          <CheckIcon size="sm" /> 所有任务已完成
-        </div>
-      )}
 
       {/* Task list */}
       <ul className="plan-panel__list">
@@ -283,7 +261,6 @@ export function PlanPanel({ sessionId, onSend, onToast }: PlanPanelProps) {
             entry={entry}
             index={idx}
             total={plan.entries.length}
-            elapsed={elapsed[idx]}
             editing={editingIdx === idx}
             editText={editText}
             onEditTextChange={setEditText}
@@ -324,7 +301,11 @@ export function PlanPanel({ sessionId, onSend, onToast }: PlanPanelProps) {
           <AddIcon size="sm" /> 添加
         </button>
       </div>
-    </div>
+      <div className="plan-editor__foot">
+        <button type="button" className="bench-btn" onClick={onCancel}>取消</button>
+        <button type="button" className="bench-btn bench-btn--primary" onClick={() => onSubmit(plan)} disabled={!plan.entries.length}>放入输入框</button>
+      </div>
+    </section>
   );
 }
 

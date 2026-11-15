@@ -1,7 +1,22 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import { PLAN_TOOL } from "@openbuddy/protocol/plan";
 import type { EngineContext } from "./engine-context.js";
 import { messageText } from "./titles.js";
 import type { Slot } from "./types.js";
+import { planFromBranch, slimPlan, stateFromDetails } from "./builtin/plan-state.js";
+
+/**
+ * `agent://plan` (20261116-pii W3.1): the slim plan of a session's current branch — the step
+ * list only, never the tool-call history. Sent after every `ob_todo` result, when a session is
+ * opened or focused, and after any tree navigation (regenerate, rewind, branch switch).
+ */
+export function emitPlan(engine: EngineContext, sessionId: string, items: unknown) {
+  engine.emit("agent://plan", { sessionId, items: slimPlan(items) });
+}
+/** Rebuild the plan from the slot's current branch and send it. */
+export function emitBranchPlan(engine: EngineContext, slot: Slot) {
+  emitPlan(engine, slot.id, planFromBranch(slot.session.sessionManager).items);
+}
 
 /**
  * Strip the cumulative `message` / `partial` snapshots from streaming events.
@@ -170,6 +185,11 @@ export function onEvent(engine: EngineContext, slot: Slot, event: AgentSessionEv
   }
   const payload = slimEvent(event);
   if (payload) engine.emitEvent(slot, payload);
+  if (event.type === "tool_execution_end" && event.toolName === PLAN_TOOL && !event.isError) {
+    // Failed calls carry no details: the plan stays as it was.
+    const state = stateFromDetails((event.result as { details?: unknown } | undefined)?.details);
+    if (state) emitPlan(engine, sessionId, state.items);
+  }
   if (event.type === "tool_execution_end") {
     void engine.checkpoints.finish(event.toolCallId).then(
       (record) => { if (record || event.toolName === "write" || event.toolName === "edit") engine.emit("agent://artifacts", { sessionId }); },

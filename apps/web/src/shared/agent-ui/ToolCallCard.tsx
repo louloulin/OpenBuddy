@@ -9,11 +9,13 @@ import {
   FolderToolIcon,
   McpIcon,
   SearchToolIcon,
+  TaskListIcon,
   TerminalToolIcon,
   ToolDefaultIcon,
   ViewedToolIcon,
 } from "@openbuddy/ui/icon/icons/index";
 import { diffStats, formatDuration, toolDiff, toolLabel, toolOutput, toolSubject } from "@openbuddy/chat-core/tool-summary";
+import { todoCallSummary } from "@openbuddy/chat-core/plan-utils";
 import { ChevronGlyph } from "./icons";
 
 type ToolCallCardProps = {
@@ -39,6 +41,7 @@ function ToolIcon({ name }: { name: string }) {
   if (name === "ls") return <FolderToolIcon size={14} />;
   if (name === "grep" || name === "find") return <SearchToolIcon size={14} />;
   if (name.startsWith("mcp__")) return <McpIcon size={14} />;
+  if (name === "ob_todo") return <TaskListIcon size={14} />;
   return <ToolDefaultIcon size={14} />;
 }
 
@@ -63,10 +66,12 @@ export const ToolCallCard = memo(function ToolCallCard({ tc, cwd, onOpen, stoppe
   // Arguments still streaming (e.g. a large write) before the tool runs.
   const generating = running && !tc.startedAt && (tc.argBytes ?? 0) > 0;
   const label = toolLabel(tc.kind);
-  const subject = toolSubject(tc.kind, tc.rawInput, cwd);
+  // ob_todo (pii W3.2): the step that changed and the plan's progress, not the raw arguments.
+  const todo = tc.kind === "ob_todo" ? todoCallSummary(tc.rawInput, tc.details) : undefined;
+  const subject = todo ? todo.subject : toolSubject(tc.kind, tc.rawInput, cwd);
   const diff = !running ? toolDiff(tc) : undefined;
   const stats = diff ? diffStats(diff.lines) : undefined;
-  const time = generating
+  const time = todo ? "" : generating
     ? `生成中 · ${formatBytes(tc.argBytes ?? 0)}`
     : running ? (elapsed !== undefined && elapsed >= 1000 ? formatDuration(elapsed) : "") : stopped ? "" : formatDuration(tc.durationMs);
   const status = stopped ? "stopped" : tc.status;
@@ -84,7 +89,8 @@ export const ToolCallCard = memo(function ToolCallCard({ tc, cwd, onOpen, stoppe
       >
         <span className="toolrow__icon"><ToolIcon name={tc.kind} /></span>
         <span className="toolrow__label">{label}</span>
-        {subject && <span className="toolrow__subject">{subject}</span>}
+        {subject && <span className={"toolrow__subject" + (todo ? " toolrow__subject--plain" : "")}>{subject}</span>}
+        {todo?.progress && <span className="toolrow__plan" aria-label={`计划进度 ${todo.progress}`}>{todo.progress}</span>}
         {stats && (stats.added > 0 || stats.removed > 0) && (
           <span className="toolrow__stats">
             {stats.added > 0 && <span className="toolrow__add">+{stats.added}</span>}
