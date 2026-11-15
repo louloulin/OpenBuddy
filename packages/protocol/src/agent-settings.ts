@@ -7,6 +7,7 @@
  * in `openbuddy.json`. Nothing here is a secret.
  */
 import type { ModelState } from './dto.js';
+import type { SessionExpertInfo } from './experts.js';
 
 /** 逐条: one queued message per turn. 合并: everything queued goes in one turn. */
 export type QueueDeliveryMode = 'one-at-a-time' | 'all';
@@ -74,6 +75,8 @@ export interface SessionModelState extends ModelState {
   mode?: AgentModeName;
   /** False when the current model has no reasoning: the thinking control is greyed out. */
   supportsThinking?: boolean;
+  /** The expert bound on the current branch (W2.2); null when none. Follows branch moves. */
+  expert?: SessionExpertInfo | null;
 }
 
 /** `agent_cycle_model` (Ctrl/Cmd+P) result. `changed: false` says why nothing moved. */

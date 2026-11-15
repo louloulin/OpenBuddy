@@ -4,7 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { SessionSearchIndex, highlightRanges, makeSnippet, searchTerms, searchableText } from "../src/session-search";
+import { SessionSearchIndex, highlightRanges, makeSnippet, readSessionInfo, searchTerms, searchableText } from "../src/session-search";
 
 const cleanups: Array<() => Promise<unknown>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
@@ -26,9 +26,10 @@ function write(dir: string, cwd: string, turns: Array<[string, string]>) {
   }
   return manager;
 }
+/** An index whose per-file reads are counted. */
 function counting(dir: string) {
-  const calls = { list: 0 };
-  const index = new SessionSearchIndex(dir, () => { calls.list++; return SessionManager.listAll(dir); });
+  const calls = { reads: 0 };
+  const index = new SessionSearchIndex(dir, (path) => { calls.reads++; return readSessionInfo(path); });
   return { index, calls };
 }
 
@@ -90,7 +91,7 @@ describe("SessionSearchIndex (pii W1.4)", () => {
       await index.search(query);
       timings.push(performance.now() - start);
     }
-    expect(calls.list).toBe(1);
+    expect(calls.reads).toBe(200);
     expect(index.lastRefresh.skipped).toBe(true);
     expect(Math.max(...timings)).toBeLessThan(300);
     expect((await index.search("表格 结论", { limit: 500 })).length).toBe(100);
@@ -101,9 +102,21 @@ describe("SessionSearchIndex (pii W1.4)", () => {
     const hits = await index.search("长颈鹿");
     expect(hits.map((h) => h.session.id)).toEqual([managers[7].getSessionId()]);
     expect(index.lastRefresh).toEqual({ rebuilt: 1, total: 200, skipped: false });
-    expect(calls.list).toBe(2);
+    // Only that file was read again (no full listAll parse).
+    expect(calls.reads).toBe(201);
     console.log(`session search: cold ${coldMs.toFixed(0)} ms, cached max ${Math.max(...timings).toFixed(1)} ms over 200 sessions`);
   }, 60_000);
+
+  it("reads one session file the way Pi's listAll describes it", async () => {
+    const dir = await sessionDir();
+    const manager = write(dir, "/work/a", [["第一个问题", "第一个回答"], ["第二个问题", "第二个回答"]]);
+    manager.appendSessionInfo("命名的会话");
+    const [listed] = await SessionManager.listAll(dir);
+    const read = await readSessionInfo(manager.getSessionFile()!);
+    const pick = (info: any) => ({ id: info.id, cwd: info.cwd, name: info.name, firstMessage: info.firstMessage, allMessagesText: info.allMessagesText, messageCount: info.messageCount, modified: info.modified.getTime(), created: info.created.getTime() });
+    expect(pick(read)).toEqual(pick(listed));
+    expect(await readSessionInfo(join(dir, "missing.jsonl"))).toBeNull();
+  });
 
   it("drops deleted sessions and handles a missing directory", async () => {
     const dir = await sessionDir();
@@ -113,7 +126,7 @@ describe("SessionSearchIndex (pii W1.4)", () => {
     expect(await index.search("alpha")).toHaveLength(2);
     await rm(gone.getSessionFile()!);
     expect((await index.search("alpha")).map((h) => h.session.id)).toEqual([kept.getSessionId()]);
-    const empty = new SessionSearchIndex(join(dir, "missing"), async () => []);
+    const empty = new SessionSearchIndex(join(dir, "missing"));
     expect(await empty.search("alpha")).toEqual([]);
   });
 });

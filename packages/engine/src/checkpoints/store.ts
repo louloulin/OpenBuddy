@@ -28,6 +28,12 @@ export interface RevertResult {
   conflicts: { path: string; reason: "changed_since" | "missing_snapshot" }[];
 }
 
+/** What a branch switch would write (`planSwitch`): each file's target content and its content when planned. */
+export interface SwitchPlan {
+  conflicts: RevertResult["conflicts"];
+  writes: Array<{ path: string; hash: string | null; current: string | null }>;
+}
+
 const MAX_FILE = 20 * 1024 * 1024;
 const QUOTA = 500 * 1024 * 1024;
 const TRACKED = new Set(["write", "edit"]);
@@ -163,6 +169,13 @@ export class CheckpointStore {
    * `changed_since` conflict; unless `force`, any such conflict means nothing is written at all.
    */
   async switchBranch(sessionId: string, undoIds: string[], redoIds: string[], opts: { skip?: string[]; force?: boolean } = {}): Promise<RevertResult> {
+    const plan = await this.planSwitch(sessionId, undoIds, redoIds, opts);
+    if (!opts.force && plan.conflicts.some((c) => c.reason === "changed_since")) return { restored: [], conflicts: plan.conflicts };
+    return this.applySwitch(sessionId, plan, opts);
+  }
+
+  /** `switchBranch` without writing anything: the conflicts and the writes it would make. */
+  async planSwitch(sessionId: string, undoIds: string[], redoIds: string[], opts: { skip?: string[]; force?: boolean } = {}): Promise<SwitchPlan> {
     const index = await this.index(sessionId);
     const pick = (ids: string[]) => {
       const set = new Set(ids);
@@ -171,22 +184,30 @@ export class CheckpointStore {
       return byPath;
     };
     const undo = pick(undoIds), redo = pick(redoIds);
-    const result: RevertResult = { restored: [], conflicts: [] };
-    const writes: Array<{ path: string; hash: string | null }> = [];
+    const plan: SwitchPlan = { conflicts: [], writes: [] };
     for (const path of new Set([...undo.keys(), ...redo.keys()])) {
       if (opts.skip?.includes(path)) continue;
       const a = undo.get(path), b = redo.get(path);
-      if ([...(a ?? []), ...(b ?? [])].some((r) => r.skipped)) { result.conflicts.push({ path, reason: "missing_snapshot" }); continue; }
+      if ([...(a ?? []), ...(b ?? [])].some((r) => r.skipped)) { plan.conflicts.push({ path, reason: "missing_snapshot" }); continue; }
       // Where the file should end up, and where it should be now if nothing else touched it.
       const desired = b ? b[b.length - 1].after : a![0].before;
       const expected = a ? a[a.length - 1].after : b![0].before;
       const current = (await this.capture(sessionId, path, false)).hash;
       if (current === desired) continue;
-      if (!opts.force && current !== expected) { result.conflicts.push({ path, reason: "changed_since" }); continue; }
-      writes.push({ path, hash: desired });
+      if (!opts.force && current !== expected) { plan.conflicts.push({ path, reason: "changed_since" }); continue; }
+      plan.writes.push({ path, hash: desired, current });
     }
-    if (!opts.force && result.conflicts.some((c) => c.reason === "changed_since")) return result;
-    for (const { path, hash } of writes) {
+    return plan;
+  }
+
+  /**
+   * Make a plan's writes. A file that changed after planning (e.g. while a summary ran) is a
+   * `changed_since` conflict and is left alone, unless `force`.
+   */
+  async applySwitch(sessionId: string, plan: SwitchPlan, opts: { force?: boolean } = {}): Promise<RevertResult> {
+    const result: RevertResult = { restored: [], conflicts: [...plan.conflicts] };
+    for (const { path, hash, current } of plan.writes) {
+      if (!opts.force && (await this.capture(sessionId, path, false)).hash !== current) { result.conflicts.push({ path, reason: "changed_since" }); continue; }
       await this.restore(sessionId, path, hash);
       result.restored.push(path);
     }

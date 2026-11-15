@@ -12,8 +12,9 @@ import type { ThinkingLevel } from "../types.js";
  * - appends the persona to the system prompt (`before_agent_start` → `{ systemPrompt }`), never
  *   replacing what Pi, the project context or other built-ins wrote.
  *
- * Model and thinking level are applied once at binding time (they are session state Pi persists
- * itself); see `features/expert.ts`.
+ * Model and thinking level are applied at binding time (they are session state Pi persists
+ * itself), and again when the leaf moves to a branch with a different binding; see
+ * `features/expert.ts` (`followExpert`) and `features/branch-state.ts`.
  */
 export const EXPERT_ENTRY = "openbuddy.expert";
 
@@ -36,9 +37,9 @@ export interface ExpertBinding {
   warnings: string[];
 }
 
-/** The binding on the current branch; `null` entries mark an explicit unbind. */
-export function currentBinding(sm: BranchReader): ExpertBinding | undefined {
-  return readBranchState<ExpertBinding | null>(sm, EXPERT_ENTRY) ?? undefined;
+/** The binding on the current branch (or the branch ending at `fromId`); `null` entries mark an explicit unbind. */
+export function currentBinding(sm: BranchReader, fromId?: string): ExpertBinding | undefined {
+  return readBranchState<ExpertBinding | null>(sm, EXPERT_ENTRY, fromId) ?? undefined;
 }
 
 const glob = (pattern: string) => new RegExp(`^${pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`);

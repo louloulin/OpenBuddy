@@ -73,8 +73,8 @@ export class PiEngine {
     this.skills = new SkillsService(settings);
     this.mcp = new McpService(settings, openUrl, emit);
     this.sessionDir = join(settings.dir, "sessions");
-    // A refresh lists fresh (and shares the result with the sidebar's list cache).
-    this.searchIndex = new SessionSearchIndex(this.sessionDir, () => { this.invalidateList(); return this.all(); });
+    // A refresh parses only new or changed session files and leaves the sidebar's list cache alone.
+    this.searchIndex = new SessionSearchIndex(this.sessionDir);
     this.checkpoints = new CheckpointStore(join(settings.dir, "checkpoints"), (path) => this.trash(path));
   }
   /** Move a file to the OS trash via the host; without a host trash (tests), or if it fails, into `<dir>/trash`. */
@@ -240,6 +240,8 @@ export class PiEngine {
       availableThinkingLevels: s.getAvailableThinkingLevels(),
       supportsThinking: s.supportsThinking(),
       mode: this.mode(id),
+      // The expert bound on the current branch (W2.2): the header badge follows branch moves.
+      expert: features.sessionExpert(this, id),
     };
   }
   async setModel(id: string, modelId: string, providerId?: string) {

@@ -1,7 +1,8 @@
 import { agentClearSessionExpert, agentSetSessionExpert, type SessionExpertInfo } from "@openbuddy/client/agent-client";
-import type { AgentEntry } from "@openbuddy/protocol/dto";
+import type { AgentEntry, PiMessage } from "@openbuddy/protocol/dto";
 import type { ExpertEntry } from "@openbuddy/protocol/experts";
 import { friendlyError } from "@openbuddy/chat-core/error-format";
+import { parseUserText } from "@openbuddy/chat-core/user-text";
 import { useSessionsStore } from "../features/sessions/state/sessions-store";
 import { usePendingExpertStore } from "../features/experts";
 
@@ -15,9 +16,40 @@ const WARNINGS: Record<string, string> = {
 };
 const notice = (bound: SessionExpertInfo) => bound.warnings.map((w) => WARNINGS[w]).filter(Boolean).join("；") || undefined;
 
-/** Mirror the session's binding (from a load snapshot or a bind call) into its sidebar entry. */
+/**
+ * Old-style sessions (before W2.2) had the persona injected into their first prompt; the engine
+ * reports no binding for them, but their badge stays (sessionId → the badge it shows).
+ */
+const legacy = new Map<string, { name: string; avatar?: string }>();
+
+/** The expert an old-style session's first prompt carries (`parseUserText`), if any. */
+function legacyExpert(messages: readonly PiMessage[]): string | undefined {
+  const first = messages.find((m) => m.role === "user");
+  if (!first) return undefined;
+  const text = typeof first.content === "string" ? first.content : first.content.map((p) => (p.type === "text" ? p.text ?? "" : "")).join("");
+  return parseUserText(text).expert;
+}
+
+/**
+ * Mirror the session's binding (from a load snapshot, a bind call or a model-state event, which
+ * follows branch switches) into its sidebar entry. Without a binding, an old-style session keeps
+ * the expert its first prompt carried.
+ */
 export function showSessionExpert(sessionId: string, expert: SessionExpertInfo | null | undefined) {
-  useSessionsStore.getState().upsert({ sessionId, expertId: expert?.id, expertName: expert?.name, expertAvatar: expert?.avatar });
+  const kept = expert ? undefined : legacy.get(sessionId);
+  useSessionsStore.getState().upsert({ sessionId, expertId: expert?.id, expertName: expert?.name ?? kept?.name, expertAvatar: expert?.avatar ?? kept?.avatar });
+}
+
+/** A session was (re)loaded: remember an old-style injected expert, then mirror the binding. */
+export function showLoadedExpert(sessionId: string, snapshot: { expert?: SessionExpertInfo | null; messages: readonly PiMessage[] }) {
+  const injected = snapshot.expert ? undefined : legacyExpert(snapshot.messages);
+  // A role preamble names the expert; the hidden persona block does not, so keep the badge shown so far.
+  const state = useSessionsStore.getState();
+  const shown = [...state.independent, ...Object.values(state.workspaceSessions).flat()].find((s) => s.sessionId === sessionId);
+  const badge = injected === "persona" ? (shown?.expertName ? { name: shown.expertName, avatar: shown.expertAvatar } : undefined) : injected ? { name: injected } : undefined;
+  if (badge) legacy.set(sessionId, badge);
+  else if (!snapshot.expert) legacy.delete(sessionId);
+  showSessionExpert(sessionId, snapshot.expert);
 }
 
 /** A new task was just created: bind the summoned (pending) expert before its first prompt. Returns a toast, if any. */
@@ -37,7 +69,8 @@ export async function bindPendingExpert(sessionId: string): Promise<string | und
 /** The header badge's ×: unbind and restore the task's own model, thinking level and tools. */
 export async function clearSessionExpert(sessionId: string): Promise<string> {
   try {
-    await agentClearSessionExpert(sessionId);
+    // Nothing bound in the engine: the × removes an old-style badge.
+    if (!(await agentClearSessionExpert(sessionId))) legacy.delete(sessionId);
     showSessionExpert(sessionId, null);
     return "已移除专家，任务恢复原来的设置";
   } catch (e) {

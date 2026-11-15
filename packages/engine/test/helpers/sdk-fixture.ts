@@ -18,7 +18,12 @@ const secureStorage = {
   decryptString: (value: Buffer) => value.toString().split("").reverse().join(""),
 };
 
-export async function sdkFixture(reply: (request: FixtureRequest, index: number) => FixtureReply | Promise<FixtureReply>, cleanups: Array<() => Promise<unknown>>, options: { extensionFactories?: ExtensionFactory[] } = {}) {
+export async function sdkFixture(
+  reply: (request: FixtureRequest, index: number) => FixtureReply | Promise<FixtureReply>,
+  cleanups: Array<() => Promise<unknown>>,
+  /** `trash`: the host's HostShell.trash (files a checkpoint restore removes go there). */
+  options: { trash?: (path: string) => Promise<void>; extensionFactories?: ExtensionFactory[] } = {},
+) {
   const root = await mkdtemp(join(tmpdir(), "openbuddy-w1-"));
   cleanups.push(() => rm(root, { recursive: true, force: true }));
   const requests: FixtureRequest[] = [];
@@ -52,7 +57,7 @@ export async function sdkFixture(reply: (request: FixtureRequest, index: number)
     userDataDir: root,
     safeStorage: secureStorage,
     emit: (name, payload) => events.push({ name, payload }),
-    shell: { openPath: async () => "", openExternal: async () => {}, showItemInFolder: () => {} },
+    shell: { openPath: async () => "", openExternal: async () => {}, showItemInFolder: () => {}, ...(options.trash ? { trash: options.trash } : {}) },
     extensionFactories: options.extensionFactories,
   });
   cleanups.push(engine.dispose);

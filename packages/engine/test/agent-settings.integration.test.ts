@@ -186,7 +186,7 @@ describe("agent settings persisted in pi-settings.json (pii W0.4)", () => {
 });
 
 describe("mode persistence as the first built-in (pii W0.5)", () => {
-  it("keeps 问一问 across close/reopen, restart and fork, and restores each branch's mode on rewind", async () => {
+  it("keeps 问一问 across close/reopen, restart, fork and 从这里编辑", async () => {
     const f = await fixture();
     await f.call("agent_send", { sessionId: f.sid, text: "first in craft" });
     expect(toolNames(f.requests.at(-1)!)).toEqual(expect.arrayContaining(["bash", "write"]));
@@ -209,12 +209,16 @@ describe("mode persistence as the first built-in (pii W0.5)", () => {
     await f.call("agent_load_session", { sessionId: f.sid, cwd: f.root });
     expect(await f.call("agent_session_info", { sessionId: f.sid })).toMatchObject({ mode: "ask" });
 
-    // 从这里编辑 on the first prompt goes back to before the switch: that branch is 做一做.
+    // 从这里编辑 on the first prompt goes back to before the switch, but the prompt is sent again with
+    // the mode selected now: 问一问 stays (switching versions ‹1/2› restores each branch's own mode,
+    // see branch-state.integration.test.ts).
     const points = (await f.call("rewind_points", { sessionId: f.sid })) as Array<{ entryId: string; preview: string }>;
     f.events.length = 0;
     await f.call("rewind_execute", { sessionId: f.sid, entryId: points[0].entryId });
-    expect(await f.call("agent_get_model_state", { sessionId: f.sid })).toMatchObject({ mode: "craft" });
-    expect(f.events.some((e) => e.name === "agent://model-state" && e.payload.mode === "craft")).toBe(true);
+    expect(await f.call("agent_get_model_state", { sessionId: f.sid })).toMatchObject({ mode: "ask" });
+    expect(f.events.some((e) => e.name === "agent://model-state" && e.payload.mode === "craft")).toBe(false);
+    await f.call("agent_send", { sessionId: f.sid, text: "first again" });
+    expect(toolNames(f.requests.at(-1)!)).toEqual(["find", "grep", "ls", "ob_todo", "read"]);
   });
 
   it("keeps the mode in memory only while the built-in is switched off", async () => {
