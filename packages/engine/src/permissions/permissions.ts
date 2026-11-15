@@ -24,7 +24,8 @@ export function destructiveInfo(toolName: string, input: unknown): { command?: s
 const READ_ONLY = ["read", "grep", "find", "ls"];
 /**
  * Built-in tools whose only effect is session bookkeeping (`ob_todo` writes the plan into its
- * own result): allowed in every mode unless a deny rule matches. They still pass this gate.
+ * own result): allowed in every mode unless a deny rule matches — but only when the session's
+ * tool of that name is the enabled built-in itself (`builtinTool`). They still pass this gate.
  */
 export const SESSION_ONLY_TOOLS = ["ob_todo"];
 /** The input field a rule pattern is matched against, per tool. */
@@ -45,6 +46,8 @@ export class Permissions {
     private emit: Emit,
     /** 0 disables the timeout: an unanswered request waits until answered or cancelled. */
     private timeoutMs = 0,
+    /** Whether the session's tool of that name is the enabled built-in's own (not a look-alike). */
+    private builtinTool: (sessionId: string, toolName: string) => boolean = () => false,
   ) {}
   extension(sessionId: string): ExtensionFactory {
     return (pi) => {
@@ -68,7 +71,7 @@ export class Permissions {
     if (rule?.action === "deny") return false;
     if (rule?.action === "allow" || config.permissionMode === "always-approve")
       return true;
-    if (SESSION_ONLY_TOOLS.includes(toolName)) return true;
+    if (SESSION_ONLY_TOOLS.includes(toolName) && this.builtinTool(sessionId, toolName)) return true;
     if (this.sessionAllow.get(sessionId)?.has(toolName)) return true;
     if (config.permissionMode === "auto" && READ_ONLY.includes(toolName))
       return true;

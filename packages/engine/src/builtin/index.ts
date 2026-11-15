@@ -3,6 +3,7 @@ import type { EngineContext } from "../engine-context.js";
 import { todoBuiltin } from "./todo.js";
 import { modeExtension } from "./mode.js";
 import { persona } from "./persona.js";
+import { trackBuiltinTools } from "./reserved-tools.js";
 
 /**
  * Built-in extension channel (20261116-pii §5, W0.5): trusted, app-provided Pi extensions such as
@@ -12,7 +13,9 @@ import { persona } from "./persona.js";
  *   extensions, so every tool they add still goes through the permission gate.
  * - They are NOT governed by the user-extension master switch or folder trust (they are the
  *   app's own code), but each can be turned off individually through `enabled` (W0.4 settings).
- * - Tools they register must start with `ob_`; the session tool allowlist admits `ob_*`.
+ * - Tools they register must start with `ob_` and be declared in `tools`; the session tool
+ *   allowlist names the declared tools of the enabled built-ins, and extensions loaded from disk
+ *   cannot register `ob_*` names (reserved-tools.ts).
  * - Per-session state belongs in session entries (custom entries or tool-result `details`), so
  *   forks, branch switches and regenerations stay correct; only cross-session data (experts,
  *   memory) lives in files.
@@ -47,9 +50,17 @@ export const BUILTIN_EXTENSIONS: BuiltinExtension[] = [
 // W3.1 plan / todo (`ob_todo`).
 BUILTIN_EXTENSIONS.push(todoBuiltin);
 
-/** Factories for one session, in registration order, skipping the ones switched off. */
+/**
+ * Factories for one session, in registration order, skipping the ones switched off. Their tool
+ * definitions are recorded (reserved-tools.ts) so the permission gate can tell them from look-alikes.
+ */
 export function builtinFactories(ctx: BuiltinContext, enabled: (id: string) => boolean = () => true): ExtensionFactory[] {
-  return BUILTIN_EXTENSIONS.filter((b) => enabled(b.id)).map((b) => b.create(ctx));
+  return BUILTIN_EXTENSIONS.filter((b) => enabled(b.id)).map((b) => trackBuiltinTools(b.id, b.tools ?? [], b.create(ctx)));
 }
+/** Tool names of the enabled built-ins: the session tool allowlist names exactly these (no `ob_*`). */
+export function builtinToolNames(enabled: (id: string) => boolean = () => true): string[] {
+  return BUILTIN_EXTENSIONS.filter((b) => enabled(b.id)).flatMap((b) => [...(b.tools ?? [])]);
+}
+export { isBuiltinToolDefinition, reserveBuiltinToolNames } from "./reserved-tools.js";
 export { readBranchHistory, readBranchState, writeBranchState } from "./session-state.js";
 export type { BranchReader, EntryWriter } from "./session-state.js";

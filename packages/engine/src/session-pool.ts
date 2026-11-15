@@ -6,7 +6,7 @@ import {
 import { existsSync } from "node:fs";
 import type { EngineContext } from "./engine-context.js";
 import { validateThinkingLevel, type Slot, type ThinkingLevel } from "./types.js";
-import { builtinFactories } from "./builtin/index.js";
+import { builtinFactories, builtinToolNames, reserveBuiltinToolNames } from "./builtin/index.js";
 import { restoreMode } from "./features/mode.js";
 import { favoriteScope } from "./features/agent-settings.js";
 
@@ -45,6 +45,7 @@ export async function open(
   // Persisted Pi settings (pi-settings.json, 20261116-pii W0.4); project settings still need trust.
   const sdkSettings = engine.settings.pi.manager(trusted);
   const sessionId = manager.getSessionId();
+  const builtinEnabled = (id: string) => engine.settings.pi.builtinEnabled(id);
   const loader = new DefaultResourceLoader({
     cwd,
     agentDir: engine.settings.dir,
@@ -67,9 +68,11 @@ export async function open(
       engine.checkpoints.extension(sessionId, () => cwd),
       engine.mcp.extension(),
       // Built-in extensions (20261116-pii W0.5): app code, before user extensions.
-      ...builtinFactories({ engine, sessionId, cwd }, (id) => engine.settings.pi.builtinEnabled(id)),
+      ...builtinFactories({ engine, sessionId, cwd }, builtinEnabled),
       ...engine.extensionFactories,
     ],
+    // `ob_*` tool names are the built-ins' own: extensions from disk can neither take nor shadow them.
+    extensionsOverride: reserveBuiltinToolNames,
   });
   await loader.reload();
   const errors = loader.getExtensions().errors;
@@ -85,7 +88,8 @@ export async function open(
     resourceLoader: loader,
     settingsManager: sdkSettings,
     model,
-    tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "mcp__*", "ob_*"],
+    // The enabled built-ins' tools by name (not `ob_*`): a switched-off built-in's name stays unused.
+    tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "mcp__*", ...builtinToolNames(builtinEnabled)],
     thinkingLevel: requestedThinking,
     // Favourite models, cycled with Ctrl/Cmd+P (W1.6).
     scopedModels: favoriteScope(engine),

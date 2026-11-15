@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
+import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { createEngineHandlers } from "@openbuddy/host/handlers";
 
 export interface FixtureRequest { messages: Array<{ role: string; content?: unknown }>; [key: string]: unknown }
@@ -17,7 +18,7 @@ const secureStorage = {
   decryptString: (value: Buffer) => value.toString().split("").reverse().join(""),
 };
 
-export async function sdkFixture(reply: (request: FixtureRequest, index: number) => FixtureReply | Promise<FixtureReply>, cleanups: Array<() => Promise<unknown>>) {
+export async function sdkFixture(reply: (request: FixtureRequest, index: number) => FixtureReply | Promise<FixtureReply>, cleanups: Array<() => Promise<unknown>>, options: { extensionFactories?: ExtensionFactory[] } = {}) {
   const root = await mkdtemp(join(tmpdir(), "openbuddy-w1-"));
   cleanups.push(() => rm(root, { recursive: true, force: true }));
   const requests: FixtureRequest[] = [];
@@ -52,6 +53,7 @@ export async function sdkFixture(reply: (request: FixtureRequest, index: number)
     safeStorage: secureStorage,
     emit: (name, payload) => events.push({ name, payload }),
     shell: { openPath: async () => "", openExternal: async () => {}, showItemInFolder: () => {} },
+    extensionFactories: options.extensionFactories,
   });
   cleanups.push(engine.dispose);
   const call = async (name: string, payload: Record<string, unknown> = {}) => engine.handlers[name]!(payload);
