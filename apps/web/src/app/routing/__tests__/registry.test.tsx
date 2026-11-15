@@ -78,8 +78,9 @@ describe("FeatureRegistry (pii W0.2)", () => {
     expect(LEGACY_BLOCKED_VIEWS.every((label) => routeEntry(FEATURES, label))).toBe(true);
   });
 
-  it("every nav entry has a route and ids are unique", () => {
+  it("every live nav entry has a route and ids are unique", () => {
     expect(new Set(FEATURES.map((e) => e.id)).size).toBe(FEATURES.length);
-    expect(FEATURES.filter((e) => e.nav && !e.route)).toEqual([]);
+    // Offline entries are declared for the record (plan D8) and never rendered, so they need no route.
+    expect(FEATURES.filter((e) => e.nav && !e.route && !e.offline)).toEqual([]);
   });
 });
