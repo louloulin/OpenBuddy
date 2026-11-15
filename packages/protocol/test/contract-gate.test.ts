@@ -81,7 +81,7 @@ describe("IPC contract gate", () => {
     expect(PENDING_COMMANDS.filter((name) => commands.has(name))).toEqual([]);
     const used = rendererCommands();
     expect(PENDING_COMMANDS.filter((name) => !used.has(name))).toEqual([]);
-    expect(PENDING_COMMANDS.length).toBeLessThanOrEqual(55);
+    expect(PENDING_COMMANDS.length).toBeLessThanOrEqual(40); // 55 → 40 after pii W1.4 + W2.1–W2.3 (20261116-pii §7: target ≤ 20)
     expect(PENDING_EVENTS.filter((name) => events.has(name))).toEqual([]);
   });
 
