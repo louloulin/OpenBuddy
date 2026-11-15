@@ -1,0 +1,1622 @@
+{
+ "consoleLog": [
+  {
+   "src": "main-stdout",
+   "line": "RENDERER_CONSOLE debug [telemetry] INFO app_started ",
+   "at": 1794646733308
+  },
+  {
+   "src": "renderer",
+   "type": "debug",
+   "line": "[telemetry] INFO app_started ",
+   "at": 1794646733309
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005911.160023:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646751160
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005911.160055:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646751160
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005911.160081:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646751160
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005911.160095:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646751160
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005913.879763:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646753879
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005913.879788:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646753879
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005913.879811:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646753879
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005913.879822:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646753879
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005924.444536:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646764444
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005924.445164:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646764445
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005924.445198:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646764445
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005924.445217:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646764445
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005926.053046:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646766053
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005926.053074:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646766053
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005926.053098:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646766053
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005926.053107:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646766053
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005939.799454:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646779799
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005939.799486:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646779799
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005939.799507:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646779799
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005939.799514:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646779799
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005940.600297:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646780600
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005940.600327:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646780600
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005940.600351:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646780600
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005940.600361:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646780600
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005941.398242:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646781398
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005941.398275:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646781398
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005941.398303:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646781398
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005941.398311:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646781398
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005942.197295:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646782197
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005942.197328:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646782197
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005942.197356:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646782197
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005942.197368:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646782197
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005942.999179:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646782999
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005942.999215:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646782999
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005942.999240:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646782999
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005942.999252:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646782999
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005943.796280:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646783796
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005943.796310:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646783796
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005943.796336:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646783796
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005943.796347:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646783796
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005944.597613:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646784597
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005944.597649:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646784597
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005944.597680:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646784597
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/005944.597692:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646784597
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010007.556246:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646807556
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010007.556284:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646807556
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010007.556310:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646807556
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010007.556320:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646807556
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010008.161855:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646808161
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010008.161886:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646808161
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010008.161908:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646808161
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010008.161918:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646808161
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010019.362095:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646819362
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010019.362137:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646819362
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010019.362161:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646819362
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010019.362175:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646819362
+  },
+  {
+   "src": "main-stdout",
+   "line": "RENDERER_CONSOLE debug [telemetry] INFO session_complete [object Object]",
+   "at": 1794646825809
+  },
+  {
+   "src": "renderer",
+   "type": "debug",
+   "line": "[telemetry] INFO session_complete {sessionId: 01a1d949-577a-7765-8406-069e51e2197e, stopReason: end_turn}",
+   "at": 1794646825809
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010026.412484:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646826412
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010026.412524:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646826412
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010026.412547:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646826412
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010026.412557:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646826412
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010039.603373:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646839603
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010039.603410:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646839603
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010039.603434:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646839603
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010039.603443:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646839603
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010039.986953:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646839987
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010039.986988:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646839987
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010039.987019:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646839987
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010039.987027:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646839987
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010055.302946:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646855303
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010055.303321:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646855303
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010055.303352:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646855303
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010055.303426:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646855303
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010055.336417:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646855336
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010055.336442:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646855336
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010055.336463:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646855336
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010055.336473:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646855336
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010055.386233:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646855386
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010055.386259:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646855386
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010055.386284:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646855386
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010055.386293:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646855386
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010055.438814:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646855438
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010055.438838:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646855438
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010055.438860:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646855438
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010055.438873:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646855438
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010115.407998:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646875408
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010115.408051:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646875408
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010115.408088:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646875408
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010115.408100:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646875408
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010115.979847:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646875979
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010115.979877:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646875979
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010115.979901:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646875979
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010115.979910:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646875979
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010133.789585:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646893789
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010133.789624:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646893789
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010133.789648:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646893789
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010133.789658:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646893789
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010136.076219:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646896076
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010136.076261:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646896076
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010136.076287:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646896076
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010136.076299:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646896076
+  },
+  {
+   "src": "main-stdout",
+   "line": "RENDERER_CONSOLE debug [telemetry] INFO session_complete [object Object]",
+   "at": 1794646911753
+  },
+  {
+   "src": "renderer",
+   "type": "debug",
+   "line": "[telemetry] INFO session_complete {sessionId: 01a1d949-577a-7765-8406-069e51e2197e, stopReason: end_turn}",
+   "at": 1794646911754
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010153.904967:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646913905
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010153.905016:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646913905
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010153.905058:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646913905
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010153.905072:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646913905
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010154.507108:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646914507
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010154.507141:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646914507
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010154.507163:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646914507
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010154.507173:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646914507
+  },
+  {
+   "src": "main-stdout",
+   "line": "RENDERER_CONSOLE debug [telemetry] WARN permission_request [object Object]",
+   "at": 1794646938811
+  },
+  {
+   "src": "renderer",
+   "type": "debug",
+   "line": "[telemetry] WARN permission_request {sessionId: 01a1d949-577a-7765-8406-069e51e2197e}",
+   "at": 1794646938812
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010221.633421:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646941633
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010221.633461:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646941633
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010221.633486:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646941633
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010221.633500:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646941633
+  },
+  {
+   "src": "main-stdout",
+   "line": "RENDERER_CONSOLE debug [telemetry] INFO session_complete [object Object]",
+   "at": 1794646953359
+  },
+  {
+   "src": "renderer",
+   "type": "debug",
+   "line": "[telemetry] INFO session_complete {sessionId: 01a1d949-577a-7765-8406-069e51e2197e, stopReason: end_turn}",
+   "at": 1794646953360
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010236.121209:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646956121
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010236.121255:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646956121
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010236.121279:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646956121
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010236.121288:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646956121
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010247.958701:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646967958
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010247.958740:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646967958
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010247.958763:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646967958
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010247.958773:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646967958
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010259.695379:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646979695
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010259.695454:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646979695
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010259.695479:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646979695
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010259.695487:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646979695
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23169:1114/010311.091911:ERROR:components/viz/service/display/display.cc:271] Frame latency is negative: -0.104 ms",
+   "at": 1794646991092
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010313.099548:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646993099
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010313.099625:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646993099
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010313.099669:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794646993099
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010313.099685:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794646993099
+  },
+  {
+   "src": "main-stdout",
+   "line": "RENDERER_CONSOLE debug [telemetry] INFO session_complete [object Object]",
+   "at": 1794647004608
+  },
+  {
+   "src": "renderer",
+   "type": "debug",
+   "line": "[telemetry] INFO session_complete {sessionId: 01a1d949-577a-7765-8406-069e51e2197e, stopReason: end_turn}",
+   "at": 1794647004608
+  },
+  {
+   "src": "main-stdout",
+   "line": "RENDERER_CONSOLE warning [OpenBuddy] Turn ended abnormally: [object Object]",
+   "at": 1794647004627
+  },
+  {
+   "src": "main-stdout",
+   "line": "RENDERER_CONSOLE debug [telemetry] ERROR turn_error [object Object]",
+   "at": 1794647004627
+  },
+  {
+   "src": "renderer",
+   "type": "warning",
+   "line": "[OpenBuddy] Turn ended abnormally: {sessionId: 01a1d949-577a-7765-8406-069e51e2197e, kind: error, detail: 429: {\"message\":\"Rate limit reached for fixture mo… server)\",\"type\":\"rate_limit_error\",\"code\":\"429\"}}",
+   "at": 1794647004627
+  },
+  {
+   "src": "renderer",
+   "type": "debug",
+   "line": "[telemetry] ERROR turn_error {sessionId: 01a1d949-577a-7765-8406-069e51e2197e, kind: error}",
+   "at": 1794647004627
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010328.171468:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647008171
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010328.171507:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647008171
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010328.171532:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647008171
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010328.171545:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647008171
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010342.003454:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647022003
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010342.003518:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647022003
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010342.003602:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647022003
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010342.003699:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647022003
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010354.369698:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647034369
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010354.369769:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647034369
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010354.369794:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647034369
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010354.369813:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647034369
+  },
+  {
+   "src": "main-stdout",
+   "line": "RENDERER_CONSOLE debug [telemetry] INFO session_complete [object Object]",
+   "at": 1794647035980
+  },
+  {
+   "src": "renderer",
+   "type": "debug",
+   "line": "[telemetry] INFO session_complete {sessionId: 01a1d94c-8cc2-7765-8406-06a0e789ab1b, stopReason: end_turn}",
+   "at": 1794647035981
+  },
+  {
+   "src": "main-stdout",
+   "line": "RENDERER_CONSOLE debug [telemetry] INFO session_complete [object Object]",
+   "at": 1794647039143
+  },
+  {
+   "src": "renderer",
+   "type": "debug",
+   "line": "[telemetry] INFO session_complete {sessionId: 01a1d94c-9922-7765-8406-06a30bab79c2, stopReason: end_turn}",
+   "at": 1794647039144
+  },
+  {
+   "src": "main-stdout",
+   "line": "RENDERER_CONSOLE debug [telemetry] INFO session_complete [object Object]",
+   "at": 1794647042347
+  },
+  {
+   "src": "renderer",
+   "type": "debug",
+   "line": "[telemetry] INFO session_complete {sessionId: 01a1d94c-a5a5-7765-8406-06a4bad04754, stopReason: end_turn}",
+   "at": 1794647042348
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010403.959505:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647043959
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010403.959545:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647043959
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010403.959570:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647043959
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010403.959580:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647043959
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010413.647022:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647053647
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010413.647097:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647053647
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010413.647122:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647053647
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010413.647130:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647053647
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010414.117200:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647054117
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010414.117233:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647054117
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010414.117260:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647054117
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010414.117272:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647054117
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010428.866966:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647068867
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010428.867000:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647068867
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010428.867023:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647068867
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010428.867034:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647068867
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010429.479085:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647069479
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010429.479401:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647069479
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010429.479433:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647069479
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010429.479454:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647069479
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010443.866757:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647083866
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010443.866793:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647083866
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010443.866819:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647083866
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010443.866828:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647083866
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010444.465565:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647084465
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010444.465598:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647084465
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010444.465623:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647084465
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010444.465637:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647084465
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010458.285981:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647098286
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010458.286022:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647098286
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010458.286046:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647098286
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010458.286055:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647098286
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010500.000263:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647100000
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010500.000310:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647100000
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010500.000334:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647100000
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010500.000344:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647100000
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010501.719162:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647101719
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010501.719203:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647101719
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010501.719228:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647101719
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010501.719241:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647101719
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010503.434199:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647103434
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010503.434232:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647103434
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010503.434255:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647103434
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010503.434266:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647103434
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010505.151555:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647105151
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010505.151600:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647105151
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010505.151629:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647105151
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010505.151645:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647105151
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010547.002804:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647147002
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010547.002847:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647147002
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010547.002874:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647147002
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010547.002889:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647147002
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010548.331998:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647148332
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010548.332033:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647148332
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010548.332060:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647148332
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010548.332074:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647148332
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010603.164492:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647163164
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010603.164535:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647163164
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010603.164564:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647163164
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010603.164580:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647163164
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010604.162153:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647164162
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010604.162187:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647164162
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010604.162213:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647164162
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010604.162226:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647164162
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010625.996767:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647185996
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010625.996807:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647185996
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010625.996834:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647185996
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010625.996848:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647185996
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010635.592128:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647195592
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010635.592169:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647195592
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010635.592197:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647195592
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010635.592211:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647195592
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010655.998807:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647215998
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010655.998845:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647215998
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010655.998872:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647215998
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010655.998886:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647215998
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010720.145898:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647240145
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010720.145937:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647240145
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010720.145967:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647240145
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010720.145974:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647240145
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010720.940554:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647240940
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010720.940581:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647240940
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010720.940604:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647240940
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010720.940614:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647240940
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010736.897625:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647256897
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010736.897666:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647256897
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010736.897689:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647256897
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010736.897704:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647256897
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010736.960956:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647256961
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010736.960988:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647256961
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010736.961009:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647256961
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010736.961020:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647256961
+  },
+  {
+   "src": "main-stdout",
+   "line": "RENDERER_CONSOLE debug [telemetry] INFO session_complete [object Object]",
+   "at": 1794647274125
+  },
+  {
+   "src": "renderer",
+   "type": "debug",
+   "line": "[telemetry] INFO session_complete {sessionId: 01a1d94c-8cc2-7765-8406-06a0e789ab1b, stopReason: end_turn}",
+   "at": 1794647274126
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010756.690331:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647276690
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010756.690373:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647276690
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010756.690396:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647276690
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010756.690406:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647276690
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010807.818028:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647287818
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010807.818062:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647287818
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010807.818086:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647287818
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010807.818095:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647287818
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010829.973863:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647309973
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010829.973894:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647309973
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010829.973917:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647309973
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010829.973927:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647309973
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010830.673089:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647310673
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010830.673118:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647310673
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010830.673140:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647310673
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010830.673150:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647310673
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010831.598993:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647311599
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010831.599025:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647311599
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010831.599051:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647311599
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010831.599062:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647311599
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010855.463784:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647335463
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010855.463827:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647335463
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010855.463858:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647335463
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010855.463866:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647335463
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010855.967986:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647335968
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010855.968017:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647335968
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010855.968040:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647335968
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010855.968049:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647335968
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010858.052159:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647338052
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010858.052197:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647338052
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010858.052222:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647338052
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010858.052232:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647338052
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010858.960351:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647338960
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010858.960385:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647338960
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010858.960408:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647338960
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010858.960417:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647338960
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010859.456715:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647339456
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010859.456746:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647339456
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010859.456769:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647339456
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010859.456779:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647339456
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010900.790993:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647340791
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010900.791022:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647340791
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010900.791045:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647340791
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010900.791054:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647340791
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010901.671158:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647341671
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010901.671199:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647341671
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010901.671224:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647341671
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010901.671240:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647341671
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010935.844718:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647375844
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010935.844750:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647375844
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010935.844774:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647375844
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010935.844788:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647375844
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010937.688133:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647377688
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010937.688173:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647377688
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010937.688198:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647377688
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010937.688208:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647377688
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010938.171814:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647378171
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010938.171841:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647378171
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010938.171863:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647378171
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010938.171874:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647378171
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010939.235555:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647379235
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010939.235580:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647379235
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010939.235603:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")",
+   "at": 1794647379235
+  },
+  {
+   "src": "main-stderr",
+   "line": "[23139:1114/010939.235614:ERROR:dbus/object_proxy.cc:589] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: ",
+   "at": 1794647379235
+  }
+ ],
+ "pageErrors": []
+}

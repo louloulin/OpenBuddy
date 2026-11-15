@@ -28,8 +28,6 @@ release/
 nul
 test-grok-connection.mjs
 
-# Documentation
-docs/
 
 # Sensitive certificates / keys
 *.p12

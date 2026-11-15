@@ -1,0 +1,388 @@
+{
+  "at": "2026-11-15T01:06:16.109Z",
+  "ok": true,
+  "steps": [
+    {
+      "name": "home",
+      "result": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/01-home.png"
+    },
+    {
+      "name": "configure fixture provider",
+      "result": {
+        "models": [
+          {
+            "modelId": "fixture-model",
+            "providerId": "fixture",
+            "name": "Fixture 模型",
+            "contextWindow": 128000,
+            "reasoning": true,
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 4096,
+            "availableThinkingLevels": [
+              "off",
+              "minimal",
+              "low",
+              "medium",
+              "high"
+            ],
+            "modelKey": "model:fixture/fixture-model",
+            "pricingKnown": false
+          }
+        ],
+        "providers": [
+          {
+            "id": "fixture",
+            "providerKind": "custom",
+            "baseUrl": "http://127.0.0.1:47224/v1",
+            "apiBackend": "chat_completions",
+            "authScheme": "bearer",
+            "label": "Fixture",
+            "apiKey": "••••"
+          }
+        ]
+      }
+    },
+    {
+      "name": "chat markdown answer",
+      "result": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/02-chat-markdown.png"
+    },
+    {
+      "name": "code block copy",
+      "result": {
+        "clipboardWrites": 1
+      }
+    },
+    {
+      "name": "tool approval",
+      "result": [
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/03-approval.png",
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/04-tool-done.png"
+      ]
+    },
+    {
+      "name": "agent writes files → workbench",
+      "result": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/05-workbench.png"
+    },
+    {
+      "name": "branch switcher",
+      "result": [
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/08-branch-2of2.png",
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/08-branch-1of2.png"
+      ]
+    },
+    {
+      "name": "bang command",
+      "result": [
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/09-bash-mode.png",
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/09-bash-output.png",
+        "hello"
+      ]
+    },
+    {
+      "name": "@ file mention",
+      "result": {
+        "all": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/10-file-mention-all.png",
+        "groups": [
+          "本任务产物"
+        ],
+        "shot": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/10-file-mention.png",
+        "items": [
+          "report.md\ndocs"
+        ],
+        "value": "看看 @docs/report.md "
+      }
+    },
+    {
+      "name": "plan: 想一想 records steps with ob_todo",
+      "result": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/11-plan-ready.png"
+    },
+    {
+      "name": "plan: 按此计划执行 updates the steps",
+      "result": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/12-plan-progress.png"
+    },
+    {
+      "name": "plan: ob_todo rows in the transcript",
+      "result": [
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/13-plan-transcript.png",
+        [
+          "更新计划 开始 #1 读取 data/sales.csv 并核对字段 0/4",
+          "更新计划 完成 #1 读取 data/sales.csv 并核对字段 1/4",
+          "更新计划 开始 #2 按区域汇总季度销售额 1/4",
+          "更新计划 完成 #2 按区域汇总季度销售额 2/4",
+          "更新计划 开始 #3 撰写分析报告 docs/report.md 2/4"
+        ]
+      ]
+    },
+    {
+      "name": "plan: task overview popover",
+      "result": [
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/14-task-overview.png",
+        "步骤 2/4 · 产物 4"
+      ]
+    },
+    {
+      "name": "settings",
+      "result": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/06-settings.png"
+    },
+    {
+      "name": "settings sections",
+      "result": [
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/07-settings-account.png",
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/07-settings-agent-mail.png",
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/07-settings-shortcuts.png",
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/07-settings-model.png",
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/07-settings-assistant.png",
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/07-settings-personalize.png",
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/07-settings-security.png",
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/07-settings-help.png"
+      ]
+    },
+    {
+      "name": "agent settings persisted (pii W0.4)",
+      "result": {
+        "before": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/15-settings-agent.png",
+        "after": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/16-settings-agent-persisted.png",
+        "autoCompaction": {
+          "enabled": false,
+          "reserveTokens": 16384,
+          "keepRecentTokens": 20000
+        },
+        "followUpMode": "all",
+        "builtins": [
+          "mode:true",
+          "persona:true",
+          "todo:true"
+        ]
+      }
+    },
+    {
+      "name": "model favourites (pii W1.6)",
+      "result": {
+        "menu": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/17-model-menu-favorites.png",
+        "cycled": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/18-ctrl-p-cycled.png",
+        "favoriteModels": [
+          "model:fixture/fixture-model",
+          "model:fixture/fixture-priced"
+        ]
+      }
+    },
+    {
+      "name": "context popover (pii W1.5)",
+      "result": {
+        "popover": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/19-context-popover.png",
+        "compacted": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/20-context-compact.png",
+        "cost": "$0.0063",
+        "message": "暂时没有可压缩的内容，对话再长一些后再试",
+        "autoCompaction": true
+      }
+    },
+    {
+      "name": "mode restored after switching sessions (pii W0.5)",
+      "result": {
+        "title": "__LONG__ 帮我整理一个重构方案",
+        "shot": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/21-mode-restored.png",
+        "checked": "true"
+      }
+    },
+    {
+      "name": "close settings",
+      "result": true
+    },
+    {
+      "name": "sidebar after cleanup",
+      "result": {
+        "nav": [
+          "experts-hub:专家·技能·连接器",
+          "projects:项目"
+        ],
+        "moreItems": [
+          "我的文件",
+          "知识库",
+          "用量统计",
+          "通知渠道",
+          "策略设置"
+        ],
+        "shot": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/22-sidebar-registry.png"
+      }
+    },
+    {
+      "name": "click every entry",
+      "result": {
+        "visited": [
+          "experts-hub",
+          "projects",
+          "my-files",
+          "knowledge-base",
+          "usage",
+          "notify-channels",
+          "policy"
+        ],
+        "commands": [
+          "experts_load",
+          "list_dir"
+        ],
+        "rejected": [],
+        "notImplemented": []
+      }
+    },
+    {
+      "name": "experts hub with skills and MCP",
+      "result": {
+        "tabs": [
+          "专家",
+          "技能",
+          "连接器",
+          "扩展"
+        ],
+        "shots": [
+          "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/23-hub-skills.png",
+          "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/24-hub-connectors-mcp.png",
+          "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/25-hub-extensions.png"
+        ]
+      }
+    },
+    {
+      "name": "second task",
+      "result": true
+    },
+    {
+      "name": "palette content search",
+      "result": {
+        "marks": [
+          "统一卡片的圆角"
+        ],
+        "findValue": "统一卡片的圆角",
+        "count": "1/1",
+        "highlights": 1,
+        "shots": [
+          "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/26-palette-content-search.png",
+          "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/27-palette-hit-opened.png"
+        ]
+      }
+    },
+    {
+      "name": "host capabilities",
+      "result": {
+        "protocolVersion": 1,
+        "platform": "desktop",
+        "commands": 128,
+        "events": 27,
+        "includesSelf": true,
+        "includesNative": true,
+        "features": []
+      }
+    },
+    {
+      "name": "experts center",
+      "result": {
+        "cards": 12,
+        "shot": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/28-experts-center.png"
+      }
+    },
+    {
+      "name": "experts detail",
+      "result": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/29-expert-detail.png"
+    },
+    {
+      "name": "my experts (empty)",
+      "result": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/30-my-experts-empty.png"
+    },
+    {
+      "name": "expert editor: create",
+      "result": [
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/31-expert-editor.png",
+        "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/32-my-experts.png"
+      ]
+    },
+    {
+      "name": "summon → composer prefilled (not sent)",
+      "result": {
+        "prefilled": "帮我规划一个三天两晚的杭州周末行程，预算 2000 元",
+        "shot": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/33-summon-prefilled.png"
+      }
+    },
+    {
+      "name": "send → persona reaches the model",
+      "result": {
+        "persona": "旅行规划师",
+        "shot": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/34-persona-answer.png"
+      }
+    },
+    {
+      "name": "unbind expert",
+      "result": "/tmp/claude-1001/-home-devbox-OpenBuddy/32afa658-714e-4c5d-a526-7da84e979659/scratchpad/pii-final/35-expert-unbound.png"
+    },
+    {
+      "name": "audit",
+      "result": {
+        "invoked": 228,
+        "distinctCommands": 51,
+        "byCommand": {
+          "account_get_api_key": 1,
+          "agent_auth_status": 5,
+          "agent_bash": 1,
+          "agent_clear_session_expert": 1,
+          "agent_compact": 1,
+          "agent_cycle_model": 1,
+          "agent_extensions_list": 1,
+          "agent_get_model_state": 3,
+          "agent_init": 1,
+          "agent_list_sessions": 1,
+          "agent_list_workspaces": 1,
+          "agent_load_session": 2,
+          "agent_navigate": 2,
+          "agent_new_session": 3,
+          "agent_regenerate": 1,
+          "agent_resolve_permission": 1,
+          "agent_send": 10,
+          "agent_session_info": 29,
+          "agent_session_usage": 24,
+          "agent_set_mode": 3,
+          "agent_set_session_expert": 1,
+          "agent_tree": 17,
+          "agents_defaults_get": 14,
+          "agents_defaults_save": 1,
+          "agents_list": 4,
+          "agents_save": 1,
+          "artifacts_list": 17,
+          "clipboard_write_text": 1,
+          "commands_list": 3,
+          "experts_load": 5,
+          "files_search": 2,
+          "host_capabilities": 2,
+          "list_dir": 1,
+          "mcp_auth_status": 1,
+          "mcp_config_path": 1,
+          "mcp_config_read": 1,
+          "mcp_list": 3,
+          "notification_list": 1,
+          "notification_prefs_get": 1,
+          "path_stat": 12,
+          "permission_list": 1,
+          "permission_mode_get": 9,
+          "permission_mode_set": 2,
+          "providers_list": 10,
+          "providers_save_model": 2,
+          "providers_save_provider": 1,
+          "session_search": 1,
+          "settings_agent_get": 8,
+          "settings_agent_set": 5,
+          "skills_list": 6,
+          "window_is_maximized": 2
+        },
+        "rejected": [
+          {
+            "command": "agent_compact",
+            "error": "Nothing to compact (session too small)"
+          }
+        ],
+        "notImplemented": [],
+        "pageErrors": [],
+        "fixtureRequests": 18
+      }
+    }
+  ]
+}

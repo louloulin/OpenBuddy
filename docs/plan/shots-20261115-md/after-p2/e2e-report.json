@@ -1,0 +1,131 @@
+{
+  "at": "2026-11-14T22:22:30.642Z",
+  "ok": true,
+  "steps": [
+    {
+      "name": "home",
+      "result": "/home/devbox/OpenBuddy/docs/plan/shots-20261115-md/after-p2/01-home.png"
+    },
+    {
+      "name": "configure fixture provider",
+      "result": {
+        "models": [
+          {
+            "modelId": "fixture-model",
+            "providerId": "fixture",
+            "name": "Fixture 模型",
+            "contextWindow": 128000,
+            "reasoning": true,
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 4096,
+            "availableThinkingLevels": [
+              "off",
+              "minimal",
+              "low",
+              "medium",
+              "high"
+            ],
+            "modelKey": "model:fixture/fixture-model",
+            "pricingKnown": false
+          }
+        ],
+        "providers": [
+          {
+            "id": "fixture",
+            "providerKind": "custom",
+            "baseUrl": "http://127.0.0.1:47224/v1",
+            "apiBackend": "chat_completions",
+            "authScheme": "bearer",
+            "label": "Fixture",
+            "apiKey": "••••"
+          }
+        ]
+      }
+    },
+    {
+      "name": "chat markdown answer",
+      "result": "/home/devbox/OpenBuddy/docs/plan/shots-20261115-md/after-p2/02-chat-markdown.png"
+    },
+    {
+      "name": "tool approval",
+      "result": [
+        "/home/devbox/OpenBuddy/docs/plan/shots-20261115-md/after-p2/03-approval.png",
+        "/home/devbox/OpenBuddy/docs/plan/shots-20261115-md/after-p2/04-tool-done.png"
+      ]
+    },
+    {
+      "name": "agent writes files → workbench",
+      "result": "/home/devbox/OpenBuddy/docs/plan/shots-20261115-md/after-p2/05-workbench.png"
+    },
+    {
+      "name": "settings",
+      "result": "/home/devbox/OpenBuddy/docs/plan/shots-20261115-md/after-p2/06-settings.png"
+    },
+    {
+      "name": "settings sections",
+      "result": [
+        "/home/devbox/OpenBuddy/docs/plan/shots-20261115-md/after-p2/07-settings-account.png",
+        "/home/devbox/OpenBuddy/docs/plan/shots-20261115-md/after-p2/07-settings-agent-mail.png",
+        "/home/devbox/OpenBuddy/docs/plan/shots-20261115-md/after-p2/07-settings-shortcuts.png",
+        "/home/devbox/OpenBuddy/docs/plan/shots-20261115-md/after-p2/07-settings-model.png",
+        "/home/devbox/OpenBuddy/docs/plan/shots-20261115-md/after-p2/07-settings-assistant.png",
+        "/home/devbox/OpenBuddy/docs/plan/shots-20261115-md/after-p2/07-settings-personalize.png",
+        "/home/devbox/OpenBuddy/docs/plan/shots-20261115-md/after-p2/07-settings-security.png",
+        "/home/devbox/OpenBuddy/docs/plan/shots-20261115-md/after-p2/07-settings-help.png"
+      ]
+    },
+    {
+      "name": "host capabilities",
+      "result": {
+        "protocolVersion": 1,
+        "platform": "desktop",
+        "commands": 104,
+        "events": 26,
+        "includesSelf": true,
+        "includesNative": true,
+        "features": []
+      }
+    },
+    {
+      "name": "audit",
+      "result": {
+        "invoked": 67,
+        "distinctCommands": 25,
+        "byCommand": {
+          "account_get_api_key": 1,
+          "agent_auth_status": 4,
+          "agent_get_model_state": 1,
+          "agent_init": 1,
+          "agent_list_sessions": 1,
+          "agent_list_workspaces": 1,
+          "agent_new_session": 1,
+          "agent_resolve_permission": 1,
+          "agent_send": 3,
+          "agent_session_info": 4,
+          "agent_session_usage": 4,
+          "agents_defaults_get": 11,
+          "agents_defaults_save": 1,
+          "artifacts_list": 8,
+          "host_capabilities": 1,
+          "notification_list": 1,
+          "notification_prefs_get": 1,
+          "path_stat": 6,
+          "permission_list": 1,
+          "permission_mode_get": 2,
+          "permission_mode_set": 1,
+          "providers_list": 8,
+          "providers_save_model": 1,
+          "providers_save_provider": 1,
+          "window_is_maximized": 2
+        },
+        "rejected": [],
+        "notImplemented": [],
+        "pageErrors": [],
+        "fixtureRequests": 6
+      }
+    }
+  ]
+}

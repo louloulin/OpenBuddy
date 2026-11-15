@@ -1,0 +1,54 @@
+{
+ "ok": true,
+ "result": {
+  "label": "after-u0.8",
+  "turns": 200,
+  "sessionId": "01a1da52-77e0-74c6-a58f-3c54201be0c1",
+  "buildS": 1.8,
+  "median": {
+   "firstScreenMs": 143,
+   "interactiveMs": 143,
+   "longFrames": 1,
+   "maxBlockingMs": 0
+  },
+  "runs": [
+   {
+    "firstScreenMs": 163,
+    "interactiveMs": 163,
+    "longFrames": 1,
+    "maxBlockingMs": 0,
+    "turnsInDom": 15,
+    "codeBlocksInDom": 13,
+    "domNodes": 1734,
+    "keystrokeSlowEvents": 2,
+    "keystrokeMaxMs": 16
+   },
+   {
+    "firstScreenMs": 143,
+    "interactiveMs": 143,
+    "longFrames": 1,
+    "maxBlockingMs": 0,
+    "turnsInDom": 15,
+    "codeBlocksInDom": 13,
+    "domNodes": 1734,
+    "keystrokeSlowEvents": 2,
+    "keystrokeMaxMs": 16
+   },
+   {
+    "firstScreenMs": 135,
+    "interactiveMs": 135,
+    "longFrames": 1,
+    "maxBlockingMs": 0,
+    "turnsInDom": 15,
+    "codeBlocksInDom": 13,
+    "domNodes": 1734,
+    "keystrokeSlowEvents": 2,
+    "keystrokeMaxMs": 16
+   }
+  ],
+  "budget": {
+   "firstScreenMs": 300,
+   "interactiveMs": 800
+  }
+ }
+}

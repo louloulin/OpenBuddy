@@ -1,0 +1,69 @@
+{
+ "ok": true,
+ "result": {
+  "label": "run",
+  "durationS": 23.6,
+  "answerChars": 27549,
+  "toolRows": 0,
+  "codeBlocks": 12,
+  "mainThread": {
+   "meanBusyPerFrameMs": 4.65,
+   "windowBusyPerFrameMs": {
+    "all": {
+     "p50": 4.98,
+     "p95": 6.6
+    },
+    "answer": {
+     "p50": 5.11,
+     "p95": 6.6
+    },
+    "write": {
+     "p50": null,
+     "p95": null
+    }
+   },
+   "scriptMsTotal": 3617,
+   "layoutMsTotal": 223
+  },
+  "frames": {
+   "count": 1495,
+   "intervalP50": 16.7,
+   "intervalP95": 16.8,
+   "intervalP99": 16.8,
+   "over50ms": 0,
+   "answerIntervalP95": 16.7
+  },
+  "longAnimationFrames": {
+   "count": 0,
+   "maxMs": 0,
+   "maxBlockingMs": 0,
+   "answerCount": 0
+  },
+  "keystrokeToPaint": {
+   "typed": 13,
+   "slowEvents": 30,
+   "maxMs": 32,
+   "note": "Event Timing only reports events ≥16ms; 0 slow events means every keystroke painted within 16ms"
+  },
+  "streamEnd": {
+   "codeBlocks": 12,
+   "remountedCodeBlocks": 1,
+   "layoutShiftTotal": 0.0076
+  },
+  "domWrites": {
+   "insideLiveTurn": 5713,
+   "outsideLiveTurn": 96
+  },
+  "ipcBytes": {
+   "total": 4834619,
+   "byChannel": {
+    "agent://model-state": 200,
+    "agent://session-status": 143,
+    "agent://event": 4834138,
+    "agent://summary": 84,
+    "agent://artifacts": 54
+   },
+   "writeContentBytes": 1048576
+  }
+ }
+}

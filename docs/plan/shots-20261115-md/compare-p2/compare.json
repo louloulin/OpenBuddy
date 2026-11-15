@@ -1,0 +1,101 @@
+[
+ {
+  "shot": "01-home.png",
+  "sameSize": true,
+  "diffPixels": 0.0,
+  "diffBox": null
+ },
+ {
+  "shot": "02-chat-markdown.png",
+  "sameSize": true,
+  "diffPixels": 0.00010416666666666667,
+  "diffBox": [
+   679,
+   687,
+   702,
+   695
+  ]
+ },
+ {
+  "shot": "03-approval.png",
+  "sameSize": true,
+  "diffPixels": 0.0,
+  "diffBox": null
+ },
+ {
+  "shot": "04-tool-done.png",
+  "sameSize": true,
+  "diffPixels": 0.00010416666666666667,
+  "diffBox": [
+   679,
+   295,
+   702,
+   303
+  ]
+ },
+ {
+  "shot": "05-workbench.png",
+  "sameSize": true,
+  "diffPixels": 0.00010416666666666667,
+  "diffBox": [
+   496,
+   626,
+   519,
+   634
+  ]
+ },
+ {
+  "shot": "06-settings.png",
+  "sameSize": true,
+  "diffPixels": 0.0,
+  "diffBox": null
+ },
+ {
+  "shot": "07-settings-account.png",
+  "sameSize": true,
+  "diffPixels": 0.0,
+  "diffBox": null
+ },
+ {
+  "shot": "07-settings-agent-mail.png",
+  "sameSize": true,
+  "diffPixels": 0.0,
+  "diffBox": null
+ },
+ {
+  "shot": "07-settings-assistant.png",
+  "sameSize": true,
+  "diffPixels": 0.0,
+  "diffBox": null
+ },
+ {
+  "shot": "07-settings-help.png",
+  "sameSize": true,
+  "diffPixels": 0.0,
+  "diffBox": null
+ },
+ {
+  "shot": "07-settings-model.png",
+  "sameSize": true,
+  "diffPixels": 0.0,
+  "diffBox": null
+ },
+ {
+  "shot": "07-settings-personalize.png",
+  "sameSize": true,
+  "diffPixels": 0.0,
+  "diffBox": null
+ },
+ {
+  "shot": "07-settings-security.png",
+  "sameSize": true,
+  "diffPixels": 0.0,
+  "diffBox": null
+ },
+ {
+  "shot": "07-settings-shortcuts.png",
+  "sameSize": true,
+  "diffPixels": 0.0,
+  "diffBox": null
+ }
+]

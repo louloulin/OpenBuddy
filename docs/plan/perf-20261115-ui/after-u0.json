@@ -1,0 +1,79 @@
+{
+ "ok": true,
+ "result": {
+  "label": "after-u0",
+  "durationS": 23.5,
+  "answerChars": 27549,
+  "toolRows": 31,
+  "codeBlocks": 12,
+  "mainThread": {
+   "meanBusyPerFrameMs": 4.53,
+   "windowBusyPerFrameMs": {
+    "all": {
+     "p50": 4.89,
+     "p95": 6.32
+    },
+    "answer": {
+     "p50": 5.07,
+     "p95": 6.33
+    },
+    "write": {
+     "p50": 0.94,
+     "p95": 6.32
+    }
+   },
+   "scriptMsTotal": 3382,
+   "layoutMsTotal": 179
+  },
+  "frames": {
+   "count": 1711,
+   "intervalP50": 16.7,
+   "intervalP95": 16.7,
+   "intervalP99": 16.8,
+   "over50ms": 0,
+   "answerIntervalP95": 16.7
+  },
+  "longAnimationFrames": {
+   "count": 0,
+   "maxMs": 0,
+   "maxBlockingMs": 0,
+   "answerCount": 0
+  },
+  "keystrokeToPaint": {
+   "typed": 13,
+   "streaming": {
+    "slowEvents": 32,
+    "maxMs": 32,
+    "maxInputDelayMs": 2.3,
+    "maxHandlerMs": 1.9
+   },
+   "idle": {
+    "slowEvents": 20,
+    "maxMs": 16,
+    "maxInputDelayMs": 0.2,
+    "maxHandlerMs": 1.1
+   },
+   "note": "Event Timing reports events ≥16ms (duration includes waiting for the next vsync, 8ms granularity); compare streaming vs the idle control group"
+  },
+  "streamEnd": {
+   "codeBlocks": 12,
+   "remountedCodeBlocks": 0,
+   "layoutShiftTotal": 0.0061
+  },
+  "domWrites": {
+   "insideLiveTurn": 5788,
+   "outsideLiveTurn": 138
+  },
+  "ipcBytes": {
+   "total": 1392168,
+   "byChannel": {
+    "agent://model-state": 200,
+    "agent://session-status": 143,
+    "agent://event": 1391687,
+    "agent://summary": 84,
+    "agent://artifacts": 54
+   },
+   "writeContentBytes": 1048576
+  }
+ }
+}

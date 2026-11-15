@@ -1,0 +1,1380 @@
+{
+ "main": [
+  {
+   "command": "window_is_maximized",
+   "status": "resolved",
+   "at": 1794646733307
+  },
+  {
+   "command": "agent_init",
+   "status": "resolved",
+   "at": 1794646733308
+  },
+  {
+   "command": "agent_list_sessions",
+   "status": "resolved",
+   "at": 1794646733311
+  },
+  {
+   "command": "agent_list_workspaces",
+   "status": "resolved",
+   "at": 1794646733311
+  },
+  {
+   "command": "commands_list",
+   "status": "resolved",
+   "at": 1794646733316
+  },
+  {
+   "command": "permission_mode_get",
+   "status": "resolved",
+   "at": 1794646733317
+  },
+  {
+   "command": "providers_list",
+   "status": "resolved",
+   "at": 1794646733322
+  },
+  {
+   "command": "providers_list",
+   "status": "resolved",
+   "at": 1794646751260
+  },
+  {
+   "command": "providers_fetch_models",
+   "status": "resolved",
+   "at": 1794646752356
+  },
+  {
+   "command": "providers_save_model",
+   "status": "resolved",
+   "at": 1794646764521
+  },
+  {
+   "command": "providers_save_model",
+   "status": "resolved",
+   "at": 1794646764534
+  },
+  {
+   "command": "providers_list",
+   "status": "resolved",
+   "at": 1794646764541
+  },
+  {
+   "command": "agent_auth_status",
+   "status": "resolved",
+   "at": 1794646764541
+  },
+  {
+   "command": "agents_defaults_get",
+   "status": "resolved",
+   "at": 1794646764541
+  },
+  {
+   "command": "notification_append",
+   "status": "resolved",
+   "at": 1794646764542
+  },
+  {
+   "command": "providers_list",
+   "status": "resolved",
+   "at": 1794646764543
+  },
+  {
+   "command": "agent_auth_status",
+   "status": "resolved",
+   "at": 1794646764543
+  },
+  {
+   "command": "agents_defaults_get",
+   "status": "resolved",
+   "at": 1794646764543
+  },
+  {
+   "command": "notification_append",
+   "status": "resolved",
+   "at": 1794646764543
+  },
+  {
+   "command": "providers_list",
+   "status": "resolved",
+   "at": 1794646764543
+  },
+  {
+   "command": "agent_auth_status",
+   "status": "resolved",
+   "at": 1794646764544
+  },
+  {
+   "command": "agents_defaults_get",
+   "status": "resolved",
+   "at": 1794646764544
+  },
+  {
+   "command": "providers_list",
+   "status": "resolved",
+   "at": 1794646764544
+  },
+  {
+   "command": "providers_list",
+   "status": "resolved",
+   "at": 1794646766128
+  },
+  {
+   "command": "providers_save_model",
+   "status": "resolved",
+   "at": 1794646779058
+  },
+  {
+   "command": "providers_list",
+   "status": "resolved",
+   "at": 1794646779066
+  },
+  {
+   "command": "agent_auth_status",
+   "status": "resolved",
+   "at": 1794646779066
+  },
+  {
+   "command": "agents_defaults_get",
+   "status": "resolved",
+   "at": 1794646779067
+  },
+  {
+   "command": "notification_append",
+   "status": "resolved",
+   "at": 1794646779067
+  },
+  {
+   "command": "agent_auth_status",
+   "status": "resolved",
+   "at": 1794646779088
+  },
+  {
+   "command": "account_get_api_key",
+   "status": "resolved",
+   "at": 1794646779088
+  },
+  {
+   "command": "notification_list",
+   "status": "resolved",
+   "at": 1794646779888
+  },
+  {
+   "command": "providers_list",
+   "status": "resolved",
+   "at": 1794646781488
+  },
+  {
+   "command": "agents_defaults_get",
+   "status": "resolved",
+   "at": 1794646781488
+  },
+  {
+   "command": "permission_list",
+   "status": "resolved",
+   "at": 1794646783087
+  },
+  {
+   "command": "agents_defaults_get",
+   "status": "resolved",
+   "at": 1794646818752
+  },
+  {
+   "command": "agents_defaults_save",
+   "status": "resolved",
+   "at": 1794646818754
+  },
+  {
+   "command": "providers_list",
+   "status": "resolved",
+   "at": 1794646818755
+  },
+  {
+   "command": "agent_auth_status",
+   "status": "resolved",
+   "at": 1794646818755
+  },
+  {
+   "command": "agents_defaults_get",
+   "status": "resolved",
+   "at": 1794646818755
+  },
+  {
+   "command": "notification_append",
+   "status": "resolved",
+   "at": 1794646818756
+  },
+  {
+   "command": "agent_new_session",
+   "status": "resolved",
+   "at": 1794646824825
+  },
+  {
+   "command": "notification_append",
+   "status": "resolved",
+   "at": 1794646824839
+  },
+  {
+   "command": "agent_get_model_state",
+   "status": "resolved",
+   "at": 1794646824839
+  },
+  {
+   "command": "agent_send",
+   "status": "resolved",
+   "at": 1794646824840
+  },
+  {
+   "command": "agent_get_queue",
+   "status": "resolved",
+   "at": 1794646824909
+  },
+  {
+   "command": "commands_list",
+   "status": "resolved",
+   "at": 1794646824910
+  },
+  {
+   "command": "permission_mode_get",
+   "status": "resolved",
+   "at": 1794646824910
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794646824910
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794646824911
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794646824916
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794646824916
+  },
+  {
+   "command": "path_stat",
+   "status": "resolved",
+   "at": 1794646825157
+  },
+  {
+   "command": "notification_append",
+   "status": "resolved",
+   "at": 1794646825809
+  },
+  {
+   "command": "folder_trust_respond",
+   "status": "resolved",
+   "at": 1794646838786
+  },
+  {
+   "command": "agent_send",
+   "status": "resolved",
+   "at": 1794646893377
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794646893382
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794646893386
+  },
+  {
+   "command": "notification_append",
+   "status": "resolved",
+   "at": 1794646911753
+  },
+  {
+   "command": "agent_send",
+   "status": "resolved",
+   "at": 1794646938613
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794646938623
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794646938626
+  },
+  {
+   "command": "notification_append",
+   "status": "resolved",
+   "at": 1794646938811
+  },
+  {
+   "command": "agent_resolve_permission",
+   "status": "resolved",
+   "at": 1794646953098
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794646953114
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794646953119
+  },
+  {
+   "command": "notification_append",
+   "status": "resolved",
+   "at": 1794646953359
+  },
+  {
+   "command": "agent_send",
+   "status": "resolved",
+   "at": 1794646990575
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794646990589
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794646990595
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794646992589
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794646992592
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794646996595
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794646996596
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647004605
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647004606
+  },
+  {
+   "command": "notification_append",
+   "status": "resolved",
+   "at": 1794647004608
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647004625
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647004632
+  },
+  {
+   "command": "commands_list",
+   "status": "resolved",
+   "at": 1794647034442
+  },
+  {
+   "command": "permission_mode_get",
+   "status": "resolved",
+   "at": 1794647034443
+  },
+  {
+   "command": "agent_new_session",
+   "status": "resolved",
+   "at": 1794647035074
+  },
+  {
+   "command": "agent_get_model_state",
+   "status": "resolved",
+   "at": 1794647035077
+  },
+  {
+   "command": "agent_send",
+   "status": "resolved",
+   "at": 1794647035078
+  },
+  {
+   "command": "agent_get_queue",
+   "status": "resolved",
+   "at": 1794647035081
+  },
+  {
+   "command": "commands_list",
+   "status": "resolved",
+   "at": 1794647035082
+  },
+  {
+   "command": "permission_mode_get",
+   "status": "resolved",
+   "at": 1794647035082
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647035082
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647035082
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647035083
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647035083
+  },
+  {
+   "command": "path_stat",
+   "status": "resolved",
+   "at": 1794647035326
+  },
+  {
+   "command": "notification_append",
+   "status": "resolved",
+   "at": 1794647035980
+  },
+  {
+   "command": "commands_list",
+   "status": "resolved",
+   "at": 1794647037612
+  },
+  {
+   "command": "permission_mode_get",
+   "status": "resolved",
+   "at": 1794647037613
+  },
+  {
+   "command": "agent_new_session",
+   "status": "resolved",
+   "at": 1794647038242
+  },
+  {
+   "command": "agent_get_model_state",
+   "status": "resolved",
+   "at": 1794647038244
+  },
+  {
+   "command": "agent_send",
+   "status": "resolved",
+   "at": 1794647038245
+  },
+  {
+   "command": "agent_get_queue",
+   "status": "resolved",
+   "at": 1794647038248
+  },
+  {
+   "command": "commands_list",
+   "status": "resolved",
+   "at": 1794647038248
+  },
+  {
+   "command": "permission_mode_get",
+   "status": "resolved",
+   "at": 1794647038248
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647038248
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647038248
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647038250
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647038250
+  },
+  {
+   "command": "path_stat",
+   "status": "resolved",
+   "at": 1794647038495
+  },
+  {
+   "command": "notification_append",
+   "status": "resolved",
+   "at": 1794647039143
+  },
+  {
+   "command": "commands_list",
+   "status": "resolved",
+   "at": 1794647040780
+  },
+  {
+   "command": "permission_mode_get",
+   "status": "resolved",
+   "at": 1794647040780
+  },
+  {
+   "command": "agent_new_session",
+   "status": "resolved",
+   "at": 1794647041444
+  },
+  {
+   "command": "agent_get_model_state",
+   "status": "resolved",
+   "at": 1794647041447
+  },
+  {
+   "command": "agent_send",
+   "status": "resolved",
+   "at": 1794647041448
+  },
+  {
+   "command": "agent_get_queue",
+   "status": "resolved",
+   "at": 1794647041450
+  },
+  {
+   "command": "commands_list",
+   "status": "resolved",
+   "at": 1794647041450
+  },
+  {
+   "command": "permission_mode_get",
+   "status": "resolved",
+   "at": 1794647041451
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647041451
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647041451
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647041453
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647041453
+  },
+  {
+   "command": "path_stat",
+   "status": "resolved",
+   "at": 1794647041698
+  },
+  {
+   "command": "notification_append",
+   "status": "resolved",
+   "at": 1794647042347
+  },
+  {
+   "command": "agent_set_session_pinned",
+   "status": "resolved",
+   "at": 1794647067326
+  },
+  {
+   "command": "agent_set_session_pinned",
+   "status": "resolved",
+   "at": 1794647068258
+  },
+  {
+   "command": "list_dir",
+   "status": "resolved",
+   "at": 1794647097277
+  },
+  {
+   "command": "skills_list",
+   "status": "resolved",
+   "at": 1794647147123
+  },
+  {
+   "command": "mcp_config_path",
+   "status": "resolved",
+   "at": 1794647162256
+  },
+  {
+   "command": "mcp_config_read",
+   "status": "resolved",
+   "at": 1794647162256
+  },
+  {
+   "command": "mcp_auth_status",
+   "status": "resolved",
+   "at": 1794647162256
+  },
+  {
+   "command": "agent_extensions_list",
+   "status": "resolved",
+   "at": 1794647163255
+  },
+  {
+   "command": "agent_load_session",
+   "status": "resolved",
+   "at": 1794647184105
+  },
+  {
+   "command": "agent_get_queue",
+   "status": "resolved",
+   "at": 1794647184123
+  },
+  {
+   "command": "commands_list",
+   "status": "resolved",
+   "at": 1794647184123
+  },
+  {
+   "command": "permission_mode_get",
+   "status": "resolved",
+   "at": 1794647184123
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647184123
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647184124
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647184149
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647184149
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647184151
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647184154
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647184162
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647184162
+  },
+  {
+   "command": "skills_list",
+   "status": "resolved",
+   "at": 1794647185389
+  },
+  {
+   "command": "agent_init",
+   "status": "resolved",
+   "at": 1794647195660
+  },
+  {
+   "command": "agent_list_sessions",
+   "status": "resolved",
+   "at": 1794647195662
+  },
+  {
+   "command": "agent_load_session",
+   "status": "resolved",
+   "at": 1794647208871
+  },
+  {
+   "command": "agent_get_queue",
+   "status": "resolved",
+   "at": 1794647208878
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647208878
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647208879
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647208899
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647208899
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647208900
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647208902
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647208909
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647208909
+  },
+  {
+   "command": "agent_load_session",
+   "status": "resolved",
+   "at": 1794647210421
+  },
+  {
+   "command": "agent_get_queue",
+   "status": "resolved",
+   "at": 1794647210441
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647210441
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647210441
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647210491
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647210491
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647210492
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647210493
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647210499
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647210500
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647210508
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647210509
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647210515
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647210520
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647210521
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647210523
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647210524
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647210524
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647210524
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647210525
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647210525
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647210525
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647210525
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647210525
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647210525
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647210525
+  },
+  {
+   "command": "agent_load_session",
+   "status": "resolved",
+   "at": 1794647212038
+  },
+  {
+   "command": "agent_get_queue",
+   "status": "resolved",
+   "at": 1794647212051
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647212051
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647212051
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647212082
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647212082
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647212083
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647212086
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647212095
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647212095
+  },
+  {
+   "command": "commands_list",
+   "status": "resolved",
+   "at": 1794647213622
+  },
+  {
+   "command": "permission_mode_get",
+   "status": "resolved",
+   "at": 1794647213623
+  },
+  {
+   "command": "agent_load_session",
+   "status": "resolved",
+   "at": 1794647214436
+  },
+  {
+   "command": "agent_get_queue",
+   "status": "resolved",
+   "at": 1794647214444
+  },
+  {
+   "command": "commands_list",
+   "status": "resolved",
+   "at": 1794647214444
+  },
+  {
+   "command": "permission_mode_get",
+   "status": "resolved",
+   "at": 1794647214445
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647214445
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647214445
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647214481
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647214481
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647214482
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647214483
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647214491
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647214491
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647273175
+  },
+  {
+   "command": "agent_send",
+   "status": "resolved",
+   "at": 1794647273178
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647273185
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647273225
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647273227
+  },
+  {
+   "command": "notification_append",
+   "status": "resolved",
+   "at": 1794647274125
+  },
+  {
+   "command": "providers_list",
+   "status": "resolved",
+   "at": 1794647310990
+  },
+  {
+   "command": "providers_list",
+   "status": "resolved",
+   "at": 1794647323782
+  },
+  {
+   "command": "providers_list",
+   "status": "resolved",
+   "at": 1794647333988
+  },
+  {
+   "command": "agent_load_session",
+   "status": "resolved",
+   "at": 1794647336065
+  },
+  {
+   "command": "agent_get_queue",
+   "status": "resolved",
+   "at": 1794647336094
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647336095
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647336095
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647336168
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647336168
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647336169
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647336173
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647336182
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647336184
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647336196
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647336197
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647336204
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647336210
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647336212
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647336215
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647336224
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647336224
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647336224
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647336224
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647336224
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647336224
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647336224
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647336224
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647336224
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647336224
+  },
+  {
+   "command": "commands_list",
+   "status": "resolved",
+   "at": 1794647338151
+  },
+  {
+   "command": "permission_mode_get",
+   "status": "resolved",
+   "at": 1794647338152
+  },
+  {
+   "command": "skills_list",
+   "status": "resolved",
+   "at": 1794647340864
+  },
+  {
+   "command": "commands_list",
+   "status": "resolved",
+   "at": 1794647358199
+  },
+  {
+   "command": "permission_mode_get",
+   "status": "resolved",
+   "at": 1794647358199
+  },
+  {
+   "command": "providers_list",
+   "status": "resolved",
+   "at": 1794647374095
+  },
+  {
+   "command": "window_is_maximized",
+   "status": "resolved",
+   "at": 1794647374843
+  },
+  {
+   "command": "agent_load_session",
+   "status": "resolved",
+   "at": 1794647375929
+  },
+  {
+   "command": "agent_get_queue",
+   "status": "resolved",
+   "at": 1794647375991
+  },
+  {
+   "command": "commands_list",
+   "status": "resolved",
+   "at": 1794647375991
+  },
+  {
+   "command": "permission_mode_get",
+   "status": "resolved",
+   "at": 1794647375992
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647375992
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647375992
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647376147
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647376147
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647376148
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647376150
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647376156
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647376158
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647376168
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647376169
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647376174
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647376177
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647376179
+  },
+  {
+   "command": "agent_session_info",
+   "status": "resolved",
+   "at": 1794647376181
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647376182
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647376183
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647376183
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647376183
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647376185
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647376185
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647376185
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647376185
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647376185
+  },
+  {
+   "command": "agent_session_usage",
+   "status": "resolved",
+   "at": 1794647376185
+  },
+  {
+   "command": "providers_list",
+   "status": "resolved",
+   "at": 1794647378309
+  }
+ ],
+ "renderer": []
+}
