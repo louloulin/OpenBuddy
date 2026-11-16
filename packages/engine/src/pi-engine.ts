@@ -80,7 +80,17 @@ export class PiEngine {
   ) {
     this.cwd = this.inbox = join(settings.dir, "inbox");
     // Auto-approval of built-in bookkeeping tools (`ob_todo`) needs the session's tool to be the built-in's own.
-    this.permissions = new Permissions(settings, emit, 0, (sessionId, tool) => isBuiltinToolDefinition(this.slots.get(sessionId)?.session.getToolDefinition(tool)));
+    this.permissions = new Permissions(
+      settings,
+      emit,
+      0,
+      (sessionId, tool) => isBuiltinToolDefinition(this.slots.get(sessionId)?.session.getToolDefinition(tool)),
+      // 子代理 (W3.4): a child's approval card names the sub-agent it came from.
+      (sessionId) => {
+        const slot = this.slots.get(sessionId);
+        return slot?.parentId ? { parentId: slot.parentId, name: slot.agentName } : undefined;
+      },
+    );
     this.ui = new ExtensionUiBridge(emit);
     this.providers = new Providers(settings);
     this.skills = new SkillsService(settings);

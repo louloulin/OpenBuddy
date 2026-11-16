@@ -104,6 +104,8 @@ export function PermissionCard({ request, cwd }: { request: PermissionRequest; c
       <div className="perm-card__head">
         <ShieldAlertIcon size={16} className="perm-card__icon" />
         <span className="perm-card__title">{title}</span>
+        {/* 子代理 (W3.4): say which sub-agent asked before the user approves for it. */}
+        {request.subagent && <span className="perm-card__from">来自子代理 {request.subagent.name ?? "子代理"}</span>}
         {(!destructive || typed) && risk && risk.level !== "low" && (
           <span className={"perm-card__risk perm-card__risk--" + risk.level} title={risk.reasons.join("；")}>{riskLabel(risk.level)}</span>
         )}

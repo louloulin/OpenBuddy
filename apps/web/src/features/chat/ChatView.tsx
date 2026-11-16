@@ -33,6 +33,7 @@ import { TurnView } from "./TurnView";
 import { ErrorCard } from "./ErrorCard";
 import { PromptHistory } from "./PromptHistory";
 import { PlanPanel } from "./PlanPanel";
+import { SubagentCards } from "./SubagentCards";
 import { onTaskOverview } from "./task-overview-bus";
 import { ArrowDown } from "lucide-react";
 import { FolderIcon, PanelIcon, SearchIcon } from "@openbuddy/ui/icon/icons/index";
@@ -552,6 +553,8 @@ export function ChatView({
                 </div>
               );
             })}
+            {/* 子代理 (W3.4): the cards of the children this session spawned. */}
+            {sessionId && <SubagentCards sessionId={sessionId} />}
             {/* Manual /compact runs outside a turn. */}
             {compacting && !streaming && (
               <div className="chat-compacting" role="status"><span className="ob-shining-text">正在压缩上下文…</span></div>

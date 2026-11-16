@@ -4,6 +4,7 @@ import { todoBuiltin } from "./todo.js";
 import { modeExtension } from "./mode.js";
 import { persona } from "./persona.js";
 import { memoryBuiltin } from "./memory.js";
+import { subagentBuiltin } from "./subagent.js";
 import { trackBuiltinTools } from "./reserved-tools.js";
 
 /**
@@ -52,6 +53,8 @@ export const BUILTIN_EXTENSIONS: BuiltinExtension[] = [
 BUILTIN_EXTENSIONS.push(todoBuiltin);
 // W5.2 / W5.3 memory injection and `ob_remember`.
 BUILTIN_EXTENSIONS.push(memoryBuiltin);
+// W3.4 sub-agents (`ob_subagent`): child sessions in the pool, parallel or chained.
+BUILTIN_EXTENSIONS.push(subagentBuiltin);
 
 /**
  * Factories for one session, in registration order, skipping the ones switched off. Their tool

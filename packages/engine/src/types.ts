@@ -55,6 +55,15 @@ export interface Slot {
   userBash?: boolean;
   /** Set while the engine moves the leaf, until the branch state has followed (features/branch-state.ts). */
   tree?: { move: TreeMove; oldLeafId: string | null };
+  /**
+   * 子代理 (pii W3.4): the session that spawned this one with `ob_subagent`. A child's approvals
+   * are tagged with it, its usage is attributed to it, and stopping the parent cascades down.
+   */
+  parentId?: string;
+  /** The expert / label the child was spawned as (shown on its approval and subagent card). */
+  agentName?: string;
+  /** Never evicted while its parent runs; an in-memory child is closed with the parent anyway. */
+  subagent?: boolean;
 }
 
 export interface PoolLimits {

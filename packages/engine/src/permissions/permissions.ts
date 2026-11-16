@@ -48,6 +48,8 @@ export class Permissions {
     private timeoutMs = 0,
     /** Whether the session's tool of that name is the enabled built-in's own (not a look-alike). */
     private builtinTool: (sessionId: string, toolName: string) => boolean = () => false,
+    /** 子代理 (W3.4): the parent of a child session, so its approvals can say 来自子代理 X. */
+    private subagentOf: (sessionId: string) => { parentId: string; name?: string } | undefined = () => undefined,
   ) {}
   extension(sessionId: string): ExtensionFactory {
     return (pi) => {
@@ -128,10 +130,13 @@ export class Permissions {
         resolve({ allow, ...(note ? { note } : {}) });
       };
       this.pending.set(requestId, { sessionId, toolName, input, finish, userCommand });
+      const subagent = this.subagentOf(sessionId);
       this.emit("agent://permission", {
         requestId,
         sessionId,
         toolCallId,
+        // 子代理 (W3.4): the card says which sub-agent asked; the request still belongs to the child.
+        ...(subagent ? { subagent } : {}),
         toolKind: toolName,
         title: toolName,
         rawInput: input,

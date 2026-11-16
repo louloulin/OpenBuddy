@@ -242,6 +242,8 @@ export interface PermissionRequest {
   options: PermissionOption[];
   /** Set when the call deletes files (bash rm, delete tools): the card asks harder. */
   destructive?: { command?: string; paths?: string[] };
+  /** 子代理 (W3.4): the child session asking; the card says 来自子代理 X. */
+  subagent?: { parentId: string; name?: string };
 }
 
 // ---------- prompt completion ----------

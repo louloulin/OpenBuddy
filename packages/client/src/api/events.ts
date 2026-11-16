@@ -1,6 +1,7 @@
 // Event subscription: agent://… and app://… events from the host, fanned out to typed handlers.
 import type { ConnectorNeededEvent, PermissionRequest, PromptComplete, SessionSummaryEvent, SessionUpdate, TurnErrorEvent } from "@openbuddy/protocol/dto";
 import type { SessionModelState } from "@openbuddy/protocol/agent-settings";
+import type { SubagentEvent } from "@openbuddy/protocol/subagent";
 import { listen, type UnlistenFn } from "../ipc";
 import type { QuestionRequest, UiDismissReason } from "../types";
 import type { ExtensionUiState } from "./approvals";
@@ -31,6 +32,8 @@ export async function subscribeAgentEvents(handlers: {
   onFocusSession?: (event: { sessionId: string }) => void;
   /** An MCP tool needs its server authorized (pii W2.5). */
   onConnectorNeeded?: (event: ConnectorNeededEvent) => void;
+  /** A sub-agent started / finished (pii W3.4). */
+  onSubagent?: (event: SubagentEvent) => void;
 }): Promise<UnlistenFn> {
   const unlisteners: UnlistenFn[] = [];
   const wire = async <T>(event: string, callback: ((payload: T) => void) | undefined) => {
@@ -59,6 +62,7 @@ export async function subscribeAgentEvents(handlers: {
     await wire("agent://artifacts", handlers.onArtifacts);
     await wire("app://focus-session", handlers.onFocusSession);
     await wire<ConnectorNeededEvent>("agent://connector-needed", handlers.onConnectorNeeded);
+    await wire<SubagentEvent>("agent://subagent", handlers.onSubagent);
     await wire<{ sessionId: string; message: string }>("agent://error", handlers.onTurnError
       ? ({ sessionId, message }) => handlers.onTurnError!({ sessionId, kind: "error", detail: message })
       : undefined);

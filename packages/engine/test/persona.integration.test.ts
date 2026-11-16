@@ -87,7 +87,7 @@ describe("expert persona built-in (pii W2.2)", () => {
     const bound = await f.call("agent_set_session_expert", { sessionId: f.sid, expertId: expert.id });
     expect(bound).toMatchObject({ sessionId: f.sid, id: "persona-tester", name: "Persona Tester", avatar: "🧪", scope: "user", warnings: [] });
     // ob_* built-in tools (W3.1 ob_todo, W5.3 ob_remember) are always kept alongside the expert's own list.
-    expect(bound.applied).toEqual({ model: "model:fixture/reasoning", thinking: "high", tools: ["read", "grep", "ob_todo", "ob_remember"] });
+    expect(bound.applied).toEqual({ model: "model:fixture/reasoning", thinking: "high", tools: ["read", "grep", "ob_todo", "ob_remember", "ob_subagent"] });
     expect(await f.call("agent_get_model_state", { sessionId: f.sid })).toMatchObject({ modelId: "reasoning", thinkingLevel: "high" });
 
     await f.call("agent_send", { sessionId: f.sid, text: "hello expert" });
@@ -105,12 +105,12 @@ describe("expert persona built-in (pii W2.2)", () => {
     expect(system).toContain("- grep:");
     expect(system).not.toContain("- bash:");
     expect(request.model).toBe("reasoning");
-    expect(toolsOf(request)).toEqual(["grep", "ob_remember", "ob_todo", "read"]);
+    expect(toolsOf(request)).toEqual(["grep", "ob_remember", "ob_subagent", "ob_todo", "read"]);
 
     // A mode switch resets the mode's tools; the next run is still narrowed to the expert's.
     await f.call("agent_set_mode", { sessionId: f.sid, mode: "craft" });
     await f.call("agent_send", { sessionId: f.sid, text: "after mode switch" });
-    expect(toolsOf(f.requests.at(-1)!)).toEqual(["grep", "ob_remember", "ob_todo", "read"]);
+    expect(toolsOf(f.requests.at(-1)!)).toEqual(["grep", "ob_remember", "ob_subagent", "ob_todo", "read"]);
 
     // Reopening (full engine restart) keeps the binding: it lives in the session's entries.
     await f.restart();
@@ -119,7 +119,7 @@ describe("expert persona built-in (pii W2.2)", () => {
     expect(snapshot).toMatchObject({ modelId: "reasoning", thinkingLevel: "high" });
     await f.call("agent_send", { sessionId: f.sid, text: "after restart" });
     expect(systemOf(f.requests.at(-1)!)).toContain("PERSONA-MARKER");
-    expect(toolsOf(f.requests.at(-1)!)).toEqual(["grep", "ob_remember", "ob_todo", "read"]);
+    expect(toolsOf(f.requests.at(-1)!)).toEqual(["grep", "ob_remember", "ob_subagent", "ob_todo", "read"]);
 
     // Forks inherit the binding.
     const fork = await f.call("agent_fork_session", { sessionId: f.sid });
@@ -146,7 +146,7 @@ describe("expert persona built-in (pii W2.2)", () => {
     const f = await fixture();
     const reviewer = await f.call("agent_set_session_expert", { sessionId: f.sid, expertId: "code-reviewer" });
     expect(reviewer).toMatchObject({ id: "code-reviewer", scope: "builtin", avatar: "🔍", warnings: ["thinking_unsupported"] });
-    expect(reviewer.applied.tools.sort()).toEqual(["find", "grep", "ls", "ob_remember", "ob_todo", "read"]);
+    expect(reviewer.applied.tools.sort()).toEqual(["find", "grep", "ls", "ob_remember", "ob_subagent", "ob_todo", "read"]);
     await f.call("agent_send", { sessionId: f.sid, text: "review" });
     expect(systemOf(f.requests.at(-1)!)).toContain("## 专家人设：代码审查员");
 

@@ -49,7 +49,12 @@ export const selectPermissionForSession =
   (sessionId: string | null) =>
   (s: PermissionState): PermissionRequest | null => {
     if (!sessionId) return null;
-    return s.queues[sessionId]?.[0] ?? null;
+    // 子代理 (W3.4): a child's request surfaces on its parent's card, tagged 来自子代理 X.
+    const own = s.queues[sessionId]?.[0];
+    if (own) return own;
+    for (const [sid, queue] of Object.entries(s.queues))
+      if (queue[0]?.subagent?.parentId === sessionId) return { ...queue[0], sessionId: sid };
+    return null;
   };
 
 /** Legacy: head of all queues (used nowhere after migration to inline). */

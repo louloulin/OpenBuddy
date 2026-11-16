@@ -19,6 +19,7 @@ import { useSessionStore } from "../features/chat/state/session-store";
 import { usePlanFeed } from "../features/chat/state/plan-store";
 import { useArtifactsStore } from "../features/workbench/state/artifacts-store";
 import { useConnectorNeededStore } from "../features/composer/state/connector-needed-store";
+import { useSubagentStore } from "../features/chat/state/subagent-store";
 import { useSessionsStore } from "../features/sessions/state/sessions-store";
 import { usePermissionStore } from "../features/approvals/state/permission-store";
 import { useQuestionStore } from "../features/approvals/state/question-store";
@@ -251,6 +252,8 @@ function Shell() {
           onConnectorNeeded: (event) => {
             useConnectorNeededStore.getState().raise(event.sessionId, { server: event.server, tool: event.tool, reason: event.reason });
           },
+          // 子代理 (pii W3.4): fold each child's lifecycle into the parent's cards.
+          onSubagent: (event) => useSubagentStore.getState().apply(event),
           onComplete: (p) => {
             reportEvent("session_complete", "info", { sessionId: p.sessionId, stopReason: p.stopReason });
             // Ignore completes for side-channel sessions (inspiration generation)

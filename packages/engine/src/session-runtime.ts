@@ -119,6 +119,9 @@ export async function queue(
 }
 export async function cancel(engine: EngineContext, id: string) {
   const slot = engine.slot(id);
+  // 子代理 (W3.4): stopping the parent stops every child it spawned (depth-first).
+  for (const child of [...engine.slots.values()].filter((candidate) => candidate.parentId === id))
+    await cancel(engine, child.id).catch(() => {});
   slot.cancelledGeneration = slot.generation;
   engine.ui.cancel(id, "cancelled");
   engine.mcp.auth.cancel(id);

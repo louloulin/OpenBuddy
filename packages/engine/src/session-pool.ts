@@ -224,7 +224,8 @@ const occupied = (slot: Slot) => slot.busy || slot.userBash === true;
 /** Close idle sessions over the live limit (least recently used first). */
 export async function evictOverflow(engine: EngineContext, keep: string) {
   const candidates = [...engine.slots.values()]
-    .filter((s) => s.id !== keep && s.id !== engine.focusedId && !occupied(s) && !engine.permissions.hasPending(s.id) && !engine.ui.hasPending(s.id))
+    // 子代理 (W3.4) are owned by their parent: the parent closes them, the pool never evicts them.
+    .filter((s) => !s.subagent && s.id !== keep && s.id !== engine.focusedId && !occupied(s) && !engine.permissions.hasPending(s.id) && !engine.ui.hasPending(s.id))
     .sort((a, b) => a.lastActive - b.lastActive);
   while (engine.slots.size > engine.limits.maxLive && candidates.length)
     await engine.close(candidates.shift()!.id);
@@ -232,6 +233,7 @@ export async function evictOverflow(engine: EngineContext, keep: string) {
 export async function evictIdle(engine: EngineContext, now = Date.now()) {
   for (const slot of [...engine.slots.values()])
     if (
+      !slot.subagent &&
       slot.id !== engine.focusedId &&
       !occupied(slot) &&
       !engine.permissions.hasPending(slot.id) &&
