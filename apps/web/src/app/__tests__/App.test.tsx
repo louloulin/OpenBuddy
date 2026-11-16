@@ -34,7 +34,9 @@ describe("Electron first launch", () => {
     expect(await screen.findByText("请先配置 API Key 开始使用")).toBeInTheDocument();
     expect(screen.getByRole("textbox")).toBeDisabled();
     await waitFor(() => expect(requests).toContain("providers_list"));
-    expect(requests.filter(command => /experts|automations|agents_list|tasks|team_|marketplace|plugins|memory|prompt_history/.test(command))).toEqual([]);
+    // 运行中 (W4.5): the sidebar asks for running tasks on mount; it stays empty here.
+    expect(requests.filter(command => command === "tasks_list")).toEqual(["tasks_list"]);
+    expect(requests.filter(command => /experts|automations|agents_list|team_|marketplace|plugins|memory|prompt_history/.test(command))).toEqual([]);
     // pii W0.1: capabilities are read once at startup.
     expect(requests.filter(command => command === "host_capabilities")).toEqual(["host_capabilities"]);
     expect(screen.queryByText(/未就绪/)).toBeNull();

@@ -1,103 +1,114 @@
-
 import { useCallback, useEffect, useState } from "react";
 import {
   TaskListIcon,
   DeleteIcon,
   RefreshCwIcon,
-  CheckIcon,
 } from "@openbuddy/ui/icon/icons/index";
 import { taskKill, tasksList } from "@openbuddy/client/agent-client";
 import type { RunningTask } from "@openbuddy/protocol/dto";
 
+/**
+ * 运行中 (pii W4.5): every running turn, including automation background sessions and
+ * sub-agents. Rows show kind, elapsed time and waiting approvals; the stop button cancels the
+ * turn (a `!command` row stops via bash abort in the host). The panel hides itself when idle.
+ */
+const KIND_LABEL: Record<string, string> = {
+  automation: "自动化",
+  subagent: "子代理",
+  bash: "命令",
+  task: "任务",
+};
+
+export function formatElapsed(startedAt?: number, now = Date.now()): string {
+  if (!startedAt) return "";
+  const seconds = Math.max(0, Math.floor((now - startedAt) / 1000));
+  if (seconds < 60) return `${seconds} 秒`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} 分 ${seconds % 60} 秒`;
+  return `${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分`;
+}
+
 interface TasksPanelProps {
-  /** Optional: listen for task update events to auto-refresh. Set to a counter
-   *  that increments on each `agent://task-update`. */
-  refreshSignal?: number;
   onToast?: (msg: string) => void;
 }
 
-export function TasksPanel({ refreshSignal, onToast }: TasksPanelProps) {
+export function TasksPanel({ onToast }: TasksPanelProps) {
   const [tasks, setTasks] = useState<RunningTask[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
 
   const reload = useCallback(async () => {
-    setLoading(true);
     try {
-      setTasks(await tasksList());
+      const list = await tasksList();
+      setTasks(Array.isArray(list) ? list : []);
     } catch {
       setTasks([]);
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    reload();
-  }, [reload, refreshSignal]);
+    void reload();
+    // The host has no push channel for this list; 4s keeps 用时 and new turns current.
+    const timer = setInterval(() => {
+      void reload();
+      setNow(Date.now());
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [reload]);
 
   const handleKill = useCallback(
-    async (taskId: string) => {
+    async (task: RunningTask) => {
       try {
-        await taskKill(taskId);
-        onToast?.("已终止任务");
-        reload();
+        await taskKill(task.id);
+        onToast?.(`已停止「${task.description ?? task.title ?? "任务"}」`);
+        await reload();
       } catch (e) {
-        onToast?.(`终止失败：${String(e).replace(/^Error:\s*/, "")}`);
+        onToast?.(`停止失败：${String(e).replace(/^Error:\s*/, "")}`);
       }
     },
     [onToast, reload],
   );
 
-  if (tasks.length === 0 && !loading) {
-    return null; // Hide entirely when empty — panel only shows when there's work.
-  }
+  if (tasks.length === 0) return null;
 
   return (
-    <div className="tasks-panel">
+    <section className="tasks-panel" aria-label="运行中任务">
       <div className="tasks-panel__header">
         <h3 className="tasks-panel__title">
-          <TaskListIcon size="sm" /> 运行中任务 ({tasks.length})
+          <TaskListIcon size="sm" /> 运行中 ({tasks.length})
         </h3>
-        <button
-          className="tasks-panel__refresh"
-          onClick={reload}
-          disabled={loading}
-          title="刷新"
-        >
+        <button className="tasks-panel__refresh" onClick={() => void reload()} title="刷新" aria-label="刷新运行中任务">
           <RefreshCwIcon size="sm" />
         </button>
       </div>
       <ul className="tasks-panel__list">
-        {tasks.map((task) => (
-          <li key={task.id} className="tasks-panel__item">
-            <div className="tasks-panel__item-icon">
-              {task.status === "completed" ? (
-                <CheckIcon size="sm" />
-              ) : (
-                <TaskListIcon size="sm" />
-              )}
-            </div>
-            <div className="tasks-panel__item-body">
-              <div className="tasks-panel__item-desc">
-                {task.description ?? task.id}
+        {tasks.map((task) => {
+          const label = KIND_LABEL[task.kind ?? "task"] ?? "任务";
+          return (
+            <li key={task.id} className="tasks-panel__item" data-kind={task.kind ?? "task"}>
+              <div className="tasks-panel__item-body">
+                <div className="tasks-panel__item-desc" title={task.description ?? task.title}>
+                  {task.description ?? task.title ?? task.id}
+                </div>
+                <div className="tasks-panel__item-meta">
+                  <span className={`tasks-panel__kind tasks-panel__kind--${task.kind ?? "task"}`}>{label}</span>
+                  {task.startedAt ? <span>· {formatElapsed(task.startedAt, now)}</span> : null}
+                  {task.pending ? (
+                    <span className="tasks-panel__pending">· 待确认 {task.pending}</span>
+                  ) : null}
+                </div>
               </div>
-              <div className="tasks-panel__item-meta">
-                {task.kind && <span>{task.kind}</span>}
-                {task.status && <span>· {task.status}</span>}
-                <span className="tasks-panel__item-id">#{task.id.slice(0, 8)}</span>
-              </div>
-            </div>
-            <button
-              className="tasks-panel__kill"
-              onClick={() => handleKill(task.id)}
-              title="终止"
-            >
-              <DeleteIcon size="sm" />
-            </button>
-          </li>
-        ))}
-        {loading && <li className="tasks-panel__loading">加载中…</li>}
+              <button
+                className="tasks-panel__kill"
+                onClick={() => void handleKill(task)}
+                title="停止"
+                aria-label={`停止 ${task.description ?? task.title ?? "任务"}`}
+              >
+                <DeleteIcon size="sm" />
+              </button>
+            </li>
+          );
+        })}
       </ul>
-    </div>
+    </section>
   );
 }

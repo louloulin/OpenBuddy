@@ -674,6 +674,27 @@ try {
     const last = ctx.fixture.requests.at(-1);
     if (last.persona) throw new Error('persona still sent after unbinding');
     return await ctx.shot('35-expert-unbound');`);
+  // pii W4.5: the sidebar 运行中 panel lists the running turn with elapsed time; stop cancels it.
+  await step('运行中面板（任务 / 用时 / 停止）', `
+    ctx.fixture.delayMs = 1500;
+    await page.locator('.sidebar__nav-item', { hasText: '新建任务' }).first().click();
+    await page.locator('.wb-composer__input').waitFor({ state: 'visible', timeout: 10000 });
+    await page.locator('.wb-composer__input').fill('慢慢写一段说明，让我看看运行中面板');
+    await page.getByRole('button', { name: '发送', exact: true }).click();
+    const panel = page.locator('.tasks-panel');
+    await panel.waitFor({ timeout: 15000 });
+    await page.waitForFunction(() => /[1-9]\\d* 秒|\\d+ 分/.test(document.querySelector('.tasks-panel')?.textContent ?? ''), null, { timeout: 15000 });
+    await ctx.sleep(300);
+    const shot = await ctx.shot('49-running-tasks');
+    const rows = await panel.locator('.tasks-panel__item').allInnerTexts();
+    if (!rows.length || !rows.some((text) => text.includes('任务'))) throw new Error('running panel rows: ' + JSON.stringify(rows));
+    const before = (await ctx.audit()).main.filter((r) => r.command === 'task_kill').length;
+    await panel.locator('.tasks-panel__kill').first().click();
+    await page.waitForFunction(() => !document.querySelector('.tasks-panel'), null, { timeout: 15000 });
+    const kills = (await ctx.audit()).main.filter((r) => r.command === 'task_kill').length;
+    if (kills !== before + 1) throw new Error('stop did not call task_kill');
+    ctx.fixture.delayMs = 60;
+    return { shot, rows, kills };`);
   const audit = await step('audit', `
     const a = await ctx.audit();
     const rejected = a.main.filter(r => r.status === 'rejected');

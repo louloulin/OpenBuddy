@@ -36,6 +36,7 @@ import { basename, relativeTime, sortPinnedFirst, ProjectNodeIcon } from "./side
 import { filterSessions, TaskFilterMenu } from "./sidebar-parts/TaskFilterMenu";
 import { SessionContextMenu } from "./sidebar-parts/SessionContextMenu";
 import { MoreDropdown } from "./sidebar-parts/MoreDropdown";
+import { TasksPanel } from "./TasksPanel";
 
 /** A sidebar / 更多 entry. The app builds the lists from its FeatureRegistry (pii W0.2): the former
  *  fixed NAV (项目, 技能与 MCP) is now the registry's 项目 and 专家·技能·连接器 entries. */
@@ -380,6 +381,9 @@ export function Sidebar({
         ))}
         {moreItems.length > 0 && <MoreDropdown items={moreItems} onNavigate={onNavigate} activeNav={activeNav} />}
       </nav>
+
+      {/* 运行中 (pii W4.5): automation / 子代理 / 命令 / 普通回合，含用时与待确认数。 */}
+      <TasksPanel />
 
       <div className="sidebar__content">
         {/* 任务分组: 收件箱(初始目录)下的会话 */}

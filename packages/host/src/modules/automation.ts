@@ -59,6 +59,9 @@ export function automationModule(ctx: HostContext): HostModule {
   const executor: AutomationExecutor = async (task) => {
     const cwd = await engine.validCwd(task.cwds.split(",")[0].trim());
     const sessionId = await engine.newSession(cwd, task.modelId, undefined, undefined, true);
+    // 后台任务视图 (W4.5): the 运行中 panel labels this session with its automation name.
+    const slot = engine.slots.get(sessionId);
+    if (slot) slot.automation = { id: task.id, name: task.name };
     // 完全访问: the user opted into unattended runs; deny rules still apply (Permissions.decide).
     if (task.permissionMode === "fullAccess") engine.permissions.grantAll(sessionId);
     engine.emit("agent://automation", { id: task.id, name: task.name, status: "running", sessionId });

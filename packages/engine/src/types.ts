@@ -64,6 +64,10 @@ export interface Slot {
   agentName?: string;
   /** Never evicted while its parent runs; an in-memory child is closed with the parent anyway. */
   subagent?: boolean;
+  /** 后台任务视图 (pii W4.5): when the current turn started, for 用时. */
+  busySince?: number;
+  /** 自动化 (pii W4.2/W4.5): the task that opened this background session, shown in 运行中. */
+  automation?: { id: string; name: string };
 }
 
 export interface PoolLimits {

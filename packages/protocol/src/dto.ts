@@ -447,10 +447,19 @@ export interface SlashCommand {
 
 export interface RunningTask {
   id: string;
+  /** "automation" | "subagent" | "bash" | "task" (pii W4.5). */
   kind?: string;
   description?: string;
   status?: string;
   sessionId?: string;
+  cwd?: string;
+  title?: string;
+  /** Epoch ms when the current turn started (用时). */
+  startedAt?: number;
+  /** Approval cards waiting on this session. */
+  pending?: number;
+  /** Sub-agent rows point at the session that spawned them. */
+  parentId?: string;
 }
 
 // ---------- subagent live events (agent://subagent) ----------

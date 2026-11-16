@@ -65,7 +65,12 @@ export function sessionModule(ctx: HostContext): HostModule {
     agent_compact: (p) => engine.compact(text(p.sessionId), typeof p.instructions === "string" ? p.instructions : undefined),
     agent_set_mode: (p) => engine.setMode(text(p.sessionId), p.mode as "craft" | "plan" | "ask"),
     agent_abort_retry: (p) => engine.abortRetry(text(p.sessionId)),
-    task_kill: (p) => engine.cancel(text(p.taskId)),
+    // 后台任务视图 (W4.5): a `!command` row stops via bash abort; everything else cancels the turn.
+    task_kill: (p) => {
+      const id = text(p.taskId);
+      const slot = engine.slots.get(id);
+      return slot?.userBash && !slot.busy ? engine.abortBash(id) : engine.cancel(id);
+    },
     agent_rename_session: (p) =>
       engine.rename(text(p.sessionId), text(p.title)),
     agent_set_session_pinned: async (p) => {

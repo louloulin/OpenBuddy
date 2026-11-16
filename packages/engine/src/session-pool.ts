@@ -177,19 +177,32 @@ export async function newSession(
   if (!background) engine.focus(slot.id);
   return slot.id;
 }
-/** Sessions currently running a turn (the renderer's 任务 view of background work). */
+/**
+ * Sessions currently running work (the renderer's 运行中 view, pii W4.5). A background
+ * automation is tagged with its task; sub-agents (W3.4) run inside the parent turn but are
+ * listed as their own row so the panel can show and stop them. `pending` counts approval cards
+ * waiting on this session; `startedAt` drives 用时.
+ */
 export function running(engine: EngineContext) {
   const meta = engine.settings.config.read().sessions;
   return [...engine.slots.values()]
-    // 子代理 (W3.4) run inside the parent turn: they are not separate background tasks.
-    .filter((slot) => slot.busy && !slot.subagent)
-    .map((slot) => ({
-      taskId: slot.id,
-      sessionId: slot.id,
-      cwd: slot.session.sessionManager.getCwd(),
-      title: meta[slot.id]?.title ?? slot.session.sessionName ?? "新任务",
-      status: "running",
-    }));
+    .filter((slot) => slot.busy || slot.userBash)
+    .map((slot) => {
+      const title = meta[slot.id]?.title ?? slot.session.sessionName ?? "新任务";
+      return {
+        id: slot.id,
+        sessionId: slot.id,
+        cwd: slot.session.sessionManager.getCwd(),
+        title,
+        kind: slot.automation ? "automation" : slot.subagent ? "subagent" : slot.userBash && !slot.busy ? "bash" : "task",
+        description: slot.automation?.name ?? slot.agentName ?? title,
+        status: slot.userBash && !slot.busy ? "running-bash" : "running",
+        startedAt: slot.busySince ?? slot.lastActive,
+        pending: engine.permissions.countPending(slot.id) + (engine.ui.hasPending(slot.id) ? 1 : 0),
+        ...(slot.parentId ? { parentId: slot.parentId } : {}),
+      };
+    })
+    .sort((a, b) => a.startedAt - b.startedAt);
 }
 /** Workspaces the preview protocol may serve: live session folders and the inbox. */
 export function previewRoots(engine: EngineContext): string[] {

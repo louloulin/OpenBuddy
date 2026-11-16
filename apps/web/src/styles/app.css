@@ -8273,17 +8273,13 @@ button.diff__path {
 /* ========================================================================
  * TasksPanel — 运行中任务浮层
  * ===================================================================== */
+/* 运行中 (pii W4.5): an inline sidebar section above the 任务 list, hidden when idle. */
 .tasks-panel {
-  position: fixed;
-  bottom: 16px;
-  right: 16px;
-  z-index: 50;
-  width: 320px;
-  background: var(--wb-bg-primary);
+  margin: 2px 8px 8px;
+  padding: 8px;
+  background: var(--wb-bg-secondary);
   border: 1px solid var(--wb-border-default);
-  border-radius: 12px;
-  box-shadow: var(--wb-shadow-lg, 0 10px 40px rgba(0, 0, 0, 0.2));
-  padding: 12px;
+  border-radius: 10px;
 }
 .tasks-panel__header {
   display: flex;
@@ -8324,9 +8320,28 @@ button.diff__path {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px;
-  background: var(--wb-bg-secondary);
+  padding: 6px 8px;
+  background: var(--wb-bg-primary);
   border-radius: 8px;
+}
+.tasks-panel__kind {
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 16px;
+  background: var(--wb-bg-secondary);
+  color: var(--wb-text-weak);
+}
+.tasks-panel__kind--automation {
+  color: #7c5cff;
+  background: rgba(124, 92, 255, 0.12);
+}
+.tasks-panel__kind--subagent {
+  color: #0f9d76;
+  background: rgba(15, 157, 118, 0.12);
+}
+.tasks-panel__pending {
+  color: #d97706;
 }
 .tasks-panel__item-icon {
   color: var(--wb-brand);

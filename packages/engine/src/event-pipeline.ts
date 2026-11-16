@@ -294,6 +294,7 @@ export function onEvent(engine: EngineContext, slot: Slot, event: AgentSessionEv
     // The SDK accepts a new prompt as soon as it settled; don't make the
     // renderer wait for the outer prompt() promise to unwind.
     slot.busy = false;
+    slot.busySince = undefined;
     slot.lastActive = Date.now();
     engine.invalidateList();
     engine.emitStatus(slot);

@@ -34,6 +34,7 @@ export async function send(engine: EngineContext, id: string, prompt: string, im
     throw Error("model_not_found: 当前模型已删除，请重新选择");
   engine.validateImages(session, images);
   slot.busy = true;
+  slot.busySince = Date.now();
   slot.failed = false;
   slot.commandError = undefined;
   slot.lastActive = Date.now();
@@ -70,6 +71,7 @@ export async function send(engine: EngineContext, id: string, prompt: string, im
       engine.permissions.cancel(id);
       if (slot.busy) {
         slot.busy = false;
+        slot.busySince = undefined;
         engine.emitStatus(slot);
       }
       if (slot.stale && engine.slots.get(id) === slot) void engine.rebuild(slot).catch(() => {});

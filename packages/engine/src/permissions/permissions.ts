@@ -180,6 +180,12 @@ export class Permissions {
     for (const item of this.pending.values()) if (item.sessionId === sessionId) return true;
     return false;
   }
+  /** 后台任务视图 (W4.5): how many approval cards this session is waiting on. */
+  countPending(sessionId: string) {
+    let count = 0;
+    for (const item of this.pending.values()) if (item.sessionId === sessionId) count += 1;
+    return count;
+  }
   cancel(sessionId?: string) {
     for (const item of [...this.pending.values()])
       if (!sessionId || item.sessionId === sessionId) item.finish(false, "cancelled");
