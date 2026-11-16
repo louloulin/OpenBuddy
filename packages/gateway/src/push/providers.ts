@@ -10,6 +10,7 @@
 import { readFileSync } from 'node:fs'
 
 import type { GatewayConfig } from '../config.js'
+import { createExpoProvider } from './expo.js'
 import { createFcmProvider, type FcmServiceAccount } from './fcm.js'
 import type { PushProvider, PushProviderName } from './types.js'
 import { createWebhookProvider } from './webhook.js'
@@ -72,6 +73,14 @@ export function buildPushProviders(
     ...(config.webhookToken ? { token: config.webhookToken } : {}),
     allowedHosts: config.webhookAllowedHosts,
     allowCleartext: config.webhookAllowCleartext,
+    ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+  })
+
+  // Expo's push service also needs no credential: the phone's Expo token
+  // already names the project. An access token only raises the quota.
+  providers.expo = createExpoProvider({
+    ...(config.expoAccessToken ? { accessToken: config.expoAccessToken } : {}),
+    ...(config.fcmChannelId ? { channelId: config.fcmChannelId } : {}),
     ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
   })
 

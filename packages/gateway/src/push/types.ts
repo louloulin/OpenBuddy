@@ -22,7 +22,7 @@ export function isPushKind(value: unknown): value is PushKind {
   return typeof value === 'string' && (PUSH_KINDS as readonly string[]).includes(value)
 }
 
-export const PUSH_PROVIDERS = ['fcm', 'webhook'] as const
+export const PUSH_PROVIDERS = ['fcm', 'webhook', 'expo'] as const
 export type PushProviderName = (typeof PUSH_PROVIDERS)[number]
 
 export function isPushProviderName(value: unknown): value is PushProviderName {

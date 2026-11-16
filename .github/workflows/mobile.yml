@@ -1,0 +1,76 @@
+# Mobile path gates (20261115-mobile.md Phase 1.5 / §9).
+#
+# Runs the three suites that cover the phone path plus the two end-to-end
+# scripts. The gateway is Bun-only, so both package managers appear here:
+# pnpm for the workspace (client + Expo app), bun for the gateway and bridge.
+name: Mobile
+on:
+  push:
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/client/**'
+      - 'packages/pi-bridge/**'
+      - 'packages/gateway/**'
+      - 'packages/protocol/**'
+      - 'scripts/e2e-mobile*.ts'
+      - 'scripts/bench-mobile.ts'
+      - '.github/workflows/mobile.yml'
+  pull_request:
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/client/**'
+      - 'packages/pi-bridge/**'
+      - 'packages/gateway/**'
+      - 'packages/protocol/**'
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: pnpm install --frozen-lockfile
+      - name: Shared client + Expo logic tests
+        run: npx vitest run packages/client apps/mobile
+      - name: Expo app typecheck
+        run: npx tsc --noEmit -p apps/mobile/tsconfig.json
+      - name: Module boundaries (including the mobile layer)
+        run: node tools/check-boundaries.mjs --check
+      - name: PiBridge tests
+        run: cd packages/pi-bridge && bun test
+      - name: Gateway regression
+        run: cd packages/gateway && bun test
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: unit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: pnpm install --frozen-lockfile
+      - name: Protocol bridge end-to-end (no LLM key)
+        run: bun run scripts/e2e-mobile.ts
+      - name: Expo logic layer end-to-end
+        run: bun run scripts/e2e-mobile-app.ts
+      - name: Mobile-path benchmark (smoke)
+        run: bun run scripts/bench-mobile.ts --commands 20 --events 200

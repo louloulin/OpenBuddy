@@ -7,14 +7,16 @@ import { GatewayTransport } from "../gateway-transport";
  * test pushes frames into, and a command router.
  */
 function fakeBridge(commands: Record<string, (payload: unknown) => unknown> = {}) {
-  let streamController: ReadableStreamDefaultController<Uint8Array> | null = null;
+  const streamControllers: ReadableStreamDefaultController<Uint8Array>[] = [];
+  const eventsUrls: string[] = [];
 
   const fetchImpl = (async (input: unknown, init?: RequestInit) => {
     const url = String(input);
     if (url.includes("/events")) {
+      eventsUrls.push(url);
       const body = new ReadableStream<Uint8Array>({
         start(controller) {
-          streamController = controller;
+          streamControllers.push(controller);
         },
       });
       return new Response(body, {
@@ -41,9 +43,15 @@ function fakeBridge(commands: Record<string, (payload: unknown) => unknown> = {}
 
   return {
     fetchImpl,
-    /** Push one SSE frame into the open stream. */
+    /** Every `/events` URL the transport asked for, oldest first. */
+    eventsUrls,
+    /** Push one SSE frame into the latest open stream. */
     push: (event: string, seq: number, data: unknown) => {
-      streamController?.enqueue(new TextEncoder().encode(`id: ${seq}\nevent: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+      streamControllers.at(-1)?.enqueue(new TextEncoder().encode(`id: ${seq}\nevent: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+    },
+    /** Ends the current stream, as a dropped connection would. */
+    drop: () => {
+      streamControllers.at(-1)?.close();
     },
   };
 }
@@ -104,5 +112,49 @@ describe("GatewayTransport", () => {
     expect(states).toContain("open");
     transport.close();
     expect(transport.state()).toBe("closed");
+  });
+
+  it("reconnects from the last seen seq and keeps delivering", async () => {
+    const bridge = fakeBridge();
+    const transport = track(new GatewayTransport({
+      baseUrl: "http://bridge.test", token: "t", fetchImpl: bridge.fetchImpl, maxBackoffMs: 50,
+    }));
+    const seen: unknown[] = [];
+    await transport.listen<{ n: number }>("agent://event", payload => seen.push(payload));
+    await sleep(50);
+    bridge.push("agent://event", 1, { n: 1 });
+    bridge.push("agent://event", 2, { n: 2 });
+    await sleep(60);
+    expect(seen).toEqual([{ n: 1 }, { n: 2 }]);
+
+    // The connection drops; the retry must resume after seq 2, not from zero.
+    bridge.drop();
+    await sleep(200);
+    expect(bridge.eventsUrls.at(-1)).toContain("since=2");
+
+    bridge.push("agent://event", 3, { n: 3 });
+    await sleep(60);
+    expect(seen).toEqual([{ n: 1 }, { n: 2 }, { n: 3 }]);
+  });
+
+  it("streams events without TextDecoderStream (React Native/Hermes)", async () => {
+    // Hermes ships TextDecoder but not the TransformStream wrapper, so the
+    // transport must decode by hand. Remove it for this test only.
+    const globalWithStream = globalThis as { TextDecoderStream?: unknown };
+    const saved = globalWithStream.TextDecoderStream;
+    delete globalWithStream.TextDecoderStream;
+    try {
+      const bridge = fakeBridge();
+      const transport = track(new GatewayTransport({ baseUrl: "http://bridge.test", token: "t", fetchImpl: bridge.fetchImpl }));
+      const seen: unknown[] = [];
+      await transport.listen<{ n: number }>("agent://event", payload => seen.push(payload));
+      await sleep(50);
+      bridge.push("agent://event", 1, { n: 1 });
+      bridge.push("agent://event", 2, { n: 2 });
+      await sleep(80);
+      expect(seen).toEqual([{ n: 1 }, { n: 2 }]);
+    } finally {
+      globalWithStream.TextDecoderStream = saved;
+    }
   });
 });

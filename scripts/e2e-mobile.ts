@@ -148,13 +148,15 @@ check('device is bound to the enrolled desktop', claim.scopes.includes('sessions
 // ── 5. Phone side: GatewayTransport through the gateway tunnel ──────────────
 
 const phone = new GatewayTransport({
-  baseUrl: gatewayUrl,
+  // The gateway forwards the phone's path verbatim to the desktop bridge, so
+  // the mobile base URL carries the /api prefix the bridge serves.
+  baseUrl: `${gatewayUrl}/api`,
   token: claim.deviceToken,
   maxBackoffMs: 500,
 })
 
-// Capabilities: the phone learns the surface from the bridge (via /sdk tunnel).
-const capsResponse = await fetch(`${gatewayUrl}/sdk/capabilities`, {
+// Capabilities: the phone learns the surface from the bridge (via the /api tunnel).
+const capsResponse = await fetch(`${gatewayUrl}/api/capabilities`, {
   headers: { authorization: `Bearer ${claim.deviceToken}` },
 })
 const caps = (await capsResponse.json()) as { platform: string; commands: string[] }
@@ -193,7 +195,7 @@ check('desktop-native command refused for the phone', denied)
 
 // ── 6. Security: wrong token, revoked-scope behavior ────────────────────────
 
-const badResponse = await fetch(`${gatewayUrl}/sdk/capabilities`, {
+const badResponse = await fetch(`${gatewayUrl}/api/capabilities`, {
   headers: { authorization: 'Bearer dvc_fake_token' },
 })
 check('wrong device token rejected', badResponse.status === 401 || badResponse.status === 403)

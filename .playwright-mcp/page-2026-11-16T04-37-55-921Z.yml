@@ -1,0 +1,35 @@
+- generic [ref=f2e27]:
+  - generic [ref=f2e30]:
+    - heading "会话" [level=1] [ref=f2e32]
+    - generic [ref=f2e39]:
+      - generic [ref=f2e42] [cursor=pointer]:
+        - generic [ref=f2e43]: 置顶
+        - generic [ref=f2e44]: 手机端接入设计
+        - generic [ref=f2e45]: 6 分钟前
+      - generic [ref=f2e48] [cursor=pointer]:
+        - generic [ref=f2e49]: 评审：网关隧道改动
+        - generic [ref=f2e50]: 3 小时前
+      - generic [ref=f2e53] [cursor=pointer]:
+        - generic [ref=f2e54]: 周会纪要
+        - generic [ref=f2e55]: 1 天前
+  - tablist [ref=f2e57]:
+    - tab "⏷ ⏷ 会话" [selected] [ref=f2e59] [cursor=pointer]:
+      - generic [ref=f2e60]:
+        - generic [ref=f2e61]: ⏷
+        - generic [ref=f2e63]: ⏷
+      - generic [ref=f2e65]: 会话
+    - tab "⏷ ⏷ 搜索" [ref=f2e67] [cursor=pointer]:
+      - generic [ref=f2e68]:
+        - generic [ref=f2e69]: ⏷
+        - generic [ref=f2e71]: ⏷
+      - generic [ref=f2e73]: 搜索
+    - tab "⏷ ⏷ 通知" [ref=f2e75] [cursor=pointer]:
+      - generic [ref=f2e76]:
+        - generic [ref=f2e77]: ⏷
+        - generic [ref=f2e79]: ⏷
+      - generic [ref=f2e81]: 通知
+    - tab "⏷ ⏷ 我" [ref=f2e83] [cursor=pointer]:
+      - generic [ref=f2e84]:
+        - generic [ref=f2e85]: ⏷
+        - generic [ref=f2e87]: ⏷
+      - generic [ref=f2e89]: 我

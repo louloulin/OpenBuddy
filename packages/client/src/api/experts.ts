@@ -10,6 +10,7 @@ import type {
   ExpertRootInfo,
   SessionExpertInfo,
 } from "@openbuddy/protocol/experts";
+import type { TeamTemplate } from "@openbuddy/protocol/teams";
 import { invoke } from "../ipc";
 
 export type { ExpertCenterCatalog, ExpertDraft, ExpertEntry, ExpertRootInfo, SessionExpertInfo };
@@ -107,4 +108,16 @@ export async function expertsLinkAgents(root: string, ids?: string[]): Promise<n
 /** Open an experts directory in the system file manager (the `files` module's `open_path`). */
 export async function expertsOpenDir(path: string): Promise<void> {
   await invoke<void>("open_path", { path });
+}
+
+// ---------- 专家团 (pii W3.5) ----------
+
+/** Built-in team pipelines, with whether each is already in 我的指令. */
+export async function teamsList(): Promise<TeamTemplate[]> {
+  return invoke<TeamTemplate[]>("teams_list");
+}
+
+/** Install one team as a global 我的指令 prompt template (`/team-...`). */
+export async function teamsInstall(id: string): Promise<TeamTemplate> {
+  return invoke<TeamTemplate>("teams_install", { id });
 }

@@ -97,6 +97,8 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'agent_extensions_add' || command === 'agent_extensions_remove') string('path');
   // 测试连接 (W2.4): the server name in mcp.json.
   if (command === 'mcp_test') string('name', 256);
+  // 专家团 (W3.5): install a preset by id.
+  if (command === 'teams_install') string('id', 128);
   // 扩展中心 (W2.6): preview one path in an isolated loader; cwd scopes project extensions.
   if (command === 'agent_extensions_inspect') {
     string('path');

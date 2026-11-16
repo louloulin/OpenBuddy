@@ -1,5 +1,6 @@
 import { text } from "@openbuddy/services/settings/settings";
 import { ExpertStore } from "@openbuddy/services/agents/store";
+import { teamPrompt, teamSeed, teamTemplates } from "@openbuddy/services/agents/teams";
 import { clearSessionExpert, setSessionExpert } from "@openbuddy/engine/features/expert";
 import { ProtocolError } from "@openbuddy/protocol/errors";
 import type { ExpertDraft, ExpertEntry } from "@openbuddy/protocol/experts";
@@ -59,6 +60,17 @@ export function expertsModule(ctx: HostContext): HostModule {
       return `data:${image.mime};base64,${image.base64}`;
     },
     experts_link_agents: (p) => experts().importFrom(text(p.root), strings(p.ids)),
+    // 专家团 (W3.5): preset pipelines, installed as a 我的指令 prompt template.
+    teams_list: async () => {
+      const saved = new Set((await engine.prompts.list()).map((entry) => entry.name));
+      return teamTemplates((command) => saved.has(command));
+    },
+    teams_install: async (p) => {
+      const team = teamSeed(text(p.id));
+      if (!team) throw new ProtocolError("team_not_found", "找不到这个专家团");
+      await engine.prompts.save("global", { name: team.command, description: team.description, content: teamPrompt(team) });
+      return teamTemplates((command) => command === team.command)[0];
+    },
   };
   return { id: "experts", commands };
 }

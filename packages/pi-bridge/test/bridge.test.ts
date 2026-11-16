@@ -58,7 +58,7 @@ describe('EventBuffer', () => {
     buffer.push('agent://event', { n: 3 })
     expect(buffer.head()).toBe(3)
     expect(buffer.since(1)!.map(item => item.payload)).toEqual([{ n: 2 }, { n: 3 }])
-    expect(buffer.since(0)).toEqual([])
+    expect(buffer.since(0)!.map(item => item.payload)).toEqual([{ n: 1 }, { n: 2 }, { n: 3 }])
   })
 
   test('a gap too old reports null (resync)', () => {
@@ -135,31 +135,106 @@ describe('bridge server', () => {
     server.emit('agent://event', { turn: 1 })
     server.emit('agent://event', { turn: 2 })
 
-    const response = await server.app.request('/events?since=0', { headers: auth })
-    expect(response.status).toBe(200)
-    const reader = response.body!.getReader()
-    const decoder = new TextDecoder()
-    let text = ''
-    const readFor = async (ms: number) => {
-      const deadline = Date.now() + ms
-      while (Date.now() < deadline) {
-        const { done, value } = await reader.read()
-        if (done) break
-        text += decoder.decode(value)
-        if (text.includes('turn: 2')) break
+    // SSE is an HTTP surface: exercise it through a real server rather than
+    // app.request() so the streaming/response plumbing matches production.
+    const http = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: server.app.fetch })
+    // The stream never ends on its own, so a hung read must fail loudly: the
+    // timeout aborts the request and the reader rejects.
+    const signal = AbortSignal.timeout(5000)
+    try {
+      const response = await fetch(`http://127.0.0.1:${http.port}/events?since=0`, { headers: auth, signal })
+      expect(response.status).toBe(200)
+      const reader = response.body!.getReader()
+      const decoder = new TextDecoder()
+      let text = ''
+      const readUntil = async (needle: string) => {
+        while (!text.includes(needle)) {
+          const { done, value } = await reader.read()
+          if (done) break
+          text += decoder.decode(value)
+        }
       }
+
+      await readUntil('turn":2')
+      expect(text).toContain('event: hello')
+      expect(text).toContain('id: 1')
+      expect(text).toContain('"turn":1')
+      expect(text).toContain('"turn":2')
+
+      // The same stream keeps tailing: a live event arrives with the next seq.
+      server.emit('agent://event', { turn: 3 })
+      await readUntil('turn":3')
+      expect(text).toContain('id: 3')
+      expect(text).toContain('"turn":3')
+      await reader.cancel()
+    } finally {
+      server.close()
+      http.stop(true)
     }
-    await readFor(500)
-    expect(text).toContain('event: hello')
-    expect(text).toContain('id: 1')
-    expect(text).toContain('"turn":1')
-    expect(text).toContain('"turn":2')
-    reader.cancel()
   })
 
   test('events endpoint requires auth', async () => {
     const server = createBridgeServer(fakeDispatcher(), { token: TOKEN })
     const response = await server.app.request('/events')
     expect(response.status).toBe(401)
+  })
+
+  test('camera upload writes bytes and returns a sendable path', async () => {
+    const saved: { bytes: number; extension: string }[] = []
+    const server = createBridgeServer(fakeDispatcher(), {
+      token: TOKEN,
+      uploads: {
+        maxBytes: 8 * 1024 * 1024,
+        save: async (bytes, extension) => {
+          saved.push({ bytes: bytes.byteLength, extension })
+          return { path: `/tmp/openbuddy-upload/shot.${extension}` }
+        },
+      },
+    })
+
+    const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0x00])
+    const response = await server.app.request('/api/upload', {
+      method: 'POST',
+      headers: { ...auth, 'content-type': 'image/jpeg' },
+      body: bytes,
+    })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ path: '/tmp/openbuddy-upload/shot.jpg', bytes: 4 })
+    expect(saved).toEqual([{ bytes: 4, extension: 'jpg' }])
+  })
+
+  test('camera upload refuses wrong types, empty bodies and oversized bodies', async () => {
+    const server = createBridgeServer(fakeDispatcher(), {
+      token: TOKEN,
+      uploads: { maxBytes: 3, save: async () => ({ path: '/tmp/x' }) },
+    })
+
+    const wrongType = await server.app.request('/api/upload', {
+      method: 'POST', headers: { ...auth, 'content-type': 'image/gif' }, body: new Uint8Array([1]),
+    })
+    expect(wrongType.status).toBe(415)
+
+    const empty = await server.app.request('/api/upload', {
+      method: 'POST', headers: { ...auth, 'content-type': 'image/png' }, body: new Uint8Array(),
+    })
+    expect(empty.status).toBe(400)
+
+    const tooBig = await server.app.request('/api/upload', {
+      method: 'POST', headers: { ...auth, 'content-type': 'image/png' }, body: new Uint8Array([1, 2, 3, 4]),
+    })
+    expect(tooBig.status).toBe(413)
+  })
+
+  test('upload is closed when the bridge has no sink, and requires auth', async () => {
+    const server = createBridgeServer(fakeDispatcher(), { token: TOKEN })
+    const disabled = await server.app.request('/api/upload', {
+      method: 'POST', headers: { ...auth, 'content-type': 'image/jpeg' }, body: new Uint8Array([1]),
+    })
+    expect(disabled.status).toBe(404)
+
+    const unauthorized = await server.app.request('/api/upload', {
+      method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: new Uint8Array([1]),
+    })
+    expect(unauthorized.status).toBe(401)
   })
 })

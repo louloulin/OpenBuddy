@@ -1,0 +1,27 @@
+- generic [ref=e27]:
+  - generic [ref=e30]:
+    - heading "会话" [level=1] [ref=e32]
+    - generic [ref=e34]:
+      - generic [ref=e35] [cursor=pointer]: "Failed to execute 'fetch' on 'Window': Illegal invocation（点按关闭）"
+      - generic [ref=e37]: 还没有会话。 在电脑上开始一个会话，这里会出现它。
+  - tablist [ref=e40]:
+    - tab "⏷ ⏷ 会话" [selected] [ref=e42] [cursor=pointer]:
+      - generic [ref=e43]:
+        - generic [ref=e44]: ⏷
+        - generic [ref=e46]: ⏷
+      - generic [ref=e48]: 会话
+    - tab "⏷ ⏷ 搜索" [ref=e50] [cursor=pointer]:
+      - generic [ref=e51]:
+        - generic [ref=e52]: ⏷
+        - generic [ref=e54]: ⏷
+      - generic [ref=e56]: 搜索
+    - tab "⏷ ⏷ 通知" [ref=e58] [cursor=pointer]:
+      - generic [ref=e59]:
+        - generic [ref=e60]: ⏷
+        - generic [ref=e62]: ⏷
+      - generic [ref=e64]: 通知
+    - tab "⏷ ⏷ 我" [ref=e66] [cursor=pointer]:
+      - generic [ref=e67]:
+        - generic [ref=e68]: ⏷
+        - generic [ref=e70]: ⏷
+      - generic [ref=e72]: 我

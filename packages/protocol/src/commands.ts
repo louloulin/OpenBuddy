@@ -32,7 +32,7 @@ export const COMMANDS = [
   'agents_list', 'agents_get', 'agents_save', 'agents_delete', 'agents_template',
   'agent_set_session_expert', 'agent_clear_session_expert',
   'experts_default_root', 'experts_list_roots', 'experts_set_roots', 'experts_load', 'experts_read_agent_prompt',
-  'experts_thumbnail', 'experts_image_bytes', 'experts_link_agents',
+  'experts_thumbnail', 'experts_image_bytes', 'experts_link_agents', 'teams_list', 'teams_install',
   // 记忆 (20261116-pii W5.1–W5.3): the memory host module.
   'memory_list', 'memory_get', 'memory_save', 'memory_delete', 'memory_rewrite',
   // 技能目录 + 我的指令 (20261116-pii W2.7): the skills host module.

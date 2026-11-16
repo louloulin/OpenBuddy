@@ -12,6 +12,7 @@ import { ExpertDetailModal } from "./ExpertDetailModal";
 import { ExpertEditor } from "./ExpertEditor";
 import { ExpertSources } from "./ExpertSources";
 import { FeaturedScenes } from "./FeaturedScenes";
+import { TeamCards } from "./TeamCards";
 import { MyExperts } from "./MyExperts";
 import { draftOf, emptyDraft, errorText, matches, toPending } from "./expert-model";
 import "./experts.css";
@@ -190,6 +191,8 @@ export function ExpertsTab({ pills, onGoHome, onToast, views = { center: true, m
         {catalog && (
           <>
             {!search && !cat && <FeaturedScenes scenes={scenes} expertById={expertById} onOpen={setDetail} />}
+            {/* 专家团 (W3.5): preset pipelines, installed as 我的指令. */}
+            {!search && !cat && <TeamCards onToast={onToast} onSearch={setSearch} />}
             <div className="ec-list-head">
               <h3 className="ec-section-title ex-list-title">全部专家<span className="ex-count">{visible.length}</span></h3>
               <button type="button" className="ec-source-btn" onClick={() => void loadCatalog()} disabled={loading} title="刷新" aria-label="刷新专家">

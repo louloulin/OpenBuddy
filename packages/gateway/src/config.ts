@@ -47,6 +47,8 @@ export type GatewayConfig = {
   fcmServiceAccountPath?: string
   /** Android notification channel the app registers. */
   fcmChannelId: string
+  /** Optional Expo access token; only raises the push quota. */
+  expoAccessToken?: string
   /** Shared secret sent as `Authorization: Bearer …` to webhook destinations. */
   webhookToken?: string
   /** Hosts a webhook destination may point at. Empty allows any https host. */
@@ -212,6 +214,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       : DEFAULT_ALLOWED_ORIGINS,
     fcmServiceAccountPath: env.GATEWAY_FCM_SERVICE_ACCOUNT || undefined,
     fcmChannelId: env.GATEWAY_FCM_CHANNEL_ID || 'lumos',
+    expoAccessToken: env.GATEWAY_EXPO_ACCESS_TOKEN || undefined,
     webhookToken: env.GATEWAY_WEBHOOK_TOKEN || undefined,
     webhookAllowedHosts: envList(env.GATEWAY_WEBHOOK_ALLOWED_HOSTS),
     webhookAllowCleartext: envBool(env.GATEWAY_WEBHOOK_ALLOW_CLEARTEXT),

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 
 import { createFcmProvider, fcmErrorCode, isPermanentFcmFailure, type FcmServiceAccount } from '../src/push/fcm.js'
 import { createWebhookProvider, isAllowedWebhookUrl } from '../src/push/webhook.js'
+import { createExpoProvider } from '../src/push/expo.js'
 import { createPushDispatcher } from '../src/push/dispatcher.js'
 import { parseServiceAccount } from '../src/push/providers.js'
 import { Store } from '../src/store.js'
@@ -1273,7 +1274,7 @@ describe('push routes', () => {
 
     const state = await fetch(`${harness.url}/admin/push`, { headers: authHeader(ADMIN_TOKEN) })
     const body = await state.json() as { providers: string[]; counts: { active: number }; registrations: unknown[] }
-    expect(body.providers).toEqual(['webhook'])
+    expect(body.providers).toEqual(['webhook', 'expo'])
     expect(body.counts.active).toBe(1)
     expect(body.registrations).toHaveLength(1)
 
@@ -1343,7 +1344,7 @@ describe('push routes', () => {
     const health = await (await fetch(`${harness.url}/admin/health`, { headers: authHeader(ADMIN_TOKEN) })).json() as {
       push: { providers: string[]; watching: boolean; registrations: { active: number; dead: number } }
     }
-    expect(health.push.providers).toEqual(['webhook'])
+    expect(health.push.providers).toEqual(['webhook', 'expo'])
     expect(health.push.watching).toBe(true)
     expect(health.push.registrations).toEqual({ active: 0, dead: 0 })
   })
@@ -1368,3 +1369,90 @@ async function waitUntil(condition: () => boolean, timeoutMs = 1000): Promise<vo
   }
   throw new Error('condition not met before the deadline')
 }
+
+// ── Expo push provider ───────────────────────────────────────
+
+describe('expo provider', () => {
+  const message = {
+    token: 'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]',
+    kind: 'approval' as const,
+    title: 'Approval needed',
+    body: 'A session is waiting.',
+    sessionId: 's-1',
+    requestId: 'req-1',
+    collapseKey: 'session:s-1',
+  }
+
+  test('posts the notification and carries the deep-link data', async () => {
+    const calls: { url: string; init: RequestInit }[] = []
+    const provider = createExpoProvider({
+      sendUrl: 'https://expo.test/send',
+      fetchImpl: (async (url: string, init: RequestInit) => {
+        calls.push({ url: String(url), init })
+        return new Response(JSON.stringify({ data: { status: 'ok', id: 'ticket-1' } }), { status: 200 })
+      }) as unknown as typeof fetch,
+    })
+
+    expect(await provider.send(message)).toEqual({ ok: true })
+    expect(calls).toHaveLength(1)
+    expect(calls[0]!.url).toBe('https://expo.test/send')
+    const body = JSON.parse(String(calls[0]!.init.body))
+    expect(body).toMatchObject({
+      to: message.token,
+      title: message.title,
+      body: message.body,
+      collapseId: 'session:s-1',
+      data: { kind: 'approval', sessionId: 's-1', requestId: 'req-1' },
+    })
+  })
+
+  test('rejects a token that is not an Expo token without calling the network', async () => {
+    let called = false
+    const provider = createExpoProvider({
+      fetchImpl: (async () => { called = true; return new Response('{}') }) as unknown as typeof fetch,
+    })
+    expect(await provider.send({ ...message, token: 'fcm-raw-token' }))
+      .toEqual({ ok: false, permanent: true, error: 'expo: not an Expo push token' })
+    expect(called).toBe(false)
+  })
+
+  test('a DeviceNotRegistered ticket is permanent, a 5xx is transient', async () => {
+    const unregistered = createExpoProvider({
+      fetchImpl: (async () => new Response(JSON.stringify({
+        data: { status: 'error', details: { error: 'DeviceNotRegistered' } },
+      }), { status: 200 })) as unknown as typeof fetch,
+    })
+    const first = await unregistered.send(message)
+    expect(first.ok).toBe(false)
+    expect(first.ok === false && first.permanent).toBe(true)
+
+    const flaky = createExpoProvider({
+      fetchImpl: (async () => new Response('upstream down', { status: 503 })) as unknown as typeof fetch,
+    })
+    const second = await flaky.send(message)
+    expect(second).toEqual({ ok: false, permanent: false, error: 'expo 503' })
+  })
+
+  test('a 4xx means the token or credential is unusable', async () => {
+    const provider = createExpoProvider({
+      fetchImpl: (async () => new Response('invalid token', { status: 400 })) as unknown as typeof fetch,
+    })
+    const outcome = await provider.send(message)
+    expect(outcome.ok).toBe(false)
+    expect(outcome.ok === false && outcome.permanent).toBe(true)
+    expect(outcome.ok === false && outcome.error).toContain('expo 400')
+  })
+
+  test('sends the access token when configured', async () => {
+    let header: string | null = null
+    const provider = createExpoProvider({
+      accessToken: 'expo-secret',
+      fetchImpl: (async (_url: string, init: RequestInit) => {
+        header = new Headers(init.headers).get('authorization')
+        return new Response(JSON.stringify({ data: { status: 'ok' } }), { status: 200 })
+      }) as unknown as typeof fetch,
+    })
+    await provider.send(message)
+    expect(header).toBe('Bearer expo-secret')
+  })
+})

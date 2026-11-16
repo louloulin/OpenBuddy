@@ -57,6 +57,9 @@ const LAYERS = [
   { name: 'ui', match: ['packages/ui/'], allow: [], forbid: [/^node:/, /^electron$/] },
   { name: 'markdown', match: ['packages/markdown/'], allow: ['ui'], forbid: [/^node:/, /^electron$/] },
   { name: 'web', match: ['apps/web/', 'src/'], allow: ['chat-core', 'client', 'platform', 'ui', 'markdown', 'protocol'], forbid: [/^node:/, /^electron$/] },
+  // The Expo app reuses the pure layers (protocol/chat-core/client) and writes
+  // its own React Native views; it must never reach for Electron or Node.
+  { name: 'mobile', match: ['apps/mobile/'], allow: ['protocol', 'client', 'chat-core'], forbid: [/^node:/, /^electron$/] },
 ];
 // Allowed feature → feature edges in apps/web (§5.2).
 const FEATURE_EDGES = {
@@ -171,6 +174,9 @@ for (const [f, deps] of graph) {
 // Reachability from the app entry points.
 {
   const entries = ['src/main.tsx', 'apps/web/src/app/main.tsx', 'apps/web/src/main.tsx', 'electron/main.ts', 'apps/desktop/src/main.ts', 'apps/desktop/src/main/index.ts'].filter(e => fileSet.has(e));
+  // expo-router discovers routes by file, so `app/**` are entry points the
+  // static import walk cannot reach on its own.
+  for (const f of files) if (/^apps\/mobile\/app\/.*\.tsx$/.test(f)) entries.push(f);
   const seen = new Set(); const todo = [...entries];
   while (todo.length) { const f = todo.pop(); if (seen.has(f)) continue; seen.add(f); for (const d of graph.get(f) ?? []) if (d.file && !d.mock) todo.push(d.file); }
   for (const f of files) {

@@ -12542,3 +12542,51 @@ button.diff__path {
 
 /* 子代理审批 (pii W3.4): the card says which sub-agent asked. */
 .perm-card__from { flex-shrink: 0; padding: 1px 7px; border-radius: 999px; font-size: 11px; color: #b45309; background: color-mix(in oklab, #b45309 14%, transparent); }
+
+/* 灵感 (pii W2.8): static scene cards built from the home scenes. */
+.inspiration { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 20px 28px 40px; gap: 14px; overflow-y: auto; }
+.inspiration__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.inspiration__title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 18px; color: var(--wb-text-strong); }
+.inspiration__hint { margin: 4px 0 0; font-size: 12.5px; color: var(--wb-text-medium); }
+.inspiration__search { display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 32px; border-radius: 8px; background: var(--wb-bg-secondary); color: var(--wb-text-medium); min-width: 220px; }
+.inspiration__search input { flex: 1 1 auto; border: 0; background: transparent; color: var(--wb-text-strong); font: inherit; font-size: 13px; outline: none; }
+.inspiration__chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.inspiration__chip { height: 28px; padding: 0 12px; border: 1px solid var(--wb-border-default); border-radius: 999px; background: transparent; color: var(--wb-text-medium); font: inherit; font-size: 12.5px; cursor: pointer; }
+.inspiration__chip:hover { color: var(--wb-text-strong); }
+.inspiration__chip--on { background: var(--wb-text-strong, #1d1c1a); border-color: transparent; color: var(--wb-bg-primary, #fff); }
+.inspiration__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.inspiration__empty { padding: 40px 0; text-align: center; color: var(--wb-text-medium); font-size: 13px; }
+.inspiration-card { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--wb-border-default); border-radius: 12px; background: var(--wb-bg-primary); }
+.inspiration-card:hover { border-color: var(--wb-border-strong, var(--wb-border-default)); }
+.inspiration-card__meta { display: flex; gap: 6px; align-items: center; }
+.inspiration-card__mode { padding: 1px 7px; border-radius: 999px; font-size: 11px; background: var(--wb-bg-secondary); color: var(--wb-text-medium); }
+.inspiration-card__cat { font-size: 11px; color: var(--wb-text-tertiary, var(--wb-text-medium)); }
+.inspiration-card__title { margin: 0; font-size: 14px; color: var(--wb-text-strong); }
+.inspiration-card__prompt { margin: 0; font-size: 12.5px; line-height: 1.65; color: var(--wb-text-medium); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.inspiration-card__actions { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 6px; flex-wrap: wrap; }
+.inspiration-card__go { display: inline-flex; align-items: center; gap: 2px; height: 28px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--wb-accent, #2f6fed); color: #fff; font: inherit; font-size: 12.5px; cursor: pointer; }
+.inspiration-card__save { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; border: 1px solid var(--wb-border-default); border-radius: 8px; background: transparent; color: var(--wb-text-strong); font: inherit; font-size: 12.5px; cursor: pointer; }
+.inspiration-card__save:hover:not(:disabled) { background: var(--wb-bg-secondary); }
+.inspiration-card__save:disabled { opacity: .6; cursor: default; }
+.inspiration-card__command { font-size: 11px; color: var(--wb-text-tertiary, var(--wb-text-medium)); }
+.inspiration-preview { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,.32); }
+.inspiration-preview__card { width: min(560px, 100%); max-height: 80vh; overflow: auto; padding: 20px; border-radius: 14px; background: var(--wb-bg-primary); box-shadow: var(--wb-shadow-lg); }
+.inspiration-preview__title { margin: 0 0 6px; font-size: 16px; color: var(--wb-text-strong); }
+.inspiration-preview__text { margin: 10px 0; padding: 12px; border-radius: 10px; background: var(--wb-bg-secondary); font-family: var(--wb-font-mono, ui-monospace, monospace); font-size: 12.5px; line-height: 1.7; white-space: pre-wrap; color: var(--wb-text-strong); }
+.inspiration-preview__actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* 专家团 (pii W3.5): preset expert pipelines. */
+.team-cards { margin: 6px 0 14px; }
+.team-cards__hint { font-size: 11.5px; color: var(--wb-text-tertiary, var(--wb-text-medium)); }
+.team-cards__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; margin-top: 8px; }
+.team-card { display: flex; flex-direction: column; gap: 8px; padding: 13px 14px; border: 1px solid var(--wb-border-default); border-radius: 12px; background: var(--wb-bg-primary); }
+.team-card__title { margin: 0; font-size: 14px; color: var(--wb-text-strong); }
+.team-card__desc { margin: 0; font-size: 12px; line-height: 1.6; color: var(--wb-text-medium); }
+.team-card__stages { display: flex; flex-direction: column; gap: 4px; margin: 2px 0; padding: 0; list-style: none; }
+.team-card__stage { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.team-card__role { flex-shrink: 0; min-width: 44px; color: var(--wb-text-tertiary, var(--wb-text-medium)); }
+.team-card__expert { border: 0; background: transparent; padding: 0; color: var(--wb-text-strong); font: inherit; font-size: 12px; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.team-card__arrow { color: var(--wb-text-tertiary, var(--wb-text-medium)); }
+.team-card__actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 4px; flex-wrap: wrap; }
+.team-card__command { font-size: 11px; color: var(--wb-text-tertiary, var(--wb-text-medium)); }
+.team-card__installed { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: #15803d; }

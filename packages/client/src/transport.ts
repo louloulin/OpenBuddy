@@ -9,6 +9,10 @@
 import * as ipc from "./ipc";
 import type { UnlistenFn } from "./ipc";
 
+// Re-exported so a non-Electron transport can name `listen`'s return type
+// without importing the preload module.
+export type { UnlistenFn };
+
 export type TransportState = "connecting" | "open" | "closed";
 
 export interface Transport {

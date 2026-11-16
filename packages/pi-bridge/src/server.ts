@@ -21,7 +21,7 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 
-import { isCommand } from '@openbuddy/protocol/commands'
+import { isCommand, type CommandName } from '@openbuddy/protocol/commands'
 import { validateCommandPayload, type Payload } from '@openbuddy/protocol/validate'
 import { EVENTS, isEvent, type EventName } from '@openbuddy/protocol/events'
 
@@ -37,15 +37,53 @@ export type HostDispatcher = {
   servedCommands: () => readonly string[]
 }
 
+/** Image types the upload route accepts, mapped to the stored extension. */
+const UPLOAD_TYPES = new Map([
+  ['image/jpeg', 'jpg'],
+  ['image/png', 'png'],
+  ['image/webp', 'webp'],
+])
+
+export type UploadSink = {
+  /** Refuse bodies larger than this. */
+  maxBytes: number
+  /** Persists the bytes and returns the absolute path to send as an attachment. */
+  save: (bytes: Uint8Array, extension: string) => Promise<{ path: string }>
+}
+
 export type BridgeServerOptions = {
   /** Bearer token required on every request; the gateway agent supplies it. */
   token: string
   /** True (tests) disables the token check. */
   noAuth?: boolean
+  /**
+   * Camera uploads. Absent means the route answers 404 — a desktop without a
+   * temp directory to write to simply does not offer image attachments.
+   */
+  uploads?: UploadSink
+}
+
+/** Minimal Bun socket surface the bridge needs (kept structural for tests). */
+export type BridgeSocket = {
+  data: { since?: number }
+  send: (data: string) => void
+  close: (code?: number, reason?: string) => void
 }
 
 export type BridgeServer = {
   app: Hono
+  /**
+   * Bun fetch handler. Handles the `GET /ws` upgrade itself and delegates
+   * everything else to `app`; hosting code passes it to `Bun.serve` together
+   * with `websocket`.
+   */
+  fetch: (req: Request, server?: unknown) => Response | undefined | Promise<Response | undefined>
+  /** Bun socket handlers; pass to `Bun.serve({ websocket })`. */
+  websocket: {
+    open: (socket: BridgeSocket) => void
+    message: (socket: BridgeSocket, message: string | ArrayBuffer | Uint8Array) => void
+    close: (socket: BridgeSocket) => void
+  }
   /** Feeds one engine event into the buffer; the desktop wiring calls this. */
   emit: (event: string, payload: unknown) => void
   close: () => void
@@ -107,6 +145,52 @@ export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeSe
     }
   })
 
+  /**
+   * Camera images (20261115-mobile.md §5.6).
+   *
+   * `validate.ts` forbids image bytes on `agent_send`; the contract only takes
+   * `attachments: [{ path }]`, and a phone has no path on the desktop's disk.
+   * So the phone PUTs the bytes here and sends back the path it gets.
+   *
+   * The bytes never reach a model directly: they land in a private temp
+   * directory with a random name, and the caller still has to spend a turn
+   * (`agent_send`) to use them, which is what the desktop's permission model
+   * already governs.
+   */
+  app.on('POST', ['/upload', '/api/upload'], async (c) => {
+    if (!authorized(c.req.header('authorization'))) {
+      return c.json({ error: 'unauthorized' }, 401)
+    }
+    if (!options.uploads) {
+      return c.json({ error: 'uploads_disabled' }, 404)
+    }
+    const mime = (c.req.header('content-type') ?? '').split(';')[0]!.trim().toLowerCase()
+    const extension = UPLOAD_TYPES.get(mime)
+    if (!extension) {
+      return c.json({ error: 'unsupported_media_type', allowed: [...UPLOAD_TYPES.keys()] }, 415)
+    }
+    const declared = Number(c.req.header('content-length') ?? '')
+    if (Number.isFinite(declared) && declared > options.uploads.maxBytes) {
+      return c.json({ error: 'payload_too_large', maxBytes: options.uploads.maxBytes }, 413)
+    }
+    let bytes: Uint8Array
+    try {
+      bytes = new Uint8Array(await c.req.arrayBuffer())
+    } catch {
+      return c.json({ error: 'unreadable_body' }, 400)
+    }
+    if (bytes.byteLength === 0) return c.json({ error: 'empty_body' }, 400)
+    if (bytes.byteLength > options.uploads.maxBytes) {
+      return c.json({ error: 'payload_too_large', maxBytes: options.uploads.maxBytes }, 413)
+    }
+    try {
+      const written = await options.uploads.save(bytes, extension)
+      return c.json({ path: written.path, bytes: bytes.byteLength })
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'upload_failed' }, 500)
+    }
+  })
+
   app.on('GET', ['/events', '/api/events'], (c) => {
     if (!authorized(c.req.header('authorization'))) {
       return c.json({ error: 'unauthorized' }, 401)
@@ -149,8 +233,121 @@ export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeSe
     })
   })
 
+  // ── WebSocket multiplex (openbuddy/bridge/1) ────────────────────────────
+  //
+  // One socket carries commands and the event tail: the phone cannot afford a
+  // connection per session on a mobile network. Frames are JSON, one object per
+  // message; `cmd`/`reply` correlate on `id`, `evt` carries the same monotonic
+  // `seq` the SSE stream uses.
+
+  const sendFrame = (socket: BridgeSocket, frame: unknown): void => {
+    try {
+      socket.send(JSON.stringify(frame))
+    } catch {
+      // The socket closed between the lookup and the write.
+    }
+  }
+
+  const onSocketMessage = async (socket: BridgeSocket, raw: string | ArrayBuffer | Uint8Array): Promise<void> => {
+    if (typeof raw !== 'string') {
+      sendFrame(socket, { t: 'reply', id: '', ok: false, error: 'binary frames are not supported' })
+      return
+    }
+    let frame: { t?: unknown; id?: unknown; command?: unknown; payload?: unknown }
+    try {
+      frame = JSON.parse(raw) as typeof frame
+    } catch {
+      sendFrame(socket, { t: 'reply', id: '', ok: false, error: 'bad_frame' })
+      return
+    }
+    if (frame.t === 'ping') {
+      sendFrame(socket, { t: 'pong' })
+      return
+    }
+    if (frame.t !== 'cmd') return
+
+    const id = typeof frame.id === 'string' ? frame.id : ''
+    const command = String(frame.command ?? '')
+    if (!allowed.has(command)) {
+      sendFrame(socket, { t: 'reply', id, ok: false, error: `not_implemented: ${command.slice(0, 128)}` })
+      return
+    }
+    let payload: Payload
+    try {
+      payload = validateCommandPayload(command as CommandName, frame.payload ?? {})
+    } catch (error) {
+      sendFrame(socket, { t: 'reply', id, ok: false, error: error instanceof Error ? error.message : 'invalid_payload' })
+      return
+    }
+    try {
+      const result = await dispatcher.dispatch(command, payload)
+      sendFrame(socket, { t: 'reply', id, ok: true, result: result ?? null })
+    } catch (error) {
+      sendFrame(socket, { t: 'reply', id, ok: false, error: error instanceof Error ? error.message : String(error) })
+    }
+  }
+
+  const onSocketOpen = (socket: BridgeSocket): void => {
+    const since = typeof socket.data.since === 'number' && Number.isFinite(socket.data.since)
+      ? socket.data.since
+      : 0
+    const replay = buffer.since(since)
+    const resync = replay === null
+    sendFrame(socket, { t: 'hello', head: buffer.head(), resync })
+    if (resync) sendFrame(socket, { t: 'resync', head: buffer.head() })
+    for (const item of resync ? [] : replay ?? []) {
+      sendFrame(socket, { t: 'evt', event: item.event, seq: item.seq, payload: item.payload })
+    }
+
+    // Subscribe after the replay, in the same tick as the replay snapshot, so
+    // no event falls between them (the buffer is synchronous).
+    const deliver = (item: BridgeEvent): void => {
+      sendFrame(socket, { t: 'evt', event: item.event, seq: item.seq, payload: item.payload })
+    }
+    streams.add(deliver)
+    ;(socket.data as { deliver?: (item: BridgeEvent) => void }).deliver = deliver
+  }
+
+  const onSocketClose = (socket: BridgeSocket): void => {
+    const deliver = (socket.data as { deliver?: (item: BridgeEvent) => void }).deliver
+    if (deliver) streams.delete(deliver)
+  }
+
+  /**
+   * Bun fetch entry point: upgrades `/ws` and `/api/ws`, and otherwise serves
+   * the HTTP app unchanged. Hosting code must pass the second `server`
+   * argument to `Bun.serve`'s fetch for the upgrade to be possible.
+   */
+  const fetchHandler: BridgeServer['fetch'] = (req, server) => {
+    const url = new URL(req.url)
+    if (url.pathname !== '/ws' && url.pathname !== '/api/ws') return app.fetch(req)
+
+    const tokenFromQuery = url.searchParams.get('token')
+    const header = req.headers.get('authorization')
+    if (!options.noAuth && header !== `Bearer ${options.token}` && tokenFromQuery !== options.token) {
+      return new Response(JSON.stringify({ error: 'unauthorized' }), {
+        status: 401,
+        headers: { 'content-type': 'application/json' },
+      })
+    }
+    const upgradable = server as { upgrade?: (req: Request, opts: { data: { since: number } }) => boolean } | undefined
+    if (!upgradable?.upgrade) {
+      return new Response(JSON.stringify({ error: 'websocket_unsupported' }), {
+        status: 426,
+        headers: { 'content-type': 'application/json' },
+      })
+    }
+    const since = Number(url.searchParams.get('since') ?? '')
+    const ok = upgradable.upgrade(req, { data: { since: Number.isFinite(since) ? since : 0 } })
+    // Bun expects `undefined` once it owns the socket.
+    return ok ? undefined : new Response(JSON.stringify({ error: 'upgrade_failed' }), {
+      status: 400,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+
   // Every engine event lands in the buffer exactly once, then fans out to the
-  // connected SSE streams.
+  // connected SSE streams and sockets.
   const offEngine = dispatcher.listen((event, payload) => {
     const item = buffer.push(event, payload)
     for (const deliver of streams) deliver(item)
@@ -158,6 +355,12 @@ export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeSe
 
   return {
     app,
+    fetch: fetchHandler,
+    websocket: {
+      open: onSocketOpen,
+      message: (socket, message) => { void onSocketMessage(socket, message) },
+      close: onSocketClose,
+    },
     emit: (event, payload) => {
       const item = buffer.push(event, payload)
       for (const deliver of streams) deliver(item)

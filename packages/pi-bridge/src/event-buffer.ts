@@ -37,13 +37,15 @@ export class EventBuffer {
   /**
    * Events after `since` (exclusive), or null when the client is too far
    * behind — the gap no longer lives in the buffer.
+   *
+   * `since === 0` means "I have nothing yet": replay everything currently
+   * buffered. A client that connects after a long absence still gets the
+   * newest window rather than an empty stream.
    */
   since(since: number): BridgeEvent[] | null {
-    if (since >= this.nextSeq) return []
-    if (since === 0) return []
-    if (this.ring.length === 0) return since < this.nextSeq ? null : []
+    if (this.ring.length === 0) return []
     const oldest = this.ring[0]!.seq
-    if (since + 1 < oldest) return null
+    if (since !== 0 && since + 1 < oldest) return null
     return this.ring.filter(item => item.seq > since)
   }
 }

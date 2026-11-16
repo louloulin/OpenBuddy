@@ -133,14 +133,30 @@ export class GatewayTransport implements Transport {
         this.attempt = 0
         this.setStateInternal('open')
 
-        const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
+        // React Native's Hermes has no TextDecoderStream, so decode by hand
+        // when it is missing rather than assuming the browser platform.
+        const reader = typeof TextDecoderStream === 'undefined'
+          ? null
+          : response.body.pipeThrough(new TextDecoderStream()).getReader()
+        const rawReader = reader ? null : response.body.getReader()
+        const decoder = new TextDecoder()
         let bufferText = ''
         let resync = false
         try {
           while (true) {
-            const { done, value } = await reader.read()
+            let done: boolean
+            let value: string | undefined
+            if (reader) {
+              const next = await reader.read()
+              done = next.done
+              value = next.value
+            } else {
+              const next = await rawReader!.read()
+              done = next.done
+              value = next.value ? decoder.decode(next.value, { stream: true }) : ''
+            }
             if (done) break
-            bufferText += value
+            bufferText += value ?? ''
             let boundary: number
             while ((boundary = bufferText.indexOf('\n\n')) !== -1) {
               const raw = bufferText.slice(0, boundary)
@@ -164,7 +180,8 @@ export class GatewayTransport implements Transport {
             }
           }
         } finally {
-          reader.releaseLock()
+          if (reader) reader.releaseLock()
+          else rawReader?.releaseLock()
         }
       } catch {
         // fall through to backoff
