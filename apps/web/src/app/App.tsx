@@ -221,7 +221,12 @@ function Shell() {
 
         unlisten = await subscribeAgentEvents({
           // The bound expert rides along, so the badge follows ‹1/2› switches, 重新生成 and 从这里编辑 (pii W2.2).
-          onModelState: state => { useAgentModelStore.getState().apply(state); if (state.expert !== undefined) showSessionExpert(state.sessionId, state.expert); },
+          // 子代理 (W3.4) are in-memory children: their model-state must not add a sidebar row.
+          onModelState: state => {
+            if (state.subagent) return;
+            useAgentModelStore.getState().apply(state);
+            if (state.expert !== undefined) showSessionExpert(state.sessionId, state.expert);
+          },
           onUpdate: (u) => {
             sessionStore.getState().queueUpdate(u);
             if (u.type === "queue_update" && u.sessionId && Array.isArray(u.steering) && Array.isArray(u.followUp)) {
@@ -246,6 +251,8 @@ function Shell() {
             void selectSessionRef.current?.(event.sessionId, entry?.cwd);
           },
           onSessionStatus: (event) => {
+            // 子代理 (W3.4) sessions are in-memory children, never sidebar rows.
+            if (useSubagentStore.getState().isChild(event.sessionId)) return;
             sessionsStore.getState().upsert({ sessionId: event.sessionId, status: sessionStatusOf(event.status) });
           },
           // 即时连接卡 (pii W2.5): an MCP tool needs its server authorized; the composer shows 连接.
@@ -255,6 +262,8 @@ function Shell() {
           // 子代理 (pii W3.4): fold each child's lifecycle into the parent's cards.
           onSubagent: (event) => useSubagentStore.getState().apply(event),
           onComplete: (p) => {
+            // 子代理 (W3.4): a child's settle belongs to its card, not the sidebar/transcript.
+            if (useSubagentStore.getState().isChild(p.sessionId)) return;
             reportEvent("session_complete", "info", { sessionId: p.sessionId, stopReason: p.stopReason });
             // Ignore completes for side-channel sessions (inspiration generation)
             // — they're handled by their own listeners, not the main transcript.
@@ -287,6 +296,7 @@ function Shell() {
 
           },
           onSummary: ({ sessionId, title }) => {
+            if (useSubagentStore.getState().isChild(sessionId)) return;
             // sidebar entry in place. This overrides the "新会话" placeholder
             // set optimistically in handleSendNew. Stamp updatedAt so the
             // sidebar can re-sort the freshly-active session to the top.

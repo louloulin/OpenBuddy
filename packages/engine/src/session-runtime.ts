@@ -4,6 +4,8 @@ import type { PromptImages, SessionRunStatus, Slot } from "./types.js";
 
 export function emitStatus(engine: EngineContext, slot: Slot) {
   engine.flushDelta(slot);
+  // 子代理 (W3.4) are not sidebar rows: their progress comes from agent://subagent, not session-status.
+  if (slot.subagent) return;
   engine.emit("agent://session-status", {
     sessionId: slot.id,
     status: engine.runStatus(slot),

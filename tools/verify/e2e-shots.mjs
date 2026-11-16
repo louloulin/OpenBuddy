@@ -383,14 +383,65 @@ try {
     const tabs = await page.locator('.um-pills [role=tab]').allTextContents();
     await ctx.sleep(800);
     const skills = await ctx.shot('23-hub-skills');
+    // W2.4: configure a real MCP-over-HTTP server (the driver's fixture), then 测试连接 against it.
+    await ctx.call('mcp_upsert', { server: { name: '销售数据', transport: 'streamable_http', target: 'http://127.0.0.1:${FIXTURE_PORT}/mcp', headers: { Authorization: 'Bearer local-fixture-only' }, enabled: true } });
     await page.getByRole('tab', { name: '连接器' }).click();
-    await page.getByText('远程服务授权', { exact: true }).waitFor({ timeout: 10000 });
-    await ctx.sleep(900);
-    const mcp = await ctx.shot('24-hub-connectors-mcp');
+    await page.getByText('MCP 服务', { exact: true }).waitFor({ timeout: 10000 });
+    await page.locator('.mcp-server', { hasText: '销售数据' }).waitFor({ timeout: 10000 });
+    await ctx.sleep(500);
+    const configured = await ctx.shot('24-hub-connectors-mcp');
+    await page.locator('.mcp-server', { hasText: '销售数据' }).getByRole('button', { name: '测试连接' }).click();
+    // Wait for a result banner either way, so a failure reports its message instead of timing out.
+    await page.locator('.mcp-server__badge--ok, .mcp-server__badge--bad').first().waitFor({ timeout: 30000 });
+    const testError = await page.locator('.mcp-server__error').first().textContent().catch(() => null);
+    const tools = await page.locator('.mcp-server__tools code').allTextContents();
+    if (!tools.includes('query_sales')) throw new Error('test connect failed: ' + (testError ?? tools.join(',')));
+    await ctx.sleep(700);
+    const mcp = await ctx.shot('24b-hub-connectors-tested');
     await page.getByRole('tab', { name: '扩展' }).click();
+    // W2.6: 扩展中心 shows a card per path (or its empty state).
+    await page.getByText('扩展中心', { exact: true }).waitFor({ timeout: 10000 });
     await ctx.sleep(800);
     const extensions = await ctx.shot('25-hub-extensions');
-    return { tabs, shots: [skills, mcp, extensions] };`);
+    await page.getByRole('tab', { name: '我的指令' }).click();
+    // W2.7 / S8: 我的指令 lists the Pi prompt templates and opens an editor.
+    await page.getByRole('button', { name: /新建指令/ }).waitFor({ timeout: 10000 });
+    await ctx.sleep(800);
+    const prompts = await ctx.shot('25b-hub-prompts');
+    await page.getByRole('button', { name: /新建指令/ }).click();
+    await page.getByPlaceholder('weekly-report').waitFor({ timeout: 5000 });
+    await page.getByPlaceholder('weekly-report').fill('weekly-report');
+    await page.getByPlaceholder('一句话说明这条指令做什么').fill('按本周要点写一份周报');
+    await page.getByPlaceholder('<本周要点>').fill('<本周要点>');
+    await page.locator('.um-prompts__editor-content textarea').fill('请根据 $1 整理本周工作，写成一份结构清晰的周报。');
+    await ctx.sleep(500);
+    const editor = await ctx.shot('25c-prompt-editor');
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.locator('.um-prompts__item', { hasText: 'weekly-report' }).waitFor({ timeout: 10000 });
+    await ctx.sleep(700);
+    const saved = await ctx.shot('25d-prompt-saved');
+    const templates = await ctx.call('prompts_list');
+    return { tabs, shots: [skills, configured, mcp, extensions, prompts, editor, saved], tools, templates: templates.map(t => t.scope + '/' + t.name) };`);
+  // 20261116-pii W3.4: ob_subagent runs two child sessions; the transcript shows their cards.
+  await step('subagent cards', `
+    await page.locator('.sidebar__nav-item', { hasText: '新建任务' }).first().click();
+    await page.locator('.wb-composer__input').waitFor({ state: 'visible', timeout: 10000 });
+    // The home composer has no mode control yet; a fresh task starts in 做一做 anyway.
+    await page.locator('.wb-composer__input').fill('__SUBAGENT__ 并行核对一下本季度销售数据');
+    await page.getByRole('button', { name: '发送', exact: true }).click();
+    const allow = page.getByRole('button', { name: '允许本次', exact: true });
+    await allow.waitFor({ timeout: 30000 });
+    await ctx.sleep(500);
+    await allow.click();
+    const card = page.locator('.subagent-card').first();
+    await card.waitFor({ timeout: 30000 });
+    await page.locator('.subagent-card__state--done').first().waitFor({ timeout: 60000 });
+    await ctx.sleep(1200);
+    const collapsed = await ctx.shot('36-subagent-cards');
+    const states = await page.locator('.subagent-card__state').allTextContents();
+    await card.locator('.subagent-card__head').first().click();
+    await ctx.sleep(500);
+    return { collapsed, states, expanded: await ctx.shot('37-subagent-expanded') };`);
   await step('second task', `
     await page.getByRole('button', { name: '新建任务', exact: true }).first().click();
     const input = page.locator('.wb-composer__input');

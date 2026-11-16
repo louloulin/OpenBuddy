@@ -173,6 +173,21 @@ async function streamText(chunk, text, delay) {
   for (const p of parts) { chunk({ content: p }); if (delay) await sleep(delay); }
 }
 const fixtureServer = createServer(async (req, res) => {
+  // 20261116-pii W2.4: a minimal MCP-over-HTTP endpoint, so 测试连接 exercises a real handshake.
+  if (req.method === 'POST' && req.url.startsWith('/mcp')) {
+    let body = ''; for await (const part of req) body += part;
+    let message; try { message = JSON.parse(body || '{}'); } catch { res.writeHead(400); res.end(); return; }
+    const single = Array.isArray(message) ? message[0] : message;
+    if (single.id === undefined) { res.writeHead(202); res.end(); return; }
+    let result;
+    if (single.method === 'initialize') result = { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'demo-mcp', version: '1.0.0' } };
+    else if (single.method === 'tools/list') result = { tools: [{ name: 'query_sales', description: '查询销售数据', inputSchema: { type: 'object', properties: {} } }, { name: 'inventory_check', description: '检查库存', inputSchema: { type: 'object', properties: {} } }] };
+    else result = {};
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Mcp-Session-Id': 'demo-session' });
+    res.end(JSON.stringify({ jsonrpc: '2.0', id: single.id, result }));
+    return;
+  }
+
   if (req.method === 'GET' && /\/models\/?$/.test(req.url)) { fixture.requests.push({ url: req.url, method: 'GET', auth: req.headers.authorization ? 'present' : 'none', at: Date.now() }); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ object: 'list', data: [{ id: 'fixture-model', object: 'model' }, { id: 'fixture-reasoner', object: 'model' }] })); return; }
   if (req.method !== 'POST') { res.writeHead(404); res.end(); return; }
   let body = ''; for await (const b of req) body += b;
@@ -253,6 +268,21 @@ const fixtureServer = createServer(async (req, res) => {
     await streamText(chunk, lastUserText.includes('__PLAN__')
       ? '计划已记录在「任务计划」里，共 4 步：先核对数据，再按区域汇总，然后写报告，最后生成看板并自查。确认后我就开始执行。'
       : '前两步已完成：数据 24 行、字段齐全，四个区域的季度汇总也算好了。第 3 步「撰写分析报告」需要你确认统计口径（含税还是不含税）后再继续。', fixture.delayMs / 3);
+    finish(); return;
+  }
+  // __SUBAGENT__ (20261116-pii W3.4): the parent calls ob_subagent (parallel), each child answers,
+  // then the parent summarises — the transcript shows the sub-agent cards.
+  if (lastUserText.includes('子任务')) {
+    await streamText(chunk, `子任务完成：${lastUserText.slice(0, 24)} 已核对，结果见附件。`, fixture.delayMs / 2);
+    finish(); return;
+  }
+  if (lastUserText.includes('__SUBAGENT__')) {
+    if (toolsSinceUser === 0) {
+      await streamText(chunk, '这件事可以拆成两半并行做，我派两个子代理。', fixture.delayMs);
+      chunk({ tool_calls: [{ index: 0, id: 'call_sub_1', type: 'function', function: { name: 'ob_subagent', arguments: JSON.stringify({ mode: 'parallel', tasks: ['子任务 A：统计本季度各区域销售额', '子任务 B：核对库存周转是否有异常'] }) } }] });
+      finish('tool_calls'); return;
+    }
+    await streamText(chunk, '两个子代理都回来了：A 给出四个区域的季度汇总，B 发现西部库存周转偏低。下面是它们的结论。', fixture.delayMs / 3);
     finish(); return;
   }
   if (lastUserText.includes('__RM__')) {

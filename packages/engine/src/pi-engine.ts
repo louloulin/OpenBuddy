@@ -268,6 +268,8 @@ export class PiEngine {
       mode: this.mode(id),
       // The expert bound on the current branch (W2.2): the header badge follows branch moves.
       expert: features.sessionExpert(this, id),
+      // 子代理 (W3.4): a child session; the sidebar ignores its model-state, the parent shows its card.
+      ...(this.slots.get(id)?.parentId ? { subagent: { parentId: this.slots.get(id)!.parentId! } } : {}),
     };
   }
   async setModel(id: string, modelId: string, providerId?: string) {

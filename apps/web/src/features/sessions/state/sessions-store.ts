@@ -176,6 +176,9 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       // 3) New entry — route by cwd. The 任务 group is the "inbox" = the cwd
       // an absolute path. A session whose cwd equals homeCwd (or, defensively,
       // an empty cwd) is independent; everything else belongs to a 空间 node.
+      // A status-only update for a session the sidebar has never seen must not create a row:
+      // 子代理 (W3.4) children and other side-channel sessions emit status without a title or cwd.
+      if (!s.title && !s.cwd) return {};
       const cwd = s.cwd ?? "";
       const isInbox = !cwd || cwd === state.homeCwd;
       if (isInbox) {

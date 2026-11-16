@@ -12,6 +12,8 @@ export function invalidateList(engine: EngineContext) {
   engine.listCache = undefined;
 }
 export function ensureTitle(engine: EngineContext, slot: Slot, text: string) {
+  // 子代理 (W3.4) are in-memory children: no sidebar title, no agent://summary entry.
+  if (slot.subagent) return;
   const meta = engine.settings.config.read().sessions[slot.id];
   if (meta?.title || slot.session.sessionName) return;
   const title = deriveTitle(text);
@@ -72,8 +74,10 @@ export async function list(engine: EngineContext, cwd: string, includeArchived =
         status: listStatus(engine.runStatus(slot)),
       };
     });
-  // Sessions created in this run are not on disk until their first exchange.
+  // Sessions created in this run are not on disk until their first exchange. 子代理 (W3.4) are
+  // in-memory children owned by their parent: they never become sidebar entries.
   for (const slot of engine.slots.values()) {
+    if (slot.subagent) continue;
     if (slot.session.sessionManager.getCwd() !== cwd || result.some((s) => s.sessionId === slot.id)) continue;
     if (!slot.busy && !meta[slot.id]?.title) continue;
     const model = slot.session.model;

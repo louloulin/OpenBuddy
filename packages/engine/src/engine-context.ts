@@ -67,7 +67,7 @@ export interface EngineContext {
   toolArgProgress(slot: Slot, source: { contentIndex?: number; delta?: string; partial?: { content?: Array<{ arguments?: unknown }> } }): void;
   onEvent(slot: Slot, event: AgentSessionEvent): void;
   ensureTitle(slot: Slot, text: string): void;
-  open(manager: SessionManager, modelId?: string, providerId?: string, thinkingLevel?: ThinkingLevel): Promise<Slot>;
+  open(manager: SessionManager, modelId?: string, providerId?: string, thinkingLevel?: ThinkingLevel, subagent?: { parentId: string; agentName?: string }): Promise<Slot>;
   focus(id: string): void;
   all(): Promise<SessionInfo[]>;
   resolve(id: string, cwd?: string): Promise<SessionInfo>;
@@ -78,6 +78,8 @@ export interface EngineContext {
   writablePath(id: string, path: string): string;
   queueState(id: string): { steering: string[]; followUp: string[] };
   close(id: string): Promise<void>;
+  /** 做一做 / 想一想 / 问一问 (uses the session's slot; persistence is per branch). */
+  setMode(id: string, mode: AgentMode): void;
   evictOverflow(keep: string): Promise<void>;
   rebuild(slot: Slot): Promise<void>;
   reload(filter?: (slot: Slot) => boolean): Promise<void>;

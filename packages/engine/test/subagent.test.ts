@@ -58,6 +58,8 @@ describe("子代理 ob_subagent (pii W3.4)", () => {
     const childIds = started.map((e) => e.payload.childId);
     expect(sessions.map((s) => s.sessionId)).not.toEqual(expect.arrayContaining(childIds));
     expect(sessions.map((s) => s.sessionId)).toContain(f.sid);
+    // Running children are not listed as background tasks either (they belong to the parent turn).
+    expect(await f.call("tasks_list")).toEqual([]);
   });
 
   it("reports a child failure without failing the parent turn", async () => {

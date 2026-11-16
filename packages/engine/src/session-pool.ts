@@ -19,6 +19,8 @@ export async function open(
   modelId?: string,
   providerId?: string,
   thinkingLevel?: ThinkingLevel,
+  /** 子代理 (W3.4): tag the slot from the very first event, so it never becomes a sidebar row. */
+  subagent?: { parentId: string; agentName?: string },
 ): Promise<Slot> {
   const savedContext = manager.buildSessionContext();
   const model = modelId
@@ -125,6 +127,7 @@ export async function open(
     stale: false,
     lastActive: Date.now(),
     failed: false,
+    ...(subagent ? { parentId: subagent.parentId, agentName: subagent.agentName, subagent: true } : {}),
   };
   // 做一做 / 想一想 / 问一问 of the branch being opened (W0.5; in-memory when the built-in is off).
   restoreMode(engine, slot);
@@ -176,7 +179,8 @@ export async function newSession(
 export function running(engine: EngineContext) {
   const meta = engine.settings.config.read().sessions;
   return [...engine.slots.values()]
-    .filter((slot) => slot.busy)
+    // 子代理 (W3.4) run inside the parent turn: they are not separate background tasks.
+    .filter((slot) => slot.busy && !slot.subagent)
     .map((slot) => ({
       taskId: slot.id,
       sessionId: slot.id,

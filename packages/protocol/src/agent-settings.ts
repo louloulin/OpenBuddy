@@ -77,6 +77,8 @@ export interface SessionModelState extends ModelState {
   supportsThinking?: boolean;
   /** The expert bound on the current branch (W2.2); null when none. Follows branch moves. */
   expert?: SessionExpertInfo | null;
+  /** 子代理 (W3.4): set on a child session; the sidebar must not list it. */
+  subagent?: { parentId: string };
 }
 
 /** `agent_cycle_model` (Ctrl/Cmd+P) result. `changed: false` says why nothing moved. */

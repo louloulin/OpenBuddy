@@ -109,11 +109,8 @@ export function createSubagentExtension({ engine, sessionId, cwd }: SubagentCont
     const providerId = model && model.includes("/") ? model.split("/")[0] : undefined;
     let slot: Slot | undefined;
     try {
-      slot = await engine.open(SessionManager.inMemory(cwd), modelId, providerId);
+      slot = await engine.open(SessionManager.inMemory(cwd), modelId, providerId, undefined, { parentId: sessionId, agentName: expertName });
       child.id = slot.id;
-      slot.parentId = sessionId;
-      slot.agentName = expertName;
-      slot.subagent = true;
       // A child inherits the parent's 做一做 / 想一想 / 问一问: 问一问 children must not write files.
       const parentMode = engine.modes.get(sessionId);
       if (parentMode && parentMode !== "craft") engine.setMode(slot.id, parentMode);

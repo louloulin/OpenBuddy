@@ -15,6 +15,10 @@ export interface SubagentRun {
 interface SubagentState {
   /** parent session id → its children, in spawn order. */
   bySession: Record<string, SubagentRun[]>;
+  /** Every child session id seen, so sidebar events for them can be ignored. */
+  children: Record<string, true>;
+  /** Is this id a sub-agent session (never a sidebar row)? */
+  isChild: (sessionId: string) => boolean;
   apply: (event: SubagentEvent) => void;
   /** Clear a session's finished children (leaving running ones) when a new turn starts. */
   reset: (sessionId: string) => void;
@@ -24,8 +28,10 @@ interface SubagentState {
  * 子代理卡片 (pii W3.4): `agent://subagent` events folded per parent session. The transcript shows
  * the cards under the turn that spawned them; a finished child keeps its answer for expansion.
  */
-export const useSubagentStore = create<SubagentState>((set) => ({
+export const useSubagentStore = create<SubagentState>((set, get) => ({
   bySession: {},
+  children: {},
+  isChild: (sessionId) => !!get().children[sessionId],
   apply: (event) => set((state) => {
     const current = state.bySession[event.parentId] ?? [];
     const index = current.findIndex((run) => run.childId && run.childId === event.childId);
@@ -40,7 +46,10 @@ export const useSubagentStore = create<SubagentState>((set) => ({
     };
     const list = index >= 0 ? current.map((run, i) => (i === index ? { ...run, ...next } : run)) : [...current, next];
     // A child that was never named (created but not yet announced) keeps its placeholder id.
-    return { bySession: { ...state.bySession, [event.parentId]: list } };
+    return {
+      bySession: { ...state.bySession, [event.parentId]: list },
+      children: event.childId ? { ...state.children, [event.childId]: true } : state.children,
+    };
   }),
   reset: (sessionId) => set((state) => ({
     bySession: {

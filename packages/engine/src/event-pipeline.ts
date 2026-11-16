@@ -207,7 +207,8 @@ export function onEvent(engine: EngineContext, slot: Slot, event: AgentSessionEv
   if (event.type === "message_start") slot.toolArgs = undefined;
   // An extension or /name renamed the session, or the thinking level moved (e.g. clamped after
   // a model switch): keep the sidebar title and the composer's thinking control in sync (C7/C8).
-  if (event.type === "session_info_changed" && event.name?.trim()) {
+  // 子代理 (W3.4) are in-memory children: their name change must not create a sidebar row.
+  if (event.type === "session_info_changed" && event.name?.trim() && !slot.subagent) {
     engine.metadata(sessionId, { title: event.name.trim() });
     engine.invalidateList();
     engine.emit("agent://summary", { sessionId, title: event.name.trim() });

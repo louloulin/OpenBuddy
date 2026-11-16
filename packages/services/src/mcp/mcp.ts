@@ -268,7 +268,7 @@ export class McpService {
         ok: false,
         ms: Date.now() - started,
         transport: transportName,
-        error: this.settings.secrets.redact(message),
+        error: String(this.settings.secrets.redact(message)),
       };
     } finally {
       clearTimeout(timer);
