@@ -674,6 +674,33 @@ try {
     const last = ctx.fixture.requests.at(-1);
     if (last.persona) throw new Error('persona still sent after unbinding');
     return await ctx.shot('35-expert-unbound');`);
+  // W4.6: 通知渠道 — configure a webhook in the renderer, send a real test message from the host.
+  await step('通知渠道（主进程发送）', `
+    const more = page.getByRole('button', { name: /更多.*文件/ });
+    await more.hover();
+    await page.locator('.sidebar__more-popover [data-feature="notify-channels"]').click();
+    await page.getByRole('region', { name: '通知渠道' }).waitFor({ timeout: 10000 });
+    await ctx.sleep(500);
+    const empty = await ctx.shot('50-notify-channels-empty');
+    await page.getByLabel('渠道类型').selectOption('generic-webhook');
+    await page.getByPlaceholder('Webhook URL').fill('http://127.0.0.1:${FIXTURE_PORT}/webhook');
+    await page.getByPlaceholder('显示名(可选)').fill('销售群机器人');
+    await page.getByRole('button', { name: '+ 添加' }).click();
+    const row = page.locator('.notify-panel__row', { hasText: '销售群机器人' });
+    await row.waitFor({ timeout: 10000 });
+    await ctx.sleep(400);
+    const configured = await ctx.shot('51-notify-channels-configured');
+    const before = ctx.fixture.webhooks.length;
+    await row.getByRole('button', { name: '测试' }).click();
+    await page.getByText('测试消息已发送到 销售群机器人', { exact: false }).first().waitFor({ timeout: 15000 });
+    await ctx.sleep(500);
+    if (ctx.fixture.webhooks.length !== before + 1) throw new Error('host did not POST the webhook: ' + JSON.stringify(ctx.fixture.webhooks));
+    const sent = ctx.fixture.webhooks.at(-1);
+    if (!sent.body.title || !sent.body.title.includes('OpenBuddy')) throw new Error('unexpected webhook payload: ' + sent.raw);
+    const listed = await ctx.call('notify_channels_list');
+    if (!listed.some((c) => c.label === '销售群机器人' && c.enabled)) throw new Error('channel not persisted: ' + JSON.stringify(listed));
+    const tested = await ctx.shot('52-notify-channels-tested');
+    return { empty, configured, tested, payload: sent.body, channels: listed.map((c) => c.label + ':' + c.kind + ':' + c.enabled) };`);
   // pii W4.5: the sidebar 运行中 panel lists the running turn with elapsed time; stop cancels it.
   await step('运行中面板（任务 / 用时 / 停止）', `
     ctx.fixture.delayMs = 1500;

@@ -142,7 +142,8 @@ export const FEATURES: FeatureEntry<FeatureRouteProps>[] = [
     id: "notify-channels",
     nav: { label: "通知渠道", slot: "more", order: 40, icon: MoreMenuInspirationIcon },
     route: { view: "通知渠道", render: (p) => panel(<NotifyChannelsPanel onToast={p.onToast} />) },
-    requires: [],
+    // W4.6: the channels live in the host (settings + sending), so the entry needs its commands.
+    requires: ["notify_channels_list"],
   },
   {
     id: "browser-preview",

@@ -15,10 +15,14 @@ describe("PlaceholderPage (FeatureRegistry routes, pii W0.2)", () => {
 
   it("renders a route only when the host serves its commands", () => {
     useCapabilitiesStore.getState().apply(null);
+    // 通知渠道 (W4.6) needs the host's channel commands: without them the entry stays dark.
     const { unmount } = render(<PlaceholderPage label="通知渠道" />);
-    // 通知渠道 needs no host command, so it renders even without host_capabilities.
-    expect(screen.getByText(/渠道配置尚未接入主进程/)).toBeInTheDocument();
+    expect(screen.getByText("当前版本不提供这个功能")).toBeInTheDocument();
     unmount();
+    useCapabilitiesStore.getState().apply({ protocolVersion: 1, platform: "desktop", commands: ["notify_channels_list"], events: [], features: [] });
+    const { unmount: unmount2 } = render(<PlaceholderPage label="通知渠道" />);
+    expect(screen.getByRole("region", { name: "通知渠道" })).toBeInTheDocument();
+    unmount2();
     render(<PlaceholderPage label="自动化" />);
     expect(screen.getByText("当前版本不提供这个功能")).toBeInTheDocument();
   });

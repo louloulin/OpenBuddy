@@ -66,7 +66,7 @@ import(${JSON.stringify(pathToFileURL(main).href)}).catch(e=>{console.error(e);a
 `);
 
 // ---------------- fixture model provider ----------------
-const fixture = { requests: [], held: [], nextStatus: [], delayMs: 60 };
+const fixture = { requests: [], held: [], nextStatus: [], delayMs: 60, webhooks: [] };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const ANSWER = `## 修复建议
 
@@ -173,6 +173,13 @@ async function streamText(chunk, text, delay) {
   for (const p of parts) { chunk({ content: p }); if (delay) await sleep(delay); }
 }
 const fixtureServer = createServer(async (req, res) => {
+  // 20261116-pii W4.6: a webhook sink, so 通知渠道 测试发送 is a real POST from the host.
+  if (req.method === 'POST' && req.url.startsWith('/webhook')) {
+    let body = ''; for await (const part of req) body += part;
+    let parsed = {}; try { parsed = JSON.parse(body || '{}'); } catch { /* keep {} */ }
+    fixture.webhooks.push({ body: parsed, raw: body, at: Date.now() });
+    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true}'); return;
+  }
   // 20261116-pii W2.4: a minimal MCP-over-HTTP endpoint, so 测试连接 exercises a real handshake.
   if (req.method === 'POST' && req.url.startsWith('/mcp')) {
     let body = ''; for await (const part of req) body += part;

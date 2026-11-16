@@ -108,6 +108,8 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'library_remove') string('id');
   // 自动化 (W4): ids are opaque strings; the payload itself is validated by AutomationService.save.
   if (/^(automations_delete|automations_set_status|automations_run|automation_records_archive|automation_records_delete)$/.test(command)) string('id', 128);
+  // 通知渠道 (W4.6): the service validates kind / endpoint; ids stay bounded here.
+  if (/^(notify_channels_delete|notify_channels_test)$/.test(command)) string('id', 128);
   // 扩展中心 (W2.6): preview one path in an isolated loader; cwd scopes project extensions.
   if (command === 'agent_extensions_inspect') {
     string('path');

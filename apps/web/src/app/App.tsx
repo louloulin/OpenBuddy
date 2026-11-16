@@ -54,7 +54,6 @@ import type { AgentEntry } from "@openbuddy/protocol/dto";
 import { useProjectsStore, type ProjectMeta } from "../features/projects/state/projects-store";
 import { usePiQueueStore } from "../features/composer/state/pi-queue-store";
 import { recordUsage, loadUsage, loadQuotaConfig } from "../features/settings/usage-quota";
-import { dispatchNotification } from "../features/settings/notify-channels";
 import {
   registerTelemetryProvider,
   createConsoleTelemetryProvider,
@@ -287,12 +286,7 @@ function Shell() {
               const title = sessionsStore.getState().titleOf?.(p.sessionId) ?? "任务";
               void notificationAppend("session_complete", failed ? `任务失败：${title}` : `任务完成：${title}`, undefined, p.sessionId, failed ? "error" : "info");
               if (!failed) useUnseenStore.getState().mark(p.sessionId);
-              void dispatchNotification({
-                title: failed ? "OpenBuddy 任务失败" : "OpenBuddy 任务完成",
-                body: title,
-                level: failed ? "error" : "info",
-                sessionId: p.sessionId,
-              }).catch(() => { /* notification dispatch failure is non-fatal */ });
+              // 通知渠道的发送在主进程（pii W4.6）：渲染层不再推送 webhook。
             }
 
           },

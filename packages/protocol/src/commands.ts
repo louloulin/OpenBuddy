@@ -13,6 +13,8 @@ export const COMMANDS = [
   'mcp_config_path', 'mcp_test', 'mcp_auth_trigger', 'mcp_auth_status', 'skills_list', 'skills_add',
   'skills_remove', 'skills_toggle', 'commands_list', 'notification_list', 'notification_append',
   'notification_mark_read', 'notification_mark_all_read', 'notification_clear',
+  // 通知渠道 (20261116-pii W4.6): configured in the renderer, sent by the host.
+  'notify_channels_list', 'notify_channels_save', 'notify_channels_delete', 'notify_channels_test',
   'agents_defaults_get', 'agents_defaults_save', 'usage_snapshot', 'dialog_open', 'dialog_save', 'dialog_ask',
   'window_minimize', 'window_toggle_maximize', 'window_close', 'window_is_maximized', 'window_edit', 'clipboard_write_text',
   'agent_get_model_state', 'agent_set_thinking_level', 'agent_resolve_ui',

@@ -1,6 +1,15 @@
-// §5.3 `notifications` module: notification_list / append / mark_read / mark_all_read / clear, notification_prefs_get / set.
+// §5.3 `notifications` module: notification_list / append / mark_read / mark_all_read / clear, notification_prefs_get / set,
+// and 通知渠道 (W4.6): notify_channels_list / save / delete / test.
 import { invoke } from "../ipc";
 import type { NotificationEntry, NotificationKind } from "@openbuddy/protocol/dto";
+import type { NotifyChannel, NotifyChannelDraft, NotifyResult } from "@openbuddy/protocol/notifications";
+
+// ---------- 通知渠道 (W4.6): configured here, sent by the host ----------
+
+export const notifyChannelsList = () => invoke<NotifyChannel[]>("notify_channels_list");
+export const notifyChannelsSave = (channel: NotifyChannelDraft) => invoke<NotifyChannel>("notify_channels_save", { channel });
+export const notifyChannelsDelete = (id: string) => invoke<void>("notify_channels_delete", { id });
+export const notifyChannelsTest = (id: string) => invoke<NotifyResult>("notify_channels_test", { id });
 
 // ---------- notification log (智能体邮箱) ----------
 

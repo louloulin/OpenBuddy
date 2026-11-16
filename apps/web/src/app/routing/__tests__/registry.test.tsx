@@ -67,8 +67,9 @@ describe("FeatureRegistry (pii W0.2)", () => {
   it("returns false while loading and never shows offline entries", () => {
     const loading = snapshot([...COMMANDS], [], "loading");
     expect(navItems(FEATURES, loading, "primary")).toEqual([]);
-    // 灵感 is online since W2.8 (static cards, no host command).
-    expect(labels(navItems(FEATURES, loading, "more"))).toEqual(["用量统计", "通知渠道", "灵感", "策略设置"]);
+    // 灵感 is online since W2.8 (static cards, no host command); 通知渠道 needs the host's
+    // channel commands (W4.6), so it stays dark while the capabilities are still loading.
+    expect(labels(navItems(FEATURES, loading, "more"))).toEqual(["用量统计", "灵感", "策略设置"]);
     const everything = snapshot([...COMMANDS, "inspiration_generate", "open_url"]);
     for (const id of ["cloud-storage", "assistant", "browser-preview", "settings-data"])
       expect(isAvailable(FEATURES.find((e) => e.id === id)!, everything)).toBe(false);

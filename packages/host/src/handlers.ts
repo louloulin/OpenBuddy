@@ -1,4 +1,5 @@
 import { createSettings } from "@openbuddy/services/settings/settings";
+import { NotifyChannelsService } from "@openbuddy/services/notifications/channels";
 import { PiEngine } from "@openbuddy/engine/pi-engine";
 import type { Emit } from "@openbuddy/kernel";
 import type { EngineOptions, Handler, HostContext } from "./module.js";
@@ -6,8 +7,20 @@ import { HOST_MODULES } from "./modules/index.js";
 export type { EngineOptions, Handler, HostContext, HostModule } from "./module.js";
 export async function createEngineHandlers(options: EngineOptions) {
   const settings = createSettings(options.userDataDir, options.safeStorage);
-  const emit: Emit = (event, payload) =>
-    options.emit(event, settings.secrets.redact(payload));
+  // 通知渠道 (W4.6): approval / completion pushes leave the renderer and go out from here.
+  const channels = new NotifyChannelsService(settings, { openExternal: (url) => options.shell.openExternal(url) });
+  /** The session the user is reading; a turn that ends in another session still deserves a notice. */
+  let currentSessionId: () => string | undefined = () => undefined;
+  const emit: Emit = (event, payload) => {
+    const redacted = settings.secrets.redact(payload);
+    options.emit(event, redacted);
+    if (event === "agent://permission" || event === "agent://session-status") channels.observe(event, redacted);
+    if (event === "agent://session-status") {
+      const data = (redacted ?? {}) as { sessionId?: string; status?: string };
+      if (data.sessionId && data.status && data.status !== "running" && data.sessionId !== currentSessionId())
+        options.emit("agent://background-notice", { sessionId: data.sessionId, status: data.status });
+    }
+  };
   const engine = new PiEngine(
     settings,
     emit,
@@ -17,6 +30,7 @@ export async function createEngineHandlers(options: EngineOptions) {
     options.shell.trash ? (path) => options.shell.trash!(path) : undefined,
   );
   await engine.initialize();
+  currentSessionId = () => engine.currentSessionId;
   const update = (fn: (c: ReturnType<typeof settings.config.read>) => void) => {
     const c = settings.config.read();
     fn(c);

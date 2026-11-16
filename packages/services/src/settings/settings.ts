@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { SafeStorage } from "@openbuddy/kernel";
+import type { NotifyChannel } from "@openbuddy/protocol/notifications";
 import { PiSettingsStore } from "./pi-settings.js";
 
 // Moved to @openbuddy/kernel (20261115-md R2); re-exported so existing importers keep working.
@@ -154,6 +155,8 @@ export interface AppSettings {
   >;
   /** System notifications while the window is in the background (20261115-ui U6.1); on by default. */
   notifyPrefs?: { system?: boolean };
+  /** 通知渠道 (pii W4.6): webhook / mail / desktop, sent by the host. */
+  notifyChannels?: NotifyChannel[];
   notifications: Array<{
     id: number;
     kind: string;

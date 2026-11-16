@@ -1,48 +1,89 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { NotifyChannelsPanel } from "../NotifyChannelsPanel";
-import { resetNotifyChannels, registerNotifyChannel, listAllNotifyChannels } from "@/features/settings/notify-channels";
+import type { NotifyChannel } from "@openbuddy/protocol/notifications";
+
+// 20261116-pii W4.6：渠道的配置与发送都在主进程，面板只调用宿主命令。
+const { list, save, remove, test } = vi.hoisted(() => ({
+  list: vi.fn(),
+  save: vi.fn(),
+  remove: vi.fn(),
+  test: vi.fn(),
+}));
+vi.mock("@openbuddy/client/agent-client", () => ({
+  notifyChannelsList: list,
+  notifyChannelsSave: save,
+  notifyChannelsDelete: remove,
+  notifyChannelsTest: test,
+}));
+
+const channel = (patch: Partial<NotifyChannel> = {}): NotifyChannel => ({
+  id: "ch1",
+  label: "群机器人",
+  kind: "slack-webhook",
+  endpoint: "https://hooks.example/x",
+  enabled: true,
+  ...patch,
+});
+
+beforeEach(() => {
+  list.mockReset();
+  save.mockReset();
+  remove.mockReset();
+  test.mockReset();
+});
 
 describe("NotifyChannelsPanel", () => {
-  beforeEach(resetNotifyChannels);
-
-  it("无渠道时显示空态", () => {
+  it("无渠道时显示空态", async () => {
+    list.mockResolvedValue([]);
     render(<NotifyChannelsPanel />);
-    expect(screen.getByText("暂无通知渠道")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("暂无通知渠道")).toBeInTheDocument());
   });
 
-  it("添加渠道后显示在列表", () => {
-    render(<NotifyChannelsPanel onToast={vi.fn()} />);
-    const inputs = screen.getAllByRole("textbox");
-    fireEvent.change(inputs[0], { target: { value: "我的Slack" } });
-    fireEvent.change(inputs[1], { target: { value: "https://hooks.slack.com/x" } });
-    fireEvent.click(screen.getByText("+ 添加"));
-    expect(screen.getByText("我的Slack")).toBeInTheDocument();
-    expect(listAllNotifyChannels()[0].enabled).toBe(false);
-  });
-
-  it("移除渠道", () => {
-    registerNotifyChannel({ id: "test", label: "Test", kind: "generic-webhook", enabled: true });
-    render(<NotifyChannelsPanel onToast={vi.fn()} />);
-    expect(screen.getByText("Test")).toBeInTheDocument();
-    fireEvent.click(screen.getByTitle("移除"));
-    expect(screen.queryByText("Test")).toBeNull();
-  });
-
-  it("渠道尚未接入时不能启用发送", () => {
-    registerNotifyChannel({ id: "test", label: "Test", kind: "generic-webhook", enabled: true });
+  it("列出主进程返回的渠道", async () => {
+    list.mockResolvedValue([channel()]);
     render(<NotifyChannelsPanel />);
-    expect(screen.getByTitle("渠道尚未接入主进程，不能启用发送")).toBeDisabled();
-    expect(screen.getByText(/渠道配置尚未接入主进程/)).toBeInTheDocument();
-    expect(screen.getByText("未接入发送")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("群机器人")).toBeInTheDocument());
+    // 「Slack」既是行类型也是下拉选项，取行内的那一个。
+    expect(screen.getByText("Slack", { selector: ".notify-panel__row-kind" })).toBeInTheDocument();
   });
 
-  it("禁用发送测试且不会发起外部网络请求", () => {
-    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true, status: 200 } as Response);
-    registerNotifyChannel({ id: "test", label: "Webhook", kind: "generic-webhook", endpoint: "https://example.com/hook", enabled: true });
-    const onToast = vi.fn(); render(<NotifyChannelsPanel onToast={onToast} />);
-    const test = screen.getByRole("button", { name: "测试" });
-    expect(test).toBeDisabled(); fireEvent.click(test);
-    expect(fetch).not.toHaveBeenCalled(); expect(onToast).not.toHaveBeenCalled(); fetch.mockRestore();
+  it("添加渠道时调用宿主的保存命令", async () => {
+    list.mockResolvedValue([]);
+    save.mockResolvedValue(channel());
+    render(<NotifyChannelsPanel />);
+    await waitFor(() => expect(screen.getByText("暂无通知渠道")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("渠道类型"), { target: { value: "generic-webhook" } });
+    fireEvent.change(screen.getByPlaceholderText("Webhook URL"), { target: { value: "https://hooks.example/new" } });
+    fireEvent.click(screen.getByRole("button", { name: "+ 添加" }));
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    expect(save.mock.calls[0][0]).toMatchObject({
+      kind: "generic-webhook",
+      endpoint: "https://hooks.example/new",
+      enabled: true,
+    });
+  });
+
+  it("测试发送走宿主命令并提示结果", async () => {
+    list.mockResolvedValue([channel()]);
+    test.mockResolvedValue({ id: "ch1", ok: true });
+    const toast = vi.fn();
+    render(<NotifyChannelsPanel onToast={toast} />);
+    await waitFor(() => expect(screen.getByText("群机器人")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "测试" }));
+    await waitFor(() => expect(test).toHaveBeenCalledWith("ch1"));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringContaining("测试消息已发送")));
+  });
+
+  it("停用与移除也走宿主命令", async () => {
+    list.mockResolvedValue([channel()]);
+    save.mockResolvedValue(channel({ enabled: false }));
+    remove.mockResolvedValue(undefined);
+    render(<NotifyChannelsPanel />);
+    await waitFor(() => expect(screen.getByText("群机器人")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "停用 群机器人" }));
+    await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: "ch1", enabled: false })));
+    fireEvent.click(screen.getByRole("button", { name: "移除 群机器人" }));
+    await waitFor(() => expect(remove).toHaveBeenCalledWith("ch1"));
   });
 });

@@ -1,9 +1,22 @@
 import { text } from "@openbuddy/services/settings/settings";
+import { NotifyChannelsService } from "@openbuddy/services/notifications/channels";
+import type { NotifyChannelDraft } from "@openbuddy/protocol/notifications";
 import type { Handler, HostContext, HostModule } from "../module.js";
-/** §5.3 `notifications` module. In-app notification list and system notification preference. */
+/** §5.3 `notifications` module. In-app notification list, system preference and 通知渠道 (W4.6). */
 export function notificationsModule(ctx: HostContext): HostModule {
   const { settings, update } = ctx;
+  // Built on first use (modules.test.ts builds factories without a live context).
+  let channels: NotifyChannelsService | undefined;
+  const notifyChannels = (): NotifyChannelsService =>
+    (channels ??= new NotifyChannelsService(settings, {
+      // Electron's net.fetch is not required for correctness; the runtime fetch works in the host.
+      openExternal: (url) => ctx.options.shell.openExternal(url),
+    }));
   const commands: Record<string, Handler> = {
+    notify_channels_list: () => notifyChannels().list(),
+    notify_channels_save: (p) => notifyChannels().save((p.channel ?? {}) as NotifyChannelDraft),
+    notify_channels_delete: (p) => notifyChannels().remove(text(p.id)),
+    notify_channels_test: (p) => notifyChannels().test(text(p.id)),
     notification_list: () =>
       settings.config.read().notifications.slice().reverse(),
     notification_append: (p) => {
