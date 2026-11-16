@@ -20,6 +20,8 @@ export * from "./api/experts";
 export * from "./api/memory";
 export * from "./api/skills-catalog";
 export * from "./api/prompts";
+export * from "./api/usage";
+export * from "./api/library";
 
 // Appendix B: wrappers for commands the main-process contract does not implement (kept, not deleted).
 export * from "./api/deferred/connectors";

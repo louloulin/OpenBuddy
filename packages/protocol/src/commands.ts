@@ -13,7 +13,7 @@ export const COMMANDS = [
   'mcp_config_path', 'mcp_test', 'mcp_auth_trigger', 'mcp_auth_status', 'skills_list', 'skills_add',
   'skills_remove', 'skills_toggle', 'commands_list', 'notification_list', 'notification_append',
   'notification_mark_read', 'notification_mark_all_read', 'notification_clear',
-  'agents_defaults_get', 'agents_defaults_save', 'dialog_open', 'dialog_save', 'dialog_ask',
+  'agents_defaults_get', 'agents_defaults_save', 'usage_snapshot', 'dialog_open', 'dialog_save', 'dialog_ask',
   'window_minimize', 'window_toggle_maximize', 'window_close', 'window_is_maximized', 'window_edit', 'clipboard_write_text',
   'agent_get_model_state', 'agent_set_thinking_level', 'agent_resolve_ui',
   'agent_steer', 'agent_follow_up', 'agent_get_queue', 'agent_clear_queue',
@@ -35,6 +35,8 @@ export const COMMANDS = [
   'experts_thumbnail', 'experts_image_bytes', 'experts_link_agents', 'teams_list', 'teams_install',
   // 记忆 (20261116-pii W5.1–W5.3): the memory host module.
   'memory_list', 'memory_get', 'memory_save', 'memory_delete', 'memory_rewrite',
+  // 资料库知识源 (pii W5.5): the library host module.
+  'library_list', 'library_add', 'library_remove',
   // 技能目录 + 我的指令 (20261116-pii W2.7): the skills host module.
   'skills_catalog_default_root', 'skills_catalog_list_roots', 'skills_catalog_load', 'skills_catalog_read_skill',
   'prompts_list', 'prompts_get', 'prompts_save', 'prompts_delete',

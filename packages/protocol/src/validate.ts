@@ -99,6 +99,9 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'mcp_test') string('name', 256);
   // 专家团 (W3.5): install a preset by id.
   if (command === 'teams_install') string('id', 128);
+  // 资料库知识源 (W5.5): absolute folder paths.
+  if (command === 'library_add') string('path');
+  if (command === 'library_remove') string('id');
   // 扩展中心 (W2.6): preview one path in an isolated loader; cwd scopes project extensions.
   if (command === 'agent_extensions_inspect') {
     string('path');

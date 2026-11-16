@@ -15,6 +15,8 @@ export function hostModule(ctx: HostContext): HostModule {
   return {
     id: "host",
     commands: {
+      // 用量统计 (W5.6): per-session cumulative tokens / cost, aggregated by day / model / expert.
+      usage_snapshot: () => ctx.engine.usageStats.snapshot(),
       host_capabilities: () => {
         const platform = ctx.options.platform;
         const commands = new Set<string>([...ctx.servedCommands(), ...(platform?.commands ?? [])]);

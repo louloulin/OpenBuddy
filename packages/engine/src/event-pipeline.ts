@@ -13,6 +13,36 @@ import { planFromBranch, slimPlan, stateFromDetails } from "./builtin/plan-state
 export function emitPlan(engine: EngineContext, sessionId: string, items: unknown) {
   engine.emit("agent://plan", { sessionId, items: slimPlan(items) });
 }
+/** 用量 (pii W5.6): store this session's cumulative stats after a settled turn. */
+function recordUsage(engine: EngineContext, slot: Slot) {
+  if (slot.subagent) return; // a child's usage belongs to the parent turn (§W3.4)
+  // Test doubles of EngineContext may omit the service; recording is best-effort either way.
+  if (!engine.usageStats || typeof engine.usageStats.record !== "function") return;
+  try {
+    const stats = slot.session.getSessionStats();
+    const model = slot.session.model;
+    const state = engine.modelState(slot.id) as { expert?: { name?: string } | null };
+    const expert = state.expert;
+    engine.usageStats.record({
+      sessionId: slot.id,
+      ...(engine.settings.config.read().sessions[slot.id]?.title ? { title: engine.settings.config.read().sessions[slot.id].title } : {}),
+      cwd: slot.session.sessionManager.getCwd(),
+      at: new Date().toISOString(),
+      ...(model ? { modelKey: `${model.provider}/${model.id}` } : {}),
+      ...(expert?.name ? { expertName: expert.name } : {}),
+      tokens: {
+        input: stats.tokens.input + stats.tokens.cacheRead,
+        output: stats.tokens.output,
+        total: stats.tokens.total,
+      },
+      cost: stats.cost,
+      toolCalls: stats.toolCalls,
+    });
+  } catch {
+    /* a slot without a model or stats must not break the turn */
+  }
+}
+
 /** Rebuild the plan from the slot's current branch and send it. */
 export function emitBranchPlan(engine: EngineContext, slot: Slot) {
   emitPlan(engine, slot.id, planFromBranch(slot.session.sessionManager).items);
@@ -259,6 +289,8 @@ export function onEvent(engine: EngineContext, slot: Slot, event: AgentSessionEv
       slot.failed = true;
     }
     slot.finalError = undefined;
+    // 用量 (W5.6): one cumulative entry per session, fed by Pi's own stats.
+    recordUsage(engine, slot);
     // The SDK accepts a new prompt as soon as it settled; don't make the
     // renderer wait for the outer prompt() promise to unwind.
     slot.busy = false;

@@ -9,6 +9,7 @@ import type { McpService } from "@openbuddy/services/mcp/mcp";
 import type { MemoryService } from "@openbuddy/services/memory/memory";
 import type { SkillCatalogService } from "@openbuddy/services/skills/catalog";
 import type { PromptsService } from "@openbuddy/services/prompts/prompts";
+import type { UsageService } from "@openbuddy/services/usage/usage";
 import type { Providers } from "@openbuddy/services/providers/providers";
 import type { Settings } from "@openbuddy/services/settings/settings";
 import type { SkillsService } from "@openbuddy/services/skills/skills";
@@ -38,6 +39,8 @@ export interface EngineContext {
   readonly memory: MemoryService;
   readonly skillCatalog: SkillCatalogService;
   readonly prompts: PromptsService;
+  /** 用量统计 (W5.6); the per-session snapshot method is `usage(id)`. */
+  readonly usageStats: UsageService;
   readonly checkpoints: CheckpointStore;
   extensionFactories: ExtensionFactory[];
   modes: Map<string, AgentMode>;

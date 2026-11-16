@@ -39,8 +39,8 @@ describe("visible capability boundaries", () => {
   });
   it("describes quota thresholds as reminders that do not block sending", () => {
     render(<UsageQuotaPanel />);
-    expect(screen.getByText(/仅作本地用量提醒，不会阻止发送/)).toBeInTheDocument();
+    expect(screen.getByText(/阈值只作提醒，不会阻止发送/)).toBeInTheDocument();
     expect(screen.getByText("Token 提醒阈值")).toBeInTheDocument();
-    expect(screen.getByText("总 Token")).toBeInTheDocument();
+    expect(screen.getByText("Token")).toBeInTheDocument();
   });
 });

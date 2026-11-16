@@ -346,8 +346,9 @@ try {
     await more.hover();
     await page.locator('.sidebar__more-popover').waitFor({ timeout: 5000 });
     const moreItems = await page.locator('.sidebar__more-popover [role=menuitem]').allTextContents();
-    // 策略设置 stays until W6 folds it into the security centre (it says it is a local preview); these are offline.
-    if (moreItems.some(t => ['灵感', '云存储'].includes(t.trim()))) throw new Error('offline entry offered: ' + moreItems.join(','));
+    // 灵感 is online since W2.8 (static scene cards); 策略设置 stays until W6 (it says it is a local preview).
+    // 云存储 needs a provider account and must not be offered.
+    if (moreItems.some(t => ['云存储'].includes(t.trim()))) throw new Error('offline entry offered: ' + moreItems.join(','));
     await ctx.sleep(400);
     const shot = await ctx.shot('22-sidebar-registry');
     await page.mouse.move(900, 500);
@@ -376,6 +377,48 @@ try {
     const notImplemented = fresh.filter(r => /not_implemented/.test(r.error ?? '')).map(r => r.command);
     if (notImplemented.length) throw new Error('not_implemented while clicking entries: ' + notImplemented.join(','));
     return { visited, commands: [...new Set(fresh.map(r => r.command))].sort(), rejected: fresh.filter(r => r.status === 'rejected').map(r => r.command + ': ' + r.error), notImplemented };`);
+  // W5.5: 资料库 has three tabs — 记忆 / 我的文件 / 知识库.
+  await step('资料库三标签', `
+    await page.locator('.sidebar__nav > [data-feature="library"]').click();
+    await page.getByRole('tab', { name: '记忆' }).waitFor({ timeout: 10000 });
+    await ctx.sleep(600);
+    const memory = await ctx.shot('38-library-memory');
+    await page.getByRole('tab', { name: '我的文件' }).click();
+    await page.locator('.my-files-panel, .resources-panel').first().waitFor({ timeout: 10000 });
+    await ctx.sleep(800);
+    const files = await ctx.shot('39-library-files');
+    await page.getByRole('tab', { name: '知识库' }).click();
+    await page.getByText('知识库', { exact: true }).first().waitFor({ timeout: 10000 });
+    await ctx.sleep(700);
+    const knowledge = await ctx.shot('40-library-knowledge');
+    return { memory, files, knowledge };`);
+  // W2.8: 灵感 is static scene cards; 存为指令 writes a /scene- prompt template.
+  await step('灵感静态场景', `
+    const more = page.getByRole('button', { name: /更多.*文件/ });
+    await more.hover();
+    await page.locator('.sidebar__more-popover [data-feature="inspiration"]').click();
+    await page.getByRole('heading', { name: '财报分析全流程' }).waitFor({ timeout: 10000 });
+    await ctx.sleep(600);
+    const cards = await page.locator('.inspiration-card').count();
+    const grid = await ctx.shot('41-inspiration');
+    const first = page.locator('.inspiration-card').first();
+    await first.getByRole('button', { name: /存为指令/ }).click();
+    await ctx.sleep(1200);
+    const prompts = await ctx.call('prompts_list');
+    const scene = prompts.find((entry) => String(entry.name).startsWith('scene-working-'));
+    if (!scene) throw new Error('scene template not saved');
+    return { cards, grid, scene: scene.name };`);
+  // W5.6: 用量统计 reads the host's real usage snapshot.
+  await step('用量统计', `
+    const more = page.getByRole('button', { name: /更多.*文件/ });
+    await more.hover();
+    await page.locator('.sidebar__more-popover [data-feature="usage"]').click();
+    await page.locator('.quota-panel__stat-value').first().waitFor({ timeout: 10000 });
+    await ctx.sleep(1000);
+    const values = await page.locator('.quota-panel__stat-value').allTextContents();
+    const snapshot = await ctx.call('usage_snapshot');
+    if (!snapshot || typeof snapshot.totals !== 'object') throw new Error('usage_snapshot shape: ' + JSON.stringify(snapshot));
+    return { values, totals: snapshot.totals, shot: await ctx.shot('42-usage') };`);
   // U7.6: 技能与 MCP merged into 专家·技能·连接器 (catalog tabs hidden until their commands exist).
   await step('experts hub with skills and MCP', `
     await page.locator('.sidebar__nav > [data-feature="experts-hub"]').click();
@@ -493,7 +536,22 @@ try {
     const count = await page.locator('.ec-grid .ec-card').count();
     if (count < 8) throw new Error('expected at least 8 built-in experts, got ' + count);
     await ctx.sleep(600);
-    return { cards: count, shot: await ctx.shot('28-experts-center') };`);
+    const center = await ctx.shot('28-experts-center');
+    // W3.5 专家团: preset pipelines install as a /team- prompt template.
+    const team = page.locator('.team-card').first();
+    await team.scrollIntoViewIfNeeded();
+    await team.waitFor({ timeout: 10000 });
+    const teamShot = await ctx.shot('28b-expert-teams');
+    let teamCommand = '';
+    if (!(await team.getByText('已在我的指令').count())) {
+      await team.getByRole('button', { name: /添加到我的指令/ }).click();
+      await team.getByText('已在我的指令').waitFor({ timeout: 10000 });
+    }
+    teamCommand = (await team.locator('.team-card__command').textContent())?.trim() ?? '';
+    await ctx.sleep(500);
+    const installed = await ctx.call('prompts_list');
+    if (!installed.some((entry) => '/' + entry.name === teamCommand)) throw new Error('team not installed: ' + teamCommand);
+    return { cards: count, shots: [center, teamShot, await ctx.shot('28c-expert-team-installed')], teamCommand };`);
   await step('experts detail', `
     await page.locator('.ec-grid [data-expert-id="data-analyst"]').click();
     const dialog = page.getByRole('dialog', { name: '专家：数据分析师' });

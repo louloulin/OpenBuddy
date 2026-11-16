@@ -12590,3 +12590,9 @@ button.diff__path {
 .team-card__actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 4px; flex-wrap: wrap; }
 .team-card__command { font-size: 11px; color: var(--wb-text-tertiary, var(--wb-text-medium)); }
 .team-card__installed { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: #15803d; }
+
+/* 资料库三标签 (pii W5.5). */
+.resources-panel__tabs { display: flex; gap: 4px; padding: 10px 20px 0; }
+.resources-panel__tab { height: 28px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--wb-text-medium); font: inherit; font-size: 12.5px; cursor: pointer; }
+.resources-panel__tab:hover { color: var(--wb-text-strong); }
+.resources-panel__tab--on { background: var(--wb-bg-secondary); color: var(--wb-text-strong); font-weight: 500; }

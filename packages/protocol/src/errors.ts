@@ -28,6 +28,8 @@ export const PROTOCOL_ERROR_CODES = [
   'expert_not_found',
   'expert_invalid',
   'expert_readonly',
+  // 20261116-pii W3.5
+  'team_not_found',
 ] as const;
 export type ProtocolErrorCode = typeof PROTOCOL_ERROR_CODES[number];
 

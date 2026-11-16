@@ -13,6 +13,7 @@ import { filesModule } from "./files.js";
 import { hostModule } from "./host.js";
 import { expertsModule } from "./experts.js";
 import { memoryModule } from "./memory.js";
+import { libraryModule } from "./library.js";
 /**
  * The §5.3 host modules, in assembly order. `files` stays last: its service handlers were
  * spread after the command literal before the split, so it keeps the last word on a key.
@@ -30,6 +31,7 @@ export const HOST_MODULES: readonly HostModuleFactory[] = [
   artifactsModule,
   expertsModule,
   memoryModule,
+  libraryModule,
   hostModule,
   filesModule,
 ];

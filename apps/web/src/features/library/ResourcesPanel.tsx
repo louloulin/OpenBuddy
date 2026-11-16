@@ -17,6 +17,8 @@ import {
   memorySave,
 } from "@openbuddy/client/agent-client";
 import type { MemoryEntry } from "@openbuddy/protocol/dto";
+import { MyFilesPanel } from "./MyFilesPanel";
+import { KnowledgeBasePanel } from "./KnowledgeBasePanel";
 
 interface ResourcesPanelProps {
   cwd?: string;
@@ -24,7 +26,11 @@ interface ResourcesPanelProps {
   initialTab?: "library" | "inspiration";
 }
 
+/** 资料库 (pii W5.5): 记忆 / 我的文件 / 知识库 in one page. */
+type LibraryTab = "memory" | "files" | "knowledge";
+
 export function ResourcesPanel({ cwd, onToast }: ResourcesPanelProps) {
+  const [tab, setTab] = useState<LibraryTab>("memory");
   const [entries, setEntries] = useState<MemoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
@@ -108,8 +114,34 @@ export function ResourcesPanel({ cwd, onToast }: ResourcesPanelProps) {
   const globalCount = entries.filter((e) => e.scope === "global").length;
   const workspaceCount = entries.filter((e) => e.scope === "workspace").length;
 
+  const tabs: Array<{ id: LibraryTab; label: string }> = [
+    { id: "memory", label: "记忆" },
+    { id: "files", label: "我的文件" },
+    { id: "knowledge", label: "知识库" },
+  ];
+  const tabsRow = (
+    <div className="resources-panel__tabs" role="tablist" aria-label="资料库">
+      {tabs.map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          role="tab"
+          aria-selected={tab === item.id}
+          className={"resources-panel__tab" + (tab === item.id ? " resources-panel__tab--on" : "")}
+          onClick={() => setTab(item.id)}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (tab === "files") return <div className="resources-panel">{tabsRow}<MyFilesPanel cwd={cwd} onToast={onToast} /></div>;
+  if (tab === "knowledge") return <div className="resources-panel">{tabsRow}<KnowledgeBasePanel onToast={onToast} /></div>;
+
   return (
     <div className="resources-panel">
+      {tabsRow}
       <div className="resources-panel__header">
         <h2 className="resources-panel__title">资料库</h2>
           <div className="resources-panel__header-actions">

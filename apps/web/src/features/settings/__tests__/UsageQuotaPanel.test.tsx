@@ -1,57 +1,57 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { UsageQuotaPanel } from "../UsageQuotaPanel";
-import { recordUsage, clearUsage, saveQuotaConfig, type UsageRecord } from "@/features/settings/usage-quota";
+import { saveQuotaConfig } from "@/features/settings/usage-quota";
+import type { UsageSnapshot } from "@openbuddy/protocol/usage";
 
-describe("UsageQuotaPanel", () => {
-  beforeEach(() => {
-    clearUsage();
-    window.localStorage.removeItem("openbuddy.quota");
+const today = new Date().toISOString().slice(0, 10);
+const snapshot: UsageSnapshot = {
+  generatedAt: new Date().toISOString(),
+  totals: { tokens: 700, prompt: 600, completion: 100, cost: 0.01, sessions: 2 },
+  byDate: { [today]: { tokens: 700, cost: 0.01, sessions: 2 } },
+  byModel: { "fixture/model-a": { tokens: 700, cost: 0.01, sessions: 2 } },
+  byExpert: { "专家 · 分析师": { tokens: 400, cost: 0.005, sessions: 1 } },
+  sessions: [
+    { sessionId: "a", title: "季度分析", cwd: "/ws", at: new Date().toISOString(), modelKey: "fixture/model-a", expertName: "分析师", tokens: { input: 300, output: 100, total: 400 }, cost: 0.005, toolCalls: 2 },
+    { sessionId: "b", title: "周报", cwd: "/ws", at: new Date().toISOString(), modelKey: "fixture/model-a", tokens: { input: 250, output: 50, total: 300 }, cost: 0.005, toolCalls: 1 },
+  ],
+};
+
+const mocks = vi.hoisted(() => ({ usageSnapshot: vi.fn() }));
+vi.mock("@openbuddy/client/agent-client", () => ({ usageSnapshot: mocks.usageSnapshot }));
+
+beforeEach(() => {
+  window.localStorage.removeItem("openbuddy.quota");
+  mocks.usageSnapshot.mockReset();
+});
+
+describe("用量统计 (pii W5.6)", () => {
+  it("reads the host snapshot instead of a localStorage ledger", async () => {
+    mocks.usageSnapshot.mockResolvedValue(snapshot);
+    const { container } = render(<UsageQuotaPanel />);
+    await waitFor(() => expect(container.querySelector(".quota-panel__stat-value")?.textContent).toBe("700"));
+    const stats = [...container.querySelectorAll(".quota-panel__stat-value")].map((el) => el.textContent);
+    expect(stats).toEqual(["700", "2", "$0.0100"]); // token / 任务数 / 费用
+    expect(screen.getByText("fixture/model-a")).toBeInTheDocument();
+    expect(screen.getByText("专家 · 分析师")).toBeInTheDocument();
+    expect(screen.getByText("季度分析")).toBeInTheDocument();
   });
 
-  it("空数据显示 0 token + 0 调用", () => {
-    render(<UsageQuotaPanel />);
-    // 空数据时总 Token 显示 0(作为 stat-value)。
-    const tokenStat = screen.getByText("总 Token");
-    expect(tokenStat.previousElementSibling?.textContent).toBe("0");
-    expect(screen.getByText("调用次数")).toBeInTheDocument();
+  it("shows 0 for an empty snapshot", async () => {
+    mocks.usageSnapshot.mockResolvedValue({ generatedAt: new Date().toISOString(), totals: { tokens: 0, prompt: 0, completion: 0, cost: 0, sessions: 0 }, byDate: {}, byModel: {}, byExpert: {}, sessions: [] });
+    const { container } = render(<UsageQuotaPanel />);
+    await waitFor(() => expect(container.querySelector(".quota-panel__stat-value")).toBeInTheDocument());
+    expect([...container.querySelectorAll(".quota-panel__stat-value")].map((el) => el.textContent)).toEqual(["0", "0", "$0.0000"]);
+    expect(screen.queryByText("按模型")).not.toBeInTheDocument();
   });
 
-  it("有用量记录 → 显示汇总", () => {
-    recordUsage([], { modelId: "gpt-4", promptTokens: 500, completionTokens: 200 });
+  it("keeps the local reminder threshold", async () => {
+    mocks.usageSnapshot.mockResolvedValue(snapshot);
+    saveQuotaConfig({ period: "daily", tokenLimit: 500 });
     render(<UsageQuotaPanel />);
-    // totalTokens = 700
-    expect(screen.getByText("700")).toBeInTheDocument();
-    expect(screen.getByText("1")).toBeInTheDocument(); // count
-  });
-
-  it("切换本月/今日周期", () => {
-    render(<UsageQuotaPanel />);
-    expect(screen.getByText("今日")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/700 \/ 500/)).toBeInTheDocument());
+    expect(screen.getByText("已达到提醒阈值，仍可发送")).toBeInTheDocument();
     fireEvent.click(screen.getByText("本月"));
-    // 重新渲染后仍正常。
-    expect(screen.getByText("总 Token")).toBeInTheDocument();
-  });
-
-  it("配置配额 → 显示进度条", () => {
-    recordUsage([], { modelId: "gpt-4", promptTokens: 800, completionTokens: 200 });
-    saveQuotaConfig({ period: "daily", tokenLimit: 1000 });
-    render(<UsageQuotaPanel />);
-    // 1000 token used = 1000, limit 1000 → pct 100
-    expect(screen.getByText(/1,000 \/ 1,000/)).toBeInTheDocument();
-  });
-
-  it("按模型分组显示", () => {
-    recordUsage([], { modelId: "gpt-4", promptTokens: 100, completionTokens: 50 });
-    recordUsage([{
-      date: new Date().toISOString().slice(0, 10),
-      modelId: "gpt-4",
-      promptTokens: 100,
-      completionTokens: 50,
-      ts: Date.now(),
-    } as UsageRecord], { modelId: "claude", promptTokens: 50, completionTokens: 30 });
-    render(<UsageQuotaPanel />);
-    expect(screen.getByText("gpt-4")).toBeInTheDocument();
-    expect(screen.getByText("claude")).toBeInTheDocument();
+    expect(screen.getByText("Token")).toBeInTheDocument();
   });
 });

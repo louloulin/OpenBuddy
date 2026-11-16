@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { open as openDialog } from "@openbuddy/client/ipc";
 import { searchKb, listKbProvidersWithStats, registerKbProvider, unregisterKbProvider, rebuildAllKbProviders, type KbEntry, type KbIndexStats } from "@/features/library/knowledge-base";
 import { createLocalKbProvider } from "@/features/library/local-kb-provider";
+import { libraryAdd, libraryList, libraryRemove } from "@openbuddy/client/agent-client";
 import { createDesktopDirectoryReader, isDesktopAvailable } from "@/features/library/desktop-kb-reader";
 
 interface KnowledgeBasePanelProps {
@@ -44,7 +45,10 @@ export function KnowledgeBasePanel({ onOpen, onToast }: KnowledgeBasePanelProps)
     try {
       const dir = await openDialog({ directory: true, multiple: false });
       if (!dir || Array.isArray(dir)) return;
-      registerKbProvider(createLocalKbProvider(dir as string, createDesktopDirectoryReader()));
+      const folder = dir as string;
+      registerKbProvider(createLocalKbProvider(folder, createDesktopDirectoryReader()));
+      // 资料库 (W5.5): keep the source in library.json so it survives a restart.
+      await libraryAdd(folder).catch((e) => onToast?.(`已添加到本次会话，但保存失败：${String(e).replace(/^Error:\s*/, "")}`));
       setRefreshKey((k) => k + 1);
       onToast?.("已添加本地知识源");
     } catch (e) {
@@ -54,11 +58,25 @@ export function KnowledgeBasePanel({ onOpen, onToast }: KnowledgeBasePanelProps)
 
   /** 移除一个已注册知识源(by id)。 */
   const removeSource = (id: string) => {
-    if (unregisterKbProvider(id)) {
+    const removed = unregisterKbProvider(id);
+    // 资料库 (W5.5): the same id is the folder path in library.json.
+    if (removed) void libraryRemove(id).catch(() => {});
+    if (removed) {
       setRefreshKey((k) => k + 1);
       onToast?.("已移除知识源");
     }
   };
+
+  // 资料库 (W5.5): rebuild the local providers from the persisted library.json on mount.
+  useEffect(() => {
+    let cancelled = false;
+    void libraryList().then((saved) => {
+      if (cancelled || !isDesktopAvailable()) return;
+      for (const source of saved) registerKbProvider(createLocalKbProvider(source.path, createDesktopDirectoryReader()));
+      if (saved.length) setRefreshKey((k) => k + 1);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   /** 重建索引:刷新所有知识源缓存(本地文件夹内容变化后手动重新扫描)。 */
   const [rebuilding, setRebuilding] = useState(false);

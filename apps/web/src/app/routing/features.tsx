@@ -150,7 +150,8 @@ export const FEATURES: FeatureEntry<FeatureRouteProps>[] = [
     id: "inspiration",
     nav: { label: "灵感", slot: "more", order: 60, icon: MoreMenuInspirationIcon },
     route: { view: "灵感", render: (p) => <InspirationPanel cwd={p.cwd} onToast={p.onToast} onLaunch={p.onLaunch ? (prompt: string) => p.onLaunch!(prompt) : undefined} /> },
-    requires: ["inspiration_generate"],
+    // pii W2.8: static scene cards (no model call), so the entry no longer needs a host command.
+    requires: [],
   },
   {
     id: "policy",
