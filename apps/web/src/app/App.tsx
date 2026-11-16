@@ -11,6 +11,7 @@ import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { AboutDialog } from "../features/settings/AboutDialog";
 import { FolderTrustDialog } from "../features/approvals/FolderTrustDialog";
 import { TopbarActions } from "./shell/TopbarActions";
+import { setPendingAutomationDraft } from "../features/automation/pending-draft";
 import { SidebarToggleIcon, WbNewTaskIcon } from "@openbuddy/ui/icon/icons/index";
 import { ModelRuntimeContext, type ModelOption } from "../features/models/ModelSelector";
 import { useExtensionUiStore } from "../features/approvals/state/extension-ui-store";
@@ -919,7 +920,12 @@ function Shell() {
                     title={currentTitle}
                     onForked={handleForked}
                     pinned={currentEntry?.pinned}
+                    cwd={currentEntry?.cwd ?? cwdRef.current}
                     onToast={showToast}
+                    onSaveAsAutomation={(patch) => {
+                      setPendingAutomationDraft(patch);
+                      handleNavigate("自动化");
+                    }}
                     onSessionsChanged={(patch) => {
                       if (patch) sessionsStore.getState().upsert({ sessionId: currentSessionId, ...patch });
                     }}
@@ -968,6 +974,7 @@ function Shell() {
               onToast={showToast}
               cwd={cwdRef.current}
               onSelectWorkspace={handleSelectWorkspace}
+              onOpenSession={(sessionId) => void handleSelectSession(sessionId)}
               sessionId={currentSessionId ?? resourceSessionRef.current}
               onLaunch={handleLaunchDiscover}
               onSend={handleSendNew}

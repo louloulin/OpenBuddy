@@ -18,25 +18,31 @@ import {
   agentSetSessionArchived,
 } from "@openbuddy/client/agent-client";
 import { buildSessionMarkdown, sanitizeFilename } from "@openbuddy/chat-core/export-markdown";
+import type { Automation } from "@openbuddy/protocol/dto";
 import { TaskOverview } from "./TaskOverview";
 
 interface TopbarActionsProps {
   sessionId: string;
   title: string;
   pinned?: boolean;
+  cwd?: string;
   onToast?: (msg: string) => void;
   onForked?: (sessionId: string) => void | Promise<void>;
   /** After archive/pin mutations, parent merges the patch into the sessions store. */
   onSessionsChanged?: (patch?: Record<string, unknown>) => void;
+  /** 保存为自动化 (pii W4.3): hand a pre-filled draft to the automation panel. */
+  onSaveAsAutomation?: (patch: Partial<Automation>) => void;
 }
 
 export function TopbarActions({
   sessionId,
   title,
   pinned,
+  cwd,
   onToast,
   onSessionsChanged,
   onForked,
+  onSaveAsAutomation,
 }: TopbarActionsProps) {
   const streaming = useSessionStore(state => state.streaming);
   const [open, setOpen] = useState(false);
@@ -108,7 +114,18 @@ export function TopbarActions({
     }
   }, [sessionId, onToast, onSessionsChanged]);
 
-    const handleFork = async () => {
+  /** Pre-fill the automation form from this session: title, last user message, workspace. */
+  const handleSaveAsAutomation = useCallback(() => {
+    if (!onSaveAsAutomation) return;
+    setOpen(false);
+    const lastUser = [...useSessionStore.getState().messages].reverse().find((m) => m.role === "user");
+    const prompt = lastUser
+      ? lastUser.parts.filter((part) => part.kind === "text").map((part) => part.text).join("\n").trim()
+      : "";
+    onSaveAsAutomation({ name: title || "自动化任务", prompt, ...(cwd ? { cwds: cwd } : {}) });
+  }, [onSaveAsAutomation, title, cwd]);
+
+  const handleFork = async () => {
     if (streaming || busy || !onForked) return;
     setBusy(true); setOpen(false);
     try { const childId = await agentForkSession(sessionId); await onForked(childId); onToast?.("已创建分叉会话"); }
@@ -139,6 +156,11 @@ export function TopbarActions({
       {open && (
         <div className="topbar-actions__menu" onClick={(e) => e.stopPropagation()}>
           {onForked && <button type="button" className="topbar-actions__item" disabled={streaming || busy} onClick={() => { void handleFork(); }}>分叉为新会话</button>}
+          {onSaveAsAutomation && (
+            <button type="button" className="topbar-actions__item" onClick={handleSaveAsAutomation}>
+              <span>保存为自动化</span>
+            </button>
+          )}
           <button type="button" className="topbar-actions__item" onClick={handleExport}>
             <span className="topbar-actions__item-icon">📄</span>
             <span>导出为 Markdown</span>

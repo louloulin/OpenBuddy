@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { AutomationPanel } from "../AutomationPanel";
+import { setPendingAutomationDraft } from "../pending-draft";
 import type { AutomationSnapshot } from "@openbuddy/protocol/dto";
 
 const emptySnapshot: AutomationSnapshot = { automations: [], records: [] };
@@ -68,6 +69,14 @@ describe("AutomationPanel（截图 1/3 空态）", () => {
     expect(screen.getByText(/技能/)).toBeInTheDocument();
     expect(screen.getByText("召唤专家")).toBeInTheDocument();
     expect(screen.getByText("完全访问权限")).toBeInTheDocument();
+  });
+
+  it("保存为自动化：会话 ⋯ 菜单交来的草稿直接预填创建表单", async () => {
+    setPendingAutomationDraft({ name: "季度销售自动化", prompt: "把季度销售数据整理成报告", cwds: "/ws" });
+    render(<AutomationPanel />);
+    await waitFor(() => expect(screen.getByText("执行频率")).toBeInTheDocument());
+    expect((document.querySelector(".atm-modal-input") as HTMLInputElement).value).toBe("季度销售自动化");
+    expect((document.querySelector(".atm-prompt-textarea") as HTMLTextAreaElement).value).toBe("把季度销售数据整理成报告");
   });
 
   it("点击模板卡片预填进入创建表单", async () => {

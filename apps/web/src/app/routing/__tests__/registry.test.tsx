@@ -19,11 +19,11 @@ describe("FeatureRegistry (pii W0.2)", () => {
   it("entries whose requires are unmet do not render in the sidebar or the 更多 menu", async () => {
     const primary = navItems(FEATURES, desktop, "primary");
     const more = navItems(FEATURES, desktop, "more");
-    expect(labels(primary)).toEqual(["专家·技能·连接器", "资料库", "项目"]); // 资料库 lights up: memory_list is a contract command since W5.1
+    expect(labels(primary)).toEqual(["专家·技能·连接器", "自动化", "资料库", "项目"]); // 资料库 lights up: memory_list is a contract command since W5.1; 自动化 since W4
     expect(labels(more)).toEqual(["我的文件", "知识库", "用量统计", "通知渠道", "灵感", "策略设置"]);
     const user = userEvent.setup();
     render(<Sidebar onNewSession={vi.fn()} onSelect={vi.fn()} onNavigate={vi.fn()} onOpenSettings={vi.fn()} onToggleCollapse={vi.fn()} onToggleWorkspace={vi.fn()} onOpenSearch={vi.fn()} onPlaceholder={vi.fn()} activeNav="" nav={primary} moreItems={more} />);
-    for (const label of ["自动化", "助理", "技能与 MCP"]) expect(screen.queryByText(label)).toBeNull();
+    for (const label of ["助理", "技能与 MCP"]) expect(screen.queryByText(label)).toBeNull();
     await user.hover(screen.getByText("更多"));
     await screen.findByRole("menu");
     // 灵感 is online since W2.8; 云存储 / 网页预览 still need a provider or an address.
@@ -53,7 +53,9 @@ describe("FeatureRegistry (pii W0.2)", () => {
     expect(requires("library").requires).toEqual(["memory_list"]);
     expect(requires("session-search").requires).toEqual(["session_search"]);
     expect(requires("plan-panel").requiresEvents).toEqual(["agent://plan"]);
-    expect(missingFor(requires("automation"), desktop)).toEqual(["automations_snapshot"]);
+    expect(missingFor(requires("automation"), desktop)).toEqual([]);
+    // A host without the scheduler leaves 自动化 dark.
+    expect(missingFor(requires("automation"), snapshot([...COMMANDS].filter((name) => name !== "automations_snapshot")))).toEqual(["automations_snapshot"]);
   });
 
   it("only mounts the settings sections the host can serve", () => {
@@ -75,10 +77,10 @@ describe("FeatureRegistry (pii W0.2)", () => {
 
   it("refuses navigation to views the host cannot serve; the old App.tsx block list is now decided by requires", () => {
     expect(resolveView(FEATURES, desktop, "技能与 MCP")).toBe("专家·技能·连接器");
-    expect(resolveView(FEATURES, desktop, "自动化")).toBeUndefined();
+    expect(resolveView(FEATURES, desktop, "自动化")).toBe("自动化");
     expect(resolveView(FEATURES, desktop, "不存在的入口")).toBeUndefined();
     // 资料库 is served since W5.1; 灵感 since W2.8 (static cards, no host command).
-    expect(LEGACY_BLOCKED_VIEWS.filter((label) => resolveView(FEATURES, desktop, label))).toEqual(["专家·技能·连接器", "资料库", "灵感"]);
+    expect(LEGACY_BLOCKED_VIEWS.filter((label) => resolveView(FEATURES, desktop, label))).toEqual(["专家·技能·连接器", "自动化", "资料库", "灵感"]);
     expect(LEGACY_BLOCKED_VIEWS.every((label) => routeEntry(FEATURES, label))).toBe(true);
   });
 

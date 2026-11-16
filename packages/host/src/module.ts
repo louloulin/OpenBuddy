@@ -15,6 +15,11 @@ export interface EngineOptions {
    * itself (desktop: native dialogs, windows, clipboard, export; window/focus events).
    */
   platform?: { kind: string; commands?: readonly string[]; events?: readonly string[] };
+  /**
+   * 自动化 (W4): how often the scheduler checks due tasks (ms). 0 disables the timer — tests and
+   * headless runs drive `automation_tick` instead.
+   */
+  automationTickMs?: number;
 }
 export type Handler = (
   payload: Record<string, unknown>,

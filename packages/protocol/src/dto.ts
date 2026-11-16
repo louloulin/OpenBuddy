@@ -678,6 +678,8 @@ export interface AutomationRunRecord {
   startedAt: string;
   finishedAt?: string;
   sessionId?: string;
+  /** Failure / timeout reason (`automation_timeout`, executor error text). */
+  error?: string;
   archived: boolean;
 }
 

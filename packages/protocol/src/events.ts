@@ -5,7 +5,7 @@ export const EVENTS = [
   'agent://permission-mode', 'agent://models-update', 'agent://mcp-status', 'window://resized',
   'agent://model-state', 'agent://ui-request', 'agent://ui-dismiss', 'agent://ui-notification', 'agent://ui-state',
   'agent://session-status', 'agent://permission-dismiss', 'agent://artifacts', 'app://focus-session',
-  'agent://plan', 'agent://connector-needed', 'agent://subagent',
+  'agent://plan', 'agent://connector-needed', 'agent://subagent', 'agent://automation',
 ] as const;
 export type EventName = typeof EVENTS[number];
 export const isEvent = (value: unknown): value is EventName => typeof value === 'string' && (EVENTS as readonly string[]).includes(value);

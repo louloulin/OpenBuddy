@@ -41,6 +41,8 @@ export interface FeatureRouteProps {
   onToast?: (message: string) => void;
   cwd?: string;
   onSelectWorkspace?: (cwd: string) => void;
+  /** Open a saved session by id (自动化 运行记录 → 打开对应会话, pii W4.3). */
+  onOpenSession?: (sessionId: string, cwd?: string) => void;
   sessionId?: string;
   onLaunch?: (prompt: string, agent?: AgentEntry) => void;
   onSend?: (text: string, attachments?: { path: string }[]) => void | Promise<void>;
@@ -77,7 +79,10 @@ export const FEATURES: FeatureEntry<FeatureRouteProps>[] = [
   {
     id: "automation",
     nav: { label: "自动化", slot: "primary", order: 20, icon: WbAutomationNavIcon },
-    route: { view: "自动化", render: (p) => <AutomationPanel onToast={p.onToast} onNavigate={p.onNavigate} /> },
+    route: {
+      view: "自动化",
+      render: (p) => <AutomationPanel onToast={p.onToast} onNavigate={p.onNavigate} onOpenSession={p.onOpenSession} />,
+    },
     requires: ["automations_snapshot"],
   },
   {

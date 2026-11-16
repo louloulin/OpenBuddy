@@ -33,6 +33,9 @@ export const COMMANDS = [
   'agent_set_session_expert', 'agent_clear_session_expert',
   'experts_default_root', 'experts_list_roots', 'experts_set_roots', 'experts_load', 'experts_read_agent_prompt',
   'experts_thumbnail', 'experts_image_bytes', 'experts_link_agents', 'teams_list', 'teams_install',
+  // 自动化 (20261116-pii W4.1–W4.3): the automation host module.
+  'automations_snapshot', 'automations_save', 'automations_delete', 'automations_set_status', 'automations_run',
+  'automation_tick', 'automation_records_archive', 'automation_records_delete',
   // 记忆 (20261116-pii W5.1–W5.3): the memory host module.
   'memory_list', 'memory_get', 'memory_save', 'memory_delete', 'memory_rewrite',
   // 资料库知识源 (pii W5.5): the library host module.

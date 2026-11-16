@@ -164,6 +164,8 @@ export async function newSession(
   modelId?: string,
   providerId?: string,
   thinkingLevel?: ThinkingLevel,
+  /** 自动化 (W4.2): a background run must not steal focus from the session the user is reading. */
+  background = false,
 ) {
   const actual = await engine.validCwd(cwd);
   const slot = await engine.open(
@@ -172,7 +174,7 @@ export async function newSession(
     providerId,
     thinkingLevel,
   );
-  engine.focus(slot.id);
+  if (!background) engine.focus(slot.id);
   return slot.id;
 }
 /** Sessions currently running a turn (the renderer's 任务 view of background work). */

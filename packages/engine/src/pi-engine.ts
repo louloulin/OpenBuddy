@@ -175,7 +175,7 @@ export class PiEngine {
   /** @internal */ ensureTitle(slot: Slot, text: string) { return catalog.ensureTitle(this, slot, text); }
   /** @internal */ open(manager: SessionManager, modelId?: string, providerId?: string, thinkingLevel?: ThinkingLevel): Promise<Slot> { return pool.open(this, manager, modelId, providerId, thinkingLevel); }
   /** @internal */ focus(id: string) { return pool.focus(this, id); }
-  newSession(cwd: string, modelId?: string, providerId?: string, thinkingLevel?: ThinkingLevel) { return pool.newSession(this, cwd, modelId, providerId, thinkingLevel); }
+  newSession(cwd: string, modelId?: string, providerId?: string, thinkingLevel?: ThinkingLevel, background = false) { return pool.newSession(this, cwd, modelId, providerId, thinkingLevel, background); }
   all() { return catalog.all(this); }
   resolve(id: string, cwd?: string): Promise<SessionInfo> { return catalog.resolve(this, id, cwd); }
   /** Bring a session into the pool (reusing a live one) and return its snapshot. */

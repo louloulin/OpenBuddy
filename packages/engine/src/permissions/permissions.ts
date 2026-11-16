@@ -41,6 +41,8 @@ export class Permissions {
   >();
   /** Tools the user allowed for the rest of a session ("本会话允许"). */
   private sessionAllow = new Map<string, Set<string>>();
+  /** 自动化 (W4.2): sessions configured for 完全访问 run unattended; deny rules still win. */
+  private sessionAll = new Set<string>();
   constructor(
     private settings: Settings,
     private emit: Emit,
@@ -71,7 +73,7 @@ export class Permissions {
     const config = this.settings.config.read();
     const rule = this.rule(toolName, input);
     if (rule?.action === "deny") return false;
-    if (rule?.action === "allow" || config.permissionMode === "always-approve")
+    if (this.sessionAll.has(sessionId) || rule?.action === "allow" || config.permissionMode === "always-approve")
       return true;
     if (SESSION_ONLY_TOOLS.includes(toolName) && this.builtinTool(sessionId, toolName)) return true;
     if (this.sessionAllow.get(sessionId)?.has(toolName)) return true;
@@ -182,8 +184,16 @@ export class Permissions {
     for (const item of [...this.pending.values()])
       if (!sessionId || item.sessionId === sessionId) item.finish(false, "cancelled");
   }
+  /** 自动化 (W4.2): `permissionMode: "fullAccess"` — allow every call in this run. */
+  grantAll(sessionId: string) {
+    this.sessionAll.add(sessionId);
+  }
+  revokeAll(sessionId: string) {
+    this.sessionAll.delete(sessionId);
+  }
   /** Forget per-session grants when a session is deleted. */
   forget(sessionId: string) {
     this.sessionAllow.delete(sessionId);
+    this.sessionAll.delete(sessionId);
   }
 }

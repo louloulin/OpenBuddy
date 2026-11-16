@@ -37,7 +37,6 @@ const main = read(
 
 /** Renderer wrappers whose main-process side is still pending (plan §10.1 / Phase 5). Remove entries as they land. */
 const PENDING_COMMANDS = [
-  "automation_records_archive", "automation_records_delete", "automations_delete", "automations_run", "automations_save", "automations_set_status", "automations_snapshot",
   "connectors_cli_auth", "connectors_cli_auth_cancel", "connectors_cli_skills_dir", "connectors_cli_status", "connectors_cli_unauth", "connectors_default_root",
   "connectors_icon", "connectors_list_roots", "connectors_load", "connectors_read_mcp_config",
   "inspiration_generate", "internal_reload", "marketplace_action", "marketplace_list",
@@ -80,7 +79,7 @@ describe("IPC contract gate", () => {
     expect(PENDING_COMMANDS.filter((name) => commands.has(name))).toEqual([]);
     const used = rendererCommands();
     expect(PENDING_COMMANDS.filter((name) => !used.has(name))).toEqual([]);
-    expect(PENDING_COMMANDS.length).toBeLessThanOrEqual(36); // 55 → 40 (W1.4 + W2.1–W2.3) → 36 (W5 记忆 + W2.7 技能目录) (20261116-pii §7: target ≤ 20)
+    expect(PENDING_COMMANDS.length).toBeLessThanOrEqual(24); // 55 → 40 (W1.4 + W2.1–W2.3) → 36 (W5 + W2.7) → 24 (W4 自动化：7 条命令不再待实现，automation_tick 直接进契约) (20261116-pii §7: target ≤ 20)
     expect(PENDING_EVENTS.filter((name) => events.has(name))).toEqual([]);
   });
 

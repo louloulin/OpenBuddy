@@ -419,6 +419,63 @@ try {
     const snapshot = await ctx.call('usage_snapshot');
     if (!snapshot || typeof snapshot.totals !== 'object') throw new Error('usage_snapshot shape: ' + JSON.stringify(snapshot));
     return { values, totals: snapshot.totals, shot: await ctx.shot('42-usage') };`);
+  // 20261116-pii W4.1–W4.3: 自动化 — create a task, 测试运行 (a real background session), open its record.
+  await step('自动化：创建 → 测试运行 → 运行记录 → 打开会话', `
+    await page.locator('.sidebar__nav > [data-feature="automation"]').click();
+    await page.getByText('开启你的第一个自动化任务吧', { exact: true }).waitFor({ timeout: 10000 });
+    await ctx.sleep(600);
+    const empty = await ctx.shot('43-automation-empty');
+    await page.getByRole('button', { name: '+ 添加自动化' }).click();
+    await page.getByRole('button', { name: '保存', exact: true }).waitFor({ timeout: 10000 });
+    await page.locator('.atm-modal-input').first().fill('每日销售摘要');
+    const workspace = page.locator('.atm-workspace-input .atm-modal-input');
+    await workspace.click();
+    const option = page.locator('.atm-workspace-input__option').first();
+    await option.waitFor({ timeout: 10000 });
+    await option.click();
+    await page.locator('.atm-prompt-textarea').fill('用一句话总结今天的销售情况');
+    await ctx.sleep(400);
+    const form = await ctx.shot('44-automation-form');
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    // 完全访问的创建要先确认风险；改为默认权限后需再点一次保存，同样验证无人值守执行。
+    const risk = page.getByRole('dialog').filter({ hasText: '完全访问权限' });
+    await risk.waitFor({ timeout: 5000 }).catch(() => {});
+    if (await risk.isVisible().catch(() => false)) {
+      await risk.getByRole('button', { name: /改为「默认权限」运行/ }).click();
+      await page.getByRole('button', { name: '保存', exact: true }).click();
+    }
+    const row = page.locator('.atm-row', { hasText: '每日销售摘要' }).first();
+    await row.waitFor({ timeout: 15000 });
+    await ctx.sleep(600);
+    const saved = await ctx.shot('45-automation-saved');
+    await row.hover();
+    await row.locator('button[title="测试运行"]').click();
+    await page.getByText('已触发测试运行', { exact: false }).first().waitFor({ timeout: 60000 });
+    await page.getByRole('tab', { name: '运行记录' }).click();
+    const record = page.locator('.atm-inbox-row', { hasText: '每日销售摘要' }).first();
+    await record.waitFor({ timeout: 15000 });
+    await ctx.sleep(800);
+    const records = await ctx.shot('46-automation-records');
+    const recordText = await record.innerText();
+    if (!recordText.includes('成功')) throw new Error('run record not successful: ' + recordText);
+    await record.click();
+    await page.locator('.chatview__inner').waitFor({ timeout: 15000 });
+    await page.getByText('本地 fixture', { exact: false }).first().waitFor({ timeout: 30000 });
+    await ctx.sleep(1000);
+    const session = await ctx.shot('47-automation-session');
+    const snapshot = await ctx.call('automations_snapshot');
+    return { empty, form, saved, records, session, automations: snapshot.automations.map(a => a.name), recordsCount: snapshot.records.length, recordText: recordText.replace(/\\s+/g, ' ') };`);
+  // W4.3: 会话 ⋯ 菜单 → 保存为自动化，预填名称 / 最后一条用户消息 / 工作空间。
+  await step('保存为自动化（会话 ⋯ 菜单）', `
+    await page.getByRole('button', { name: '更多操作' }).first().click();
+    await page.getByRole('button', { name: '保存为自动化' }).click();
+    await page.getByText('执行频率').waitFor({ timeout: 10000 });
+    const name = await page.locator('.atm-modal-input').first().inputValue();
+    const prompt = await page.locator('.atm-prompt-textarea').inputValue();
+    const cwd = await page.locator('.atm-workspace-input .atm-modal-input').inputValue();
+    if (!name || !prompt.includes('销售')) throw new Error('draft not prefilled: ' + JSON.stringify({ name, prompt, cwd }));
+    await ctx.sleep(600);
+    return { name, prompt: prompt.slice(0, 40), cwd, shot: await ctx.shot('48-save-as-automation') };`);
   // U7.6: 技能与 MCP merged into 专家·技能·连接器 (catalog tabs hidden until their commands exist).
   await step('experts hub with skills and MCP', `
     await page.locator('.sidebar__nav > [data-feature="experts-hub"]').click();

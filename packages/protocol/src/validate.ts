@@ -1,5 +1,9 @@
 import type { CommandName } from './commands.js';
 import type { Payload } from './types.js';
+
+// Re-exported so a transport package can type its handler payload without
+// reaching into the shared types module.
+export type { Payload };
 import { validateAgentSettingsPatch } from './agent-settings.js';
 import { EXPERT_LIMITS, isExpertId } from './experts.js';
 
@@ -102,6 +106,8 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   // 资料库知识源 (W5.5): absolute folder paths.
   if (command === 'library_add') string('path');
   if (command === 'library_remove') string('id');
+  // 自动化 (W4): ids are opaque strings; the payload itself is validated by AutomationService.save.
+  if (/^(automations_delete|automations_set_status|automations_run|automation_records_archive|automation_records_delete)$/.test(command)) string('id', 128);
   // 扩展中心 (W2.6): preview one path in an isolated loader; cwd scopes project extensions.
   if (command === 'agent_extensions_inspect') {
     string('path');

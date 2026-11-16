@@ -69,6 +69,7 @@ import {
   type AutomationDraft,
 } from "./schedule-utils";
 import { Checkbox, Segmented } from "./controls";
+import { takePendingAutomationDraft } from "./pending-draft";
 import { AutomationTemplateGrid } from "./AutomationTemplateGrid";
 import { AutomationEditPage, type ModelOption } from "./AutomationEditPage";
 import { AutomationPermissionConfirmDialog } from "./AutomationPermissionConfirmDialog";
@@ -78,6 +79,8 @@ import type { ConnectorOption } from "./ConnectorSelector";
 interface AutomationPanelProps {
   onToast?: (msg: string) => void;
   onNavigate?: (label: string) => void;
+  /** 运行记录 → 打开执行这次任务的会话 (pii W4.3). */
+  onOpenSession?: (sessionId: string, cwd?: string) => void;
 }
 
 type TabKey = "tasks" | "records";
@@ -145,7 +148,7 @@ function ConfirmDialog({
   );
 }
 
-export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
+export function AutomationPanel({ onToast, onNavigate, onOpenSession }: AutomationPanelProps) {
   // ---------- 数据 ----------
   const [snapshot, setSnapshot] = useState<AutomationSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -198,6 +201,25 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // 保存为自动化 (pii W4.3): the session's ⋯ menu opened a pre-filled create form.
+  useEffect(() => {
+    const patch = takePendingAutomationDraft();
+    if (!patch) return;
+    setIsCreating(true);
+    setEditingAutomation(null);
+    setDraft({
+      ...buildDraft(),
+      ...(patch.name ? { name: patch.name } : {}),
+      ...(patch.prompt ? { prompt: patch.prompt } : {}),
+      ...(patch.cwds ? { cwds: patch.cwds } : {}),
+      ...(patch.modelId ? { modelId: patch.modelId } : {}),
+      ...(patch.expertId ? { expertId: patch.expertId } : {}),
+      ...(patch.expertName ? { expertName: patch.expertName } : {}),
+      ...(patch.skills?.length ? { skills: [...patch.skills] } : {}),
+      ...(patch.connectorIds?.length ? { connectorIds: [...patch.connectorIds] } : {}),
+    });
+  }, []);
 
   useEffect(() => {
     agentListWorkspaces().then(setWorkspaces).catch(() => setWorkspaces([]));
@@ -835,6 +857,7 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
                     <InboxRow
                       key={item.id}
                       item={item}
+                      onOpen={onOpenSession}
                       onArchive={handleArchiveRecord}
                       onDelete={handleDeleteRecord}
                     />
@@ -854,7 +877,7 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
               </div>
               {archivedGroupOpen &&
                 archivedRecords.map((item) => (
-                  <InboxRow key={item.id} item={item} archived onArchive={handleArchiveRecord} onDelete={handleDeleteRecord} />
+                  <InboxRow key={item.id} item={item} archived onOpen={onOpenSession} onArchive={handleArchiveRecord} onDelete={handleDeleteRecord} />
                 ))}
             </div>
           )}
@@ -1031,11 +1054,14 @@ function AutomationRow({
 function InboxRow({
   item,
   archived = false,
+  onOpen,
   onArchive,
   onDelete,
 }: {
   item: AutomationRunRecord;
   archived?: boolean;
+  /** 打开这次运行对应的会话 (pii W4.3); missing until the host created one. */
+  onOpen?: (sessionId: string) => void;
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
@@ -1043,9 +1069,14 @@ function InboxRow({
   const date = new Date(item.finishedAt || item.startedAt);
   const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const dateTime = `${formatRunTime(item.finishedAt || item.startedAt)}`;
+  const canOpen = !!item.sessionId && !!onOpen;
 
   return (
-    <div className={`atm-row atm-inbox-row${archived ? " atm-archived" : ""}${isRunning ? " atm-inbox-row--running" : ""}`}>
+    <div
+      className={`atm-row atm-inbox-row${archived ? " atm-archived" : ""}${isRunning ? " atm-inbox-row--running" : ""}${canOpen ? " atm-row--link" : ""}`}
+      onClick={() => canOpen && onOpen?.(item.sessionId!)}
+      title={canOpen ? "打开这次运行的会话" : undefined}
+    >
       <div className="atm-row-left">
         <div className="atm-row-content">
           <div className="atm-row-main atm-row-main-inbox">
