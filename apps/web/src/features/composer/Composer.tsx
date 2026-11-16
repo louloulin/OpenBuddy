@@ -9,6 +9,7 @@ import { clipboardSaveImage, type AgentMode } from "@openbuddy/client/agent-clie
 import { useInputHistoryKeys } from "./useInputHistoryKeys";
 import { useBangCommand } from "./useBangCommand";
 import { BangHint } from "./BangHint";
+import { ConnectorNeededBar } from "./ConnectorNeededBar";
 import { FileMentionPopover, type FileMentionHandle } from "./FileMentionPopover";
 import { WorkspacePicker } from "./WorkspacePicker";
 import { PermissionPicker } from "../approvals/PermissionPicker";
@@ -425,6 +426,7 @@ export function Composer({
           </div>
         )}
 
+        <ConnectorNeededBar sessionId={usageSessionId} onToast={onToast} />
         <BangHint bang={bash.bang} risk={bash.risk} available={bash.available} />
         <textarea
           ref={ref}

@@ -18,6 +18,36 @@ export function emitBranchPlan(engine: EngineContext, slot: Slot) {
   emitPlan(engine, slot.id, planFromBranch(slot.session.sessionManager).items);
 }
 
+/** Does an MCP tool error mean "authorize this server" rather than a tool bug? */
+const AUTH_HINT = /unauthor|authenticat|401|403|forbidden|token|oauth|credential|授权|未登录/i;
+/** `mcp__<server>__<tool>` → the configured server name (Pi replaces `-` with `_`). */
+function mcpServerOf(engine: EngineContext, toolName: string): string | undefined {
+  const rest = toolName.slice("mcp__".length);
+  if (!rest) return undefined;
+  const names = engine.mcp.list().map((entry) => entry.name);
+  // Prefer an exact namespace prefix match; fall back to the longest matching name.
+  const namespace = (name: string) => name.replace(/-/g, "_");
+  const matches = names.filter((name) => rest === namespace(name) || rest.startsWith(`${namespace(name)}__`));
+  return matches.sort((a, b) => b.length - a.length)[0];
+}
+/**
+ * 即时连接卡 (pii W2.5): an MCP tool failed for lack of authorization — tell the renderer which
+ * server needs connecting so the composer can show 需要连接 X [连接]. Only auth-shaped errors
+ * qualify (a tool bug or a network failure is not a reason to ask for a sign-in).
+ */
+export function notifyConnectorNeeded(engine: EngineContext, sessionId: string, event: { toolName: string; result?: unknown }) {
+  const server = mcpServerOf(engine, event.toolName);
+  if (!server) return;
+  const text = messageText((event.result ?? {}) as { content?: unknown });
+  if (!AUTH_HINT.test(text)) return;
+  engine.emit("agent://connector-needed", {
+    sessionId,
+    server,
+    tool: event.toolName.split("__").slice(2).join("__") || undefined,
+    reason: text.slice(0, 300),
+  });
+}
+
 /**
  * Strip the cumulative `message` / `partial` snapshots from streaming events.
  * They grow with the reply, so forwarding them per token makes IPC cost
@@ -193,6 +223,9 @@ export function onEvent(engine: EngineContext, slot: Slot, event: AgentSessionEv
     if (state) emitPlan(engine, sessionId, state.items);
   }
   if (event.type === "tool_execution_end") {
+    // 即时连接卡 (pii W2.5): an MCP tool that failed because its server is not authorized asks the
+    // composer for a 连接 X card; the user's sign-in then continues the turn.
+    if (event.isError && event.toolName.startsWith("mcp__")) notifyConnectorNeeded(engine, sessionId, event);
     void engine.checkpoints.finish(event.toolCallId).then(
       (record) => { if (record || event.toolName === "write" || event.toolName === "edit") engine.emit("agent://artifacts", { sessionId }); },
       () => {},

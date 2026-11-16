@@ -1,6 +1,12 @@
-// §5.3 `mcp` module: mcp_list / upsert / toggle / delete, mcp_config_read / save / path, mcp_auth_trigger / status.
-import type { McpAuthStatusEntry, McpAuthTriggerResult, McpConfigFile, McpServerEntry, McpUpsertRequest } from "@openbuddy/protocol/dto";
+// §5.3 `mcp` module: mcp_list / upsert / toggle / delete, mcp_config_read / save / path,
+// mcp_test (pii W2.4), mcp_auth_trigger / status.
+import type { McpAuthStatusEntry, McpAuthTriggerResult, McpConfigFile, McpServerEntry, McpTestResult, McpUpsertRequest } from "@openbuddy/protocol/dto";
 import { invoke } from "../ipc";
+
+/** 测试连接 (W2.4): connect once, list the tools, close; returns the duration or the error. */
+export async function mcpTest(name: string): Promise<McpTestResult> {
+  return invoke<McpTestResult>("mcp_test", { name });
+}
 
 // ---------- connectors / MCP (x.ai/mcp
 export async function mcpList(sessionId?: string): Promise<McpServerEntry[]> {

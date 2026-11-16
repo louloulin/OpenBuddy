@@ -1,14 +1,16 @@
-import { ensureSession } from "@/features/sessions/ensure-session";
 import { TrustedExtensionsPanel } from "./TrustedExtensionsPanel";
 import { useCallback, useEffect, useState } from "react";
-import { skillsAdd, skillsList, skillsRemove, skillsToggle, mcpAuthStatus, mcpAuthTrigger } from "@openbuddy/client/agent-client";
+import { skillsAdd, skillsList, skillsRemove, skillsToggle } from "@openbuddy/client/agent-client";
 import { dialog } from "@openbuddy/client/ipc";
-import type { SkillInfo, McpAuthStatusEntry } from "@openbuddy/protocol/dto";
+import type { SkillInfo } from "@openbuddy/protocol/dto";
 import { McpConfigEditor } from "../experts/connectors/McpConfigEditor";
+import { McpServersPanel } from "../experts/connectors/McpServersPanel";
 
 /** MVP resources use installed Pi skills and the actual MCP configuration. */
-export function AgentResourcesPanel({ cwd, sessionId, onToast, section, header }: {
-  cwd?: string; sessionId?: string; onToast?: (message: string) => void;
+export function AgentResourcesPanel({ cwd, onToast, section, header }: {
+  cwd?: string; onToast?: (message: string) => void;
+  /** Accepted for API compatibility (MCP sign-in no longer needs a session, W2.4). */
+  sessionId?: string;
   /** Show one section without the title and tabs: the management tabs of 专家·技能·连接器 (pii W0.3 / U7.6). */
   section?: "skills" | "mcp" | "extensions";
   /** Rendered in the top bar of an embedded section (the hub's tab pills). */
@@ -17,9 +19,6 @@ export function AgentResourcesPanel({ cwd, sessionId, onToast, section, header }
   const [tabState, setTab] = useState<"skills" | "mcp" | "extensions">("skills");
   const tab = section ?? tabState;
   const [skills, setSkills] = useState<SkillInfo[]>([]);
-  const [auth, setAuth] = useState<McpAuthStatusEntry[]>([]);
-  const [authBusy, setAuthBusy] = useState(false);
-  const [authMessage, setAuthMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
@@ -27,27 +26,6 @@ export function AgentResourcesPanel({ cwd, sessionId, onToast, section, header }
     try { setSkills(await skillsList(cwd)); } catch (e) { setError(String(e)); }
   }, [cwd]);
   useEffect(() => { void load(); }, [load]);
-  const refreshAuth = useCallback(async () => {
-    if (!sessionId) { setAuth([]); return; }
-    setAuth(await mcpAuthStatus(sessionId));
-  }, [sessionId]);
-  useEffect(() => {
-    if (tab !== "mcp") return;
-    let active = true;
-    if (sessionId) void mcpAuthStatus(sessionId).then(entries => { if (active) setAuth(entries); }).catch(error => { if (active) setAuthMessage(`读取授权状态失败：${String(error)}`); });
-    else setAuth([]);
-    return () => { active = false; };
-  }, [tab, sessionId]);
-  const authorize = async (serverName: string) => {
-    if (!sessionId || authBusy) return;
-    setAuthBusy(true); setAuthMessage("");
-    try {
-      const result = await mcpAuthTrigger(sessionId, serverName);
-      if (result.status === "authenticated") await refreshAuth();
-      else setAuthMessage(result.status === "cancelled" ? "授权已取消，可重试。" : "授权失败，请检查 MCP OAuth 配置后重试。");
-    } catch (error) { setAuthMessage(`授权失败：${String(error)}`); }
-    finally { setAuthBusy(false); }
-  };
   const run = async (action: () => Promise<void>) => {
     setBusy(true); setError("");
     try { await action(); await load(); } catch (e) { setError(String(e)); } finally { setBusy(false); }
@@ -62,17 +40,9 @@ export function AgentResourcesPanel({ cwd, sessionId, onToast, section, header }
   const body = <>
     {error && <p className="res-panel__error" role="alert">{error}</p>}
     {tab === "extensions" ? <div className="res-panel__body"><TrustedExtensionsPanel /></div> : tab === "mcp" ? <div className="res-panel__body">
-      <section className="res-panel__card" aria-label="MCP 授权">
-        <h3 className="res-panel__card-title">远程服务授权</h3>
-        {!sessionId && <div className="res-panel__row"><p className="res-panel__muted">授权 MCP 需要先打开一个任务。</p><button type="button" className="res-panel__btn" disabled={authBusy} onClick={() => { setAuthBusy(true); void ensureSession().catch(error => setAuthMessage(String(error))).finally(() => setAuthBusy(false)); }}>使用当前默认模型创建会话</button></div>}
-        {sessionId && <button type="button" className="res-panel__btn" disabled={authBusy} onClick={() => { void refreshAuth().catch(error => setAuthMessage(`读取授权状态失败：${String(error)}`)); }}>刷新授权状态</button>}
-        {authMessage && <p className="res-panel__error" role="alert">{authMessage}</p>}
-        {auth.map(entry => <div key={entry.serverName} className="res-panel__item">
-          <span className="res-panel__item-name">{entry.serverName}</span><span className={"res-panel__badge" + (entry.status === "authenticated" ? " res-panel__badge--ok" : "")}>{entry.status === "authenticated" ? "已授权" : "需要授权"}</span>
-          <button type="button" className="res-panel__btn" disabled={authBusy} aria-label={`授权 ${entry.serverName}`} onClick={() => { void authorize(entry.serverName); }}>{authBusy ? "授权中…" : entry.status === "authenticated" ? "重新授权" : "授权"}</button>
-        </div>)}
-      </section>
-      <McpConfigEditor onToast={onToast} onSaved={() => { void refreshAuth().catch(error => setAuthMessage(String(error))); }} />
+      <McpServersPanel onToast={onToast} />
+      <p className="res-panel__muted">高级模式：直接编辑 mcp.json，保存后会自动重载会话。</p>
+      <McpConfigEditor onToast={onToast} />
     </div> : <div className="res-panel__body">
       <div className="res-panel__toolbar">
         <button type="button" className="res-panel__btn res-panel__btn--primary" disabled={busy} onClick={() => { void add(); }}>添加技能</button>

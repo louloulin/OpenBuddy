@@ -18,6 +18,7 @@ import { useAgentModelStore } from "../features/models/state/agent-model-store";
 import { useSessionStore } from "../features/chat/state/session-store";
 import { usePlanFeed } from "../features/chat/state/plan-store";
 import { useArtifactsStore } from "../features/workbench/state/artifacts-store";
+import { useConnectorNeededStore } from "../features/composer/state/connector-needed-store";
 import { useSessionsStore } from "../features/sessions/state/sessions-store";
 import { usePermissionStore } from "../features/approvals/state/permission-store";
 import { useQuestionStore } from "../features/approvals/state/question-store";
@@ -245,6 +246,10 @@ function Shell() {
           },
           onSessionStatus: (event) => {
             sessionsStore.getState().upsert({ sessionId: event.sessionId, status: sessionStatusOf(event.status) });
+          },
+          // 即时连接卡 (pii W2.5): an MCP tool needs its server authorized; the composer shows 连接.
+          onConnectorNeeded: (event) => {
+            useConnectorNeededStore.getState().raise(event.sessionId, { server: event.server, tool: event.tool, reason: event.reason });
           },
           onComplete: (p) => {
             reportEvent("session_complete", "info", { sessionId: p.sessionId, stopReason: p.stopReason });

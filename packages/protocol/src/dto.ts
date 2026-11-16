@@ -7,8 +7,6 @@ export interface ModelState {
   availableThinkingLevels: string[];
 }
 
-
-
 // ---------- content blocks ----------
 
 export interface TextContent {
@@ -324,47 +322,16 @@ export interface SkillInfo {
 }
 
 // ---------- connectors / MCP (x.ai/mcp/*) ----------
-
-/** One MCP server config entry surfaced to the UI. */
-export interface McpServerEntry {
-  name: string;
-  /** "stdio" | "streamable_http". */
-  transport?: string;
-  /** For stdio: command. For http: URL. */
-  target?: string;
-  enabled: boolean;
-  /** "user" | "project" | "bundled" | ... */
-  source?: string;
-  disabledReason?: string;
-  vendor?: string;
-}
-
-/** Frontend payload for creating/updating an MCP server. */
-export interface McpUpsertRequest {
-  name: string;
-  /** "stdio" or "http". */
-  transport: string;
-  /** stdio: command. http: URL. */
-  target: string;
-  args?: string[];
-  env?: Record<string, string>;
-  headers?: Record<string, string>;
-  enabled?: boolean;
-}
-
-
-export interface McpAuthTriggerResult {
-  /** "authenticated" | "failed" | "setup_required". */
-  status: string;
-  error?: string;
-}
-
-
-export interface McpAuthStatusEntry {
-  serverName: string;
-  status: "authenticated" | "needs_auth";
-  expiresAt?: number;
-}
+// The MCP wire types (server entries, upsert request, auth results, 测试连接 W2.4, 即时连接卡 W2.5)
+// live in ./mcp.ts so this file stays under its size ceiling; they are re-exported here.
+export type {
+  ConnectorNeededEvent,
+  McpAuthStatusEntry,
+  McpAuthTriggerResult,
+  McpServerEntry,
+  McpTestResult,
+  McpUpsertRequest,
+} from './mcp.js';
 
 // ---------- CLI-type connector authorization (cli.json driven) ----------
 

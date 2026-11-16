@@ -2,12 +2,15 @@ import {
   createMcpExtension,
   type McpExtensionOptions,
 } from "@earendil-works/pi-coding-agent";
+import { McpClient, StdioTransport, StreamableHttpTransport } from "@earendil-works/pi-mcp";
 import { join } from "node:path";
 import { JsonStore, object, text, type Settings } from "../settings/settings.js";
 import { McpAuthService } from "./mcp-auth.js";
 import type { Emit } from "@openbuddy/kernel";
 import type { McpOAuthSettings } from "@earendil-works/pi-mcp/oauth";
+import type { McpServerEntry, McpTestResult } from "@openbuddy/protocol/dto";
 type Config = { mcpServers: Record<string, Record<string, unknown>> };
+export type { McpTestResult };
 export class McpService {
   private store: JsonStore<Config>;
   readonly auth: McpAuthService;
@@ -24,13 +27,19 @@ export class McpService {
   get path() {
     return this.store.path;
   }
-  list() {
+  list(): McpServerEntry[] {
     return Object.entries(this.store.read().mcpServers).map(([name, c]) => ({
       name,
       transport: c.command ? "stdio" : "streamable_http",
-      target: c.command ?? c.url,
+      target: String(c.command ?? c.url ?? ""),
       enabled: c.enabled !== false,
       source: "user",
+      // W2.4 status: a URL server whose OAuth token is missing/expired needs the user's sign-in.
+      ...(typeof c.url === "string" &&
+      !Object.keys(object(c.headers ?? {})).some((k) => k.toLowerCase() === "authorization") &&
+      this.auth.status(name, c.url).status !== "authenticated"
+        ? { needsAuth: true }
+        : {}),
     }));
   }
   read() {
@@ -180,6 +189,91 @@ export class McpService {
     if (!c.mcpServers[name]) throw Error("MCP server不存在");
     c.mcpServers[name].enabled = enabled;
     this.store.write(c);
+  }
+  /** Unmask `env` / `headers` for a server (W2.4: both the live extension and the test connect). */
+  private secretsOf(name: string, config: Record<string, unknown>) {
+    const out: Record<string, Record<string, string>> = {};
+    for (const field of ["env", "headers"] as const)
+      if (config[field])
+        out[field] = Object.fromEntries(
+          Object.keys(object(config[field])).map((key) => [
+            key,
+            this.settings.secrets.get(`mcp:${name}:${field}:${key}`) ?? "",
+          ]),
+        );
+    return out;
+  }
+  /**
+   * 测试连接 (pii W2.4): connect once, list the tools, close. Runs without a session, so a server
+   * can be validated before it is used in a turn; the duration tells the user whether it is slow.
+   */
+  async testConnect(name: string, timeoutMs = 8000): Promise<McpTestResult> {
+    const config = this.store.read().mcpServers[name];
+    if (!config) throw Error("MCP server不存在");
+    const stdio = typeof config.command === "string";
+    const transportName = stdio ? "stdio" : "streamable_http";
+    const secrets = this.secretsOf(name, config);
+    const client = new McpClient({ name: "OpenBuddy", version: "1.0.0", requestTimeoutMs: timeoutMs });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    timer.unref?.();
+    const started = Date.now();
+    try {
+      const transport = stdio
+        ? new StdioTransport({
+            command: String(config.command),
+            args: Array.isArray(config.args) ? config.args.map(String) : [],
+            cwd: typeof config.cwd === "string" ? config.cwd : undefined,
+            env: secrets.env ?? {},
+            stderr: "pipe",
+          })
+        : new StreamableHttpTransport({
+            url: String(config.url),
+            headers: {
+              ...(secrets.headers ?? {}),
+              // A completed OAuth sign-in supplies the bearer token when no static one is configured.
+              ...(Object.keys(secrets.headers ?? {}).some((k) => k.toLowerCase() === "authorization")
+                ? {}
+                : this.auth.credentials.tokens(name, String(config.url))?.access_token
+                  ? { Authorization: `Bearer ${this.auth.credentials.tokens(name, String(config.url))!.access_token}` }
+                  : {}),
+            },
+            openGetStream: false,
+          });
+      const init = await client.connect(transport);
+      const tools = await client.listTools({ signal: controller.signal, timeoutMs });
+      return {
+        name,
+        ok: true,
+        ms: Date.now() - started,
+        transport: transportName,
+        serverInfo: {
+          ...(init.serverInfo?.name ? { name: init.serverInfo.name } : {}),
+          ...(init.serverInfo?.version ? { version: String(init.serverInfo.version) } : {}),
+        },
+        tools: tools.map((tool) => ({
+          name: tool.name,
+          ...(tool.description ? { description: tool.description } : {}),
+        })),
+      };
+    } catch (error) {
+      const message =
+        controller.signal.aborted
+          ? `连接超时（${timeoutMs}ms）`
+          : error instanceof Error
+            ? error.message
+            : String(error);
+      return {
+        name,
+        ok: false,
+        ms: Date.now() - started,
+        transport: transportName,
+        error: this.settings.secrets.redact(message),
+      };
+    } finally {
+      clearTimeout(timer);
+      await client.close().catch(() => {});
+    }
   }
   private oauthSettings(
     name: string,

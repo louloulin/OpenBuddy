@@ -1,6 +1,6 @@
 import { bool, text } from "@openbuddy/services/settings/settings";
 import type { Handler, HostContext, HostModule } from "../module.js";
-/** §5.3 `mcp` module. MCP servers, config file and OAuth sign-in. */
+/** §5.3 `mcp` module. MCP servers, config file, test-connect and OAuth sign-in (pii W2.4). */
 export function mcpModule(ctx: HostContext): HostModule {
   const { engine } = ctx;
   const commands: Record<string, Handler> = {
@@ -23,15 +23,19 @@ export function mcpModule(ctx: HostContext): HostModule {
       engine.mcp.toggle(text(p.name), bool(p.enabled));
       await engine.reload();
     },
+    /** 测试连接 (W2.4): one real connect + tool listing; no session needed. */
+    mcp_test: (p) => engine.mcp.testConnect(text(p.name)),
+    // Sign-in no longer requires an open task (W2.4): the session id only tags the request so a
+    // closing session can cancel its own pending sign-in.
     mcp_auth_trigger: async (p) => {
-      const id = text(p.sessionId);
-      if (!engine.has(id)) throw Error("会话未加载");
+      const id = typeof p.sessionId === "string" ? p.sessionId : "";
       const result = await engine.mcp.signIn(id, text(p.serverName));
       if (result.status === "authenticated") await engine.reload();
       return result;
     },
     mcp_auth_status: (p) => {
-      if (!engine.has(text(p.sessionId))) throw Error("会话未加载");
+      const id = typeof p.sessionId === "string" ? p.sessionId : "";
+      if (id && !engine.has(id)) throw Error("会话未加载");
       return engine.mcp.authStatus();
     },
   };
