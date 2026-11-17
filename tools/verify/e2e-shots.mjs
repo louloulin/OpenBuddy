@@ -94,10 +94,18 @@ try {
     await allow.waitFor({ timeout: 30000 });
     await ctx.sleep(600);
     const shot = await ctx.shot('03-approval');
+    // W6.1 深链：审批卡 → 安全中心，并高亮对应分类。
+    await page.getByRole('button', { name: '查看拦截规则' }).click();
+    await page.getByRole('dialog', { name: '设置' }).waitFor({ timeout: 10000 });
+    await page.locator('.sec-group.is-focus, .sec-card.is-focus').first().waitFor({ timeout: 10000 });
+    await ctx.sleep(400);
+    const rules = await ctx.shot('62-approval-rules');
+    await page.locator('button[aria-label="关闭设置"]').click();
+    await page.locator('.settings-modal').waitFor({ state: 'detached', timeout: 5000 });
     await allow.click();
     await page.getByText('工具调用正常完成', { exact: false }).first().waitFor({ timeout: 30000 });
     await ctx.sleep(800);
-    return [shot, await ctx.shot('04-tool-done')];`);
+    return [shot, rules, await ctx.shot('04-tool-done')];`);
   await step('agent writes files → workbench', `
     await ctx.call('permission_mode_set', { mode: 'always-approve' });
     const input = page.locator('.wb-composer__input');
@@ -270,7 +278,20 @@ try {
     await page.locator('.about-card').waitFor({ timeout: 10000 });
     await ctx.sleep(400);
     const about = await ctx.shot('61-about');
-    return { light, dark, about, attrs };`);
+    // W4.4 托盘常驻：开关由主进程持久化，验证真实命令后再关掉。
+    await page.locator('.settings-navigation__label').getByText('通用', { exact: true }).first().click();
+    const trayGroup = page.getByRole('group', { name: '托盘常驻' });
+    await trayGroup.waitFor({ timeout: 10000 });
+    await trayGroup.getByRole('button', { name: '开启' }).click();
+    await ctx.sleep(500);
+    const trayOn = await ctx.call('tray_get');
+    if (!trayOn.enabled) throw new Error('tray not enabled: ' + JSON.stringify(trayOn));
+    const tray = await ctx.shot('63-tray-enabled');
+    await trayGroup.getByRole('button', { name: '关闭' }).click();
+    await ctx.sleep(400);
+    const trayOff = await ctx.call('tray_get');
+    if (trayOff.enabled) throw new Error('tray not disabled: ' + JSON.stringify(trayOff));
+    return { light, dark, about, tray, attrs };`);
   // 20261116-pii W6.1/W6.2: 安全中心 — 分类规则可改，受保护路径可增删并写入本地设置。
   await step('安全中心（受保护路径 + 规则）', `
     await page.locator('.settings-navigation__label').getByText('安全中心', { exact: true }).first().click();

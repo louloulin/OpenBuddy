@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { SecuritySettingsPanel } from "../sections/SecuritySettingsPanel";
 
 const { list, save, protectedGet, protectedSet } = vi.hoisted(() => ({
@@ -72,6 +72,15 @@ describe("安全中心 (pii W6.1 / W6.2)", () => {
     await waitFor(() => expect(protectedSet).toHaveBeenCalledWith([".env", "*.pem", "config/secrets.json"]));
     fireEvent.click(screen.getByRole("button", { name: "移除受保护路径 .env" }));
     await waitFor(() => expect(protectedSet).toHaveBeenLastCalledWith(["*.pem", "config/secrets.json"]));
+  });
+
+  it("审批卡深链：定位并高亮对应分类 (W6.1)", async () => {
+    render(<SecuritySettingsPanel />);
+    await waitFor(() => expect(screen.getByText("命令")).toBeInTheDocument());
+    act(() => window.dispatchEvent(new CustomEvent("openbuddy:security-focus", { detail: { category: "command" } })));
+    await waitFor(() => expect(screen.getByText("命令").closest(".sec-group")).toHaveClass("is-focus"));
+    act(() => window.dispatchEvent(new CustomEvent("openbuddy:security-focus", { detail: { category: "protected" } })));
+    await waitFor(() => expect(screen.getByText("受保护路径").closest(".sec-card")).toHaveClass("is-focus"));
   });
 
   it("恢复默认", async () => {

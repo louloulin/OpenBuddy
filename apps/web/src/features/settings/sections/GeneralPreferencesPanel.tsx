@@ -1,14 +1,15 @@
-import { useState } from "react";
-import { Monitor, Moon, Sun, Type, Rows3 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AppWindow, Monitor, Moon, Sun, Type, Rows3 } from "lucide-react";
 import { useTheme } from "@openbuddy/ui/ThemeProvider";
+import { trayGet, traySet } from "@openbuddy/client/agent-client";
 import { SectionShell } from "./shared";
 import { loadDensity, loadFontSize, setDensity, setFontSize, type Density, type FontSize } from "../preferences";
 import { getSendKey, setSendKey, type SendKey } from "../../composer/send-key";
 
 /**
- * 通用 (20261116-pii W6.3)：主题、字号、信息密度、发送键与语言。
+ * 通用 (20261116-pii W6.3 / W4.4)：主题、字号、信息密度、发送键、托盘常驻与语言。
  * 主题写 ThemeProvider（data-theme）；字号 / 密度写 `<html data-font-size / data-density>`，
- * 由 polish.css 生效；都即时预览、下次启动仍保留。
+ * 由 polish.css 生效；托盘开关走主进程（tray.json）。都即时生效、下次启动仍保留。
  */
 const FONT_OPTIONS: Array<{ value: FontSize; label: string }> = [
   { value: "small", label: "小" },
@@ -29,6 +30,24 @@ export function GeneralPreferencesPanel() {
   const [font, setFont] = useState<FontSize>(() => loadFontSize());
   const [density, setDensityState] = useState<Density>(() => loadDensity());
   const [sendKey, setSendKeyState] = useState<SendKey>(() => getSendKey());
+  // 托盘常驻 (W4.4): read from the main process; null = 本环境没有托盘（浏览器预览）。
+  const [trayOn, setTrayOn] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    trayGet()
+      .then((result) => { if (!cancelled) setTrayOn(result.enabled); })
+      .catch(() => { if (!cancelled) setTrayOn(null); });
+    return () => { cancelled = true; };
+  }, []);
+  const toggleTray = async (next: boolean) => {
+    setTrayOn(next);
+    try {
+      const result = await traySet(next);
+      setTrayOn(result.enabled);
+    } catch {
+      setTrayOn(!next);
+    }
+  };
 
   return (
     <SectionShell title="通用" desc="外观与输入习惯。改动即时生效，并保存在这台设备上。">
@@ -150,14 +169,40 @@ export function GeneralPreferencesPanel() {
           <span className="pref-value">简体中文</span>
         </div>
 
-        <div className="pref-row pref-row--muted">
+        <div className="pref-row">
           <div className="pref-row__label">
+            <AppWindow size={16} />
             <div>
               <div className="pref-row__title">托盘常驻</div>
-              <div className="pref-row__hint">关闭窗口后驻留托盘、后台继续跑自动化（W4.4，接入后开放）。</div>
+              <div className="pref-row__hint">
+                {trayOn === null && "当前环境没有系统托盘。"}
+                {trayOn === true && "关闭窗口后驻留托盘，自动化继续在后台运行；从托盘菜单退出。"}
+                {trayOn === false && "关闭窗口即退出。开启后可在后台继续跑自动化。"}
+              </div>
             </div>
           </div>
-          <span className="pref-badge">即将上线</span>
+          {trayOn === null ? (
+            <span className="pref-badge">不可用</span>
+          ) : (
+            <div className="pref-seg" role="group" aria-label="托盘常驻">
+              <button
+                type="button"
+                className={`pref-seg__btn${!trayOn ? " is-on" : ""}`}
+                aria-pressed={!trayOn}
+                onClick={() => void toggleTray(false)}
+              >
+                关闭
+              </button>
+              <button
+                type="button"
+                className={`pref-seg__btn${trayOn ? " is-on" : ""}`}
+                aria-pressed={trayOn}
+                onClick={() => void toggleTray(true)}
+              >
+                开启
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </SectionShell>

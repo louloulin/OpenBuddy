@@ -10,6 +10,7 @@ import { exportCommands } from '../src/native/export.js';
 import { clipboardCommands } from '../src/native/clipboard.js';
 import { windowCommands } from '../src/native/window.js';
 import { dialogCommands } from '../src/native/dialog.js';
+import { trayCommands } from '../src/native/tray.js';
 
 // Factories only build closures; nothing on the context is touched until a command runs.
 const native = { window: {}, fileAccess: {}, exportGrants: new Set(), options: {} } as unknown as NativeContext;
@@ -17,7 +18,7 @@ const host = { options: { shell: {} }, settings: {}, emit: () => {}, engine: {},
 
 describe('desktop native commands (20261115-md §5.3)', () => {
   it('NATIVE_COMMANDS lists exactly the commands registered by ../native', () => {
-    const registered = Object.keys({ ...exportCommands(native), ...clipboardCommands(native), ...windowCommands(native), ...dialogCommands(native) });
+    const registered = Object.keys({ ...exportCommands(native), ...clipboardCommands(native), ...windowCommands(native), ...dialogCommands(native), ...trayCommands(native) });
     expect([...registered].sort()).toEqual([...NATIVE_COMMANDS].sort());
   });
   it('host modules plus native commands serve the whole contract on desktop', () => {

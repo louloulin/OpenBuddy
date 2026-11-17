@@ -32,3 +32,11 @@ export async function exportTextFile(path: string, content: string): Promise<str
 
 /** Saves an image on the clipboard as a granted attachment; null when there is none. */
 export const clipboardSaveImage = () => invoke<{ path: string; name: string; size: number } | null>("clipboard_save_image", {});
+
+// ---------- tray (W4.4) ----------
+
+/** 托盘常驻当前是否开启；浏览器里为 false。 */
+export const trayGet = () => invoke<{ enabled: boolean }>("tray_get", {});
+
+/** 开关托盘常驻；主进程写入 userData/tray.json，下次启动仍生效。 */
+export const traySet = (enabled: boolean) => invoke<{ enabled: boolean }>("tray_set", { enabled });

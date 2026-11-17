@@ -7,9 +7,19 @@ import { checkCommandRisk, riskLabel } from "@openbuddy/chat-core/command-risk";
 import { permissionObjectLabel, permissionTitle, toolCategory, toolSubject } from "@openbuddy/chat-core/tool-summary";
 import { ShieldAlertIcon } from "@openbuddy/ui/icon/icons/index";
 
-/** Open 设置 → 安全中心 (wired by App through a window event to avoid prop drilling). */
-export function openSecurityCenter() {
+export type SecurityFocus = "read" | "write" | "delete" | "command" | "mcp" | "other" | "protected";
+
+/**
+ * Open 设置 → 安全中心, and flash the category the approval belongs to (W6.1).
+ * Two window events keep App's settings wiring and the panel decoupled.
+ */
+export function openSecurityCenter(focus?: SecurityFocus) {
+  // Leave the approval card before the modal opens: otherwise Esc (meant for 设置) would
+  // bubble through the still-focused card and deny the pending request.
+  (document.activeElement as HTMLElement | null)?.blur();
   window.dispatchEvent(new CustomEvent("openbuddy:open-settings", { detail: { section: "security" } }));
+  // The panel mounts on the next render; deliver the focus hint after it subscribed.
+  if (focus) window.setTimeout(() => window.dispatchEvent(new CustomEvent("openbuddy:security-focus", { detail: { category: focus } })), 80);
 }
 
 /**
@@ -33,7 +43,10 @@ export function PermissionCard({ request, cwd }: { request: PermissionRequest; c
   const armedRef = useRef(false);
   const tool = request.toolKind ?? request.title ?? "";
   const subject = toolSubject(tool, request.rawInput, cwd) || (request.rawInput != null ? JSON.stringify(request.rawInput) : "");
-  const risk = toolCategory(tool) === "command" ? checkCommandRisk(subject) : undefined;
+  const category = toolCategory(tool);
+  const risk = category === "command" ? checkCommandRisk(subject) : undefined;
+  // 「查看拦截规则」直接定位到这张审批对应的分类（W6.1）。
+  const securityFocus: SecurityFocus = category === "search" ? "read" : category;
   const fullInput = request.rawInput != null ? JSON.stringify(request.rawInput, null, 2) : "";
   const destructive = request.destructive;
   // A command the user typed (`!cmd`, W1.2) that needs the strong confirmation.
@@ -109,7 +122,7 @@ export function PermissionCard({ request, cwd }: { request: PermissionRequest; c
         {(!destructive || typed) && risk && risk.level !== "low" && (
           <span className={"perm-card__risk perm-card__risk--" + risk.level} title={risk.reasons.join("；")}>{riskLabel(risk.level)}</span>
         )}
-        <button type="button" className="perm-card__rules" onClick={openSecurityCenter}>查看拦截规则</button>
+        <button type="button" className="perm-card__rules" onClick={() => openSecurityCenter(securityFocus)}>查看拦截规则</button>
       </div>
       {subject && (
         <div className="perm-card__object">

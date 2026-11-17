@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Lock, Plus, RotateCcw, Shield, Trash2 } from "lucide-react";
 import {
   permissionList,
@@ -51,6 +51,33 @@ export function SecuritySettingsPanel() {
   const [newTool, setNewTool] = useState("write");
   const [newPattern, setNewPattern] = useState("");
   const [newPath, setNewPath] = useState("");
+  // W6.1: 审批卡「查看拦截规则」定位到对应分类（protected → 受保护路径卡片）。
+  const [focus, setFocus] = useState<CategoryId | "protected" | null>(null);
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const groupsRef = useRef(new Map<string, HTMLDivElement>());
+  const protectedRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onFocus = (event: Event) => {
+      const category = (event as CustomEvent<{ category?: string }>).detail?.category;
+      const allowed = [...CATEGORIES.map((item) => item.id), "protected"];
+      if (!category || !allowed.includes(category)) return;
+      setFocus(category as CategoryId | "protected");
+      if (focusTimer.current) clearTimeout(focusTimer.current);
+      focusTimer.current = setTimeout(() => setFocus(null), 2200);
+    };
+    window.addEventListener("openbuddy:security-focus", onFocus);
+    return () => {
+      window.removeEventListener("openbuddy:security-focus", onFocus);
+      if (focusTimer.current) clearTimeout(focusTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!focus) return;
+    const target = focus === "protected" ? protectedRef.current : (groupsRef.current.get(focus) ?? groupsRef.current.get("__rules"));
+    target?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+  }, [focus]);
 
   const load = useCallback(async () => {
     try {
@@ -123,7 +150,7 @@ export function SecuritySettingsPanel() {
       {error && <div className="sec-error">{error}</div>}
 
       {/* 受保护路径 */}
-      <div className="sec-card">
+      <div ref={protectedRef} className={"sec-card" + (focus === "protected" ? " is-focus" : "")}>
         <div className="sec-card__head">
           <div className="sec-card__title">
             <Lock size={15} />
@@ -191,7 +218,10 @@ export function SecuritySettingsPanel() {
       </div>
 
       {/* 规则 */}
-      <div className="sec-card">
+      <div
+        className={"sec-card" + (focus && focus !== "protected" && !(grouped.get(focus)?.length) ? " is-focus" : "")}
+        ref={(node) => { if (node) groupsRef.current.set("__rules", node); else groupsRef.current.delete("__rules"); }}
+      >
         <div className="sec-card__head">
           <div className="sec-card__title">
             <Shield size={15} />
@@ -209,7 +239,11 @@ export function SecuritySettingsPanel() {
             const items = grouped.get(category.id) ?? [];
             if (items.length === 0) return null;
             return (
-              <div className="sec-group" key={category.id}>
+              <div
+                className={"sec-group" + (focus === category.id ? " is-focus" : "")}
+                key={category.id}
+                ref={(node) => { if (node) groupsRef.current.set(category.id, node); else groupsRef.current.delete(category.id); }}
+              >
                 <div className="sec-group__label">
                   {category.label}
                   <span className="sec-group__count">{items.length}</span>

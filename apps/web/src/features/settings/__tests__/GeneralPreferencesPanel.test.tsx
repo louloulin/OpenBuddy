@@ -1,7 +1,14 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ThemeProvider } from "@openbuddy/ui/ThemeProvider";
+
+// The tray preference lives in the main process (W4.4); the panel only mirrors it.
+const trayState = { enabled: false };
+vi.mock("@openbuddy/client/agent-client", () => ({
+  trayGet: vi.fn(async () => ({ enabled: trayState.enabled })),
+  traySet: vi.fn(async (enabled: boolean) => { trayState.enabled = enabled; return { enabled }; }),
+}));
 import { GeneralPreferencesPanel } from "../sections/GeneralPreferencesPanel";
 import { AboutSettingsPanel } from "../sections/AboutSettingsPanel";
 import { loadDensity, loadFontSize } from "../preferences";
@@ -53,6 +60,23 @@ describe("GeneralPreferencesPanel (pii W6.3)", () => {
     expect(getSendKey()).toBe("mod+enter");
     await user.click(screen.getByRole("button", { name: "Enter" }));
     expect(getSendKey()).toBe("enter");
+  });
+
+  it("mirrors the main-process tray preference and toggles it", async () => {
+    trayState.enabled = false;
+    const user = userEvent.setup();
+    render(
+      <ThemeProvider>
+        <GeneralPreferencesPanel />
+      </ThemeProvider>,
+    );
+    const group = await screen.findByRole("group", { name: "托盘常驻" });
+    await waitFor(() => expect(group).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "开启" }));
+    await waitFor(() => expect(trayState.enabled).toBe(true));
+    expect(screen.getByRole("button", { name: "开启" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "关闭" }));
+    await waitFor(() => expect(trayState.enabled).toBe(false));
   });
 
   it("关于 shows the version and the Pi engine, without faking an update check", () => {

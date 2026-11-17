@@ -7,6 +7,7 @@ import { registerIpc } from '../ipc/register.js';
 import { createEngineEventHub, startMobileBridge, type MobileBridge } from './mobile-bridge.js';
 import { notifier } from './notifier.js';
 import { installMenu } from './menu.js';
+import { TrayController } from './tray.js';
 import { confirmQuit, external } from './window.js';
 import { isEvent } from '@openbuddy/protocol/contract';
 import { WorkspaceAccess } from '@openbuddy/host/security/workspace-access';
@@ -23,6 +24,7 @@ let quitting = false;
 let runningTasks: (() => Promise<unknown[]>) | undefined;
 let cleanup: Promise<void> | undefined;
 let previewRoots: () => string[] = () => [];
+let tray: TrayController | null = null;
 function disposeEngine(): Promise<void> {
   return cleanup ??= Promise.resolve().then(() => shutdown?.()).catch(error => { console.error('Engine shutdown failed', error); });
 }
@@ -56,7 +58,17 @@ async function createWindow(): Promise<void> {
   shutdown = async () => { await engine.shutdown(); };
   runningTasks = async () => { try { return await engine.handlers.tasks_list({}) as unknown[]; } catch { return []; } };
   const workspaceAccess = await WorkspaceAccess.create(app.getPath('userData'));
-  const unregister = registerIpc(win, engine.handlers, trustedURL, workspaceAccess, { attachmentsDir: join(app.getPath('userData'), 'attachments'), exportHtml: engine.exportHtml });
+  // 托盘常驻 (W4.4): created lazily once the preference is on; closing the window then hides it
+  // and the engine keeps serving automations until 退出 OpenBuddy in the tray menu (or Cmd+Q).
+  tray ??= new TrayController({
+    show: () => {
+      const current = window;
+      if (current) { if (current.isMinimized()) current.restore(); current.show(); current.focus(); }
+      else void createWindow();
+    },
+    quit: () => app.quit(),
+  });
+  const unregister = registerIpc(win, engine.handlers, trustedURL, workspaceAccess, { attachmentsDir: join(app.getPath('userData'), 'attachments'), exportHtml: engine.exportHtml, tray: { get: () => tray!.enabled, set: enabled => tray!.setEnabled(enabled) } });
   // The mobile path is opt-in: without a gateway address the desktop opens no
   // port and behaves exactly as before (20261115-mobile.md Phase 2.6).
   let mobileBridge: MobileBridge | null = null;
@@ -79,6 +91,8 @@ async function createWindow(): Promise<void> {
   win.on('close', event => {
     if (closing || quitting) return;
     event.preventDefault();
+    // 托盘常驻：关闭只隐藏，后台自动化继续；正在运行的任务也不打断。
+    if (tray?.enabled) { win.hide(); return; }
     void confirmQuit(win, runningTasks).then(ok => {
       if (!ok) return;
       closing = true;
@@ -124,7 +138,10 @@ app.whenReady().then(async () => {
   // CSP, and Chromium's PDF viewer (chrome-extension:) needs its chrome:// resources.
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => callback(/^(https?|file):/.test(details.url) ? { responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [csp] } } : {}));
   await createWindow();
-  app.on('activate', () => { if (!window) void createWindow(); });
+  app.on('activate', () => {
+    if (!window) void createWindow();
+    else { if (window.isMinimized()) window.restore(); window.show(); window.focus(); }
+  });
 }).catch(error => { console.error('OpenBuddy startup failed', error); app.exit(1); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin' || process.env.OPENBUDDY_SMOKE_TEST === '1') app.quit(); });
 app.on('before-quit', event => {

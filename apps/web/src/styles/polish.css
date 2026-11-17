@@ -1203,3 +1203,19 @@ html[data-density="compact"] .pref-row { padding-top: 7px; padding-bottom: 7px; 
   padding: 1px 6px; border-radius: 6px; background: var(--wb-bg-tertiary, var(--ob-surface));
   font-family: var(--wb-font-code-family, ui-monospace, monospace); font-size: 11px; color: var(--wb-text-strong);
 }
+
+/* W6.1：审批卡「查看拦截规则」定位到安全中心对应分组，短暂高亮后回落。 */
+.sec-card.is-focus,
+.sec-group.is-focus {
+  animation: sec-focus-pulse 2.2s var(--ob-ease);
+}
+.sec-group.is-focus { border-radius: 12px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ob-focus) 26%, transparent); }
+@keyframes sec-focus-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ob-focus) 42%, transparent); }
+  18% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--ob-focus) 32%, transparent); }
+  70% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--ob-focus) 18%, transparent); }
+  100% { box-shadow: var(--ob-shadow-card); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sec-card.is-focus, .sec-group.is-focus { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ob-focus) 26%, transparent); }
+}

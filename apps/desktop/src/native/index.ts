@@ -8,6 +8,8 @@ export const NATIVE_COMMANDS = [
   'clipboard_write_text', 'clipboard_save_image',
   'window_minimize', 'window_toggle_maximize', 'window_close', 'window_is_maximized', 'window_edit',
   'dialog_open', 'dialog_save', 'dialog_ask',
+  // 托盘常驻 (20261116-pii W4.4).
+  'tray_get', 'tray_set',
 ] as const;
 /** Events sent by apps/desktop itself (window resize, notification click → focus session). */
 export const DESKTOP_EVENTS = ['window://resized', 'app://focus-session'] as const;

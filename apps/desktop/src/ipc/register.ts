@@ -6,6 +6,7 @@ import { exportCommands } from '../native/export.js';
 import { clipboardCommands } from '../native/clipboard.js';
 import { windowCommands } from '../native/window.js';
 import { dialogCommands } from '../native/dialog.js';
+import { trayCommands } from '../native/tray.js';
 
 export function registerIpc(window: BrowserWindow, handlers: CommandHandlers, trustedURL: string, workspaces?: WorkspaceGrants, options: NativeOptions = {}): () => void {
   const exportGrants = new Set<string>();
@@ -21,7 +22,7 @@ export function registerIpc(window: BrowserWindow, handlers: CommandHandlers, tr
   };
   // Native commands (dialog / window / clipboard / export) live in ../native; they win over host handlers.
   const native: NativeContext = { window, fileAccess, exportGrants, workspaces, options };
-  const local: CommandHandlers = { ...exportCommands(native), ...clipboardCommands(native), ...windowCommands(native), ...dialogCommands(native) };
+  const local: CommandHandlers = { ...exportCommands(native), ...clipboardCommands(native), ...windowCommands(native), ...dialogCommands(native), ...trayCommands(native) };
   ipcMain.handle('openbuddy:invoke', async (event, command: unknown, input: unknown) => {
     assertSender(event);
     if (!isCommand(command)) throw new Error(`not_implemented: ${String(command).slice(0, 128)}`);
