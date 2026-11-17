@@ -15,6 +15,7 @@ import {
   cacheSessions,
   cacheTranscript,
   dequeueMessage,
+  forgetCachedSession,
   queueMessage,
   readCachedSessions,
   readCachedTranscript,
@@ -26,6 +27,7 @@ import { canSendNow } from '../core/connection'
 import { isPreview, previewState } from '../core/preview'
 import type { Capabilities } from '../core/surface'
 import { checkNewSession, type InitAnswer } from '../core/new-session'
+import { cleanSessionTitle } from '../core/session-actions'
 import type { Approval, NotificationItem } from '../core/models'
 import type { PairPayload } from '../core/pairing'
 import {
@@ -69,6 +71,10 @@ type AppState = {
   revoked: () => Promise<void>
   resume: () => void
   regenerate: (sessionId: string) => Promise<void>
+  setSessionPinned: (sessionId: string, pinned: boolean) => Promise<void>
+  renameSession: (sessionId: string, title: string) => Promise<void>
+  setSessionArchived: (sessionId: string, archived: boolean) => Promise<void>
+  deleteSession: (sessionId: string) => Promise<void>
   markNotificationsRead: () => Promise<void>
   dismissError: () => void
 }
@@ -360,6 +366,66 @@ export const useApp = create<AppState>((set, get) => ({
     }
   },
 
+  /** Session management mirrors the desktop sidebar's menu (§4.2 P0). */
+  async setSessionPinned(sessionId, pinned) {
+    const transport = get().transport
+    if (!transport) return
+    try {
+      await transport.invoke('agent_set_session_pinned', { sessionId, pinned })
+      await patchSession(get, set, sessionId, { pinned })
+    } catch (error) {
+      set({ error: errorText(error) })
+    }
+  },
+
+  async renameSession(sessionId, title) {
+    const transport = get().transport
+    const clean = cleanSessionTitle(title)
+    if (!transport || !clean) return
+    try {
+      await transport.invoke('agent_rename_session', { sessionId, title: clean })
+      await patchSession(get, set, sessionId, { title: clean })
+    } catch (error) {
+      set({ error: errorText(error) })
+    }
+  },
+
+  async setSessionArchived(sessionId, archived) {
+    const transport = get().transport
+    if (!transport) return
+    try {
+      await transport.invoke('agent_set_session_archived', { sessionId, archived })
+      await patchSession(get, set, sessionId, { archived })
+    } catch (error) {
+      set({ error: errorText(error) })
+    }
+  },
+
+  /** Forgets the session locally only after the desktop confirms the delete. */
+  async deleteSession(sessionId) {
+    const transport = get().transport
+    if (!transport) return
+    try {
+      await transport.invoke('agent_delete_session', { sessionId })
+      const sessions = get().sessions.filter(session => session.id !== sessionId)
+      set(state => {
+        const transcripts = { ...state.transcripts }
+        delete transcripts[sessionId]
+        return {
+          sessions,
+          transcripts,
+          awaiting: state.awaiting.filter(id => id !== sessionId),
+        }
+      })
+      await Promise.all([
+        cacheSessions(sessions).catch(() => {}),
+        forgetCachedSession(sessionId).catch(() => {}),
+      ])
+    } catch (error) {
+      set({ error: errorText(error) })
+    }
+  },
+
   async markNotificationsRead() {
     const transport = get().transport
     set(state => ({ notifications: state.notifications.map(item => ({ ...item, read: true })) }))
@@ -389,6 +455,18 @@ async function loadCapabilities(
     // A capabilities probe failure is not worth an error banner: the session
     // list already reports the connection state.
   }
+}
+
+/** Applies one confirmed metadata change to the list and the cold-start cache. */
+async function patchSession(
+  get: () => AppState,
+  set: (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void,
+  sessionId: string,
+  patch: Partial<Pick<CachedSession, 'title' | 'pinned' | 'archived'>>,
+): Promise<void> {
+  const sessions = get().sessions.map(session => session.id === sessionId ? { ...session, ...patch } : session)
+  set({ sessions })
+  await cacheSessions(sessions).catch(() => {})
 }
 
 /** Folds one event into the session transcript and persists it. */

@@ -153,6 +153,15 @@ export async function dequeueMessage(id: string): Promise<void> {
   await handle.runAsync(`DELETE FROM outbox WHERE id = ?`, [id])
 }
 
+/** Drops a deleted session's cached list row and transcript. */
+export async function forgetCachedSession(sessionId: string): Promise<void> {
+  const handle = await db()
+  await handle.withTransactionAsync(async () => {
+    await handle.runAsync(`DELETE FROM sessions WHERE id = ?`, [sessionId])
+    await handle.runAsync(`DELETE FROM transcripts WHERE session_id = ?`, [sessionId])
+  })
+}
+
 /** Wipes cached content on unpair so the next device starts clean. */
 export async function clearCache(): Promise<void> {
   const handle = await db()

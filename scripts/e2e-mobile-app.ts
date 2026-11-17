@@ -34,6 +34,7 @@ import { flushOutbox } from '../apps/mobile/src/core/connection.js'
 import { groupMemory, memoryPreview, validateMemoryDraft } from '../apps/mobile/src/core/memory.js'
 import { branchLabel, branchTurns, checkpointAction, restoreHash, toCheckpoints, toRewindPoints } from '../apps/mobile/src/core/branches.js'
 import { checkNewSession } from '../apps/mobile/src/core/new-session.js'
+import { cleanSessionTitle, sessionActions } from '../apps/mobile/src/core/session-actions.js'
 
 let failures = 0
 function check(name: string, condition: boolean, detail = ''): void {
@@ -52,6 +53,8 @@ const navigated: string[] = []
 const rewound: string[] = []
 const restoredFiles: { path: string; hash: string | null }[] = []
 const newSessionCalls: unknown[] = []
+const sessionMeta: { op: string; sessionId: string; value: unknown }[] = []
+const deletedSessions: string[] = []
 const BRANCH_TREE = {
   sessionId: 'sess-1',
   leafId: 'leaf-2',
@@ -85,6 +88,18 @@ const dispatcher: HostDispatcher = {
       case 'agent_new_session':
         newSessionCalls.push(payload)
         return 'sess-new'
+      case 'agent_set_session_pinned':
+        sessionMeta.push({ op: 'pin', sessionId: String(payload.sessionId), value: payload.pinned })
+        return Boolean(payload.pinned)
+      case 'agent_rename_session':
+        sessionMeta.push({ op: 'rename', sessionId: String(payload.sessionId), value: payload.title })
+        return { renamed: true }
+      case 'agent_set_session_archived':
+        sessionMeta.push({ op: 'archive', sessionId: String(payload.sessionId), value: payload.archived })
+        return Boolean(payload.archived)
+      case 'agent_delete_session':
+        deletedSessions.push(String(payload.sessionId))
+        return { deleted: true }
       case 'agent_load_session':
         return { updates: [] }
       case 'agent_send':
@@ -147,6 +162,7 @@ const dispatcher: HostDispatcher = {
     'memory_list', 'memory_get', 'memory_save',
     'agent_tree', 'rewind_points', 'rewind_execute', 'agent_navigate', 'checkpoint_list', 'checkpoint_restore',
     'agent_init', 'agent_new_session',
+    'agent_set_session_pinned', 'agent_rename_session', 'agent_set_session_archived', 'agent_delete_session',
     'window_minimize', // must be filtered off the mobile surface
   ],
 }
@@ -366,6 +382,24 @@ check('the phone learns the desktop working directory', ready.ok && ready.cwd ==
 const createdId = ready.ok ? await transport.invoke<string>('agent_new_session', { cwd: ready.cwd }) : ''
 check('the phone can start a session on the desktop', createdId === 'sess-new')
 check('the desktop received the chosen directory', JSON.stringify(newSessionCalls[0]) === JSON.stringify({ cwd: '/e2e/workspace' }))
+
+// ── 8e. Session management: menu gating and the four desktop commands ──────
+
+const manage = sessionActions({ pinned: false, archived: false }, command => canRun(capabilities, command))
+check('the menu offers pin, rename, archive, delete', manage.map(action => action.key).join(',') === 'pin,rename,archive,delete')
+check('titles are cleaned before they leave the phone', cleanSessionTitle('  周报 \n 改写  ') === '周报 改写')
+
+await transport.invoke('agent_set_session_pinned', { sessionId: 'sess-1', pinned: true })
+check('pinning reached the desktop', sessionMeta.some(item => item.op === 'pin' && item.sessionId === 'sess-1' && item.value === true))
+
+await transport.invoke('agent_rename_session', { sessionId: 'sess-1', title: cleanSessionTitle('  周报 \n 改写  ')! })
+check('rename reached the desktop', sessionMeta.some(item => item.op === 'rename' && item.value === '周报 改写'))
+
+await transport.invoke('agent_set_session_archived', { sessionId: 'sess-1', archived: true })
+check('archiving reached the desktop', sessionMeta.some(item => item.op === 'archive' && item.value === true))
+
+await transport.invoke('agent_delete_session', { sessionId: 'sess-new' })
+check('delete reached the desktop', deletedSessions.includes('sess-new'))
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 
