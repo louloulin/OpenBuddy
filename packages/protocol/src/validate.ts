@@ -60,6 +60,13 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   }
   if (command === 'agent_export_html') string('outputPath', 4096);
   if (command === 'notification_prefs_set' && typeof payload.system !== 'boolean') throw new Error('invalid_payload: system');
+  // 受保护路径 (W6.2): a bounded list of short patterns.
+  if (command === 'permission_protected_set') {
+    if (!Array.isArray(payload.paths) || payload.paths.length > 64) throw new Error('invalid_payload: paths');
+    for (const path of payload.paths) {
+      if (typeof path !== 'string' || !path.trim() || path.length > 200 || path.includes('\0')) throw new Error('invalid_payload: path');
+    }
+  }
   if (command === 'agent_set_queue') {
     string('sessionId', 256);
     for (const key of ['steering', 'followUp']) {

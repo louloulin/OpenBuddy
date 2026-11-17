@@ -1,8 +1,9 @@
-import { bool, object, text } from "@openbuddy/services/settings/settings";
+import { DEFAULT_PROTECTED_PATHS, bool, object, text } from "@openbuddy/services/settings/settings";
 import type { Handler, HostContext, HostModule } from "../module.js";
-/** §5.3 `approvals` module. Tool permission and extension UI answers, permission rules and mode, folder trust. */
+/** §5.3 `approvals` module. Tool permission and extension UI answers, permission rules and mode, folder trust, protected paths. */
 export function approvalsModule(ctx: HostContext): HostModule {
   const { settings, emit, engine, update } = ctx;
+  const protectedPaths = () => settings.config.read().protectedPaths ?? [...DEFAULT_PROTECTED_PATHS];
   const commands: Record<string, Handler> = {
     agent_resolve_ui: (p) => engine.ui.resolve(p),
     agent_resolve_permission: (p) =>
@@ -27,6 +28,18 @@ export function approvalsModule(ctx: HostContext): HostModule {
       update((c) => {
         c.rules = rules;
       });
+    },
+    // 受保护路径 (pii W6.2): read/write the hard boundary that even 完全访问 cannot bypass.
+    permission_protected_get: () => ({ paths: protectedPaths(), defaults: [...DEFAULT_PROTECTED_PATHS] }),
+    permission_protected_set: (p) => {
+      if (!Array.isArray(p.paths)) throw Error("invalid_payload: paths");
+      const paths = p.paths.map((raw) => text(raw, "path").trim()).filter(Boolean);
+      if (paths.length > 64) throw Error("invalid_payload: paths");
+      if (paths.some((path) => path.length > 200 || path.includes("\0"))) throw Error("invalid_payload: path");
+      update((c) => {
+        c.protectedPaths = [...new Set(paths)];
+      });
+      return { paths: paths.filter((path, i) => paths.indexOf(path) === i) };
     },
     permission_mode_get: () => settings.config.read().permissionMode,
     permission_mode_set: (p) => {

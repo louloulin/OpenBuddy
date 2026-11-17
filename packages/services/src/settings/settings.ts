@@ -5,6 +5,23 @@ import type { SafeStorage } from "@openbuddy/kernel";
 import type { NotifyChannel } from "@openbuddy/protocol/notifications";
 import { PiSettingsStore } from "./pi-settings.js";
 
+/**
+ * 受保护路径 (pii W6.2)：写入类工具默认拒绝触碰的文件。规则是用户可编辑的
+ * （设置 · 安全中心），这里只是首次使用的默认值。`*.x` 匹配后缀、`.name` 匹配
+ * basename 前缀（`.env` 覆盖 `.env.local`），不含 `/` 的短名同时匹配路径段。
+ */
+export const DEFAULT_PROTECTED_PATHS = [
+  ".env",
+  ".git",
+  ".ssh",
+  "*.pem",
+  "*.key",
+  "*.p12",
+  "id_rsa",
+  "id_ed25519",
+  "credentials.json",
+] as const;
+
 // Moved to @openbuddy/kernel (20261115-md R2); re-exported so existing importers keep working.
 export type { SafeStorage };
 export { object, text, bool, unsupported } from "@openbuddy/kernel";
@@ -134,6 +151,8 @@ export function createSettings(userDataDir: string, safe: SafeStorage) {
 export interface AppSettings {
   permissionMode: "ask" | "auto" | "always-approve";
   rules: Array<{ action: string; tool: string; pattern?: string }>;
+  /** 受保护路径 (pii W6.2): write/edit/delete tools are always denied on these, in every mode. */
+  protectedPaths?: string[];
   defaults: {
     defaultModel: string;
     defaultPermission: string;

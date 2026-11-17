@@ -51,6 +51,15 @@ export async function permissionSave(rules: PermissionRule[]): Promise<void> {
   await invoke<void>("permission_save", { rules });
 }
 
+/** 受保护路径 (pii W6.2): patterns write/edit/delete tools can never touch, in every mode. */
+export async function permissionProtectedGet(): Promise<{ paths: string[]; defaults: string[] }> {
+  return invoke<{ paths: string[]; defaults: string[] }>("permission_protected_get");
+}
+
+export async function permissionProtectedSet(paths: string[]): Promise<{ paths: string[] }> {
+  return invoke<{ paths: string[] }>("permission_protected_set", { paths });
+}
+
 export type PermissionMode = "ask" | "auto" | "always-approve";
 
 /** Read the configured permission mode (default "ask"). */

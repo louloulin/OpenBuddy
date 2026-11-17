@@ -1,12 +1,47 @@
 import { randomUUID } from "node:crypto";
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
-import type { Settings } from "@openbuddy/services/settings/settings";
+import { DEFAULT_PROTECTED_PATHS, type Settings } from "@openbuddy/services/settings/settings";
 import type { Emit } from "@openbuddy/kernel";
 import { assessCommand } from "./command-risk.js";
 // The event port moved to @openbuddy/kernel (20261115-md R2); re-exported for existing importers.
 export type { Emit };
 type Reason = "resolved" | "cancelled" | "timeout";
-type Decision = { allow: boolean; note?: string };
+type Decision = { allow: boolean; note?: string; kind?: "user" | "protected" };
+
+/** Tools that mutate a path; the protected-path guard only applies to these. */
+const MUTATING_TOOL = (toolName: string) => toolName === "write" || toolName === "edit" || /delete|remove/i.test(toolName);
+
+/**
+ * 受保护路径 (pii W6.2): the first pattern matching a write/edit/delete target, or undefined.
+ * `*.x` matches a basename suffix, `.name` a basename prefix (`.env` covers `.env.local`),
+ * a pattern with `/` a path substring, and a bare short name a path segment.
+ */
+export function protectedPathOf(patterns: readonly string[], toolName: string, input: unknown): string | undefined {
+  if (!MUTATING_TOOL(toolName)) return undefined;
+  const value = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
+  const target = typeof value.path === "string" ? value.path : undefined;
+  if (!target) return undefined;
+  const segments = target.split(/[\\/]/).filter(Boolean);
+  const base = segments.at(-1) ?? target;
+  for (const raw of patterns) {
+    const pattern = raw.trim();
+    if (!pattern) continue;
+    if (pattern.startsWith("*.")) {
+      if (base.endsWith(pattern.slice(1))) return pattern;
+      continue;
+    }
+    if (pattern.endsWith("*")) {
+      if (base.startsWith(pattern.slice(0, -1))) return pattern;
+      continue;
+    }
+    if (pattern.includes("/")) {
+      if (target.includes(pattern)) return pattern;
+      continue;
+    }
+    if (base === pattern || (pattern.startsWith(".") && base.startsWith(pattern)) || segments.includes(pattern)) return pattern;
+  }
+  return undefined;
+}
 /**
  * Commands / tools that delete files: the approval card asks harder (20261115-ui §5.4). Shell
  * commands are read by the main process's own classifier (command-risk.ts).
@@ -63,7 +98,8 @@ export class Permissions {
           event.input,
         );
         if (decision.allow) return undefined;
-        // A reason from the user lets the agent try another way instead of retrying the same call.
+        // A reason lets the agent try another way instead of retrying the same call.
+        if (decision.kind === "protected") return { block: true, reason: decision.note };
         return { block: true, reason: decision.note ? `用户拒绝：${decision.note}` : "用户拒绝或权限请求已取消" };
       });
     };
@@ -90,6 +126,19 @@ export class Permissions {
     toolName: string,
     input: unknown,
   ): Promise<Decision> {
+    // 受保护路径 (W6.2/W6.4): a hard boundary — allow rules, always-approve and a full-access
+    // automation grant do not bypass it. The model gets a reason it can act on.
+    const guard = protectedPathOf(
+      this.settings.config.read().protectedPaths ?? DEFAULT_PROTECTED_PATHS,
+      toolName,
+      input,
+    );
+    if (guard)
+      return {
+        allow: false,
+        kind: "protected",
+        note: `受保护路径（${guard}）：写入被拒绝。可在 设置 · 安全中心 调整受保护路径。`,
+      };
     const decided = this.decide(sessionId, toolName, input);
     if (decided !== undefined) return { allow: decided };
     return this.ask(sessionId, toolCallId, toolName, input, destructiveInfo(toolName, input));

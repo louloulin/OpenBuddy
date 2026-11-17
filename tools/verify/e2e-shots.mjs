@@ -238,6 +238,37 @@ try {
       out.push(await ctx.shot('07-settings-' + id));
     }
     return out;`);
+  // 20261116-pii W6.1/W6.2: 安全中心 — 分类规则可改，受保护路径可增删并写入本地设置。
+  await step('安全中心（受保护路径 + 规则）', `
+    await page.locator('.settings-navigation__label').getByText('安全中心', { exact: true }).first().click();
+    await page.getByText('受保护路径', { exact: true }).waitFor({ timeout: 10000 });
+    await ctx.sleep(600);
+    const before = await ctx.shot('56-security-center');
+    await page.getByPlaceholder('.env / *.pem / .git / config/secrets.json').fill('config/secrets.json');
+    // 用卡片内的主按钮定位：按钮里带图标，按可访问名匹配容易受图标文本影响。
+    await page.locator('.sec-card').filter({ hasText: '受保护路径' }).locator('.sec-btn--ink').click();
+    await page.getByText('config/secrets.json', { exact: true }).waitFor({ timeout: 5000 });
+    const gate = await ctx.call('permission_protected_get');
+    if (!gate.paths.includes('config/secrets.json')) throw new Error('protected path not saved: ' + JSON.stringify(gate));
+    await page.locator('.sec-add--rule select').selectOption('write');
+    await page.locator('.sec-add--rule input').fill('e2e-protected');
+    await page.locator('.sec-add--rule .sec-btn--ink').click();
+    const rule = page.locator('.sec-rule', { hasText: 'e2e-protected' });
+    await rule.waitFor({ timeout: 5000 });
+    await rule.getByRole('button', { name: '拒绝' }).click();
+    await ctx.sleep(500);
+    const rules = await ctx.call('permission_list');
+    if (!rules.some((r) => r.tool === 'write' && r.action === 'deny' && r.pattern === 'e2e-protected'))
+      throw new Error('rule not saved: ' + JSON.stringify(rules));
+    await ctx.sleep(400);
+    const after = await ctx.shot('57-security-configured');
+    // 清理，避免影响后续步骤。
+    await rule.getByRole('button', { name: '删除规则 write' }).click();
+    await page.getByRole('button', { name: '移除受保护路径 config/secrets.json' }).click();
+    await ctx.sleep(400);
+    const cleaned = await ctx.call('permission_protected_get');
+    if (cleaned.paths.includes('config/secrets.json')) throw new Error('protected path not removed');
+    return { before, after, paths: gate.paths, ruleSaved: true };`);
   // 20261116-pii W0.4: 设置 · 智能体 — persisted Pi settings (pi-settings.json), reopened to prove they stuck.
   await step('agent settings persisted (pii W0.4)', `
     await page.locator('.settings-navigation__label').getByText('智能体', { exact: true }).first().click();

@@ -5,6 +5,8 @@ export const COMMANDS = [
   'agent_session_info', 'agent_session_usage', 'agent_set_model', 'agent_list_workspaces',
   'agent_resolve_permission', 'agent_resolve_question', 'folder_trust_respond',
   'permission_list', 'permission_save', 'permission_mode_get', 'permission_mode_set',
+  // 受保护路径 (20261116-pii W6.2): 安全中心编辑，权限门强制执行。
+  'permission_protected_get', 'permission_protected_set',
   'providers_list', 'providers_save_provider', 'providers_save_model', 'providers_delete_provider',
   'providers_delete_model', 'providers_fetch_models', 'providers_test', 'account_get_api_key', 'account_set_api_key',
   'read_text_file', 'write_text_file', 'read_file_base64', 'export_text_file', 'list_dir',
