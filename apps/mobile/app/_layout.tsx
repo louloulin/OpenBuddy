@@ -16,6 +16,7 @@ import { Stack, useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as Notifications from 'expo-notifications'
 
+import { AppLockGate } from '../src/components/AppLockGate'
 import { useApp } from '../src/stores/app'
 import { registerForPush, routeForNotification } from '../src/native/notifications'
 import { themeFor } from '../src/theme'
@@ -27,6 +28,10 @@ export default function RootLayout() {
   const pairing = useApp(state => state.pairing)
   const bootstrap = useApp(state => state.bootstrap)
   const resume = useApp(state => state.resume)
+  const locked = useApp(state => state.locked)
+  const unlockApp = useApp(state => state.unlockApp)
+  const noteBackground = useApp(state => state.noteBackground)
+  const relockIfNeeded = useApp(state => state.relockIfNeeded)
   const router = useRouter()
 
   useEffect(() => {
@@ -42,10 +47,15 @@ export default function RootLayout() {
   // "one tap and it works" and "wait a minute for the backoff".
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {
-      if (state === 'active') resume()
+      if (state === 'active') {
+        resume()
+        relockIfNeeded()
+      } else if (state === 'background' || state === 'inactive') {
+        noteBackground()
+      }
     })
     return () => subscription.remove()
-  }, [resume])
+  }, [resume, relockIfNeeded, noteBackground])
 
   // Ask for push permission only after pairing: a prompt on first launch, with
   // nothing to be notified about yet, is noise.
@@ -90,6 +100,7 @@ export default function RootLayout() {
               <Stack.Screen name="approval/[requestId]" options={{ title: '等待批准' }} />
             </Stack>
           )}
+          {booted && locked ? <AppLockGate theme={theme} onUnlock={unlockApp} /> : null}
         </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

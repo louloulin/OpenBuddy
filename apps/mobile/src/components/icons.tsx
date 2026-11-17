@@ -219,3 +219,13 @@ export function PlayIcon({ size = 16, color, strokeWidth = 1.9 }: IconProps) {
     </Svg>
   )
 }
+
+export function LockIcon({ size = 22, color, strokeWidth = 1.75 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Rect x={4.8} y={10.2} width={14.4} height={10} rx={2.2} stroke={color} strokeWidth={strokeWidth} />
+      <Path d="M8.2 10.2V7.6a3.8 3.8 0 0 1 7.6 0v2.6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+      <Circle cx={12} cy={15.2} r={1.1} fill={color} />
+    </Svg>
+  )
+}

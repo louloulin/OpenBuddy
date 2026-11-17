@@ -6,7 +6,9 @@
  * cache so the next cold start paints without waiting for the network.
  */
 
+import { Platform } from 'react-native'
 import { create } from 'zustand'
+import * as LocalAuthentication from 'expo-local-authentication'
 
 import type { SessionUpdate } from '@openbuddy/protocol/dto'
 import type { Transport, TransportState } from '@openbuddy/client/transport'
@@ -29,6 +31,11 @@ import type { Capabilities } from '../core/surface'
 import { checkNewSession, type InitAnswer } from '../core/new-session'
 import { cleanSessionTitle } from '../core/session-actions'
 import { bumpUnread, clearUnread, shouldMarkUnread } from '../core/unread'
+import {
+  LOCK_KEY, lockUnavailableReason, parseLockSetting, serializeLockSetting, shouldRelock,
+  type LockAvailability,
+} from '../core/app-lock'
+import { getItem, setItem } from '../transport/storage'
 import type { Approval, NotificationItem } from '../core/models'
 import type { PairPayload } from '../core/pairing'
 import {
@@ -59,6 +66,10 @@ type AppState = {
   /** Sessions that were sent to but have not answered yet. */
   awaiting: string[]
   error: string | null
+  /** Face ID / fingerprint gate (§4.2 P1). */
+  appLock: boolean
+  locked: boolean
+  backgroundedAt: number | null
 
   bootstrap: () => Promise<void>
   pair: (payload: PairPayload, deviceName: string) => Promise<void>
@@ -82,6 +93,11 @@ type AppState = {
   deleteSession: (sessionId: string) => Promise<void>
   markNotificationsRead: () => Promise<void>
   dismissError: () => void
+  lockAvailability: () => Promise<LockAvailability>
+  setAppLock: (enabled: boolean) => Promise<{ ok: boolean; reason?: string }>
+  unlockApp: () => Promise<boolean>
+  noteBackground: () => void
+  relockIfNeeded: () => void
 }
 
 const ASSISTANT_EVENT = 'agent://event'
@@ -103,6 +119,9 @@ export const useApp = create<AppState>((set, get) => ({
   notifications: [],
   awaiting: [],
   error: null,
+  appLock: false,
+  locked: false,
+  backgroundedAt: null,
 
   /** Cached paint first, then the connection catches up. */
   async bootstrap() {
@@ -110,6 +129,10 @@ export const useApp = create<AppState>((set, get) => ({
     set({ sessions: cached })
 
     const pairing = await loadPairing().catch(() => null)
+    const appLock = parseLockSetting(await getItem(LOCK_KEY).catch(() => null))
+    // The lock-screen shot is a separate review build so the other screens are
+    // not blocked behind a gate no simulator can pass.
+    const previewLock = isPreview() && process.env.EXPO_PUBLIC_UI_PREVIEW_LOCK === '1'
 
     // Design review build: render the real screens from a fixed dataset and
     // skip the network entirely. Compiled away unless the flag was set.
@@ -125,11 +148,13 @@ export const useApp = create<AppState>((set, get) => ({
         notifications: demo.notifications,
         approvals: demo.approvals,
         awaiting: demo.awaiting,
+        appLock: appLock || previewLock,
+        locked: appLock || previewLock,
       })
       return
     }
 
-    set({ pairing, booted: true })
+    set({ pairing, booted: true, appLock, locked: appLock })
     if (!pairing) return
 
     const transport = await openTransport(pairing, {
@@ -457,6 +482,62 @@ export const useApp = create<AppState>((set, get) => ({
     const transport = get().transport
     set(state => ({ notifications: state.notifications.map(item => ({ ...item, read: true })) }))
     await transport?.invoke('notification_mark_all_read', {}).catch(() => {})
+  },
+
+  async lockAvailability() {
+    if (Platform.OS === 'web') return 'unsupported'
+    try {
+      if (!(await LocalAuthentication.hasHardwareAsync())) return 'no-hardware'
+      if (!(await LocalAuthentication.isEnrolledAsync())) return 'not-enrolled'
+      return 'ready'
+    } catch {
+      return 'unsupported'
+    }
+  },
+
+  /** Enabling needs hardware; disabling needs a successful scan first. */
+  async setAppLock(enabled) {
+    if (enabled) {
+      const availability = await get().lockAvailability()
+      if (availability !== 'ready') {
+        return { ok: false, reason: lockUnavailableReason(availability) ?? undefined }
+      }
+    } else {
+      const unlocked = await get().unlockApp()
+      if (!unlocked) return { ok: false, reason: '没有通过验证，应用锁保持开启。' }
+    }
+    await setItem(LOCK_KEY, serializeLockSetting(enabled)).catch(() => {})
+    set({ appLock: enabled, ...(enabled ? {} : { locked: false }) })
+    return { ok: true }
+  },
+
+  async unlockApp() {
+    if (!get().appLock) {
+      set({ locked: false })
+      return true
+    }
+    if (Platform.OS === 'web') return false
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: '解锁 OpenBuddy',
+        cancelLabel: '取消',
+      })
+      if (!result.success) return false
+    } catch {
+      return false
+    }
+    set({ locked: false, backgroundedAt: null })
+    return true
+  },
+
+  noteBackground() {
+    if (get().appLock) set({ backgroundedAt: Date.now() })
+  },
+
+  relockIfNeeded() {
+    if (shouldRelock(get().appLock, get().backgroundedAt, Date.now())) {
+      set({ locked: true, backgroundedAt: null })
+    }
   },
 
   dismissError() {

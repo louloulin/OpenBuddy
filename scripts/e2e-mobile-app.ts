@@ -36,6 +36,7 @@ import { branchLabel, branchTurns, checkpointAction, restoreHash, toCheckpoints,
 import { checkNewSession } from '../apps/mobile/src/core/new-session.js'
 import { cleanSessionTitle, sessionActions } from '../apps/mobile/src/core/session-actions.js'
 import { bumpUnread, shouldMarkUnread, totalUnread } from '../apps/mobile/src/core/unread.js'
+import { parseLockSetting, shouldRelock } from '../apps/mobile/src/core/app-lock.js'
 
 let failures = 0
 function check(name: string, condition: boolean, detail = ''): void {
@@ -411,6 +412,12 @@ const unreadRows = [
 check('a settle for another session becomes an unread mark', shouldMarkUnread('sess-2', 'sess-1') && bumpUnread(unreadRows[0]!).unread === 1)
 check('the open session never collects a mark', !shouldMarkUnread('sess-1', 'sess-1'))
 check('the tab badge sums the rows', totalUnread(unreadRows) === 2)
+
+// ── 8g. App lock: grace window and stored flag ─────────────────────────────
+
+check('a quick app switch does not demand the lock', !shouldRelock(true, Date.now() - 5_000, Date.now()))
+check('a long absence relocks the app', shouldRelock(true, Date.now() - 10 * 60_000, Date.now()))
+check('the stored lock flag is read strictly', parseLockSetting('1') && !parseLockSetting('0') && !parseLockSetting(null))
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 

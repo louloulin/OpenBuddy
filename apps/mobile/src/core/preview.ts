@@ -195,7 +195,12 @@ export function previewState(): PreviewState {
       'agent_set_session_expert', 'agent_regenerate', 'agent_cancel',
       'agents_list', 'artifacts_list', 'agent_session_info', 'session_search',
       'automations_snapshot', 'automations_run', 'automations_set_status',
-      'notification_list', 'notification_mark_all_read', 'memory_list',
+      'notification_list', 'notification_mark_all_read', 'memory_list', 'memory_get',
+      'memory_save', 'memory_delete', 'list_dir', 'read_text_file', 'browse_directory',
+      'experts_load', 'experts_list_roots', 'agent_session_usage',
+      'agent_init', 'agent_set_session_pinned', 'agent_rename_session',
+      'agent_set_session_archived', 'agent_delete_session', 'agent_tree',
+      'rewind_points', 'rewind_execute', 'agent_navigate', 'checkpoint_list', 'checkpoint_restore',
     ],
     events: ['agent://event', 'agent://permission', 'agent://update'],
   }

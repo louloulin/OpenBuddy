@@ -80,7 +80,14 @@ export default function MeScreen() {
   const pairing = useApp(state => state.pairing)
   const connection = useApp(state => state.connection)
   const capabilities = useApp(state => state.capabilities)
+  const appLock = useApp(state => state.appLock)
+  const setAppLock = useApp(state => state.setAppLock)
   const unpair = useApp(state => state.unpair)
+
+  const toggleLock = async () => {
+    const result = await setAppLock(!appLock)
+    if (!result.ok && result.reason) Alert.alert('应用锁', result.reason)
+  }
 
   const confirmUnpair = () => {
     Alert.alert('断开这台电脑？', '设备凭证会从本机删除，需要重新扫码才能连接。', [
@@ -114,10 +121,10 @@ export default function MeScreen() {
             borderRadius: 23,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: theme.scheme === 'dark' ? theme.card : '#333333',
+            backgroundColor: theme.ink,
           }}
         >
-          <SparkIcon size={22} color={theme.scheme === 'dark' ? theme.text : '#ffffff'} />
+          <SparkIcon size={22} color={theme.inkFg} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>OpenBuddy</Text>
@@ -163,6 +170,7 @@ export default function MeScreen() {
       </Section>
 
       <Section theme={theme} label="安全">
+        <Row theme={theme} label="应用锁" value={appLock ? '已开启' : '关闭'} onPress={() => void toggleLock()} />
         <Row theme={theme} label="凭证存储" value="系统钥匙串" />
         <Row theme={theme} label="模型密钥" value="从不离开电脑" />
         <Row theme={theme} label="传输" value="HTTPS / 端到端配对" last />
