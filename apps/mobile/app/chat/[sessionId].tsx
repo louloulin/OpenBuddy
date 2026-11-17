@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { Modal, Pressable, ScrollView, Text, View, useColorScheme } from 'react-native'
+import { Modal, Pressable, ScrollView, Text, View, useColorScheme, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FlashList } from '@shopify/flash-list'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -33,6 +33,10 @@ export default function ChatScreen() {
   const theme = themeFor(useColorScheme())
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const { width } = useWindowDimensions()
+  // Tablets get the desktop's two panes: the session rail stays put while the
+  // conversation keeps its own scroll.
+  const wide = width >= 768
   const params = useLocalSearchParams<{ sessionId: string }>()
   const sessionId = decodeURIComponent(params.sessionId ?? '')
 
@@ -130,7 +134,16 @@ export default function ChatScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.surface, paddingTop: insets.top }}>
+    <View style={{ flex: 1, flexDirection: wide ? 'row' : 'column', backgroundColor: theme.surface }}>
+      {wide ? (
+        <SessionRail
+          theme={theme}
+          currentId={sessionId}
+          topInset={insets.top}
+          onPick={id => router.replace(`/chat/${encodeURIComponent(id)}`)}
+        />
+      ) : null}
+      <View style={{ flex: 1, paddingTop: insets.top }}>
       {/* In-flow header, like the desktop's `.main-topbar`: no shadow, one line. */}
       <View
         style={{
@@ -382,6 +395,56 @@ export default function ChatScreen() {
           </View>
         </View>
       </Modal>
+      </View>
+    </View>
+  )
+}
+
+/** Tablet rail: the session list the phone shows in its own tab. */
+function SessionRail({
+  theme, currentId, topInset, onPick,
+}: {
+  theme: ReturnType<typeof themeFor>
+  currentId: string
+  topInset: number
+  onPick: (sessionId: string) => void
+}) {
+  const sessions = useApp(state => state.sessions)
+  return (
+    <View
+      style={{
+        width: 280,
+        paddingTop: topInset + 16,
+        paddingBottom: 16,
+        borderRightWidth: theme.hairline,
+        borderRightColor: theme.cardBorder,
+        backgroundColor: theme.surface,
+      }}
+    >
+      <Text style={{ color: theme.text, fontSize: 20, fontWeight: '700', paddingHorizontal: 16, marginBottom: 10 }}>
+        会话
+      </Text>
+      <ScrollView>
+        {sessions.map(session => {
+          const active = session.id === currentId
+          return (
+            <Pressable
+              key={session.id}
+              onPress={() => onPick(session.id)}
+              accessibilityLabel={`切换到 ${session.title}`}
+              style={({ pressed }) => ({
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                backgroundColor: active ? theme.pressed : pressed ? theme.hover : 'transparent',
+              })}
+            >
+              <Text numberOfLines={1} style={{ color: active ? theme.text : theme.textMedium, fontSize: 14, fontWeight: active ? '600' : '400' }}>
+                {session.title}
+              </Text>
+            </Pressable>
+          )
+        })}
+      </ScrollView>
     </View>
   )
 }
