@@ -11,6 +11,7 @@ import { ActivityIndicator, Pressable, Text, TextInput, View, useColorScheme } f
 import { useRouter } from 'expo-router'
 
 import { SearchIcon } from '../../src/components/icons'
+import { isPreview, previewState } from '../../src/core/preview'
 import { canRun } from '../../src/core/surface'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
@@ -30,7 +31,18 @@ export default function SearchScreen() {
 
   const search = async () => {
     const text = query.trim()
-    if (!text || !transport) return
+    if (!text) return
+    // Design review has no tunnel; answer from the same demo dataset so the
+    // screen can be exercised (and screenshotted) without a desktop.
+    if (isPreview()) {
+      const list = previewState().sessions
+        .filter(session => session.title.includes(text) || session.preview.includes(text))
+        .map(session => ({ sessionId: session.id, title: session.title, snippet: session.preview }))
+      setHits(list)
+      setNote(list.length ? null : '没有找到匹配的会话。')
+      return
+    }
+    if (!transport) return
     setBusy(true)
     setNote(null)
     try {
