@@ -17,6 +17,7 @@ import { Text, View, useColorScheme } from 'react-native'
 
 import type { TextRow, ThinkingRow as ThinkingRowData, ToolRow } from '../core/transcript'
 import { themeFor } from '../theme'
+import { speak } from '../native/speech'
 import { SparkIcon } from './icons'
 import { Caret } from './Caret'
 import { Markdown } from './Markdown'
@@ -82,6 +83,7 @@ function AssistantRow({ row, onRegenerate }: { row: TextRow; onRegenerate?: () =
         markdown={row.text}
         canRegenerate={!row.streaming}
         onRegenerate={onRegenerate}
+        onSpeak={row.streaming ? undefined : () => speak(row.text)}
       >
         {row.isError ? (
           <Text selectable style={{ color: theme.danger, fontSize: theme.fontBody, lineHeight: theme.lineBody }}>

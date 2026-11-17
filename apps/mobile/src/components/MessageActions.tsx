@@ -13,7 +13,7 @@ import * as Clipboard from 'expo-clipboard'
 
 import { themeFor } from '../theme'
 
-export type MessageAction = 'copy' | 'copy_markdown' | 'regenerate'
+export type MessageAction = 'copy' | 'copy_markdown' | 'speak' | 'regenerate'
 
 export type MessageActionsProps = {
   /** Plain text of the message. */
@@ -23,10 +23,12 @@ export type MessageActionsProps = {
   /** Whether a "regenerate" action makes sense (assistant turns only). */
   canRegenerate?: boolean
   onRegenerate?: () => void
+  /** Assistant messages can be read out loud (语音播报). */
+  onSpeak?: () => void
   children: React.ReactNode
 }
 
-export function MessageActions({ text, markdown, canRegenerate, onRegenerate, children }: MessageActionsProps) {
+export function MessageActions({ text, markdown, canRegenerate, onRegenerate, onSpeak, children }: MessageActionsProps) {
   const theme = themeFor(useColorScheme())
   const [open, setOpen] = useState(false)
   const [note, setNote] = useState<string | null>(null)
@@ -48,6 +50,9 @@ export function MessageActions({ text, markdown, canRegenerate, onRegenerate, ch
   ]
   if (markdown && markdown !== text) {
     items.push({ key: 'copy_markdown', label: '复制 Markdown', run: () => void copy(markdown, '已复制 Markdown') })
+  }
+  if (onSpeak) {
+    items.push({ key: 'speak', label: '朗读', run: () => { setOpen(false); onSpeak() } })
   }
   if (canRegenerate && onRegenerate) {
     items.push({ key: 'regenerate', label: '重新生成', run: () => { setOpen(false); onRegenerate() } })

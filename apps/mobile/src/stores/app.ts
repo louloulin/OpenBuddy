@@ -36,6 +36,10 @@ import {
   type LockAvailability,
 } from '../core/app-lock'
 import { getItem, setItem } from '../transport/storage'
+import {
+  parseSpeakSetting, serializeSpeakSetting, shouldSpeak, SPEAK_KEY,
+} from '../core/speech'
+import { speak } from '../native/speech'
 import type { Approval, NotificationItem } from '../core/models'
 import type { PairPayload } from '../core/pairing'
 import {
@@ -70,6 +74,8 @@ type AppState = {
   appLock: boolean
   locked: boolean
   backgroundedAt: number | null
+  /** Read assistant replies of the open conversation out loud. */
+  autoSpeak: boolean
 
   bootstrap: () => Promise<void>
   pair: (payload: PairPayload, deviceName: string) => Promise<void>
@@ -98,6 +104,7 @@ type AppState = {
   unlockApp: () => Promise<boolean>
   noteBackground: () => void
   relockIfNeeded: () => void
+  setAutoSpeak: (enabled: boolean) => Promise<void>
 }
 
 const ASSISTANT_EVENT = 'agent://event'
@@ -122,6 +129,7 @@ export const useApp = create<AppState>((set, get) => ({
   appLock: false,
   locked: false,
   backgroundedAt: null,
+  autoSpeak: false,
 
   /** Cached paint first, then the connection catches up. */
   async bootstrap() {
@@ -130,6 +138,7 @@ export const useApp = create<AppState>((set, get) => ({
 
     const pairing = await loadPairing().catch(() => null)
     const appLock = parseLockSetting(await getItem(LOCK_KEY).catch(() => null))
+    const autoSpeak = parseSpeakSetting(await getItem(SPEAK_KEY).catch(() => null))
     // The lock-screen shot is a separate review build so the other screens are
     // not blocked behind a gate no simulator can pass.
     const previewLock = isPreview() && process.env.EXPO_PUBLIC_UI_PREVIEW_LOCK === '1'
@@ -150,11 +159,12 @@ export const useApp = create<AppState>((set, get) => ({
         awaiting: demo.awaiting,
         appLock: appLock || previewLock,
         locked: appLock || previewLock,
+        autoSpeak,
       })
       return
     }
 
-    set({ pairing, booted: true, appLock, locked: appLock })
+    set({ pairing, booted: true, appLock, locked: appLock, autoSpeak })
     if (!pairing) return
 
     const transport = await openTransport(pairing, {
@@ -540,6 +550,11 @@ export const useApp = create<AppState>((set, get) => ({
     }
   },
 
+  async setAutoSpeak(enabled) {
+    await setItem(SPEAK_KEY, serializeSpeakSetting(enabled)).catch(() => {})
+    set({ autoSpeak: enabled })
+  },
+
   dismissError() {
     set({ error: null })
   },
@@ -599,6 +614,12 @@ function ingestUpdate(
       }
     })
     if (markUnread) void cacheSessions(get().sessions).catch(() => {})
+    // Read-aloud follows the screen, not the notification stream: a reply in
+    // another conversation becomes an unread mark instead of audio.
+    if (shouldSpeak(get().autoSpeak, key, get().activeSessionId)) {
+      const text = get().transcripts[key]?.lastAssistantText
+      if (text) speak(text)
+    }
   }
   const current = get().transcripts[key] ?? emptyTranscript()
   const next = applyUpdate(current, update, key)

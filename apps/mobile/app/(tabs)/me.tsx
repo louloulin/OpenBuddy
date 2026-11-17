@@ -82,6 +82,8 @@ export default function MeScreen() {
   const capabilities = useApp(state => state.capabilities)
   const appLock = useApp(state => state.appLock)
   const setAppLock = useApp(state => state.setAppLock)
+  const autoSpeak = useApp(state => state.autoSpeak)
+  const setAutoSpeak = useApp(state => state.setAutoSpeak)
   const unpair = useApp(state => state.unpair)
 
   const toggleLock = async () => {
@@ -167,6 +169,16 @@ export default function MeScreen() {
         />
         <Row theme={theme} label="模型与密钥" value="仅在电脑上" onPress={() => explain('providers_save_provider')} />
         <Row theme={theme} label="文件写入" value="仅在电脑上" onPress={() => explain('write_text_file')} last />
+      </Section>
+
+      <Section theme={theme} label="语音">
+        <Row
+          theme={theme}
+          label="回复自动播报"
+          value={autoSpeak ? '已开启' : '关闭'}
+          onPress={() => void setAutoSpeak(!autoSpeak)}
+          last
+        />
       </Section>
 
       <Section theme={theme} label="安全">

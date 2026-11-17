@@ -37,6 +37,7 @@ import { checkNewSession } from '../apps/mobile/src/core/new-session.js'
 import { cleanSessionTitle, sessionActions } from '../apps/mobile/src/core/session-actions.js'
 import { bumpUnread, shouldMarkUnread, totalUnread } from '../apps/mobile/src/core/unread.js'
 import { parseLockSetting, shouldRelock } from '../apps/mobile/src/core/app-lock.js'
+import { parseSpeakSetting, serializeSpeakSetting, shouldSpeak, speakableText } from '../apps/mobile/src/core/speech.js'
 
 let failures = 0
 function check(name: string, condition: boolean, detail = ''): void {
@@ -418,6 +419,12 @@ check('the tab badge sums the rows', totalUnread(unreadRows) === 2)
 check('a quick app switch does not demand the lock', !shouldRelock(true, Date.now() - 5_000, Date.now()))
 check('a long absence relocks the app', shouldRelock(true, Date.now() - 10 * 60_000, Date.now()))
 check('the stored lock flag is read strictly', parseLockSetting('1') && !parseLockSetting('0') && !parseLockSetting(null))
+
+// ── 8h. Read-aloud: Markdown flattening, scope, stored flag ────────────────
+
+check('code blocks become a spoken placeholder', speakableText('看：\n```ts\nx=1\n```\n完。') === '看： （代码略） 完。')
+check('only the open conversation is read aloud', shouldSpeak(true, 'sess-1', 'sess-1') && !shouldSpeak(true, 'sess-1', 'sess-2'))
+check('the speak setting round-trips', parseSpeakSetting(serializeSpeakSetting(true)) && !parseSpeakSetting(serializeSpeakSetting(false)))
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 
