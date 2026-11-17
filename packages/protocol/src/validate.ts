@@ -59,6 +59,20 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
     if (payload.origin !== undefined && payload.origin !== 'apply' && payload.origin !== 'user') throw new Error('invalid_payload: origin');
   }
   if (command === 'agent_export_html') string('outputPath', 4096);
+  // 会话 JSONL 导出 / 导入 (W6.5).
+  if (command === 'agent_export_jsonl') {
+    string('sessionId', 256);
+    if (payload.outputPath !== undefined && payload.outputPath !== null) string('outputPath', 4096);
+  }
+  if (command === 'agent_import_jsonl') string('path', 4096);
+  // 反馈诊断 (W6.5): bounded free text; the renderer never sends keys.
+  if (command === 'agent_diagnose') {
+    if (payload.sessionId !== undefined && payload.sessionId !== null) string('sessionId', 256);
+    if (payload.includeSummary !== undefined && typeof payload.includeSummary !== 'boolean') throw new Error('invalid_payload: includeSummary');
+    if (payload.hint !== undefined && (typeof payload.hint !== 'string' || payload.hint.length > 2000)) throw new Error('invalid_payload: hint');
+    if (payload.feedback !== undefined && (typeof payload.feedback !== 'string' || payload.feedback.length > 4000)) throw new Error('invalid_payload: feedback');
+    if (payload.app !== undefined && (typeof payload.app !== 'string' || payload.app.length > 100)) throw new Error('invalid_payload: app');
+  }
   if (command === 'notification_prefs_set' && typeof payload.system !== 'boolean') throw new Error('invalid_payload: system');
   // 受保护路径 (W6.2): a bounded list of short patterns.
   if (command === 'permission_protected_set') {

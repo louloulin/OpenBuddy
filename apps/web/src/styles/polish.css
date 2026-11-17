@@ -1080,3 +1080,45 @@ body.bench-resizing iframe { pointer-events: none; }
 .sec-rule__delete:hover { background: var(--ob-active); color: #dc2626; }
 .sec-muted { padding: 14px 18px; font-size: 12px; color: var(--wb-text-tertiary); }
 .sec-error { margin-bottom: 10px; padding: 8px 12px; border-radius: 10px; background: color-mix(in srgb, #dc2626 10%, transparent); color: #dc2626; font-size: 12px; }
+
+/* ---------- 20261117 · W6.5：数据管理与诊断反馈 ---------- */
+.data-card,
+.diag-card {
+  border: 1px solid var(--ob-card-border);
+  border-radius: 18px;
+  background: var(--ob-card);
+  box-shadow: var(--ob-shadow-card);
+  overflow: hidden;
+}
+.data-card { padding: 6px 0 0; }
+.data-card__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 18px; }
+.data-card__label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--wb-text-strong); }
+.data-card__label svg { color: var(--wb-text-tertiary); }
+.data-card__value,
+.data-card__hint { font-size: 12px; color: var(--wb-text-tertiary); }
+.data-card__value { font-family: var(--wb-font-code-family, ui-monospace, monospace); }
+.data-card__actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 18px 12px; }
+.data-card__status { margin: 0; padding: 0 18px 8px; font-size: 12px; color: var(--wb-text-medium); }
+.data-card .sec-footnote { padding-top: 8px; }
+
+.diag-card { margin-top: 16px; }
+.diag-card__head { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px 12px; border-bottom: 1px solid var(--ob-card-border); }
+.diag-card__body { display: flex; flex-direction: column; gap: 12px; padding: 14px 18px 16px; }
+.diag-field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--wb-text-medium); }
+.diag-field textarea {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 54px; padding: 8px 10px;
+  border: 1px solid var(--ob-card-border); border-radius: 12px; background: var(--ob-card);
+  color: var(--wb-text-strong); font: inherit; font-size: 12px; line-height: 18px;
+  transition: border-color var(--ob-dur-fast) var(--ob-ease), box-shadow var(--ob-dur-fast) var(--ob-ease);
+}
+.diag-field textarea:focus-visible { outline: none; border-color: transparent; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ob-focus) 30%, transparent); }
+.diag-check { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; line-height: 18px; color: var(--wb-text-medium); cursor: pointer; }
+.diag-check input { margin-top: 2px; accent-color: var(--ob-ink); }
+.diag-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.diag-status { margin: 0; font-size: 12px; color: var(--wb-text-medium); }
+.diag-preview {
+  margin: 0; max-height: 340px; overflow: auto; padding: 12px 14px; border-radius: 12px;
+  background: var(--ob-surface); border: 1px solid var(--ob-card-border);
+  font-family: var(--wb-font-code-family, ui-monospace, monospace); font-size: 11px; line-height: 17px;
+  color: var(--wb-text-strong); white-space: pre-wrap; word-break: break-word;
+}

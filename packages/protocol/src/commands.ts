@@ -25,9 +25,11 @@ export const COMMANDS = [
   'agent_extensions_remove', 'agent_extensions_set_enabled', 'agent_extensions_set_path_enabled', 'tasks_list', 'task_kill',
   'rewind_points', 'rewind_execute', 'agent_regenerate', 'agent_compact',
   'artifacts_list', 'checkpoint_list', 'checkpoint_read', 'checkpoint_restore', 'turn_revert', 'artifact_save',
-  'agent_export_html', 'agent_set_mode', 'agent_abort_retry', 'clipboard_save_image',
+  'agent_export_html', 'agent_export_jsonl', 'agent_import_jsonl', 'agent_set_mode', 'agent_abort_retry', 'clipboard_save_image',
   'notification_prefs_get', 'notification_prefs_set', 'agent_set_queue',
   'host_capabilities', 'session_search',
+  // 反馈诊断 (20261116-pii W6.5): local preview only, never uploaded.
+  'agent_diagnose',
   // 20261116-pii W1.1 branch switcher, W1.2 `!command`, W1.3 `@` file mention.
   'agent_tree', 'agent_navigate', 'agent_bash', 'agent_bash_abort', 'files_search',
   // 20261116-pii W0.4 / W1.6 (host module `model`).

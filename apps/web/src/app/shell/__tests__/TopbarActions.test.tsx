@@ -2,9 +2,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { TopbarActions } from "../TopbarActions";
 import { useSessionStore } from "@/features/chat/state/session-store";
-const { fork } = vi.hoisted(() => ({ fork: vi.fn() }));
-vi.mock("@openbuddy/client/agent-client", () => ({ agentForkSession: fork, exportTextFile: vi.fn(), agentSetSessionPinned: vi.fn(), agentSetSessionArchived: vi.fn() }));
-beforeEach(() => { fork.mockReset(); useSessionStore.setState({ streaming: false }); });
+const { fork, exportJsonl, saveDialog } = vi.hoisted(() => ({ fork: vi.fn(), exportJsonl: vi.fn(), saveDialog: vi.fn() }));
+vi.mock("@openbuddy/client/agent-client", () => ({ agentForkSession: fork, exportTextFile: vi.fn(), agentExportJsonl: exportJsonl, saveFileDialog: saveDialog, agentSetSessionPinned: vi.fn(), agentSetSessionArchived: vi.fn() }));
+beforeEach(() => { fork.mockReset(); exportJsonl.mockReset(); saveDialog.mockReset(); useSessionStore.setState({ streaming: false }); });
+describe("会话 JSONL 导出 (pii W6.5)", () => {
+  it("uses the save dialog and exports the current session", async () => {
+    saveDialog.mockResolvedValue("/tmp/session.jsonl");
+    exportJsonl.mockResolvedValue("/tmp/session.jsonl");
+    const toast = vi.fn();
+    render(<TopbarActions sessionId="s1" title="季度报告" onToast={toast} />);
+    fireEvent.click(screen.getByRole("button", { name: "更多操作" }));
+    fireEvent.click(screen.getByRole("button", { name: "导出为 JSONL（可导入）" }));
+    await waitFor(() => expect(exportJsonl).toHaveBeenCalledWith("s1", "/tmp/session.jsonl"));
+    expect(saveDialog.mock.calls[0][0].defaultPath).toContain("季度报告");
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("已导出到 /tmp/session.jsonl"));
+  });
+});
 describe("保存为自动化 (pii W4.3)", () => {
   it("hands the title, last user message and workspace to the automation form", () => {
     useSessionStore.setState({

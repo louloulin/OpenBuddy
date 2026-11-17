@@ -8,14 +8,15 @@ import { friendlyError } from "@openbuddy/chat-core/error-format";
  * 位置：main-topbar 右侧（标题旁边）。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { save as saveDialog } from "@openbuddy/client/ipc";
 import { MoreDotsIcon, PinFilledIcon, ArchiveIcon } from "@openbuddy/ui/icon/icons/index";
 import { useSessionStore } from "@/features/chat/state/session-store";
 import {
   exportTextFile,
+  saveFileDialog,
   agentForkSession,
   agentSetSessionPinned,
   agentSetSessionArchived,
+  agentExportJsonl,
 } from "@openbuddy/client/agent-client";
 import { buildSessionMarkdown, sanitizeFilename } from "@openbuddy/chat-core/export-markdown";
 import type { Automation } from "@openbuddy/protocol/dto";
@@ -72,7 +73,7 @@ export function TopbarActions({
       }
       const md = buildSessionMarkdown(messages, title);
       const suggested = sanitizeFilename(title || "对话导出") + ".md";
-      const path = await saveDialog({
+      const path = await saveFileDialog({
         defaultPath: suggested,
         filters: [{ name: "Markdown", extensions: ["md"] }],
       });
@@ -85,6 +86,26 @@ export function TopbarActions({
       setBusy(false);
     }
   }, [title, onToast]);
+
+  /** 会话 JSONL 导出 (pii W6.5): the file can be imported on another machine as a new task. */
+  const handleExportJsonl = useCallback(async () => {
+    setOpen(false);
+    setBusy(true);
+    try {
+      const suggested = sanitizeFilename(title || "会话导出") + ".jsonl";
+      const path = await saveFileDialog({
+        defaultPath: suggested,
+        filters: [{ name: "JSONL", extensions: ["jsonl"] }],
+      });
+      if (!path) return;
+      await agentExportJsonl(sessionId, path);
+      onToast?.(`已导出到 ${path}`);
+    } catch (e) {
+      onToast?.(`导出失败：${String(e).replace(/^Error:\s*/, "")}`);
+    } finally {
+      setBusy(false);
+    }
+  }, [sessionId, title, onToast]);
 
   const handleTogglePin = useCallback(async () => {
     setOpen(false);
@@ -164,6 +185,9 @@ export function TopbarActions({
           <button type="button" className="topbar-actions__item" onClick={handleExport}>
             <span className="topbar-actions__item-icon">📄</span>
             <span>导出为 Markdown</span>
+          </button>
+          <button type="button" className="topbar-actions__item" onClick={handleExportJsonl}>
+            <span>导出为 JSONL（可导入）</span>
           </button>
           <button type="button" className="topbar-actions__item" onClick={handleTogglePin}>
             <PinFilledIcon size="sm" />

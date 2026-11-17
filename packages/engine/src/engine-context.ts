@@ -86,6 +86,8 @@ export interface EngineContext {
   evictOverflow(keep: string): Promise<void>;
   rebuild(slot: Slot): Promise<void>;
   reload(filter?: (slot: Slot) => boolean): Promise<void>;
+  /** Duplicate a live session onto a new id (features/fork.ts; also used by 会话导入, W6.5). */
+  fork(id: string): Promise<string>;
   metadata(id: string, patch: { title?: string; pinned?: boolean; archived?: boolean }): void;
   /** Only forwarded as an event payload by the split-out modules. */
   modelState(id: string): unknown;

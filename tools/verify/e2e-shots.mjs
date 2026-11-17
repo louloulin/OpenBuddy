@@ -269,6 +269,18 @@ try {
     const cleaned = await ctx.call('permission_protected_get');
     if (cleaned.paths.includes('config/secrets.json')) throw new Error('protected path not removed');
     return { before, after, paths: gate.paths, ruleSaved: true };`);
+  // 20261116-pii W6.5: 诊断报告在本地生成、脱敏、预览，不上传。
+  await step('诊断报告（本地预览）', `
+    await page.locator('.settings-navigation__label').getByText('帮助与反馈', { exact: true }).first().click();
+    await page.getByText('诊断与反馈', { exact: true }).waitFor({ timeout: 10000 });
+    await page.getByPlaceholder('例如：点「导出为 JSONL」没有反应').fill('e2e 诊断');
+    await page.getByRole('button', { name: /生成诊断报告/ }).click();
+    await page.locator('.diag-preview').waitFor({ timeout: 15000 });
+    const text = await page.locator('.diag-preview').innerText();
+    if (!text.includes('OpenBuddy 诊断报告')) throw new Error('diagnostics missing: ' + text.slice(0, 300));
+    if (text.includes('sk-') || /\\/Users\\//.test(text)) throw new Error('diagnostics leaked a key or absolute path');
+    await ctx.sleep(500);
+    return { shot: await ctx.shot('58-diagnostics'), lines: text.split('\\n').length };`);
   // 20261116-pii W0.4: 设置 · 智能体 — persisted Pi settings (pi-settings.json), reopened to prove they stuck.
   await step('agent settings persisted (pii W0.4)', `
     await page.locator('.settings-navigation__label').getByText('智能体', { exact: true }).first().click();
@@ -790,6 +802,22 @@ try {
     if (task.nextRunAt) throw new Error('a file-triggered task must not have a scheduled run: ' + task.nextRunAt);
     if (!run.sessionId) throw new Error('file trigger record has no session');
     return { form, saved, records, text, trigger: task.fileTrigger, recordStatus: run.status, sessionId: run.sessionId, recordCount: snapshot.records.length };`);
+  // W6.5: 会话 JSONL 导出 → 导入为新会话（新 id，原会话不变）。
+  await step('会话导出 / 导入（JSONL）', `
+    const workspaces = await ctx.call('agent_list_workspaces');
+    const cwd = workspaces[0] && workspaces[0].cwd;
+    if (!cwd) throw new Error('no workspace to export from');
+    const sessions = await ctx.call('agent_list_sessions', { cwd });
+    const source = sessions.find((s) => s.sessionId)?.sessionId;
+    if (!source) throw new Error('no session to export');
+    const file = ctx.tmpPath('session-export.jsonl');
+    const exported = await ctx.call('agent_export_jsonl', { sessionId: source, outputPath: file });
+    if (exported !== file) throw new Error('unexpected export path: ' + exported);
+    const imported = await ctx.call('agent_import_jsonl', { path: file });
+    if (!imported || imported === source) throw new Error('import did not create a new session: ' + imported);
+    const info = await ctx.call('agent_session_info', { sessionId: imported });
+    if (!info || info.sessionId !== imported) throw new Error('imported session not loadable: ' + JSON.stringify(info));
+    return { source, imported, exported };`);
   // pii W4.5: the sidebar 运行中 panel lists the running turn with elapsed time; stop cancels it.
   await step('运行中面板（任务 / 用时 / 停止）', `
     ctx.fixture.delayMs = 1500;

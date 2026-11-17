@@ -237,6 +237,13 @@ export class PiEngine {
   mode(id: string): AgentMode { return features.mode(this, id); }
   abortRetry(id: string) { return runtime.abortRetry(this, id); }
   exportHtml(id: string, outputPath: string) { return features.exportHtml(this, id, outputPath); }
+  /** 会话 JSONL 导出 / 导入 (W6.5). */
+  exportJsonl(id: string, outputPath?: string) { return features.exportJsonl(this, id, outputPath); }
+  importJsonl(path: string) { return features.importJsonl(this, path); }
+  /** 反馈诊断 (W6.5): let the current model summarise what went wrong, when the user asks. */
+  summarizeForBugReport(id: string, hint?: string) {
+    return this.live(id).summarizeForBugReport({ ...(hint ? { hint } : {}), signal: AbortSignal.timeout(60_000) });
+  }
   previewRoots(): string[] { return pool.previewRoots(this); }
   queueState(id: string) { return runtime.queueState(this, id); }
   clearQueue(id: string) { return runtime.clearQueue(this, id); }

@@ -4,7 +4,7 @@ import { permissionModeSet } from "@openbuddy/client/agent-client";
 import { PermissionPicker } from "../PermissionPicker";
 import { AppDialogHost } from "../../../shared/ui/AppDialog";
 
-vi.mock("@openbuddy/client/ipc", () => ({ invoke: vi.fn(), save: vi.fn(), listen: vi.fn(async () => () => {}) }));
+vi.mock("@openbuddy/client/ipc", () => ({ invoke: vi.fn(), save: vi.fn(), listen: vi.fn(async () => () => {}), hasPreloadBridge: () => true }));
 vi.mock("@openbuddy/client/agent-client", async (orig) => ({
   ...(await orig<typeof import("@openbuddy/client/agent-client")>()),
   permissionModeGet: vi.fn(async () => "ask"),

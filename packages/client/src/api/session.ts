@@ -192,6 +192,11 @@ export const agentAbortRetry = (sessionId: string) => invoke<void>("agent_abort_
 /** `outputPath` must come from the save dialog in this window. */
 export const agentExportHtml = (sessionId: string, outputPath: string) => invoke<string>("agent_export_html", { sessionId, outputPath });
 
+// 会话 JSONL 导出 / 导入 (pii W6.5).
+export const agentExportJsonl = (sessionId: string, outputPath?: string) =>
+  invoke<string>("agent_export_jsonl", { sessionId, outputPath: outputPath ?? null });
+export const agentImportJsonl = (path: string) => invoke<string>("agent_import_jsonl", { path });
+
 // ---------- full-text search (pii W1.4) ----------
 
 /** Saved sessions whose title or messages contain every whitespace-separated term, best first. */

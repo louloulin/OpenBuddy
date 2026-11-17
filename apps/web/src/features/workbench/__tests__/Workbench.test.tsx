@@ -18,6 +18,7 @@ vi.mock("@openbuddy/client/ipc", () => ({
   invoke: vi.fn(async (command: string) => (command === "read_text_file" ? "# Report\n\nhello" : command === "read_dir" ? [] : null)),
   save: vi.fn(),
   listen: vi.fn(async () => () => {}),
+  hasPreloadBridge: () => true,
 }));
 vi.mock("@openbuddy/client/agent-client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@openbuddy/client/agent-client")>();

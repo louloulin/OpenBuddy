@@ -63,6 +63,13 @@ export function sessionModule(ctx: HostContext): HostModule {
         restoreFiles: restoreOption(p.restoreFiles),
       }),
     agent_compact: (p) => engine.compact(text(p.sessionId), typeof p.instructions === "string" ? p.instructions : undefined),
+    // 会话 JSONL 导出 / 导入 (W6.5): the renderer picks the path with the native save dialog.
+    agent_export_jsonl: (p) =>
+      engine.exportJsonl(
+        text(p.sessionId),
+        typeof p.outputPath === "string" && p.outputPath ? p.outputPath : undefined,
+      ),
+    agent_import_jsonl: (p) => engine.importJsonl(text(p.path)),
     agent_set_mode: (p) => engine.setMode(text(p.sessionId), p.mode as "craft" | "plan" | "ask"),
     agent_abort_retry: (p) => engine.abortRetry(text(p.sessionId)),
     // 后台任务视图 (W4.5): a `!command` row stops via bash abort; everything else cancels the turn.

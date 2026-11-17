@@ -10,3 +10,18 @@ export async function hostCapabilities(): Promise<HostCapabilities> {
   if (!caps || !Array.isArray(caps.commands) || !Array.isArray(caps.events)) throw new Error("invalid_payload: host_capabilities");
   return caps;
 }
+
+// ---------- 反馈诊断 (pii W6.5): local preview only ----------
+
+export interface DiagnoseRequest {
+  app?: string;
+  sessionId?: string;
+  hint?: string;
+  feedback?: string;
+  includeSummary?: boolean;
+}
+
+/** Build a redacted diagnostics report; `includeSummary` lets the current model write a short summary. */
+export async function agentDiagnose(request: DiagnoseRequest = {}): Promise<{ diagnostics: string; summary?: string }> {
+  return invoke<{ diagnostics: string; summary?: string }>("agent_diagnose", request);
+}
