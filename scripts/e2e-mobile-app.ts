@@ -38,6 +38,7 @@ import { cleanSessionTitle, sessionActions } from '../apps/mobile/src/core/sessi
 import { bumpUnread, shouldMarkUnread, totalUnread } from '../apps/mobile/src/core/unread.js'
 import { parseLockSetting, shouldRelock } from '../apps/mobile/src/core/app-lock.js'
 import { parseSpeakSetting, serializeSpeakSetting, shouldSpeak, speakableText } from '../apps/mobile/src/core/speech.js'
+import { followUpsFor } from '../apps/mobile/src/core/follow-ups.js'
 
 let failures = 0
 function check(name: string, condition: boolean, detail = ''): void {
@@ -425,6 +426,12 @@ check('the stored lock flag is read strictly', parseLockSetting('1') && !parseLo
 check('code blocks become a spoken placeholder', speakableText('看：\n```ts\nx=1\n```\n完。') === '看： （代码略） 完。')
 check('only the open conversation is read aloud', shouldSpeak(true, 'sess-1', 'sess-1') && !shouldSpeak(true, 'sess-1', 'sess-2'))
 check('the speak setting round-trips', parseSpeakSetting(serializeSpeakSetting(true)) && !parseSpeakSetting(serializeSpeakSetting(false)))
+
+// ── 8i. Follow-up chips: shape-aware next questions ────────────────────────
+
+check('code answers offer code follow-ups', followUpsFor('```ts\nconst a = 1\n```')[0] === '解释这段代码')
+check('risk answers offer risk follow-ups', followUpsFor('最大的风险是回滚很难。')[0] === '展开风险')
+check('plain answers fall back to three generic chips', followUpsFor('可以。').join(',') === '展开细节,给出例子,总结成要点')
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 

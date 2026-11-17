@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useMemo } from 'react'
-import { Pressable, Text, View, useColorScheme } from 'react-native'
+import { Pressable, ScrollView, Text, View, useColorScheme } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FlashList } from '@shopify/flash-list'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -20,6 +20,7 @@ import { LoadingRow } from '../../src/components/LoadingRow'
 import { MessageRow } from '../../src/components/MessageRow'
 import { ChevronRightIcon, SparkIcon } from '../../src/components/icons'
 import { emptyTranscript, isTurnPending, type TranscriptRow } from '../../src/core/transcript'
+import { followUpsFor } from '../../src/core/follow-ups'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
 
@@ -68,6 +69,14 @@ export default function ChatScreen() {
   // streaming, its own assistant header is the waiting state; keeping both
   // puts two "OpenBuddy" identities on screen at once.
   const streamingText = transcript.rows.some(row => row.kind === 'text' && row.role === 'assistant' && row.streaming)
+  // Kimi / Grok put next-question chips under the finished reply. They only
+  // make sense once the turn is over and the answer is the latest one.
+  const suggestions = useMemo(
+    () => (!streaming && !awaiting && transcript.lastAssistantText
+      ? followUpsFor(transcript.lastAssistantText)
+      : []),
+    [streaming, awaiting, transcript.lastAssistantText],
+  )
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.surface, paddingTop: insets.top }}>
@@ -167,6 +176,32 @@ export default function ChatScreen() {
           contentContainerStyle={{ paddingVertical: 6 }}
         />
       )}
+
+      {suggestions.length ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flexGrow: 0 }}
+          contentContainerStyle={{ gap: 8, paddingHorizontal: theme.gutter, paddingVertical: 6 }}
+        >
+          {suggestions.map(text => (
+            <Pressable
+              key={text}
+              onPress={() => void send(sessionId, text)}
+              style={({ pressed }) => ({
+                borderWidth: theme.hairline,
+                borderColor: theme.cardBorder,
+                borderRadius: theme.radiusPill,
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                backgroundColor: pressed ? theme.pressed : 'transparent',
+              })}
+            >
+              <Text style={{ color: theme.textMedium, fontSize: 12 }}>{text}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
 
       {!streamingText && (awaiting || (streaming && transcript.rows.every(row => row.kind === 'thinking' || (row.kind === 'text' && row.role === 'user')))) ? (
         <LoadingRow />
