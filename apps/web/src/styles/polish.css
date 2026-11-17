@@ -1219,3 +1219,15 @@ html[data-density="compact"] .pref-row { padding-top: 7px; padding-bottom: 7px; 
 @media (prefers-reduced-motion: reduce) {
   .sec-card.is-focus, .sec-group.is-focus { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ob-focus) 26%, transparent); }
 }
+
+/* 设置分区切换的轻量淡入位移（对标 Grok / WorkBuddy 的安静转场）。 */
+.settings-modal__panel > .settings-section {
+  animation: settings-section-in 160ms var(--ob-ease);
+}
+@keyframes settings-section-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-modal__panel > .settings-section { animation: none; }
+}
