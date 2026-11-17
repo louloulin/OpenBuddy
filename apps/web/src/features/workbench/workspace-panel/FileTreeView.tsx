@@ -6,7 +6,7 @@
  *
  * 根目录取 cwd（会话工作区）。隐藏/构建目录已在后端过滤。
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { listDir, type DirEntry } from "@openbuddy/client/agent-client";
 import { pickFileEmoji } from "./file-tab-icon";
 import { ChevronRightIcon } from "@openbuddy/ui/icon/icons/index";
@@ -23,6 +23,8 @@ interface FileTreeViewProps {
   onFileSelect: (path: string) => void;
   /** 错误/提示回调。 */
   onToast?: (msg: string) => void;
+  /** Bumped on `agent://artifacts` (U1.8): reload the open folders instead of waiting for a toggle. */
+  refreshKey?: number;
 }
 
 export function FileTreeView({
@@ -30,6 +32,7 @@ export function FileTreeView({
   selectedPath,
   onFileSelect,
   onToast,
+  refreshKey = 0,
 }: FileTreeViewProps) {
   const [loaded, setLoaded] = useState<LoadedMap>(new Map());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -40,8 +43,8 @@ export function FileTreeView({
 
   // 加载根目录。
   const loadDir = useCallback(
-    async (dirPath: string) => {
-      if (loaded.has(dirPath)) return; // 已加载（含空数组）
+    async (dirPath: string, force = false) => {
+      if (!force && loaded.has(dirPath)) return; // 已加载（含空数组）
       setLoaded((prev) => {
         const next = new Map(prev);
         next.set(dirPath, undefined); // 标记为「加载中」
@@ -75,6 +78,18 @@ export function FileTreeView({
     setLoading(true);
     loadDir(root).finally(() => setLoading(false));
   }, [root]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 产物更新 (U1.8): drop the cache and re-read the root plus every open folder. A file written by
+  // the agent must appear without the user collapsing and re-expanding its directory.
+  const firstRefresh = useRef(refreshKey);
+  useEffect(() => {
+    if (refreshKey === firstRefresh.current) return;
+    firstRefresh.current = refreshKey;
+    if (!root) return;
+    setLoaded(new Map());
+    const dirs = [root, ...expanded];
+    void Promise.all(dirs.map((dir) => loadDir(dir, true)));
+  }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleDir = useCallback(
     async (dirPath: string) => {

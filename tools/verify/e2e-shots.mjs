@@ -116,7 +116,22 @@ try {
     const toggle = page.getByRole('button', { name: '展开右侧栏', exact: true });
     if (await toggle.isVisible()) await toggle.click();
     await ctx.sleep(1500);
-    return await ctx.shot('05-workbench');`);
+    const shot = await ctx.shot('05-workbench');
+    // W1.9 (U1.9): an edit made outside the app raises the banner; 重新加载 shows the new bytes.
+    const item = page.locator('.bench-item__main').first();
+    await item.waitFor({ timeout: 10000 });
+    const path = await item.getAttribute('title');
+    if (!path) throw new Error('artifact path missing');
+    await item.click();
+    await page.locator('.bench-viewer').waitFor({ timeout: 10000 });
+    const original = await ctx.call('read_text_file', { path, maxBytes: 1048576 });
+    await ctx.writeFile(path, String(original) + '\\n\\nEXTERNAL_EDIT_MARKER\\n');
+    await page.locator('.bench-external').waitFor({ timeout: 20000 });
+    const external = await ctx.shot('67-external-modified');
+    await page.getByRole('button', { name: '重新加载' }).click();
+    await page.locator('.bench-external').waitFor({ state: 'detached', timeout: 5000 });
+    await page.getByText('EXTERNAL_EDIT_MARKER', { exact: false }).first().waitFor({ timeout: 10000 });
+    return [shot, external];`);
   // 20261116-pii W1.1: regenerate → ‹ 2/2 ›, then switch back and forth; the transcript must change.
   await step('branch switcher', `
     const panel = page.getByRole('button', { name: '收起右侧栏', exact: true });

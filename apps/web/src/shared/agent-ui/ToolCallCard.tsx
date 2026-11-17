@@ -16,6 +16,7 @@ import {
 } from "@openbuddy/ui/icon/icons/index";
 import { diffStats, formatDuration, toolDiff, toolLabel, toolOutput, toolSubject } from "@openbuddy/chat-core/tool-summary";
 import { todoCallSummary } from "@openbuddy/chat-core/plan-utils";
+import { exportTextFile, saveFileDialog } from "@openbuddy/client/agent-client";
 import { ChevronGlyph } from "./icons";
 
 type ToolCallCardProps = {
@@ -172,7 +173,7 @@ export function ToolCallDetailBody({
               {cmd.command}
             </pre>
           )}
-          {cmd.output && <pre className="toolcall__output">{cmd.output}</pre>}
+          {cmd.output && <ToolOutputPre text={cmd.output} className="toolcall__output" />}
         </div>
       )}
       {images.length > 0 && (
@@ -188,11 +189,7 @@ export function ToolCallDetailBody({
           ))}
         </div>
       )}
-      {texts.map((t, i) => (
-        <pre key={i} className="toolcall__text">
-          {t.text}
-        </pre>
-      ))}
+      {texts.map((t, i) => <ToolOutputPre key={i} text={t.text} className="toolcall__text" />)}
       {!diff && !cmd && !piDiff && typeof command !== "string" && images.length === 0 && texts.length === 0 && tc.rawInput != null && (
         <pre className="toolcall__text toolcall__raw-input">
           {typeof tc.rawInput === "string"
@@ -204,6 +201,48 @@ export function ToolCallDetailBody({
         <p className="tool-detail__empty">暂无详细输出</p>
       )}
     </div>
+  );
+}
+
+/** Lines shown before a long tool output is folded (U3.3). */
+const TOOL_OUTPUT_LINES = 2000;
+
+/**
+ * Tool output: keeps very long results out of the DOM by default, with an explicit "show all" and
+ * "save as file" so nothing is lost. Matches WorkBuddy's truncated tool detail.
+ */
+function ToolOutputPre({ text, className }: { text: string; className: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const lines = text.split("\n");
+  const long = lines.length > TOOL_OUTPUT_LINES;
+  const save = async () => {
+    try {
+      const target = await saveFileDialog({ title: "保存工具输出", defaultPath: "tool-output.txt", filters: [{ name: "文本", extensions: ["txt", "log", "md"] }] });
+      if (target) await exportTextFile(target, text);
+    } catch { /* the dialog was cancelled or the host is unavailable */ }
+  };
+  if (!long || expanded) {
+    return (
+      <>
+        <pre className={className}>{text}</pre>
+        {long && (
+          <div className="toolcall__truncated">
+            <button type="button" className="toolcall__truncated-btn" onClick={() => setExpanded(false)}>收起</button>
+            <button type="button" className="toolcall__truncated-btn" onClick={() => void save()}>保存为文件</button>
+          </div>
+        )}
+      </>
+    );
+  }
+  return (
+    <>
+      <pre className={className}>{lines.slice(0, TOOL_OUTPUT_LINES).join("\n")}</pre>
+      <div className="toolcall__truncated" role="status">
+        <span>输出较长，已显示前 {TOOL_OUTPUT_LINES} 行（共 {lines.length} 行）。</span>
+        <button type="button" className="toolcall__truncated-btn" onClick={() => setExpanded(true)}>显示全部</button>
+        <button type="button" className="toolcall__truncated-btn" onClick={() => void save()}>保存为文件</button>
+      </div>
+    </>
   );
 }
 

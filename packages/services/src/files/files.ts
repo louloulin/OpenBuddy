@@ -166,6 +166,9 @@ export function fileHandlers(shell: DesktopShell, getWorkspace: () => string) {
           absolute,
           exists: true,
           kind: s.isDirectory() ? "directory" : s.isFile() ? "file" : "other",
+          // U1.9: the workbench compares these to detect edits made outside the app.
+          size: s.size,
+          mtimeMs: s.mtimeMs,
         };
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;

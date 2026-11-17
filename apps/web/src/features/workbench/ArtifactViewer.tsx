@@ -35,6 +35,48 @@ export function ArtifactViewer({ path, sessionId, info, version, onChanged, onAd
   const [menuOpen, setMenuOpen] = useState(false);
   const [selected, setSelected] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
+  // 外部修改检测 (U1.9): compare size + mtime from path_stat against the last loaded version.
+  const [external, setExternal] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const baseline = useRef<{ size: number; mtimeMs: number } | null>(null);
+
+  const statNow = async () => {
+    const stat = await invoke<{ exists?: boolean; size?: number; mtimeMs?: number }>("path_stat", { path });
+    return stat?.exists && typeof stat.mtimeMs === "number" ? { size: stat.size ?? 0, mtimeMs: stat.mtimeMs } : null;
+  };
+
+  useEffect(() => {
+    let alive = true;
+    baseline.current = null;
+    setExternal(false);
+    statNow().then((value) => { if (alive) baseline.current = value; }, () => { /* binary / vanished: no banner */ });
+    return () => { alive = false; };
+  }, [path, version]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (view === "edit") return;
+    const check = async () => {
+      if (!baseline.current) return;
+      try {
+        const current = await statNow();
+        if (current && (current.size !== baseline.current.size || current.mtimeMs !== baseline.current.mtimeMs)) setExternal(true);
+      } catch { /* stat failed: keep the preview as-is */ }
+    };
+    const onFocus = () => { void check(); };
+    window.addEventListener("focus", onFocus);
+    const timer = window.setInterval(() => { void check(); }, 4000);
+    return () => { window.removeEventListener("focus", onFocus); window.clearInterval(timer); };
+  }, [path, version, view]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const reloadExternal = async () => {
+    setReloadKey((key) => key + 1);
+    setExternal(false);
+    baseline.current = await statNow().catch(() => null);
+  };
+  const dismissExternal = async () => {
+    setExternal(false);
+    baseline.current = await statNow().catch(() => null);
+  };
 
   useEffect(() => { setView("preview"); setSelected(""); }, [path]);
   useEffect(() => {
@@ -106,6 +148,13 @@ export function ArtifactViewer({ path, sessionId, info, version, onChanged, onAd
           </>
         )}
       </div>
+      {external && view !== "edit" && (
+        <div className="bench-external" role="status">
+          <span className="bench-external__text">文件已在外部被修改，预览可能不是最新的。</span>
+          <button type="button" className="bench-btn" onClick={() => void reloadExternal()}>重新加载</button>
+          <button type="button" className="bench-btn bench-btn--ghost" onClick={() => void dismissExternal()}>忽略</button>
+        </div>
+      )}
       {selected && view === "preview" && (
         <div className="bench-selection" role="toolbar" aria-label="选中内容">
           <span className="bench-selection__count">已选中 {selected.length} 字</span>
@@ -126,7 +175,7 @@ export function ArtifactViewer({ path, sessionId, info, version, onChanged, onAd
             <div className="bench-empty__actions"><button type="button" className="bench-btn" onClick={() => setView("versions")}>打开版本历史</button></div>
           </div>
         ) : (
-          <ArtifactPreview path={path} version={version} mode={mode} onModeChange={setMode} onSelectText={isTextKind(kind) ? setSelected : undefined} />
+          <ArtifactPreview path={path} version={version + reloadKey} mode={mode} onModeChange={setMode} onSelectText={isTextKind(kind) ? setSelected : undefined} />
         )}
       </div>
     </div>
@@ -202,10 +251,32 @@ function VersionList({ path, sessionId, onBack, onRestored, onToast }: { path: s
   const [records, setRecords] = useState<CheckpointRecord[] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [diff, setDiff] = useState<{ before: string; after: string } | null>(null);
+  // 任意两版对比 (U2.2): pick two records, diff their "after" content.
+  const [compare, setCompare] = useState<string[]>([]);
+  const [compareDiff, setCompareDiff] = useState<{ before: string; after: string } | null>(null);
   const load = useCallback(() => {
     checkpointList(sessionId, path).then((list) => setRecords([...list].sort((a, b) => b.at - a.at)), () => setRecords([]));
   }, [sessionId, path]);
   useEffect(load, [load]);
+
+  useEffect(() => {
+    if (compare.length !== 2 || !records) { setCompareDiff(null); return; }
+    let alive = true;
+    const picked = records.filter((record) => compare.includes(record.id)).sort((a, b) => a.at - b.at);
+    if (picked.length !== 2) return;
+    const read = async (hash: string | null) => (hash ? (await checkpointRead(sessionId, hash)).text ?? "（二进制内容）" : "（该版本之后文件不存在）");
+    Promise.all([read(picked[0].after), read(picked[1].after)]).then(
+      ([before, after]) => { if (alive) setCompareDiff({ before, after }); },
+      (e) => { if (alive) { setCompareDiff(null); onToast(`对比失败：${friendlyError(e)}`); } },
+    );
+    return () => { alive = false; };
+  }, [compare, records, sessionId, onToast]);
+
+  const toggleCompare = (record: CheckpointRecord) => {
+    setCompare((current) => current.includes(record.id)
+      ? current.filter((id) => id !== record.id)
+      : current.length >= 2 ? [current[1], record.id] : [...current, record.id]);
+  };
 
   const show = async (record: CheckpointRecord) => {
     if (open === record.id) { setOpen(null); return; }
@@ -231,6 +302,13 @@ function VersionList({ path, sessionId, onBack, onRestored, onToast }: { path: s
         <button type="button" className="bench-btn" onClick={onBack}>← 返回预览</button>
         <span className="bench-versions__title">版本历史</span>
       </div>
+      {compare.length > 0 && (
+        <div className="bench-compare" role="status">
+          <span>已选 {compare.length}/2 个版本{compare.length === 2 ? "，对比它们的修改后内容" : "，再选一个开始对比"}</span>
+          <button type="button" className="bench-btn bench-btn--ghost" onClick={() => setCompare([])}>清除</button>
+        </div>
+      )}
+      {compareDiff && <DiffBlock before={compareDiff.before} after={compareDiff.after} />}
       {!records ? <div className="bench-skeleton"><span /><span /></div> : records.length === 0 ? (
         <div className="bench-empty"><div className="bench-empty__title">还没有版本记录</div><div className="bench-empty__hint">Buddy 修改文件或你在这里保存时，会自动留存修改前的内容。</div></div>
       ) : (
@@ -243,6 +321,13 @@ function VersionList({ path, sessionId, onBack, onRestored, onToast }: { path: s
                   <span className="bench-version__source">{SOURCE_LABEL[r.source]}{r.before === null ? " · 新建" : ""}</span>
                   {r.skipped && <span className="bench-version__skip">文件过大，未留存</span>}
                 </button>
+                <button
+                  type="button"
+                  className={"bench-btn" + (compare.includes(r.id) ? " bench-btn--primary" : "")}
+                  onClick={() => toggleCompare(r)}
+                  aria-pressed={compare.includes(r.id)}
+                  disabled={!compare.includes(r.id) && compare.length >= 2}
+                >{compare.includes(r.id) ? "已选" : "对比"}</button>
                 {!r.skipped && (r.source !== "restore" || r.before !== null) && (
                   <button type="button" className="bench-btn" onClick={() => void restore(r)}>{r.source === "restore" ? "撤销这次还原" : "还原到此前"}</button>
                 )}

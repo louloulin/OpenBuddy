@@ -200,7 +200,7 @@ export function Workbench({ sessionId, cwd, artifacts, version, toolCall, focus,
         )}
         {/* 文件 is a singleton: stays mounted once opened so expanded folders survive tab switches. */}
         {filesSeen && cwd && (
-          <div className="bench-files" hidden={active !== "files"}><FileTreeView rootPath={cwd} selectedPath={activeFile ?? undefined} onFileSelect={openFile} onToast={onToast} /></div>
+          <div className="bench-files" hidden={active !== "files"}><FileTreeView rootPath={cwd} selectedPath={activeFile ?? undefined} onFileSelect={openFile} onToast={onToast} refreshKey={version} /></div>
         )}
         {active === "files" && !cwd && (
           <div className="bench-empty"><div className="bench-empty__title">这个任务没有工作空间</div><div className="bench-empty__hint">选择一个文件夹作为工作空间后，这里会显示它的文件。</div></div>

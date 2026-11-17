@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { ToolCallCard } from "../ToolCallCard";
+import { ToolCallCard, ToolCallDetailBody } from "../ToolCallCard";
 import type { ToolCallView } from "@/features/chat/state/session-store";
 
 const base: ToolCallView = {
@@ -37,6 +37,25 @@ describe("ToolCallCard", () => {
     render(<ToolCallCard tc={{ ...base, kind: "mcp__github__create_issue", title: "mcp__github__create_issue", details: undefined, rawInput: { title: "Bug: crash" } }} />);
     expect(screen.getByText("github · create_issue")).toBeInTheDocument();
     expect(screen.getByText("Bug: crash")).toBeInTheDocument();
+  });
+
+  it("truncates very long output at 2000 lines (U3.3) and can show all", () => {
+    const output = Array.from({ length: 2500 }, (_, i) => `line ${i + 1}`).join("\n");
+    const tc: ToolCallView = {
+      ...base,
+      kind: "bash",
+      title: "bash",
+      details: undefined,
+      rawInput: { command: "cat big.log" },
+      content: [{ type: "command_output", command: "cat big.log", output } as never],
+    };
+    render(<ToolCallDetailBody tc={tc} />);
+    expect(screen.getByText(/已显示前 2000 行（共 2500 行）/)).toBeInTheDocument();
+    expect(screen.getByText(/line 2000/)).toBeInTheDocument();
+    expect(screen.queryByText(/line 2001$/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "显示全部" }));
+    expect(screen.queryByText(/已显示前 2000 行/)).toBeNull();
+    expect(screen.getByText(/line 2500$/)).toBeInTheDocument();
   });
 
   it("shows a spinner and the last output line while running, and a failure mark when failed", () => {
