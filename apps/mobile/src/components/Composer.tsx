@@ -19,6 +19,7 @@ import * as Speech from 'expo-speech'
 
 import { appendAttachments, compressOptions, checkUpload, MAX_ATTACHMENTS } from '../core/attachments'
 import { mergeTranscript, transcriptOutcome, unavailableMessage } from '../core/voice'
+import { haptic } from '../native/haptics'
 import { matchCommands, slashQuery, toSlashCommands, type SlashCommand } from '../core/slash'
 import { useApp } from '../stores/app'
 import { themeFor } from '../theme'
@@ -73,6 +74,7 @@ export function Composer({ onSend, onImage, onImages, onStop, onSteer, streaming
   const submit = () => {
     const text = draft.trim()
     if (!text && pending.length === 0) return
+    void haptic('send')
     if (pending.length) {
       const images = pending.map(({ bytes, mime }) => ({ bytes, mime }))
       setPending([])
@@ -249,10 +251,11 @@ export function Composer({ onSend, onImage, onImages, onStop, onSteer, streaming
     Speech.speak(draft, { language: 'zh-CN' })
   }
 
-  const roundButton = (onPress: () => void, disabled: boolean, child: React.ReactNode) => (
+  const roundButton = (onPress: () => void, disabled: boolean, child: React.ReactNode, label?: string) => (
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityLabel={label}
       hitSlop={6}
       style={({ pressed }) => ({
         width: 34,
@@ -382,8 +385,8 @@ export function Composer({ onSend, onImage, onImages, onStop, onSteer, streaming
           }}
         />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-          {roundButton(() => setSheet(true), busy, <CameraIcon size={20} color={theme.textMedium} />)}
-          {roundButton(() => void speak(), listening, <MicIcon size={20} color={listening ? theme.danger : theme.textMedium} />)}
+          {roundButton(() => setSheet(true), busy, <CameraIcon size={20} color={theme.textMedium} />, '添加图片')}
+          {roundButton(() => void speak(), listening, <MicIcon size={20} color={listening ? theme.danger : theme.textMedium} />, '语音输入')}
           <View style={{ flex: 1 }} />
           {streaming && onStop ? (
             <Pressable

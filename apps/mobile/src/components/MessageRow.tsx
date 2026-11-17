@@ -19,7 +19,9 @@ import * as Clipboard from 'expo-clipboard'
 import type { TextRow, ThinkingRow as ThinkingRowData, ToolRow } from '../core/transcript'
 import { themeFor } from '../theme'
 import { speak } from '../native/speech'
-import { CopyIcon, RefreshIcon, SparkIcon, VolumeIcon } from './icons'
+import { CopyIcon, RefreshIcon, ShareIcon, SparkIcon, VolumeIcon } from './icons'
+import { shareTextFile } from '../native/share'
+import { messageFilename, messageMarkdown } from '../core/share'
 import { Caret } from './Caret'
 import { Markdown } from './Markdown'
 import { MessageActions } from './MessageActions'
@@ -79,10 +81,23 @@ function InlineActions({ row, onRegenerate }: { row: TextRow; onRegenerate?: () 
     setTimeout(() => setNote(null), 1400)
   }
 
+  const share = async () => {
+    try {
+      const result = await shareTextFile(messageFilename(row.role), messageMarkdown(row.role, row.text))
+      setNote(result === 'downloaded' ? '已下载' : result === 'shared' ? '已分享' : '不支持分享')
+    } catch {
+      setNote('分享失败')
+    }
+    setTimeout(() => setNote(null), 1600)
+  }
+
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 8 }}>
       <Pressable hitSlop={10} onPress={() => void copy()} accessibilityLabel="复制">
         <CopyIcon size={15} color={theme.textWeak} />
+      </Pressable>
+      <Pressable hitSlop={10} onPress={() => void share()} accessibilityLabel="分享">
+        <ShareIcon size={15} color={theme.textWeak} />
       </Pressable>
       <Pressable hitSlop={10} onPress={() => speak(row.text)} accessibilityLabel="朗读">
         <VolumeIcon size={15} color={theme.textWeak} />

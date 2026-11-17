@@ -38,6 +38,7 @@ import { toSearchHits } from '../apps/mobile/src/core/files.js'
 import { matchCommands, slashQuery, toSlashCommands } from '../apps/mobile/src/core/slash.js'
 import { automationSavePayload, validateAutomationDraft } from '../apps/mobile/src/core/automations.js'
 import { toLibrarySources } from '../apps/mobile/src/core/library.js'
+import { messageMarkdown, transcriptMarkdown } from '../apps/mobile/src/core/share.js'
 import { cleanSessionTitle, sessionActions } from '../apps/mobile/src/core/session-actions.js'
 import { bumpUnread, shouldMarkUnread, totalUnread } from '../apps/mobile/src/core/unread.js'
 import { parseLockSetting, shouldRelock } from '../apps/mobile/src/core/app-lock.js'
@@ -627,6 +628,21 @@ check('automation delete reaches the desktop', deletedAutomations.includes('auto
 
 const library = toLibrarySources(await transport.invoke<unknown>('library_list', {}))
 check('library sources keep their label and path', library[0]?.label === 'docs' && library[0]?.path === '/e2e/workspace/docs')
+
+// ── 8p. Sharing (v3 E1/E2) ─────────────────────────────────────────────────
+
+check('a single reply shares as Markdown', messageMarkdown('assistant', '可以。') === '## OpenBuddy\n\n可以。\n')
+const sharedTranscript = transcriptMarkdown({
+  rows: [
+    { kind: 'text', id: 'u', role: 'user', text: '问题' },
+    { kind: 'text', id: 'a', role: 'assistant', text: '回答' },
+  ],
+  lastAssistantText: '回答',
+}, 'E2E 会话')
+check('the transcript shares with both roles and a title',
+  sharedTranscript.includes('# E2E 会话')
+  && sharedTranscript.includes('## 我\n\n问题')
+  && sharedTranscript.includes('## OpenBuddy\n\n回答'))
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 

@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Banner } from '../../src/components/Banner'
 import { ChatIcon, CheckIcon, PlusIcon } from '../../src/components/icons'
 import { batchSummary, toggleSelection } from '../../src/core/batch'
+import { haptic } from '../../src/native/haptics'
 import { canRun } from '../../src/core/surface'
 import {
   archivedCount, cleanSessionTitle, groupSessions, MAX_TITLE_LENGTH, sessionActions,
@@ -236,7 +237,7 @@ export default function SessionsScreen() {
         if (selectMode) setSelected(list => toggleSelection(list, item.id))
         else router.push(`/chat/${encodeURIComponent(item.id)}`)
       }}
-      onLongPress={manageable && !selectMode ? () => setMenu(session) : undefined}
+      onLongPress={manageable && !selectMode ? () => { void haptic('longPress'); setMenu(session) } : undefined}
       delayLongPress={350}
       style={({ pressed }) => ({
         backgroundColor: isSelected ? theme.pressed : pressed ? theme.hover : theme.surface,

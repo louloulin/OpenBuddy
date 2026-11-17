@@ -25,6 +25,7 @@ import { queueLabel, queueRows } from '../../src/core/turn-input'
 import type { ApprovalAction } from '../../src/core/approvals'
 import type { Approval } from '../../src/core/models'
 import { elapsedLabel, sessionTasks } from '../../src/core/tasks'
+import { haptic } from '../../src/native/haptics'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
 
@@ -114,6 +115,7 @@ export default function ChatScreen() {
   }, [tasksOpen, refreshTasks])
 
   const handleRequest = async (approval: Approval, action: ApprovalAction) => {
+    void haptic('approve')
     setBusyRequest(approval.requestId)
     try {
       if (action.type === 'permission') await resolveApproval(approval.requestId, action.approved)
@@ -144,6 +146,7 @@ export default function ChatScreen() {
         <Pressable
           onPress={() => router.back()}
           hitSlop={10}
+          accessibilityLabel="返回"
           style={({ pressed }) => ({
             width: 32,
             height: 32,
@@ -318,6 +321,7 @@ export default function ChatScreen() {
         onImages={(images, text) => void sendImages(sessionId, images, text)}
         onSteer={text => void steer(sessionId, text)}
         onStop={() => {
+          void haptic('stop')
           void useApp.getState().transport?.invoke('agent_cancel', { sessionId })
         }}
       />

@@ -18,21 +18,26 @@ export function isTruncatedRead(text: string): boolean {
   return text.endsWith(TRUNCATION_MARKER)
 }
 
-/**
- * A filename that survives iOS/Android share sheets: no path separators, no
- * control characters, and a stable fallback when the session has no title.
- */
-export function exportFilename(title: string, sessionId: string, now = new Date()): string {
+/** A slug that survives iOS/Android share sheets, with a stable fallback. */
+export function slugTitle(title: string, fallback: string): string {
   const slug = title
     // Keep letters from any script (CJK included) and digits.
     .replace(/[^\p{L}\p{N}]+/gu, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 40)
     .replace(/-+$/g, '')
-  const base = slug || sessionId.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '') || 'session'
+  return slug || fallback.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '') || 'session'
+}
+
+/** `20261117-0905`, local time. */
+export function timestamp(now = new Date()): string {
   const pad = (value: number) => String(value).padStart(2, '0')
-  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`
-  return `openbuddy-${base}-${stamp}.jsonl`
+  return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`
+}
+
+/** A filename that survives iOS/Android share sheets. */
+export function exportFilename(title: string, sessionId: string, now = new Date()): string {
+  return `openbuddy-${slugTitle(title, sessionId)}-${timestamp(now)}.jsonl`
 }
 
 /** Non-empty JSONL lines, shown next to the export action. */

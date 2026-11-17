@@ -176,6 +176,7 @@ export default function FilesScreen() {
         <Pressable
           onPress={() => router.back()}
           hitSlop={10}
+          accessibilityLabel="返回"
           style={({ pressed }) => ({
             width: 32,
             height: 32,

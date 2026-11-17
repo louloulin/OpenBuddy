@@ -176,6 +176,26 @@ export function CopyIcon({ size = 16, color, strokeWidth = 1.75 }: IconProps) {
   )
 }
 
+export function ShareIcon({ size = 16, color, strokeWidth = 1.75 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path
+        d="M12 3.6v10.2M8.2 7.4 12 3.6l3.8 3.8"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M5 12.4v5.4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5.4"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+      />
+    </Svg>
+  )
+}
+
 export function FolderIcon({ size = 20, color, strokeWidth = 1.75 }: IconProps) {
   return (
     <Svg {...base(size)}>

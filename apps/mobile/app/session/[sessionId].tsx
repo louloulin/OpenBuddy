@@ -25,6 +25,7 @@ import {
   type ThinkingLevel,
 } from '../../src/core/session-panel'
 import { isPreview, previewState } from '../../src/core/preview'
+import { transcriptFilename, transcriptMarkdown } from '../../src/core/share'
 import { shareTextFile } from '../../src/native/share'
 import { useApp } from '../../src/stores/app'
 import { themeFor, type Theme } from '../../src/theme'
@@ -89,8 +90,10 @@ export default function SessionPanelScreen() {
   const sessionId = decodeURIComponent(params.sessionId ?? '')
 
   const transport = useApp(state => state.transport)
+  const openSession = useApp(state => state.openSession)
   const exportSession = useApp(state => state.exportSession)
   const session = useApp(state => state.sessions.find(item => item.id === sessionId))
+  const transcript = useApp(state => state.transcripts[sessionId])
   const capabilities = useApp(state => state.capabilities)
   const permissionMode = useApp(state => state.permissionMode)
 
@@ -140,6 +143,12 @@ export default function SessionPanelScreen() {
   }, [transport, sessionId])
 
   useEffect(() => { void load() }, [load])
+
+  // The panel can be opened without visiting the chat first; loading the
+  // transcript here is what makes "导出 Markdown" available.
+  useEffect(() => {
+    if (sessionId) void openSession(sessionId)
+  }, [sessionId, openSession])
 
   const pickExpert = async (id: string) => {
     if (!transport) return
@@ -195,9 +204,31 @@ export default function SessionPanelScreen() {
     }
   }
 
+  // The transcript is already on the phone, so E2 shares it without asking the
+  // desktop for a save grant (which needs a native dialog the phone cannot show).
+  const shareMarkdown = async () => {
+    if (isPreview()) {
+      setExportNote('演示：整段会话导出为 Markdown')
+      return
+    }
+    if (!transcript?.rows.length) return
+    setExportNote(null)
+    try {
+      const title = session?.title ?? ''
+      const result = await shareTextFile(
+        transcriptFilename(title, sessionId),
+        transcriptMarkdown(transcript, title),
+      )
+      setExportNote(result === 'downloaded' ? '已下载整段会话' : result === 'shared' ? '已打开分享面板' : '这台设备不支持文件分享')
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure))
+    }
+  }
+
   const canSetExpert = Boolean(capabilities?.commands.includes('agent_set_session_expert'))
   const canSetThinking = Boolean(capabilities?.commands.includes('agent_set_thinking_level'))
   const canExport = Boolean(capabilities?.commands.includes('agent_export_jsonl'))
+  const canShareMarkdown = Boolean(transcript?.rows.length)
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.surface }}>
@@ -216,6 +247,7 @@ export default function SessionPanelScreen() {
         <Pressable
           onPress={() => router.back()}
           hitSlop={10}
+          accessibilityLabel="返回"
           style={({ pressed }) => ({
             width: 32,
             height: 32,
@@ -318,6 +350,14 @@ export default function SessionPanelScreen() {
       </Section>
 
       <Section theme={theme} label="资料">
+        {canShareMarkdown ? (
+          <Row
+            theme={theme}
+            label="导出 Markdown"
+            value="整段分享"
+            onPress={() => void shareMarkdown()}
+          />
+        ) : null}
         {canExport ? (
           <Row
             theme={theme}
