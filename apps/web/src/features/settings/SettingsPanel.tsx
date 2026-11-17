@@ -9,6 +9,7 @@ import {
   Shield,
   HelpCircle,
   SlidersHorizontal,
+  Smartphone,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -24,6 +25,7 @@ import {
   MemorySettingsPanel,
   PersonalizeSettingsPanel,
   SecuritySettingsPanel,
+  MobileAccessPanel,
   ShortcutsSettingsPanel,
 } from "./SettingsSections";
 
@@ -66,6 +68,7 @@ const NAV: NavItem[] = [
   { id: "assistant", label: "助理设置", icon: Bot },
   { id: "personalize", label: "个性化", icon: Palette },
   { id: "security", label: "安全中心", icon: Shield },
+  { id: "mobile", label: "手机接入", icon: Smartphone },
   { id: "help", label: "帮助与反馈", icon: HelpCircle },
   { id: "about", label: "关于", icon: Info },
 ];
@@ -168,6 +171,8 @@ export function SettingsPanel({
               <MemorySettingsPanel />
             ) : active === "help" ? (
               <HelpSettingsPanel />
+            ) : active === "mobile" ? (
+              <MobileAccessPanel />
             ) : active === "security" ? (
               <SecuritySettingsPanel />
             ) : active === "data" ? (

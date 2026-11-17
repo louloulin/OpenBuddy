@@ -14,6 +14,9 @@ import type { Approval, CachedSession, NotificationItem } from './models'
 import type { DirEntry } from './files'
 import type { Automation } from './automations'
 import type { MemoryEntry } from './memory'
+import type { BranchTree } from '@openbuddy/protocol/branches'
+import type { RewindPoint } from '@openbuddy/protocol/dto'
+import type { CheckpointRecord } from './branches'
 import type { Capabilities } from './surface'
 import type { Transcript } from './transcript'
 
@@ -34,6 +37,12 @@ export type PreviewState = {
   automations: Automation[]
   /** The memory notes the fake computer would inject. */
   memories: MemoryEntry[]
+  /** The session tree with sibling versions. */
+  branchTree: BranchTree
+  /** The prompts the phone may rewind to. */
+  rewindPoints: RewindPoint[]
+  /** The file snapshots around tool writes. */
+  checkpoints: CheckpointRecord[]
   /** The surface the fake desktop advertises, so capability gating shows as open. */
   capabilities: Capabilities
   /** The session panel's read-only view of one session. */
@@ -291,5 +300,69 @@ export function previewState(): PreviewState {
     },
   ]
 
-  return { sessions, transcripts, notifications, approvals, awaiting: ['sess-pending'], capabilities, panel, files, automations, memories }
+  const branchTree: BranchTree = {
+    sessionId: 'sess-refactor',
+    leafId: 'leaf-3',
+    turns: [
+      {
+        entryId: 'u-refactor-1',
+        timestamp: now - 600_000,
+        index: 1,
+        total: 3,
+        siblings: [
+          { entryId: 'v1', leafId: 'leaf-1', timestamp: now - 700_000, preview: '网关的 SSE 直通现在有没有缓冲？', files: [] },
+          { entryId: 'v2', leafId: 'leaf-2', timestamp: now - 650_000, preview: '网关的 SSE 直通现在有没有缓冲？顺便看看 gzip 处理。', files: [] },
+          { entryId: 'v3', leafId: 'leaf-3', timestamp: now - 600_000, preview: '网关的 SSE 直通现在有没有缓冲？给出代码位置。', files: ['packages/gateway/src/proxy.ts'] },
+        ],
+      },
+      {
+        entryId: 'u-refactor-2',
+        timestamp: now - 300_000,
+        index: 0,
+        total: 2,
+        siblings: [
+          { entryId: 'w1', leafId: 'leaf-4', timestamp: now - 320_000, preview: '那把这块单独抽出来，加一条并发测试。', files: [] },
+          { entryId: 'w2', leafId: 'leaf-5', timestamp: now - 300_000, preview: '那把这块单独抽出来，加一条 100 并发的压测。', files: ['packages/gateway/test/sse.test.ts'] },
+        ],
+      },
+    ],
+  }
+
+  const rewindPoints: RewindPoint[] = [
+    { entryId: 'u-refactor-2', index: 0, preview: '那把这块单独抽出来，加一条并发测试。' },
+    { entryId: 'u-refactor-1', index: 1, preview: '网关的 SSE 直通现在有没有缓冲？' },
+  ]
+
+  const checkpoints: CheckpointRecord[] = [
+    {
+      id: 'ck-3',
+      toolCallId: 'tool-9',
+      path: 'packages/gateway/src/proxy.ts',
+      before: 'b'.repeat(64),
+      after: 'a'.repeat(64),
+      at: now - 240_000,
+      source: 'tool',
+    },
+    {
+      id: 'ck-2',
+      path: 'packages/gateway/src/relay/sse.ts',
+      before: null,
+      after: 'c'.repeat(64),
+      at: now - 180_000,
+      source: 'apply',
+    },
+    {
+      id: 'ck-1',
+      path: 'packages/gateway/test/sse.test.ts',
+      before: 'd'.repeat(64),
+      after: 'e'.repeat(64),
+      at: now - 60_000,
+      source: 'user',
+    },
+  ]
+
+  return {
+    sessions, transcripts, notifications, approvals, awaiting: ['sess-pending'],
+    capabilities, panel, files, automations, memories, branchTree, rewindPoints, checkpoints,
+  }
 }

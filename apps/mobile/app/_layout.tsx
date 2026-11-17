@@ -85,6 +85,7 @@ export default function RootLayout() {
               <Stack.Screen name="files" options={{ headerShown: false }} />
               <Stack.Screen name="memory" options={{ title: '记忆' }} />
               <Stack.Screen name="memory/[path]" options={{ title: '记忆' }} />
+              <Stack.Screen name="branches/[sessionId]" options={{ title: '分支与检查点' }} />
               <Stack.Screen name="pair" options={{ title: '配对电脑', headerShown: false }} />
               <Stack.Screen name="approval/[requestId]" options={{ title: '等待批准' }} />
             </Stack>

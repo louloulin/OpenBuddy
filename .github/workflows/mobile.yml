@@ -80,6 +80,8 @@ jobs:
         run: npx vite build --config apps/web/vite.config.ts
       - name: H5 end-to-end (gateway-served bundle)
         run: bun run scripts/e2e-mobile-h5.ts
+      - name: Push loop end-to-end (desktop → gateway → device)
+        run: bun run scripts/e2e-mobile-push.ts
       - name: Scheduled tasks end-to-end
         run: bun run scripts/e2e-mobile-automations.ts
       - name: Weak-network end-to-end (heartbeat, revocation, reconnect)

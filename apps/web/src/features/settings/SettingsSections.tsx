@@ -26,3 +26,4 @@ export { AccountSettingsPanel } from "./sections/AccountSettingsPanel";
 export { AgentSettingsPanel } from "./sections/AgentSettingsPanel";
 export { AssistantSettingsPanel } from "./sections/AssistantSettingsPanel";
 export { AgentMailSettingsPanel } from "./sections/AgentMailSettingsPanel";
+export { MobileAccessPanel } from "./sections/MobileAccessPanel";

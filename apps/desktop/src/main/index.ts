@@ -5,6 +5,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { registerIpc } from '../ipc/register.js';
 import { createEngineEventHub, startMobileBridge, type MobileBridge } from './mobile-bridge.js';
+import { createMobileGateway, type MobileGateway } from './mobile-gateway.js';
 import { notifier } from './notifier.js';
 import { installMenu } from './menu.js';
 import { TrayController } from './tray.js';
@@ -68,7 +69,17 @@ async function createWindow(): Promise<void> {
     },
     quit: () => app.quit(),
   });
-  const unregister = registerIpc(win, engine.handlers, trustedURL, workspaceAccess, { attachmentsDir: join(app.getPath('userData'), 'attachments'), exportHtml: engine.exportHtml, tray: { get: () => tray!.enabled, set: enabled => tray!.setEnabled(enabled) } });
+  // 手机接入 (§4.4): the settings page mints pairing codes through the main
+  // process, which is the only place the gateway admin credential exists.
+  let mobileGateway: MobileGateway | undefined;
+  if (process.env.OPENBUDDY_GATEWAY_URL && process.env.OPENBUDDY_GATEWAY_ADMIN_TOKEN) {
+    mobileGateway = createMobileGateway({
+      gatewayUrl: process.env.OPENBUDDY_GATEWAY_URL,
+      adminToken: process.env.OPENBUDDY_GATEWAY_ADMIN_TOKEN,
+      ...(process.env.OPENBUDDY_GATEWAY_DESKTOP_ID ? { desktopId: process.env.OPENBUDDY_GATEWAY_DESKTOP_ID } : {}),
+    });
+  }
+  const unregister = registerIpc(win, engine.handlers, trustedURL, workspaceAccess, { attachmentsDir: join(app.getPath('userData'), 'attachments'), exportHtml: engine.exportHtml, tray: { get: () => tray!.enabled, set: enabled => tray!.setEnabled(enabled) }, ...(mobileGateway ? { mobileGateway } : {}) });
   // The mobile path is opt-in: without a gateway address the desktop opens no
   // port and behaves exactly as before (20261115-mobile.md Phase 2.6).
   let mobileBridge: MobileBridge | null = null;

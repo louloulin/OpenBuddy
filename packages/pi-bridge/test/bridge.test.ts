@@ -322,3 +322,26 @@ describe('host_capabilities over the bridge', () => {
     }
   })
 })
+
+describe('live status for the gateway push watcher', () => {
+  test('reports waiting sessions and drops them when the turn settles', async () => {
+    const dispatcher = fakeDispatcher()
+    const server = createBridgeServer(dispatcher, { token: TOKEN })
+
+    expect((await server.app.request('/api/sessions/live-status')).status).toBe(401)
+
+    dispatcher.fire('agent://event', { sessionId: 's1', event: { type: 'agent_start' } })
+    let body = await (await server.app.request('/api/sessions/live-status', { headers: auth })).json() as { sessions: unknown[] }
+    expect(body.sessions).toEqual([{ id: 's1', activityState: 'running' }])
+
+    dispatcher.fire('agent://permission', { requestId: 'req-1', sessionId: 's1', toolKind: 'agent_bash' })
+    body = await (await server.app.request('/api/sessions/live-status', { headers: auth })).json() as { sessions: unknown[] }
+    expect(body.sessions).toEqual([
+      { id: 's1', activityState: 'waiting', pendingRequestId: 'req-1', pendingToolName: 'agent_bash' },
+    ])
+
+    dispatcher.fire('agent://event', { sessionId: 's1', event: { type: 'agent_settled' } })
+    body = await (await server.app.request('/api/sessions/live-status', { headers: auth })).json() as { sessions: unknown[] }
+    expect(body.sessions).toEqual([])
+  })
+})

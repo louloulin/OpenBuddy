@@ -76,6 +76,13 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'notification_prefs_set' && typeof payload.system !== 'boolean') throw new Error('invalid_payload: system');
   // 托盘常驻 (W4.4).
   if (command === 'tray_set' && typeof payload.enabled !== 'boolean') throw new Error('invalid_payload: enabled');
+  if (command === 'mobile_pair_start' && payload.scopes !== undefined) {
+    if (!Array.isArray(payload.scopes) || payload.scopes.length > 8) throw new Error('invalid_payload: scopes');
+    for (const scope of payload.scopes) {
+      if (typeof scope !== 'string' || !/^[a-z]+:[a-z]+$/.test(scope)) throw new Error('invalid_payload: scope');
+    }
+  }
+  if (command === 'mobile_device_revoke') string('id', 128);
   // 项目 (W5.4): a bounded list of renderer-owned records; the service re-checks id / name.
   if (command === 'projects_save') {
     const project = payload.project as Record<string, unknown> | undefined;

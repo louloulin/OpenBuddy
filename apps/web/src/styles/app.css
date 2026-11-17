@@ -12777,3 +12777,85 @@ button.diff__path {
     margin: 0 8px 6px;
   }
 }
+
+/* ── 手机接入 (20261115-mobile.md §4.4) ───────────────────────────────────── */
+.settings-subtitle {
+  margin: 20px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wb-text-strong);
+}
+
+.settings-error {
+  font-size: 12px;
+  color: #e54848;
+}
+
+.settings-btn--primary {
+  border-color: var(--ob-ink, #121110);
+  background: var(--ob-ink, #121110);
+  color: var(--ob-ink-fg, #ffffff);
+}
+
+.settings-btn--primary:hover:not(:disabled) {
+  border-color: var(--ob-ink, #121110);
+  opacity: 0.9;
+}
+
+.mobile-access__pair {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.mobile-access__code {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 14px;
+  background: var(--ob-card, #ffffff);
+}
+
+.mobile-access__qr {
+  width: 180px;
+  height: 180px;
+  border-radius: 8px;
+}
+
+.mobile-access__digits {
+  font-family: ui-monospace, monospace;
+  font-size: 24px;
+  letter-spacing: 4px;
+  color: var(--wb-text-strong);
+}
+
+.mobile-access__devices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobile-access__device {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 10px;
+  background: var(--wb-bg-primary);
+}
+
+.mobile-access__meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--wb-text-medium);
+}

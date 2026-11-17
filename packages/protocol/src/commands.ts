@@ -21,6 +21,8 @@ export const COMMANDS = [
   'window_minimize', 'window_toggle_maximize', 'window_close', 'window_is_maximized', 'window_edit', 'clipboard_write_text',
   // 托盘常驻 (20261116-pii W4.4): desktop native, persisted in tray.json.
   'tray_get', 'tray_set',
+  // 手机接入 (20261115-mobile.md §4.4): desktop-only pairing management.
+  'mobile_pair_start', 'mobile_devices_list', 'mobile_device_revoke',
   'agent_get_model_state', 'agent_set_thinking_level', 'agent_resolve_ui',
   'agent_steer', 'agent_follow_up', 'agent_get_queue', 'agent_clear_queue',
   'agent_fork_session', 'agent_extensions_list', 'agent_extensions_inspect', 'agent_extensions_add',

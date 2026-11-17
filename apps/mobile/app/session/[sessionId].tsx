@@ -285,6 +285,12 @@ export default function SessionPanelScreen() {
           label="电脑上的文件"
           value="只读"
           onPress={() => router.push(`/files?sessionId=${encodeURIComponent(sessionId)}`)}
+        />
+        <Row
+          theme={theme}
+          label="分支与检查点"
+          value="切换 / 恢复"
+          onPress={() => router.push(`/branches/${encodeURIComponent(sessionId)}`)}
           last
         />
       </Section>

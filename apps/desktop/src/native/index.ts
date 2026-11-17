@@ -10,6 +10,8 @@ export const NATIVE_COMMANDS = [
   'dialog_open', 'dialog_save', 'dialog_ask',
   // 托盘常驻 (20261116-pii W4.4).
   'tray_get', 'tray_set',
+  // 手机接入 (20261115-mobile.md §4.4): pairing code + device list + revoke.
+  'mobile_pair_start', 'mobile_devices_list', 'mobile_device_revoke',
 ] as const;
 /** Events sent by apps/desktop itself (window resize, notification click → focus session). */
 export const DESKTOP_EVENTS = ['window://resized', 'app://focus-session'] as const;

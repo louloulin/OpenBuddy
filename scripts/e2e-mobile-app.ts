@@ -32,6 +32,7 @@ import { canRun, isMobileHost, visibleTabs, type Capabilities } from '../apps/mo
 import { checkUpload, compressOptions, MAX_EDGE } from '../apps/mobile/src/core/attachments.js'
 import { flushOutbox } from '../apps/mobile/src/core/connection.js'
 import { groupMemory, memoryPreview, validateMemoryDraft } from '../apps/mobile/src/core/memory.js'
+import { branchLabel, branchTurns, checkpointAction, restoreHash, toCheckpoints, toRewindPoints } from '../apps/mobile/src/core/branches.js'
 
 let failures = 0
 function check(name: string, condition: boolean, detail = ''): void {
@@ -46,6 +47,29 @@ const engineListeners = new Set<(event: string, payload: unknown) => void>()
 const sentAttachments: { text: string; attachments: unknown[] }[] = []
 const resolved: { requestId: string; decision?: unknown }[] = []
 const savedMemory: { scope: string; path: string; content: string }[] = []
+const navigated: string[] = []
+const rewound: string[] = []
+const restoredFiles: { path: string; hash: string | null }[] = []
+const BRANCH_TREE = {
+  sessionId: 'sess-1',
+  leafId: 'leaf-2',
+  turns: [
+    {
+      entryId: 'u1', timestamp: 1, index: 1, total: 2,
+      siblings: [
+        { entryId: 'v1', leafId: 'leaf-1', timestamp: 1, preview: '第一版', files: [] },
+        { entryId: 'v2', leafId: 'leaf-2', timestamp: 2, preview: '第二版', files: [] },
+      ],
+    },
+    { entryId: 'u2', timestamp: 3, index: 0, total: 1, siblings: [] },
+  ],
+}
+const BEFORE_HASH = 'a'.repeat(64)
+const AFTER_HASH = 'b'.repeat(64)
+const CHECKPOINTS = [
+  { id: 'ck1', path: 'src/a.ts', before: BEFORE_HASH, after: AFTER_HASH, at: 2_000, source: 'tool' },
+  { id: 'ck2', path: 'src/b.ts', before: null, after: AFTER_HASH, at: 1_000, source: 'apply' },
+]
 const uploadDir = await mkdtemp(join(tmpdir(), 'openbuddy-uploads-'))
 let uploadCount = 0
 
@@ -81,6 +105,24 @@ const dispatcher: HostDispatcher = {
         ]
       case 'memory_get':
         return '# 偏好\n\n- 回答用中文'
+      case 'agent_tree':
+        return BRANCH_TREE
+      case 'rewind_points':
+        return [
+          { entryId: 'u2', index: 1, preview: '第二条提问' },
+          { entryId: 'u1', index: 0, preview: '第一条提问' },
+        ]
+      case 'checkpoint_list':
+        return CHECKPOINTS
+      case 'agent_navigate':
+        navigated.push(String(payload.entryId))
+        return { navigated: true, restored: [], conflicts: [] }
+      case 'rewind_execute':
+        rewound.push(String(payload.entryId))
+        return { reverted: true }
+      case 'checkpoint_restore':
+        restoredFiles.push({ path: String(payload.path), hash: typeof payload.hash === 'string' ? payload.hash : null })
+        return { restored: [String(payload.path)], conflicts: [] }
       case 'memory_save':
         savedMemory.push({ scope: String(payload.scope), path: String(payload.path), content: String(payload.content) })
         return { scope: payload.scope, path: payload.path, content: payload.content, size: String(payload.content).length }
@@ -96,6 +138,7 @@ const dispatcher: HostDispatcher = {
     'agent_list_sessions', 'agent_load_session', 'agent_send', 'agent_resolve_permission',
     'session_search', 'notification_list',
     'memory_list', 'memory_get', 'memory_save',
+    'agent_tree', 'rewind_points', 'rewind_execute', 'agent_navigate', 'checkpoint_list', 'checkpoint_restore',
     'window_minimize', // must be filtered off the mobile surface
   ],
 }
@@ -282,6 +325,29 @@ check('draft validation refuses escaping paths', !rejected.ok)
 
 await transport.invoke('memory_save', { scope: 'global', path: 'MEMORY.md', content: '# 偏好\n\n- 回答用中文，先给结论' })
 check('memory_save reached the desktop', savedMemory.some(item => item.path === 'MEMORY.md' && item.content.includes('先给结论')))
+
+// ── 8c. Branches and checkpoints: read the tree, switch, rewind, restore ───
+
+const tree = await transport.invoke<typeof BRANCH_TREE>('agent_tree', { sessionId: 'sess-1' })
+const turns = branchTurns(tree as never)
+check('only multi-version turns get a row', turns.length === 1 && turns[0]!.entryId === 'u1')
+check('branch row reads as position and preview', branchLabel(turns[0]!) === '2/2 · 第二版')
+
+const points = toRewindPoints(await transport.invoke('rewind_points', { sessionId: 'sess-1' }))
+check('rewind points arrive sorted by index', points.map(point => point.entryId).join(',') === 'u1,u2')
+
+const checkpoints = toCheckpoints(await transport.invoke('checkpoint_list', { sessionId: 'sess-1' }))
+check('checkpoints arrive newest first', checkpoints.map(item => item.id).join(',') === 'ck1,ck2')
+check('a created file restores to absence', checkpointAction(checkpoints[1]!) === '恢复到「文件不存在」')
+
+await transport.invoke('agent_navigate', { sessionId: 'sess-1', entryId: turns[0]!.siblings[turns[0]!.index]!.leafId })
+check('switching a branch reached the desktop', navigated.includes('leaf-2'))
+
+await transport.invoke('rewind_execute', { sessionId: 'sess-1', entryId: points[0]!.entryId })
+check('rewind reached the desktop', rewound.includes('u1'))
+
+await transport.invoke('checkpoint_restore', { sessionId: 'sess-1', path: 'src/a.ts', hash: restoreHash(checkpoints[0]!) })
+check('restore sent the pre-write hash', restoredFiles.some(item => item.path === 'src/a.ts' && item.hash === BEFORE_HASH))
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 

@@ -13,6 +13,7 @@
  */
 
 import { createEngineEventHub, startMobileBridge } from '../apps/desktop/src/main/mobile-bridge.js'
+import { createMobileGateway } from '../apps/desktop/src/main/mobile-gateway.js'
 import { GatewayTransport } from '../packages/client/src/gateway-transport.js'
 
 type GatewayInfo = { url: string; adminToken: string; agentToken: string }
@@ -110,6 +111,30 @@ await transport.invoke('agent_send', { text: 'hi' })
 const streamDeadline = Date.now() + 3000
 while (!streamed && Date.now() < streamDeadline) await new Promise(resolve => setTimeout(resolve, 25))
 check('engine events reached the phone', streamed === '来自桌面桥', streamed)
+
+// ── 手机接入设置页的后端（§4.4）：主进程客户端生成码、列设备、吊销 ──────
+
+const panel = createMobileGateway({ gatewayUrl: info.url, adminToken: info.adminToken })
+const panelPair = await panel.pairStart()
+check('the settings panel mints a code through the main-process client', /^\d{8}$/.test(panelPair.code) && Boolean(panelPair.expiresAt), JSON.stringify(panelPair.scopes))
+
+const panelClaim = await (await fetch(`${info.url}/pair/claim`, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ code: panelPair.code, deviceName: 'Panel Phone', platform: 'android' }),
+})).json() as { deviceId: string; deviceToken: string }
+check('the panel code pairs a phone', typeof panelClaim.deviceToken === 'string')
+
+const devices = await panel.listDevices()
+const listed = devices.find(device => device.id === panelClaim.deviceId)
+check('the panel lists the phone that just paired', listed?.name === 'Panel Phone' && listed?.platform === 'android', JSON.stringify(devices.map(device => device.name)))
+
+await panel.revokeDevice(panelClaim.deviceId)
+const afterRevoke = await panel.listDevices()
+check('revocation shows up in the panel', Boolean(afterRevoke.find(device => device.id === panelClaim.deviceId)?.revokedAt))
+
+const refused = await fetch(`${info.url}/api/capabilities`, { headers: { authorization: `Bearer ${panelClaim.deviceToken}` } })
+check('a revoked phone is refused immediately', refused.status === 401 || refused.status === 403, `HTTP ${refused.status}`)
 
 await transport.close()
 await bridge?.close()

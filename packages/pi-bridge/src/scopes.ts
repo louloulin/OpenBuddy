@@ -15,6 +15,8 @@ const DENIED_COMMANDS = new Set([
   // Desktop-native capabilities: a phone has its own shell for these.
   'window_minimize', 'window_toggle_maximize', 'window_close', 'window_is_maximized',
   'window_edit', 'dialog_open', 'dialog_save', 'dialog_ask', 'open_path', 'open_url',
+  // Pairing management belongs to the desktop window, not to a paired phone.
+  'mobile_pair_start', 'mobile_devices_list', 'mobile_device_revoke',
   'reveal_in_folder', 'clipboard_write_text', 'clipboard_save_image',
   // Management surfaces the admin console or desktop settings own.
   'mcp_config_path', 'mcp_auth_trigger',

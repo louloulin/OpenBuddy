@@ -26,6 +26,7 @@ import { validateCommandPayload, type Payload } from '@openbuddy/protocol/valida
 import { EVENTS, isEvent, type EventName } from '@openbuddy/protocol/events'
 
 import { EventBuffer, type BridgeEvent } from './event-buffer.js'
+import { createLiveStatusTracker } from './live-status.js'
 import { isAllowedCommand, mobileCapabilities } from './scopes.js'
 
 export type HostDispatcher = {
@@ -115,6 +116,11 @@ export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeSe
   const events = EVENTS.filter((event): event is EventName => isEvent(event))
   /** Live subscribers of the SSE tail; each holds its own queue. */
   const streams = new Set<(item: BridgeEvent) => void>()
+  /**
+   * What the gateway's push watcher polls. Fed from the same event stream the
+   * phone subscribes to — the bridge never reads the engine directly.
+   */
+  const liveStatus = createLiveStatusTracker()
 
   const authorized = (header: string | null): boolean =>
     options.noAuth || header === `Bearer ${options.token}`
@@ -219,6 +225,19 @@ export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeSe
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'upload_failed' }, 500)
     }
+  })
+
+  /**
+   * The gateway polls this to decide when to interrupt a phone
+   * (`packages/gateway/src/push/watcher.ts`, `LIVE_STATUS_PATH`). Answering it
+   * is what closes the loop: without it the watcher only ever sees 404 and no
+   * push is ever sent.
+   */
+  app.on('GET', ['/sessions/live-status', '/api/sessions/live-status'], (c) => {
+    if (!authorized(c.req.header('authorization') ?? null)) {
+      return c.json({ error: 'unauthorized' }, 401)
+    }
+    return c.json(liveStatus.snapshot())
   })
 
   app.on('GET', ['/events', '/api/events'], (c) => {
@@ -392,6 +411,7 @@ export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeSe
   // Every engine event lands in the buffer exactly once, then fans out to the
   // connected SSE streams and sockets.
   const offEngine = dispatcher.listen((event, payload) => {
+    liveStatus.observe(event, payload)
     const item = buffer.push(event, payload)
     for (const deliver of streams) deliver(item)
   })
@@ -405,6 +425,7 @@ export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeSe
       close: onSocketClose,
     },
     emit: (event, payload) => {
+      liveStatus.observe(event, payload)
       const item = buffer.push(event, payload)
       for (const deliver of streams) deliver(item)
     },

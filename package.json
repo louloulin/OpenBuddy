@@ -27,6 +27,7 @@
     "e2e:mobile": "bun run scripts/e2e-mobile.ts",
     "e2e:mobile-app": "bun run scripts/e2e-mobile-app.ts",
     "e2e:mobile-h5": "bun run scripts/e2e-mobile-h5.ts",
+    "e2e:mobile-push": "bun run scripts/e2e-mobile-push.ts",
     "build:h5": "vite build --config apps/web/vite.config.ts",
     "e2e:mobile-automations": "bun run scripts/e2e-mobile-automations.ts",
     "e2e:mobile-weaknet": "bun run scripts/e2e-mobile-weaknet.ts",
