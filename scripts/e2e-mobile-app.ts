@@ -39,6 +39,9 @@ import { matchCommands, slashQuery, toSlashCommands } from '../apps/mobile/src/c
 import { automationSavePayload, validateAutomationDraft } from '../apps/mobile/src/core/automations.js'
 import { toLibrarySources } from '../apps/mobile/src/core/library.js'
 import { messageMarkdown, transcriptMarkdown } from '../apps/mobile/src/core/share.js'
+import { toSessionList } from '../apps/mobile/src/core/session-list.js'
+import { groupSessions } from '../apps/mobile/src/core/session-actions.js'
+import { toProjects } from '../apps/mobile/src/core/projects.js'
 import { cleanSessionTitle, sessionActions } from '../apps/mobile/src/core/session-actions.js'
 import { bumpUnread, shouldMarkUnread, totalUnread } from '../apps/mobile/src/core/unread.js'
 import { parseLockSetting, shouldRelock } from '../apps/mobile/src/core/app-lock.js'
@@ -643,6 +646,22 @@ check('the transcript shares with both roles and a title',
   sharedTranscript.includes('# E2E 会话')
   && sharedTranscript.includes('## 我\n\n问题')
   && sharedTranscript.includes('## OpenBuddy\n\n回答'))
+
+// ── 8q. Session list normalisation and project grouping (v3 C5) ────────────
+
+const hostRows = toSessionList([
+  { sessionId: 's1', title: '甲', updatedAt: '2026-11-17T10:00:00.000Z', cwd: '/w/a', pinned: false },
+  { id: 's2', title: '乙', updatedAt: 5, cwd: '/w/b' },
+])
+const hostS1 = hostRows.find(row => row.id === 's1')
+check('the host session shape (sessionId + ISO) is normalised',
+  hostS1?.updatedAt === Date.parse('2026-11-17T10:00:00.000Z') && hostS1?.cwd === '/w/a')
+const projectRows = groupSessions(hostRows, false, {
+  projects: toProjects({ projects: [{ id: 'p', name: '甲项目', cwd: '/w/a' }] }),
+})
+check('sessions fold into project sections',
+  projectRows.some(row => row.kind === 'label' && row.title === '甲项目' && row.count === 1)
+  && projectRows.some(row => row.kind === 'label' && row.title === 'b'))
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 

@@ -15,6 +15,7 @@ import type { DirEntry } from './files'
 import type { Automation } from './automations'
 import type { MemoryEntry } from './memory'
 import type { LibrarySource } from './library'
+import type { ProjectRef } from './projects'
 import type { BranchTree } from '@openbuddy/protocol/branches'
 import type { RewindPoint } from '@openbuddy/protocol/dto'
 import type { CheckpointRecord } from './branches'
@@ -40,6 +41,8 @@ export type PreviewState = {
   memories: MemoryEntry[]
   /** Knowledge-source folders the fake desktop registered. */
   library: LibrarySource[]
+  /** Projects that name the session list's workspace sections. */
+  projects: ProjectRef[]
   /** The session tree with sibling versions. */
   branchTree: BranchTree
   /** The prompts the phone may rewind to. */
@@ -70,6 +73,7 @@ export function previewState(): PreviewState {
       archived: false,
       preview: '把 forwardHttp 的 SSE 直通逻辑单独抽出来，补一条 100 并发的压测。',
       unread: 1,
+      cwd: '/Users/louloulin/stock/OpenBuddy',
     },
     {
       id: 'sess-mobile',
@@ -79,6 +83,7 @@ export function previewState(): PreviewState {
       archived: false,
       preview: '扫码后 device token 存钥匙串，重连按 seq 补齐。',
       unread: 0,
+      cwd: '/Users/louloulin/stock/OpenBuddy',
     },
     {
       id: 'sess-release',
@@ -88,6 +93,7 @@ export function previewState(): PreviewState {
       archived: false,
       preview: '三端产物、迁移脚本、回滚预案都过一遍。',
       unread: 0,
+      cwd: '/Users/louloulin/stock/OpenBuddy',
     },
     {
       id: 'sess-pending',
@@ -97,6 +103,7 @@ export function previewState(): PreviewState {
       archived: false,
       preview: '正在压测 100 条并发流…',
       unread: 0,
+      cwd: '/Users/louloulin/stock/OpenBuddy',
     },
     {
       id: 'sess-docs',
@@ -106,6 +113,7 @@ export function previewState(): PreviewState {
       archived: false,
       preview: '把启动方式、环境变量和边界约束写清楚。',
       unread: 0,
+      cwd: '/tmp/scratch',
     },
   ]
 
@@ -203,7 +211,7 @@ export function previewState(): PreviewState {
       'experts_load', 'experts_list_roots', 'agent_session_usage',
       'agent_init', 'agent_set_session_pinned', 'agent_rename_session',
       'agent_set_session_archived', 'agent_delete_session', 'agent_tree',
-      'agent_export_jsonl', 'files_search', 'commands_list', 'library_list',
+      'agent_export_jsonl', 'files_search', 'commands_list', 'library_list', 'projects_snapshot',
       'rewind_points', 'rewind_execute', 'agent_navigate', 'checkpoint_list', 'checkpoint_restore',
     ],
     events: ['agent://event', 'agent://permission', 'agent://update'],
@@ -376,8 +384,13 @@ export function previewState(): PreviewState {
     { id: '/Users/louloulin/notes', label: 'notes', path: '/Users/louloulin/notes' },
   ]
 
+  const projects: ProjectRef[] = [
+    { id: 'proj-openbuddy', name: 'OpenBuddy', cwd: '/Users/louloulin/stock/OpenBuddy' },
+    { id: 'proj-scratch', name: '临时试验', cwd: '/tmp/scratch' },
+  ]
+
   return {
     sessions, transcripts, notifications, approvals, awaiting: ['sess-pending'],
-    capabilities, panel, files, automations, memories, branchTree, rewindPoints, checkpoints, library,
+    capabilities, panel, files, automations, memories, branchTree, rewindPoints, checkpoints, library, projects,
   }
 }

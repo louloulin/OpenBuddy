@@ -18,6 +18,8 @@ export type CachedSession = {
   archived: boolean
   preview: string
   unread: number
+  /** Desktop workspace root (memory only; the cache table does not store it). */
+  cwd?: string
 }
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null

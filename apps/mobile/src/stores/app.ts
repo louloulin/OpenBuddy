@@ -34,6 +34,8 @@ import {
 import { cleanSessionTitle } from '../core/session-actions'
 import { exportFilename, isTruncatedRead, jsonlEntryCount, MAX_EXPORT_BYTES } from '../core/export'
 import type { BatchOutcome } from '../core/batch'
+import { toSessionList } from '../core/session-list'
+import { toProjects, type ProjectRef } from '../core/projects'
 import { bumpUnread, clearUnread, shouldMarkUnread } from '../core/unread'
 import {
   LOCK_KEY, lockUnavailableReason, parseLockSetting, serializeLockSetting, shouldRelock,
@@ -105,6 +107,10 @@ type AppState = {
   setDraft: (sessionId: string, text: string) => void
   /** Workspaces the desktop offers for a new session (plus its current cwd). */
   workspaces: WorkspaceChoice[]
+  /** Desktop projects used to fold the session list (C5). */
+  projects: ProjectRef[]
+  /** The desktop's current working directory, as last reported. */
+  currentCwd: string | null
   refreshWorkspaces: () => Promise<void>
   /** Creates a session on the desktop and returns its id, for the caller to open. */
   createSession: (cwd?: string) => Promise<string | null>
@@ -161,6 +167,8 @@ export const useApp = create<AppState>((set, get) => ({
   capabilities: null,
   sessions: [],
   workspaces: [],
+  projects: [],
+  currentCwd: null,
   drafts: {},
   activeSessionId: null,
   transcripts: {},
@@ -198,6 +206,8 @@ export const useApp = create<AppState>((set, get) => ({
         connection: 'open',
         capabilities: demo.capabilities,
         sessions: demo.sessions,
+        projects: demo.projects,
+        currentCwd: demo.sessions[0]?.cwd ?? null,
         transcripts: demo.transcripts,
         notifications: demo.notifications,
         approvals: demo.approvals,
@@ -437,23 +447,47 @@ export const useApp = create<AppState>((set, get) => ({
     const transport = get().transport
     if (!transport) return
     try {
-      const list = await transport.invoke<Array<{ id: string; title?: string; updatedAt?: number; pinned?: boolean; archived?: boolean }>>(
-        'agent_list_sessions', {},
-      )
-      const sessions: CachedSession[] = (Array.isArray(list) ? list : []).map(item => {
-        const known = get().sessions.find(session => session.id === item.id)
+      // `agent_list_sessions` is per workspace. Ask the desktop for its current
+      // directory and the other workspaces, then merge the pages so the phone
+      // sees the same sessions the sidebar does.
+      const init = await transport.invoke<InitAnswer>('agent_init', {}).catch(() => null)
+      const currentCwd = typeof init?.cwd === 'string' ? init.cwd : null
+      const spaces = await transport.invoke<WorkspaceInfo[]>('agent_list_workspaces', {}).catch(() => [])
+      const cwds = [...new Set([
+        currentCwd,
+        ...(Array.isArray(spaces) ? spaces.map(space => space.cwd) : []),
+      ].filter((value): value is string => typeof value === 'string' && !!value))].slice(0, 12)
+
+      let raw: unknown = []
+      if (cwds.length) {
+        const pages = await Promise.all(cwds.map(cwd =>
+          transport.invoke<unknown>('agent_list_sessions', { cwd, includeArchived: true }).catch(() => []),
+        ))
+        raw = pages.flat()
+      } else {
+        // An older desktop (or a test host) answers without a workspace.
+        raw = await transport.invoke<unknown>('agent_list_sessions', {}).catch(() => [])
+      }
+
+      const known = new Map(get().sessions.map(session => [session.id, session]))
+      const sessions: CachedSession[] = toSessionList(raw).map(item => {
+        const previous = known.get(item.id)
         const transcript = get().transcripts[item.id]
         return {
-          id: item.id,
-          title: item.title ?? '未命名会话',
-          updatedAt: item.updatedAt ?? known?.updatedAt ?? Date.now(),
-          pinned: item.pinned ?? known?.pinned ?? false,
-          archived: item.archived ?? known?.archived ?? false,
-          preview: transcript ? transcriptPreview(transcript) : known?.preview ?? '',
-          unread: known?.unread ?? 0,
+          ...item,
+          cwd: item.cwd ?? previous?.cwd,
+          preview: transcript ? transcriptPreview(transcript) : previous?.preview ?? '',
+          unread: previous?.unread ?? 0,
         }
       })
-      set({ sessions, error: null })
+
+      const projects = await transport.invoke<unknown>('projects_snapshot', {}).catch(() => null)
+      set(state => ({
+        sessions,
+        currentCwd,
+        projects: projects === null ? state.projects : toProjects(projects),
+        error: null,
+      }))
       await cacheSessions(sessions).catch(() => {})
     } catch (error) {
       set({ error: errorText(error) })

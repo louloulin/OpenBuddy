@@ -27,10 +27,10 @@ const demoQueue = { steering: [] as string[], followUp: [] as string[] }
 let demoTaskAlive = true
 const now = Date.now()
 
-const SESSIONS: Array<{ id: string; title: string; updatedAt: number; pinned: boolean; archived?: boolean }> = [
-  { id: 'sess-mobile', title: '手机端接入设计', updatedAt: now - 60_000, pinned: true },
-  { id: 'sess-review', title: '评审：网关隧道改动', updatedAt: now - 3 * 3_600_000, pinned: false },
-  { id: 'sess-notes', title: '周会纪要', updatedAt: now - 26 * 3_600_000, pinned: false },
+const SESSIONS: Array<{ id: string; title: string; updatedAt: number; pinned: boolean; archived?: boolean; cwd?: string }> = [
+  { id: 'sess-mobile', title: '手机端接入设计', updatedAt: now - 60_000, pinned: true, cwd: '/Users/louloulin/stock/OpenBuddy' },
+  { id: 'sess-review', title: '评审：网关隧道改动', updatedAt: now - 3 * 3_600_000, pinned: false, cwd: '/Users/louloulin/stock/OpenBuddy' },
+  { id: 'sess-notes', title: '周会纪要', updatedAt: now - 26 * 3_600_000, pinned: false, cwd: '/tmp/scratch' },
 ]
 
 const AUTOMATIONS: Array<Record<string, unknown>> = [
@@ -84,8 +84,17 @@ const HISTORY: Record<string, unknown[]> = {
 const dispatcher: HostDispatcher = {
   dispatch: async (command, payload) => {
     switch (command) {
-      case 'agent_list_sessions':
-        return SESSIONS
+      case 'agent_list_sessions': {
+        const cwd = typeof payload.cwd === 'string' ? payload.cwd : null
+        return SESSIONS.filter(session => !cwd || session.cwd === cwd)
+      }
+      case 'projects_snapshot':
+        return {
+          projects: [
+            { id: 'proj-openbuddy', name: 'OpenBuddy', cwd: '/Users/louloulin/stock/OpenBuddy' },
+            { id: 'proj-scratch', name: '临时试验', cwd: '/tmp/scratch' },
+          ],
+        }
       case 'agent_load_session':
         return { updates: HISTORY[String(payload.sessionId)] ?? [] }
       case 'agent_send': {
@@ -302,7 +311,7 @@ const dispatcher: HostDispatcher = {
     'agent_set_session_pinned', 'agent_rename_session', 'agent_set_session_archived', 'agent_delete_session',
     'agent_export_jsonl', 'read_text_file', 'agent_session_info', 'list_dir', 'files_search', 'commands_list',
     'automations_snapshot', 'automations_save', 'automations_delete', 'automations_set_status', 'automations_run',
-    'library_list',
+    'library_list', 'projects_snapshot',
     'session_search', 'notification_list',
   ],
 }

@@ -38,7 +38,7 @@ const channel = process.env.PLAYWRIGHT_CHANNEL ?? 'chrome'
 
 /** expected: every string must be present; alternatives: any one of them. */
 const screens = [
-  { name: 'sessions', path: '/', expected: ['会话', '新建任务', '重构网关隧道', '置顶会话', '其他会话'] },
+  { name: 'sessions', path: '/', expected: ['会话', '新建任务', '重构网关隧道', '置顶会话', 'OpenBuddy', '临时试验'] },
   { name: 'chat', path: '/chat/sess-refactor', expected: ['重构网关隧道', '没有缓冲', 'OpenBuddy', '允许修改这 3 个文件', 'grep'] },
   { name: 'pending', path: '/chat/sess-pending', alternatives: [['准备中', '等待模型响应']], expected: ['跑一遍 100 并发的 SSE 压测'] },
   { name: 'empty', path: '/chat/sess-empty', expected: ['OpenBuddy', '把任务发过来', '总结一下今天的改动'] },

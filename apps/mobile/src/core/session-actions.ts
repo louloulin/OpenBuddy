@@ -9,6 +9,7 @@
  */
 
 import type { CachedSession } from '../db/cache'
+import { projectLabelFor, type ProjectRef } from './projects'
 
 export type SessionActionKey = 'pin' | 'unpin' | 'rename' | 'archive' | 'unarchive' | 'delete'
 
@@ -65,20 +66,45 @@ export function sessionActions(
   return actions
 }
 
+export type SessionLabelRow = {
+  kind: 'label'
+  id: string
+  title: string
+  /** Session rows behind this label (project sections show it). */
+  count?: number
+  collapsible?: boolean
+  collapsed?: boolean
+}
+
 export type SessionRow =
-  | { kind: 'label'; id: string; title: string }
+  | SessionLabelRow
   | { kind: 'session'; id: string; session: CachedSession }
+
+export type GroupOptions = {
+  /** `projects_snapshot` rows: non-pinned sessions are folded by their cwd. */
+  projects?: readonly ProjectRef[]
+  /** Label ids the user folded away. */
+  collapsed?: readonly string[]
+}
 
 /**
  * Pinned first, then the rest; archived rows are folded behind a count unless
  * the caller asked to show them. The cached order is already
  * `pinned DESC, updated_at DESC`, so each bucket keeps its incoming order.
+ *
+ * When the list carries workspace roots, non-pinned sessions are grouped by
+ * project (C5); without any cwd the older two-bucket layout is kept.
  */
-export function groupSessions(sessions: readonly CachedSession[], showArchived = false): SessionRow[] {
+export function groupSessions(
+  sessions: readonly CachedSession[],
+  showArchived = false,
+  options: GroupOptions = {},
+): SessionRow[] {
   const active = sessions.filter(session => !session.archived)
   const archived = sessions.filter(session => session.archived)
   const pinned = active.filter(session => session.pinned)
   const rest = active.filter(session => !session.pinned)
+  const collapsed = new Set(options.collapsed ?? [])
 
   const rows: SessionRow[] = []
   if (pinned.length) {
@@ -86,8 +112,24 @@ export function groupSessions(sessions: readonly CachedSession[], showArchived =
     for (const session of pinned) rows.push({ kind: 'session', id: session.id, session })
   }
   if (rest.length) {
-    rows.push({ kind: 'label', id: 'label:recent', title: pinned.length ? '其他会话' : '最近会话' })
-    for (const session of rest) rows.push({ kind: 'session', id: session.id, session })
+    if (rest.some(session => session.cwd)) {
+      const buckets = new Map<string, CachedSession[]>()
+      for (const session of rest) {
+        const title = projectLabelFor(session.cwd, options.projects ?? [])
+        const bucket = buckets.get(title)
+        if (bucket) bucket.push(session)
+        else buckets.set(title, [session])
+      }
+      for (const [title, items] of buckets) {
+        const id = `label:project:${title}`
+        const folded = collapsed.has(id)
+        rows.push({ kind: 'label', id, title, count: items.length, collapsible: true, collapsed: folded })
+        if (!folded) for (const session of items) rows.push({ kind: 'session', id: session.id, session })
+      }
+    } else {
+      rows.push({ kind: 'label', id: 'label:recent', title: pinned.length ? '其他会话' : '最近会话' })
+      for (const session of rest) rows.push({ kind: 'session', id: session.id, session })
+    }
   }
   if (showArchived && archived.length) {
     rows.push({ kind: 'label', id: 'label:archived', title: '已归档' })

@@ -74,6 +74,8 @@ export default function SessionsScreen() {
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
   const [batchNote, setBatchNote] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState<string[]>([])
+  const projects = useApp(state => state.projects)
 
   // A new task starts on the computer: the phone asks it for the working
   // directory and opens the session it creates.
@@ -148,7 +150,13 @@ export default function SessionsScreen() {
 
   // The desktop sidebar groups the list; the phone keeps the same two groups
   // with a quiet section label instead of a collapsible tree.
-  const groups = useMemo(() => groupSessions(sessions, showArchived), [sessions, showArchived])
+  const groups = useMemo(
+    () => groupSessions(sessions, showArchived, { projects, collapsed }),
+    [sessions, showArchived, projects, collapsed],
+  )
+  const toggleCollapsed = useCallback((labelId: string) => {
+    setCollapsed(list => list.includes(labelId) ? list.filter(id => id !== labelId) : [...list, labelId])
+  }, [])
   const archived = useMemo(() => archivedCount(sessions), [sessions])
 
   const runAction = (session: CachedSession, key: SessionActionKey) => {
@@ -224,9 +232,28 @@ export default function SessionsScreen() {
   const renderItem = useCallback(({ item }: { item: SessionRow }) => {
     if (item.kind === 'label') {
       return (
-        <Text style={{ color: theme.textWeak, fontSize: 12, fontWeight: '600', paddingHorizontal: theme.gutter, paddingTop: 14, paddingBottom: 4 }}>
-          {item.title}
-        </Text>
+        <Pressable
+          disabled={!item.collapsible}
+          onPress={() => toggleCollapsed(item.id)}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            paddingHorizontal: theme.gutter,
+            paddingTop: 14,
+            paddingBottom: 4,
+            opacity: pressed && item.collapsible ? 0.6 : 1,
+          })}
+        >
+          <Text style={{ color: theme.textWeak, fontSize: 12, fontWeight: '600' }}>
+            {item.title}{item.count ? ` · ${item.count}` : ''}
+          </Text>
+          {item.collapsible ? (
+            <Text style={{ marginLeft: 'auto', color: theme.textWeak, fontSize: 11 }}>
+              {item.collapsed ? '展开' : '收起'}
+            </Text>
+          ) : null}
+        </Pressable>
       )
     }
     const session = item.session
@@ -297,7 +324,7 @@ export default function SessionsScreen() {
       ) : null}
     </Pressable>
     )
-  }, [theme, router, manageable, setMenu, selectMode, selected])
+  }, [theme, router, manageable, setMenu, selectMode, selected, collapsed, toggleCollapsed])
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.surface }}>
