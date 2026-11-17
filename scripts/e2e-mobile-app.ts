@@ -33,6 +33,7 @@ import { checkUpload, compressOptions, MAX_EDGE } from '../apps/mobile/src/core/
 import { flushOutbox } from '../apps/mobile/src/core/connection.js'
 import { groupMemory, memoryPreview, validateMemoryDraft } from '../apps/mobile/src/core/memory.js'
 import { branchLabel, branchTurns, checkpointAction, restoreHash, toCheckpoints, toRewindPoints } from '../apps/mobile/src/core/branches.js'
+import { checkNewSession } from '../apps/mobile/src/core/new-session.js'
 
 let failures = 0
 function check(name: string, condition: boolean, detail = ''): void {
@@ -50,6 +51,7 @@ const savedMemory: { scope: string; path: string; content: string }[] = []
 const navigated: string[] = []
 const rewound: string[] = []
 const restoredFiles: { path: string; hash: string | null }[] = []
+const newSessionCalls: unknown[] = []
 const BRANCH_TREE = {
   sessionId: 'sess-1',
   leafId: 'leaf-2',
@@ -78,6 +80,11 @@ const dispatcher: HostDispatcher = {
     switch (command) {
       case 'agent_list_sessions':
         return [{ id: 'sess-1', title: 'App E2E session' }]
+      case 'agent_init':
+        return { ok: true, cwd: '/e2e/workspace', inbox: '/e2e/inbox', auth: { ready: true } }
+      case 'agent_new_session':
+        newSessionCalls.push(payload)
+        return 'sess-new'
       case 'agent_load_session':
         return { updates: [] }
       case 'agent_send':
@@ -139,6 +146,7 @@ const dispatcher: HostDispatcher = {
     'session_search', 'notification_list',
     'memory_list', 'memory_get', 'memory_save',
     'agent_tree', 'rewind_points', 'rewind_execute', 'agent_navigate', 'checkpoint_list', 'checkpoint_restore',
+    'agent_init', 'agent_new_session',
     'window_minimize', // must be filtered off the mobile surface
   ],
 }
@@ -348,6 +356,16 @@ check('rewind reached the desktop', rewound.includes('u1'))
 
 await transport.invoke('checkpoint_restore', { sessionId: 'sess-1', path: 'src/a.ts', hash: restoreHash(checkpoints[0]!) })
 check('restore sent the pre-write hash', restoredFiles.some(item => item.path === 'src/a.ts' && item.hash === BEFORE_HASH))
+
+// ── 8d. Starting a task from the phone (new session) ───────────────────────
+
+const init = await transport.invoke<{ ok: boolean; cwd: string }>('agent_init', {})
+const ready = checkNewSession(init)
+check('the phone learns the desktop working directory', ready.ok && ready.cwd === '/e2e/workspace')
+
+const createdId = ready.ok ? await transport.invoke<string>('agent_new_session', { cwd: ready.cwd }) : ''
+check('the phone can start a session on the desktop', createdId === 'sess-new')
+check('the desktop received the chosen directory', JSON.stringify(newSessionCalls[0]) === JSON.stringify({ cwd: '/e2e/workspace' }))
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 

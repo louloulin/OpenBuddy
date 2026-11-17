@@ -25,6 +25,7 @@ import { applyUpdate, emptyTranscript, transcriptPreview, type Transcript } from
 import { canSendNow } from '../core/connection'
 import { isPreview, previewState } from '../core/preview'
 import type { Capabilities } from '../core/surface'
+import { checkNewSession, type InitAnswer } from '../core/new-session'
 import type { Approval, NotificationItem } from '../core/models'
 import type { PairPayload } from '../core/pairing'
 import {
@@ -59,6 +60,8 @@ type AppState = {
   unpair: () => Promise<void>
   openSession: (sessionId: string) => Promise<void>
   refreshSessions: () => Promise<void>
+  /** Creates a session on the desktop and returns its id, for the caller to open. */
+  createSession: () => Promise<string | null>
   send: (sessionId: string, text: string, attachments?: { path: string }[]) => Promise<void>
   sendImage: (sessionId: string, bytes: ArrayBuffer, mime: string, text?: string) => Promise<void>
   sendImages: (sessionId: string, images: { bytes: ArrayBuffer; mime: string }[], text?: string) => Promise<void>
@@ -213,6 +216,42 @@ export const useApp = create<AppState>((set, get) => ({
       }
     } catch (error) {
       set({ error: errorText(error) })
+    }
+  },
+
+  async createSession() {
+    const transport = get().transport
+    if (!transport) return null
+    try {
+      // The directory and the model belong to the computer: ask where it works
+      // and let the desktop pick its default model.
+      const init = await transport.invoke<InitAnswer>('agent_init', {})
+      const check = checkNewSession(init)
+      if (!check.ok) {
+        set({ error: check.reason })
+        return null
+      }
+      const sessionId = await transport.invoke<string>('agent_new_session', { cwd: check.cwd })
+      if (typeof sessionId !== 'string' || !sessionId) throw new Error('桌面没有返回会话 id')
+      await get().refreshSessions()
+      set(state => ({
+        sessions: state.sessions.some(session => session.id === sessionId)
+          ? state.sessions
+          : [{
+            id: sessionId,
+            title: '新会话',
+            updatedAt: Date.now(),
+            pinned: false,
+            archived: false,
+            preview: '',
+            unread: 0,
+          }, ...state.sessions],
+        error: null,
+      }))
+      return sessionId
+    } catch (failure) {
+      set({ error: errorText(failure) })
+      return null
     }
   },
 

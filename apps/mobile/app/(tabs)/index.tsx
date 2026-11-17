@@ -13,7 +13,8 @@ import { FlashList } from '@shopify/flash-list'
 import { useRouter } from 'expo-router'
 
 import { Banner } from '../../src/components/Banner'
-import { ChatIcon } from '../../src/components/icons'
+import { ChatIcon, PlusIcon } from '../../src/components/icons'
+import { canRun } from '../../src/core/surface'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
 import type { CachedSession } from '../../src/db/cache'
@@ -28,11 +29,27 @@ function relative(ms: number): string {
 
 export default function SessionsScreen() {
   const theme = themeFor(useColorScheme())
+  const capabilities = useApp(state => state.capabilities)
   const sessions = useApp(state => state.sessions)
   const refresh = useApp(state => state.refreshSessions)
+  const createSession = useApp(state => state.createSession)
   const connection = useApp(state => state.connection)
   const router = useRouter()
   const [refreshing, setRefreshing] = useState(false)
+  const [creating, setCreating] = useState(false)
+
+  // A new task starts on the computer: the phone asks it for the working
+  // directory and opens the session it creates.
+  const startNewTask = async () => {
+    if (creating) return
+    setCreating(true)
+    try {
+      const sessionId = await createSession()
+      if (sessionId) router.push(`/chat/${encodeURIComponent(sessionId)}`)
+    } finally {
+      setCreating(false)
+    }
+  }
 
   // The desktop sidebar groups the list; the phone keeps the same two groups
   // with a quiet section label instead of a collapsible tree.
@@ -50,6 +67,8 @@ export default function SessionsScreen() {
     }
     return rows
   }, [sessions])
+
+  const canCreate = canRun(capabilities, 'agent_new_session') && canRun(capabilities, 'agent_init')
 
   const renderItem = useCallback(({ item }: { item: { kind: 'label'; id: string; title: string } | { kind: 'session'; id: string; session: CachedSession } }) => {
     if (item.kind === 'label') {
@@ -94,6 +113,33 @@ export default function SessionsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.surface }}>
       <Banner />
+      {canCreate ? (
+        <Pressable
+          onPress={() => void startNewTask()}
+          disabled={creating || connection !== 'open'}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            marginHorizontal: theme.gutter,
+            marginTop: 10,
+            marginBottom: 4,
+            height: 44,
+            paddingHorizontal: 14,
+            borderRadius: theme.radiusPill,
+            backgroundColor: pressed ? theme.pressed : theme.card,
+            borderWidth: theme.hairline,
+            borderColor: theme.cardBorder,
+            opacity: creating || connection !== 'open' ? 0.55 : 1,
+          })}
+        >
+          <PlusIcon size={17} color={theme.text} />
+          <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>
+            {creating ? '正在新建…' : '新建任务'}
+          </Text>
+          <Text style={{ flex: 1, color: theme.textWeak, fontSize: 12, textAlign: 'right' }}>在电脑上执行</Text>
+        </Pressable>
+      ) : null}
       {sessions.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 }}>
           <View
