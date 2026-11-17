@@ -1,11 +1,14 @@
 import { create } from "zustand";
+import { projectsDelete, projectsImport, projectsSave, projectsSnapshot } from "@openbuddy/client/agent-client";
+import type { ProjectRecord } from "@openbuddy/protocol/projects";
 
 /**
- * 本地「项目」实体存储 — 对齐 WorkBuddy 项目列表 + 项目详情页的产品语义，落地为纯前端持久化。
+ * 本地「项目」实体存储 — 对齐 WorkBuddy 项目列表 + 项目详情页的产品语义。
  *
- * WorkBuddy 的项目/计划/任务/资产/成员/配置全由云端 facade 驱动；OpenBuddy 没有该后端，
- * 故这里把项目元数据 + 详情页内部数据（指令/连接器/专家/技能/看板/任务/资产/成员）
- * 一并存进 localStorage，使详情页的本地交互（增删改、看板流转）可跨刷新保留。
+ * W5.4：项目元数据与详情（指令/连接器/专家/技能/看板/任务/资产/成员）现在由宿主持久化到
+ * `projects.json`；localStorage 只作为首屏缓存与宿主不可用（浏览器预览）时的降级。
+ * 首次启动把旧缓存幂等导入宿主（按 id upsert），之后每次变更都同步一份给宿主。
+ * 项目 `instructions` 由引擎追加到该 cwd 下新会话的系统提示词（`session-pool.ts`）。
  */
 
 export interface RefItem {
@@ -121,6 +124,34 @@ function save(list: ProjectMeta[]) {
   }
 }
 
+const asRecord = (project: ProjectMeta) => project as unknown as ProjectRecord;
+const mirror = (task: Promise<unknown>) => { void task.catch(() => { /* 浏览器 / 宿主不可用：localStorage 仍是权威 */ }); };
+
+/**
+ * 宿主为权威、localStorage 为缓存：宿主有数据就覆盖缓存；宿主为空就把旧缓存一次性导入。
+ * 幂等：导入按 id upsert，重复执行不会产生重复项目。
+ */
+export async function hydrateProjects(): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    const snapshot = await projectsSnapshot();
+    const hostProjects = Array.isArray(snapshot?.projects) ? (snapshot.projects as unknown as ProjectMeta[]) : [];
+    if (hostProjects.length) {
+      useProjectsStore.setState({ projects: hostProjects });
+      save(hostProjects);
+      return;
+    }
+    const local = load();
+    if (!local.length) return;
+    const imported = await projectsImport(local.map(asRecord));
+    const merged = Array.isArray(imported?.projects) ? (imported.projects as unknown as ProjectMeta[]) : local;
+    useProjectsStore.setState({ projects: merged });
+    save(merged);
+  } catch {
+    /* renderer without a host bridge keeps the localStorage cache */
+  }
+}
+
 const uid = (p: string) => `${p}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 interface ProjectsState {
@@ -161,6 +192,8 @@ export const useProjectsStore = create<ProjectsState>((set, get) => {
     const next = get().projects.map((p) => (p.id === id ? fn(p) : p));
     set({ projects: next });
     save(next);
+    const updated = next.find((p) => p.id === id);
+    if (updated) mirror(projectsSave(asRecord(updated)));
   };
   return {
     projects: load(),
@@ -186,6 +219,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => {
       const next = [item, ...get().projects];
       set({ projects: next });
       save(next);
+      mirror(projectsSave(asRecord(item)));
       return item;
     },
     rename: (id, name) => patch(id, (p) => ({ ...p, name })),
@@ -193,6 +227,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => {
       const next = get().projects.filter((p) => p.id !== id);
       set({ projects: next });
       save(next);
+      mirror(projectsDelete(id));
     },
     updateConfig: (id, cfg) => patch(id, (p) => ({ ...p, ...cfg })),
     addPlan: (id, title, status = "pending") =>
@@ -255,3 +290,6 @@ export const useProjectsStore = create<ProjectsState>((set, get) => {
       })),
   };
 });
+
+// 首屏后台对齐宿主（旧 localStorage 一次性导入），失败时静默保留本地缓存。
+void hydrateProjects();

@@ -893,6 +893,35 @@ try {
     if (kills !== before + 1) throw new Error('stop did not call task_kill');
     ctx.fixture.delayMs = 60;
     return { shot, rows, kills };`);
+  // W5.4: 项目由宿主持久化；清掉渲染层缓存并重载后仍在；项目说明进入新会话的系统提示词。
+  await step('项目后端与项目说明 (pii W5.4)', `
+    await page.locator('.sidebar [data-feature="projects"]').click();
+    await page.getByRole('button', { name: /新建项目/ }).first().click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByPlaceholder('请输入项目名称').fill('E2E 项目');
+    await dialog.getByPlaceholder(/提供当前项目的背景信息/).fill('所有回答先给结论，再展开理由。');
+    await dialog.getByRole('button', { name: '确定', exact: true }).click();
+    await page.getByText('E2E 项目', { exact: true }).first().waitFor({ timeout: 10000 });
+    const saved = await ctx.call('projects_snapshot');
+    const project = saved.projects.find((p) => p.name === 'E2E 项目');
+    if (!project || !String(project.instructions ?? '').includes('先给结论')) throw new Error('projects_snapshot: ' + JSON.stringify(saved).slice(0, 400));
+    if (!project.cwd) throw new Error('project is not bound to the workspace');
+    const shot = await ctx.shot('64-projects-host');
+    // 清掉 localStorage 后重载：项目必须从宿主的 projects.json 回来。
+    await page.evaluate(() => localStorage.removeItem('openbuddy.projects'));
+    await page.reload();
+    await page.locator('.sidebar [data-feature="projects"]').waitFor({ timeout: 20000 });
+    await page.locator('.sidebar [data-feature="projects"]').click();
+    await page.getByText('E2E 项目', { exact: true }).first().waitFor({ timeout: 10000 });
+    // 新任务（同 cwd）的系统提示词应带上项目说明。
+    await page.getByRole('button', { name: '新建任务', exact: true }).first().click();
+    await page.locator('.wb-composer__input').waitFor({ timeout: 15000 });
+    await page.locator('.wb-composer__input').fill('确认项目说明已生效');
+    await page.getByRole('button', { name: '发送', exact: true }).click();
+    await page.getByText('以上内容由本地测试服务器生成', { exact: false }).first().waitFor({ timeout: 30000 });
+    const last = ctx.fixture.requests.at(-1);
+    if (last.project !== 'E2E 项目') throw new Error('project prompt missing: ' + JSON.stringify(last).slice(0, 300));
+    return { shot, id: project.id, reloaded: true, projectPrompt: last.project };`);
   const audit = await step('audit', `
     const a = await ctx.audit();
     const rejected = a.main.filter(r => r.status === 'rejected');

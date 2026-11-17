@@ -23,6 +23,7 @@ export * from "./api/prompts";
 export * from "./api/usage";
 export * from "./api/library";
 export * from "./api/automations";
+export * from "./api/projects";
 
 // Appendix B: wrappers for commands the main-process contract does not implement (kept, not deleted).
 export * from "./api/deferred/connectors";

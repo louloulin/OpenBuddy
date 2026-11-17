@@ -15,6 +15,7 @@ import { MemoryService } from "@openbuddy/services/memory/memory";
 import { SkillCatalogService } from "@openbuddy/services/skills/catalog";
 import { PromptsService } from "@openbuddy/services/prompts/prompts";
 import { UsageService } from "@openbuddy/services/usage/usage";
+import { ProjectsService } from "@openbuddy/services/projects/projects";
 import type { Settings } from "@openbuddy/services/settings/settings";
 import { Permissions, type Emit } from "./permissions/permissions.js";
 import { isBuiltinToolDefinition } from "./builtin/reserved-tools.js";
@@ -53,6 +54,8 @@ export class PiEngine {
   readonly prompts: PromptsService;
   /** 用量统计 (W5.6): per-session cumulative tokens / cost, aggregated on read. */
   readonly usageStats: UsageService;
+  /** 项目 (W5.4): host-persisted projects; instructions join the session's appended system prompt. */
+  readonly projects: ProjectsService;
   readonly checkpoints: CheckpointStore;
   /** Per-session mode, reapplied whenever the session slot is rebuilt. */
   /** @internal */ modes = new Map<string, AgentMode>();
@@ -102,6 +105,7 @@ export class PiEngine {
     this.skillCatalog = new SkillCatalogService(settings);
     this.prompts = new PromptsService(settings, (cwd) => this.trusted(cwd));
     this.usageStats = new UsageService(settings);
+    this.projects = new ProjectsService(settings);
     this.sessionDir = join(settings.dir, "sessions");
     // A refresh parses only new or changed session files and leaves the sidebar's list cache alone.
     this.searchIndex = new SessionSearchIndex(this.sessionDir);

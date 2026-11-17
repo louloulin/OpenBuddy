@@ -10,6 +10,7 @@ import type { MemoryService } from "@openbuddy/services/memory/memory";
 import type { SkillCatalogService } from "@openbuddy/services/skills/catalog";
 import type { PromptsService } from "@openbuddy/services/prompts/prompts";
 import type { UsageService } from "@openbuddy/services/usage/usage";
+import type { ProjectsService } from "@openbuddy/services/projects/projects";
 import type { Providers } from "@openbuddy/services/providers/providers";
 import type { Settings } from "@openbuddy/services/settings/settings";
 import type { SkillsService } from "@openbuddy/services/skills/skills";
@@ -41,6 +42,8 @@ export interface EngineContext {
   readonly prompts: PromptsService;
   /** 用量统计 (W5.6); the per-session snapshot method is `usage(id)`. */
   readonly usageStats: UsageService;
+  /** 项目 (W5.4): `instructionsFor(cwd)` feeds the session's appended system prompt. */
+  readonly projects: ProjectsService;
   readonly checkpoints: CheckpointStore;
   extensionFactories: ExtensionFactory[];
   modes: Map<string, AgentMode>;

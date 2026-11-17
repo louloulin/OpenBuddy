@@ -50,10 +50,14 @@ export async function open(
   const sdkSettings = engine.settings.pi.manager(trusted);
   const sessionId = manager.getSessionId();
   const builtinEnabled = (id: string) => engine.settings.pi.builtinEnabled(id);
+  // 项目说明 (W5.4): a project bound to this cwd appends its instructions to the system prompt.
+  // Read at session open; edits apply to the next open (the live session keeps its prompt).
+  const projectPrompt = engine.projects.instructionsFor(cwd);
   const loader = new DefaultResourceLoader({
     cwd,
     agentDir: engine.settings.dir,
     settingsManager: sdkSettings,
+    ...(projectPrompt ? { appendSystemPrompt: [projectPrompt] } : {}),
     noExtensions: !(config.extensionsEnabled && trusted),
     additionalExtensionPaths: config.extensionsEnabled
       ? (config.extensionPaths ?? []).filter((p) => !(config.extensionDisabled ?? []).includes(p))

@@ -207,7 +207,9 @@ const fixtureServer = createServer(async (req, res) => {
   const systemContent = messages.find(m => m.role === 'system' || m.role === 'developer')?.content;
   const systemText = typeof systemContent === 'string' ? systemContent : Array.isArray(systemContent) ? systemContent.map(p => p.text ?? '').join('') : '';
   const persona = systemText.match(/## 专家人设：([^\n]+)/)?.[1]?.trim();
-  fixture.requests.push({ url: req.url, model: input.model, lastRole: last?.role, lastUserText: lastUserText.slice(0, 200), tools: (input.tools ?? []).map(t => t.function?.name), reasoning_effort: input.reasoning_effort, persona, at: Date.now() });
+  // 项目说明 (20261116-pii W5.4): the engine appends "## 项目说明 · <name>\n<instructions>".
+  const project = systemText.match(/## 项目说明 · ([^\n]+)/)?.[1]?.trim();
+  fixture.requests.push({ url: req.url, model: input.model, lastRole: last?.role, lastUserText: lastUserText.slice(0, 200), tools: (input.tools ?? []).map(t => t.function?.name), reasoning_effort: input.reasoning_effort, persona, project, at: Date.now() });
   const forced = fixture.nextStatus.shift();
   if (forced || lastUserText.includes('__ERR429__') || lastUserText.includes('__ERR500__')) {
     const status = forced ?? (lastUserText.includes('__ERR429__') ? 429 : 500);

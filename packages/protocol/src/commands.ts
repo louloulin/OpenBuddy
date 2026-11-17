@@ -48,6 +48,8 @@ export const COMMANDS = [
   'memory_list', 'memory_get', 'memory_save', 'memory_delete', 'memory_rewrite',
   // 资料库知识源 (pii W5.5): the library host module.
   'library_list', 'library_add', 'library_remove',
+  // 项目 (pii W5.4 / md-R9): host-persisted projects + project instructions.
+  'projects_snapshot', 'projects_save', 'projects_delete', 'projects_import',
   // 技能目录 + 我的指令 (20261116-pii W2.7): the skills host module.
   'skills_catalog_default_root', 'skills_catalog_list_roots', 'skills_catalog_load', 'skills_catalog_read_skill',
   'prompts_list', 'prompts_get', 'prompts_save', 'prompts_delete',

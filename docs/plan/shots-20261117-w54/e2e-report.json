@@ -1,0 +1,626 @@
+{
+  "at": "2026-11-17T08:36:39.041Z",
+  "ok": true,
+  "steps": [
+    {
+      "name": "home",
+      "result": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/01-home.png"
+    },
+    {
+      "name": "configure fixture provider",
+      "result": {
+        "models": [
+          {
+            "modelId": "fixture-model",
+            "providerId": "fixture",
+            "name": "Fixture 模型",
+            "contextWindow": 128000,
+            "reasoning": true,
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 4096,
+            "availableThinkingLevels": [
+              "off",
+              "minimal",
+              "low",
+              "medium",
+              "high"
+            ],
+            "modelKey": "model:fixture/fixture-model",
+            "pricingKnown": false
+          }
+        ],
+        "providers": [
+          {
+            "id": "fixture",
+            "providerKind": "custom",
+            "baseUrl": "http://127.0.0.1:47224/v1",
+            "apiBackend": "chat_completions",
+            "authScheme": "bearer",
+            "label": "Fixture",
+            "apiKey": "••••"
+          }
+        ]
+      }
+    },
+    {
+      "name": "chat markdown answer",
+      "result": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/02-chat-markdown.png"
+    },
+    {
+      "name": "code block copy",
+      "result": {
+        "clipboardWrites": 1
+      }
+    },
+    {
+      "name": "tool approval",
+      "result": [
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/03-approval.png",
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/62-approval-rules.png",
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/04-tool-done.png"
+      ]
+    },
+    {
+      "name": "agent writes files → workbench",
+      "result": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/05-workbench.png"
+    },
+    {
+      "name": "branch switcher",
+      "result": [
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/08-branch-2of2.png",
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/08-branch-1of2.png"
+      ]
+    },
+    {
+      "name": "bang command",
+      "result": [
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/09-bash-mode.png",
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/09-bash-output.png",
+        "hello"
+      ]
+    },
+    {
+      "name": "@ file mention",
+      "result": {
+        "all": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/10-file-mention-all.png",
+        "groups": [
+          "本任务产物"
+        ],
+        "shot": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/10-file-mention.png",
+        "items": [
+          "report.md\ndocs"
+        ],
+        "value": "看看 @docs/report.md "
+      }
+    },
+    {
+      "name": "plan: 想一想 records steps with ob_todo",
+      "result": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/11-plan-ready.png"
+    },
+    {
+      "name": "plan: 按此计划执行 updates the steps",
+      "result": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/12-plan-progress.png"
+    },
+    {
+      "name": "plan: ob_todo rows in the transcript",
+      "result": [
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/13-plan-transcript.png",
+        [
+          "更新计划 开始 #1 读取 data/sales.csv 并核对字段 0/4",
+          "更新计划 完成 #1 读取 data/sales.csv 并核对字段 1/4",
+          "更新计划 开始 #2 按区域汇总季度销售额 1/4",
+          "更新计划 完成 #2 按区域汇总季度销售额 2/4",
+          "更新计划 开始 #3 撰写分析报告 docs/report.md 2/4"
+        ]
+      ]
+    },
+    {
+      "name": "plan: task overview popover",
+      "result": [
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/14-task-overview.png",
+        "步骤 2/4 · 产物 4"
+      ]
+    },
+    {
+      "name": "settings",
+      "result": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/06-settings.png"
+    },
+    {
+      "name": "settings sections",
+      "result": [
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/07-settings-general.png",
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/07-settings-model.png",
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/07-settings-assistant.png",
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/07-settings-agent-settings.png",
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/07-settings-security.png",
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/07-settings-personalize.png",
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/07-settings-memory.png",
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/07-settings-shortcuts.png",
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/07-settings-agent-mail.png",
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/07-settings-data.png",
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/07-settings-help.png",
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/07-settings-about.png"
+      ]
+    },
+    {
+      "name": "通用偏好（主题 / 字号 / 密度 / 发送键）",
+      "result": {
+        "light": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/59-general.png",
+        "dark": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/60-general-dark-large.png",
+        "about": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/61-about.png",
+        "tray": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/63-tray-enabled.png",
+        "attrs": {
+          "theme": "dark",
+          "fontSize": "large",
+          "density": "compact",
+          "sendKey": "mod+enter"
+        }
+      }
+    },
+    {
+      "name": "安全中心（受保护路径 + 规则）",
+      "result": {
+        "before": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/56-security-center.png",
+        "after": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/57-security-configured.png",
+        "paths": [
+          ".env",
+          ".git",
+          ".ssh",
+          "*.pem",
+          "*.key",
+          "*.p12",
+          "id_rsa",
+          "id_ed25519",
+          "credentials.json",
+          "config/secrets.json"
+        ],
+        "ruleSaved": true
+      }
+    },
+    {
+      "name": "诊断报告（本地预览）",
+      "result": {
+        "shot": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/58-diagnostics.png",
+        "lines": 25
+      }
+    },
+    {
+      "name": "agent settings persisted (pii W0.4)",
+      "result": {
+        "before": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/15-settings-agent.png",
+        "after": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/16-settings-agent-persisted.png",
+        "autoCompaction": {
+          "enabled": false,
+          "reserveTokens": 16384,
+          "keepRecentTokens": 20000
+        },
+        "followUpMode": "all",
+        "builtins": [
+          "mode:true",
+          "persona:true",
+          "todo:true",
+          "memory:true",
+          "subagent:true"
+        ]
+      }
+    },
+    {
+      "name": "model favourites (pii W1.6)",
+      "result": {
+        "menu": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/17-model-menu-favorites.png",
+        "cycled": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/18-ctrl-p-cycled.png",
+        "favoriteModels": [
+          "model:fixture/fixture-model",
+          "model:fixture/fixture-priced"
+        ]
+      }
+    },
+    {
+      "name": "context popover (pii W1.5)",
+      "result": {
+        "popover": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/19-context-popover.png",
+        "compacted": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/20-context-compact.png",
+        "cost": "$0.0063",
+        "message": "暂时没有可压缩的内容，对话再长一些后再试",
+        "autoCompaction": true
+      }
+    },
+    {
+      "name": "mode restored after switching sessions (pii W0.5)",
+      "result": {
+        "title": "__LONG__ 帮我整理一个重构方案",
+        "shot": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/21-mode-restored.png",
+        "checked": "true"
+      }
+    },
+    {
+      "name": "close settings",
+      "result": true
+    },
+    {
+      "name": "sidebar after cleanup",
+      "result": {
+        "nav": [
+          "experts-hub:专家·技能·连接器",
+          "automation:自动化",
+          "library:资料库",
+          "projects:项目"
+        ],
+        "moreItems": [
+          "我的文件",
+          "知识库",
+          "用量统计",
+          "通知渠道",
+          "灵感",
+          "策略设置"
+        ],
+        "shot": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/22-sidebar-registry.png"
+      }
+    },
+    {
+      "name": "click every entry",
+      "result": {
+        "visited": [
+          "experts-hub",
+          "automation",
+          "library",
+          "projects",
+          "my-files",
+          "knowledge-base",
+          "usage",
+          "notify-channels",
+          "inspiration",
+          "policy"
+        ],
+        "commands": [
+          "agent_list_workspaces",
+          "agents_list",
+          "automations_snapshot",
+          "experts_load",
+          "library_list",
+          "list_dir",
+          "mcp_list",
+          "memory_list",
+          "notify_channels_list",
+          "providers_list",
+          "skills_list",
+          "tasks_list",
+          "teams_list",
+          "usage_snapshot"
+        ],
+        "rejected": [],
+        "notImplemented": []
+      }
+    },
+    {
+      "name": "资料库三标签",
+      "result": {
+        "memory": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/38-library-memory.png",
+        "files": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/39-library-files.png",
+        "knowledge": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/40-library-knowledge.png"
+      }
+    },
+    {
+      "name": "灵感静态场景",
+      "result": {
+        "cards": 33,
+        "grid": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/41-inspiration.png",
+        "scene": "scene-working-1-1"
+      }
+    },
+    {
+      "name": "用量统计",
+      "result": {
+        "values": [
+          "20.7k",
+          "1",
+          "$0.0063"
+        ],
+        "totals": {
+          "tokens": 20700,
+          "prompt": 18000,
+          "completion": 2700,
+          "cost": 0.0063,
+          "sessions": 1
+        },
+        "shot": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/42-usage.png"
+      }
+    },
+    {
+      "name": "自动化：创建 → 测试运行 → 运行记录 → 打开会话",
+      "result": {
+        "empty": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/43-automation-empty.png",
+        "form": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/44-automation-form.png",
+        "saved": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/45-automation-saved.png",
+        "records": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/46-automation-records.png",
+        "session": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/47-automation-session.png",
+        "automations": [
+          "每日销售摘要"
+        ],
+        "recordsCount": 1,
+        "recordText": "每日销售摘要 成功 16:35"
+      }
+    },
+    {
+      "name": "保存为自动化（会话 ⋯ 菜单）",
+      "result": {
+        "name": "用一句话总结今天的销售情况",
+        "prompt": "用一句话总结今天的销售情况",
+        "cwd": "/private/var/folders/nj/vtk9xv2j4wq41_94ry3zr8hh0000gn/T/openbuddy-e2e-21072/run/profile/pi/inbox",
+        "shot": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/48-save-as-automation.png"
+      }
+    },
+    {
+      "name": "experts hub with skills and MCP",
+      "result": {
+        "tabs": [
+          "专家",
+          "技能",
+          "连接器",
+          "我的指令",
+          "扩展"
+        ],
+        "shots": [
+          "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/23-hub-skills.png",
+          "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/24-hub-connectors-mcp.png",
+          "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/24b-hub-connectors-tested.png",
+          "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/25-hub-extensions.png",
+          "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/25b-hub-prompts.png",
+          "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/25c-prompt-editor.png",
+          "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/25d-prompt-saved.png"
+        ],
+        "tools": [
+          "query_sales",
+          "inventory_check"
+        ],
+        "templates": [
+          "global/scene-working-1-1",
+          "global/weekly-report"
+        ]
+      }
+    },
+    {
+      "name": "subagent cards",
+      "result": {
+        "collapsed": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/36-subagent-cards.png",
+        "states": [
+          "已完成 · 1s",
+          "已完成 · 1s"
+        ],
+        "expanded": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/37-subagent-expanded.png"
+      }
+    },
+    {
+      "name": "second task",
+      "result": true
+    },
+    {
+      "name": "palette content search",
+      "result": {
+        "marks": [
+          "统一卡片的圆角"
+        ],
+        "findValue": "统一卡片的圆角",
+        "count": "1/1",
+        "highlights": 1,
+        "shots": [
+          "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/26-palette-content-search.png",
+          "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/27-palette-hit-opened.png"
+        ]
+      }
+    },
+    {
+      "name": "host capabilities",
+      "result": {
+        "protocolVersion": 1,
+        "platform": "desktop",
+        "commands": 176,
+        "events": 31,
+        "includesSelf": true,
+        "includesNative": true,
+        "features": []
+      }
+    },
+    {
+      "name": "experts center",
+      "result": {
+        "cards": 12,
+        "shots": [
+          "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/28-experts-center.png",
+          "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/28b-expert-teams.png",
+          "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/28c-expert-team-installed.png"
+        ],
+        "teamCommand": "/team-research-write-review"
+      }
+    },
+    {
+      "name": "experts detail",
+      "result": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/29-expert-detail.png"
+    },
+    {
+      "name": "my experts (empty)",
+      "result": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/30-my-experts-empty.png"
+    },
+    {
+      "name": "expert editor: create",
+      "result": [
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/31-expert-editor.png",
+        "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/32-my-experts.png"
+      ]
+    },
+    {
+      "name": "summon → composer prefilled (not sent)",
+      "result": {
+        "prefilled": "帮我规划一个三天两晚的杭州周末行程，预算 2000 元",
+        "shot": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/33-summon-prefilled.png"
+      }
+    },
+    {
+      "name": "send → persona reaches the model",
+      "result": {
+        "persona": "旅行规划师",
+        "shot": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/34-persona-answer.png"
+      }
+    },
+    {
+      "name": "unbind expert",
+      "result": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/35-expert-unbound.png"
+    },
+    {
+      "name": "通知渠道（主进程发送）",
+      "result": {
+        "empty": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/50-notify-channels-empty.png",
+        "configured": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/51-notify-channels-configured.png",
+        "tested": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/52-notify-channels-tested.png",
+        "payload": {
+          "title": "OpenBuddy 测试通知",
+          "body": "这条消息来自 设置 · 通知渠道 的测试按钮。",
+          "level": "info",
+          "ts": 1794904585846
+        },
+        "channels": [
+          "销售群机器人:generic-webhook:true"
+        ]
+      }
+    },
+    {
+      "name": "文件触发自动化",
+      "result": {
+        "form": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/53-automation-file-trigger.png",
+        "saved": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/54-automation-file-trigger-saved.png",
+        "records": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/55-automation-file-trigger-record.png",
+        "text": "收件箱文件触发 成功 16:36",
+        "trigger": {
+          "path": "/var/folders/nj/vtk9xv2j4wq41_94ry3zr8hh0000gn/T/openbuddy-e2e-21072/run/watched-inbox.csv"
+        },
+        "recordStatus": "success",
+        "sessionId": "01a1e8a6-9133-73f8-be6f-8901b5adf4ff",
+        "recordCount": 2
+      }
+    },
+    {
+      "name": "会话导出 / 导入（JSONL）",
+      "result": {
+        "source": "01a1e8a6-9133-73f8-be6f-8901b5adf4ff",
+        "imported": "01a1e8a6-98d1-73f8-be6f-890385116ee5",
+        "exported": "/var/folders/nj/vtk9xv2j4wq41_94ry3zr8hh0000gn/T/openbuddy-e2e-21072/run/session-export.jsonl"
+      }
+    },
+    {
+      "name": "运行中面板（任务 / 用时 / 停止）",
+      "result": {
+        "shot": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/49-running-tasks.png",
+        "rows": [
+          "慢慢写一段说明，让我看看运行中面板\n任务\n· 2 秒"
+        ],
+        "kills": 1
+      }
+    },
+    {
+      "name": "项目后端与项目说明 (pii W5.4)",
+      "result": {
+        "shot": "/Users/louloulin/stock/OpenBuddy/docs/plan/shots-20261117-w54/64-projects-host.png",
+        "id": "proj_1794904597304_4m2cwt",
+        "reloaded": true,
+        "projectPrompt": "E2E 项目"
+      }
+    },
+    {
+      "name": "audit",
+      "result": {
+        "invoked": 457,
+        "distinctCommands": 76,
+        "byCommand": {
+          "agent_auth_status": 4,
+          "agent_bash": 1,
+          "agent_clear_session_expert": 1,
+          "agent_compact": 1,
+          "agent_cycle_model": 1,
+          "agent_diagnose": 1,
+          "agent_export_jsonl": 1,
+          "agent_extensions_list": 1,
+          "agent_get_model_state": 6,
+          "agent_import_jsonl": 1,
+          "agent_init": 2,
+          "agent_list_sessions": 3,
+          "agent_list_workspaces": 8,
+          "agent_load_session": 3,
+          "agent_navigate": 2,
+          "agent_new_session": 6,
+          "agent_regenerate": 1,
+          "agent_resolve_permission": 2,
+          "agent_send": 13,
+          "agent_session_info": 45,
+          "agent_session_usage": 35,
+          "agent_set_mode": 3,
+          "agent_set_session_expert": 1,
+          "agent_tree": 21,
+          "agents_defaults_get": 17,
+          "agents_defaults_save": 1,
+          "agents_list": 9,
+          "agents_save": 1,
+          "artifacts_list": 23,
+          "automations_run": 1,
+          "automations_save": 2,
+          "automations_snapshot": 22,
+          "clipboard_write_text": 1,
+          "commands_list": 4,
+          "experts_load": 5,
+          "files_search": 2,
+          "host_capabilities": 3,
+          "library_list": 2,
+          "list_dir": 2,
+          "mcp_config_path": 3,
+          "mcp_config_read": 3,
+          "mcp_list": 10,
+          "mcp_test": 1,
+          "mcp_upsert": 1,
+          "memory_list": 4,
+          "notification_append": 2,
+          "notification_list": 1,
+          "notification_prefs_get": 1,
+          "notify_channels_list": 4,
+          "notify_channels_save": 1,
+          "notify_channels_test": 1,
+          "path_stat": 16,
+          "permission_list": 5,
+          "permission_mode_get": 17,
+          "permission_mode_set": 2,
+          "permission_protected_get": 6,
+          "permission_protected_set": 2,
+          "permission_save": 3,
+          "projects_save": 1,
+          "projects_snapshot": 3,
+          "prompts_list": 6,
+          "prompts_save": 2,
+          "providers_list": 17,
+          "providers_save_model": 2,
+          "providers_save_provider": 1,
+          "session_search": 1,
+          "settings_agent_get": 10,
+          "settings_agent_set": 5,
+          "skills_list": 12,
+          "task_kill": 1,
+          "tasks_list": 41,
+          "teams_install": 1,
+          "teams_list": 3,
+          "tray_get": 5,
+          "tray_set": 2,
+          "usage_snapshot": 3
+        },
+        "rejected": [
+          {
+            "command": "agent_compact",
+            "error": "Nothing to compact (session too small)"
+          }
+        ],
+        "notImplemented": [],
+        "pageErrors": [],
+        "fixtureRequests": 26
+      }
+    }
+  ]
+}

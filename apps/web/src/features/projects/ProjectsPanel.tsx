@@ -33,7 +33,7 @@ interface ProjectsPanelProps {
 
 const FROM_TEMPLATES = TEMPLATE_OPTIONS.filter((t) => t.id !== "custom");
 
-export function ProjectsPanel({ onToast, onStartProjectConversation }: ProjectsPanelProps) {
+export function ProjectsPanel({ cwd, onToast, onStartProjectConversation }: ProjectsPanelProps) {
   const projects = useProjectsStore((s) => s.projects);
   const rename = useProjectsStore((s) => s.rename);
   const remove = useProjectsStore((s) => s.remove);
@@ -154,6 +154,7 @@ export function ProjectsPanel({ onToast, onStartProjectConversation }: ProjectsP
       {create && (
         <CreateProjectDialog
           preset={create}
+          cwd={cwd}
           onCancel={() => setCreate(null)}
           onConfirm={(saved) => {
             setCreate(null);
@@ -226,9 +227,11 @@ function ProjectCard({
 interface CreatePreset { templateId?: string }
 
 function CreateProjectDialog({
-  preset, onCancel, onConfirm,
+  preset, cwd, onCancel, onConfirm,
 }: {
   preset: CreatePreset;
+  /** 当前工作区：项目说明会追加到该目录下新会话的系统提示词（W5.4）。 */
+  cwd?: string;
   onCancel: () => void;
   onConfirm: (saved: ProjectMeta) => void;
 }) {
@@ -267,6 +270,7 @@ function CreateProjectDialog({
     if (!name.trim()) return;
     const saved = add({
       name: name.trim(),
+      cwd: cwd || undefined,
       templateId,
       instructions: instructions.trim() || undefined,
       connectors, experts, skills,

@@ -76,6 +76,18 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'notification_prefs_set' && typeof payload.system !== 'boolean') throw new Error('invalid_payload: system');
   // 托盘常驻 (W4.4).
   if (command === 'tray_set' && typeof payload.enabled !== 'boolean') throw new Error('invalid_payload: enabled');
+  // 项目 (W5.4): a bounded list of renderer-owned records; the service re-checks id / name.
+  if (command === 'projects_save') {
+    const project = payload.project as Record<string, unknown> | undefined;
+    if (!project || typeof project !== 'object' || Array.isArray(project)) throw new Error('invalid_payload: project');
+    if (typeof project.id !== 'string' || !project.id.trim() || project.id.length > 200) throw new Error('invalid_payload: project.id');
+    if (typeof project.name !== 'string' || !project.name.trim() || project.name.length > 200) throw new Error('invalid_payload: project.name');
+    if (project.instructions !== undefined && typeof project.instructions !== 'string') throw new Error('invalid_payload: instructions');
+  }
+  if (command === 'projects_delete') string('id', 200);
+  if (command === 'projects_import') {
+    if (!Array.isArray(payload.projects) || payload.projects.length > 500) throw new Error('invalid_payload: projects');
+  }
   // 受保护路径 (W6.2): a bounded list of short patterns.
   if (command === 'permission_protected_set') {
     if (!Array.isArray(payload.paths) || payload.paths.length > 64) throw new Error('invalid_payload: paths');
