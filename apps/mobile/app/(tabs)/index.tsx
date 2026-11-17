@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Banner } from '../../src/components/Banner'
 import { ChatIcon, PlusIcon } from '../../src/components/icons'
@@ -49,6 +50,7 @@ export default function SessionsScreen() {
   const deleteSession = useApp(state => state.deleteSession)
   const connection = useApp(state => state.connection)
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const [refreshing, setRefreshing] = useState(false)
   const [creating, setCreating] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
@@ -176,6 +178,18 @@ export default function SessionsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.surface }}>
+      <View style={{
+        paddingTop: insets.top + 10,
+        paddingHorizontal: theme.gutter,
+        paddingBottom: 2,
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+      }}>
+        <Text style={{ color: theme.text, fontSize: 28, fontWeight: '700', letterSpacing: -0.5 }}>会话</Text>
+        <Text style={{ marginLeft: 'auto', marginBottom: 4, color: theme.textWeak, fontSize: 12 }}>
+          {connection === 'open' ? '电脑在线' : connection === 'connecting' ? '连接中' : '已断开'}
+        </Text>
+      </View>
       <Banner />
       {canCreate ? (
         <Pressable
@@ -352,7 +366,7 @@ export default function SessionsScreen() {
                 disabled={!cleanSessionTitle(renameText)}
                 style={({ pressed }) => ({ opacity: pressed || !cleanSessionTitle(renameText) ? 0.5 : 1 })}
               >
-                <Text style={{ color: theme.accent, fontSize: 15, fontWeight: '600' }}>保存</Text>
+                <Text style={{ color: theme.text, fontSize: 15, fontWeight: '600' }}>保存</Text>
               </Pressable>
             </View>
           </View>

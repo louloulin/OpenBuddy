@@ -234,7 +234,9 @@ export function Composer({ onSend, onImage, onImages, onStop, streaming = false,
         // The chat screen owns the bottom inset; a composer rendered on its own
         // still keeps clear of the home indicator.
         paddingBottom: Math.max(10, insets.bottom),
-        backgroundColor: theme.canvas,
+        // Same surface as the transcript: Grok's composer is not a separate
+        // tinted band, the card itself is the affordance.
+        backgroundColor: theme.surface,
       }}
     >
       <View

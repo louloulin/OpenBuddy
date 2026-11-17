@@ -118,7 +118,7 @@ export default function AutomationsScreen() {
             电脑上没有定时任务。{'\n'}在桌面端设置一个，它会出现在这里。
           </Text>
           <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
-            <Text style={{ color: theme.accent, fontSize: 13 }}>返回</Text>
+            <Text style={{ color: theme.text, fontSize: 13 }}>返回</Text>
           </Pressable>
         </View>
       ) : null}

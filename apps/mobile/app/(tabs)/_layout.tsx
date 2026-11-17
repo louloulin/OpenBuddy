@@ -55,6 +55,8 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: '会话',
+          // The sessions screen paints its own Grok-style large title.
+          headerShown: false,
           href: tabs.sessions === false ? null : undefined,
           tabBarBadge: unreadSessions > 0 ? unreadSessions : undefined,
           tabBarBadgeStyle: { backgroundColor: theme.ink, color: theme.inkFg, fontSize: 10 },

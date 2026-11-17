@@ -245,7 +245,7 @@ export default function FilesScreen() {
               })}
             >
               {entry.kind === 'directory'
-                ? <FolderIcon size={17} color={theme.accent} />
+                ? <FolderIcon size={17} color={theme.textMedium} />
                 : <FileIcon size={17} color={theme.textWeak} />}
               <Text numberOfLines={1} style={{ flex: 1, color: theme.text, fontSize: 15 }}>
                 {entry.name}

@@ -45,7 +45,7 @@ export function ToolCard({ row }: { row: ToolRow }) {
             style={{
               fontFamily: theme.mono,
               fontSize: 11,
-              color: theme.accent,
+              color: theme.textMedium,
               backgroundColor: theme.surface,
               borderWidth: theme.hairline,
               borderColor: theme.cardBorder,

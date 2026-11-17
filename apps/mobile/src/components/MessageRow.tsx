@@ -12,13 +12,14 @@
  * Only the streaming row changes on each token, so `memo` keeps the rest still.
  */
 
-import { memo } from 'react'
-import { Text, View, useColorScheme } from 'react-native'
+import { memo, useState } from 'react'
+import { Pressable, Text, View, useColorScheme } from 'react-native'
+import * as Clipboard from 'expo-clipboard'
 
 import type { TextRow, ThinkingRow as ThinkingRowData, ToolRow } from '../core/transcript'
 import { themeFor } from '../theme'
 import { speak } from '../native/speech'
-import { SparkIcon } from './icons'
+import { CopyIcon, RefreshIcon, SparkIcon, VolumeIcon } from './icons'
 import { Caret } from './Caret'
 import { Markdown } from './Markdown'
 import { MessageActions } from './MessageActions'
@@ -59,24 +60,50 @@ function UserBubble({ row }: { row: TextRow }) {
   )
 }
 
+/**
+ * A small icon row under a finished reply, the way Grok bot keeps copy / speak
+ * / retry one tap away instead of hidden behind a long press. The long-press
+ * sheet still exists for discoverability and for the Markdown variant.
+ */
+function InlineActions({ row, onRegenerate }: { row: TextRow; onRegenerate?: () => void }) {
+  const theme = themeFor(useColorScheme())
+  const [note, setNote] = useState<string | null>(null)
+
+  const copy = async () => {
+    try {
+      await Clipboard.setStringAsync(row.text)
+      setNote('已复制')
+    } catch {
+      setNote('复制失败')
+    }
+    setTimeout(() => setNote(null), 1400)
+  }
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 8 }}>
+      <Pressable hitSlop={10} onPress={() => void copy()} accessibilityLabel="复制">
+        <CopyIcon size={15} color={theme.textWeak} />
+      </Pressable>
+      <Pressable hitSlop={10} onPress={() => speak(row.text)} accessibilityLabel="朗读">
+        <VolumeIcon size={15} color={theme.textWeak} />
+      </Pressable>
+      {onRegenerate ? (
+        <Pressable hitSlop={10} onPress={onRegenerate} accessibilityLabel="重新生成">
+          <RefreshIcon size={15} color={theme.textWeak} />
+        </Pressable>
+      ) : null}
+      {note ? <Text style={{ color: theme.textWeak, fontSize: 11 }}>{note}</Text> : null}
+    </View>
+  )
+}
+
 function AssistantRow({ row, onRegenerate }: { row: TextRow; onRegenerate?: () => void }) {
   const theme = themeFor(useColorScheme())
   return (
-    <View style={{ paddingHorizontal: theme.gutter, paddingVertical: 8 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-        <View
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: 12,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: theme.ink,
-          }}
-        >
-          <SparkIcon size={14} color={theme.inkFg} />
-        </View>
-        <Text style={{ color: theme.text, fontSize: theme.fontMeta, fontWeight: '500' }}>OpenBuddy</Text>
+    <View style={{ paddingHorizontal: theme.gutter, paddingVertical: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <SparkIcon size={14} color={theme.textWeak} />
+        <Text style={{ color: theme.textWeak, fontSize: 12, fontWeight: '600', letterSpacing: 0.2 }}>OpenBuddy</Text>
       </View>
       <MessageActions
         text={row.text}
@@ -93,9 +120,12 @@ function AssistantRow({ row, onRegenerate }: { row: TextRow; onRegenerate?: () =
           <Markdown source={row.text} />
         )}
         {row.streaming ? (
-          <Caret color={theme.accent} fontSize={theme.fontBody} lineHeight={theme.lineBody} />
+          <Caret color={theme.text} fontSize={theme.fontBody} lineHeight={theme.lineBody} />
         ) : null}
       </MessageActions>
+      {!row.streaming && !row.isError && row.text ? (
+        <InlineActions row={row} onRegenerate={onRegenerate} />
+      ) : null}
     </View>
   )
 }

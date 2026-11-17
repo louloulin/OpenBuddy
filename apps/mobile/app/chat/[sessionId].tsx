@@ -18,7 +18,7 @@ import { Composer } from '../../src/components/Composer'
 import { ApprovalCard } from '../../src/components/ApprovalCard'
 import { LoadingRow } from '../../src/components/LoadingRow'
 import { MessageRow } from '../../src/components/MessageRow'
-import { ChevronRightIcon } from '../../src/components/icons'
+import { ChevronRightIcon, SparkIcon } from '../../src/components/icons'
 import { emptyTranscript, isTurnPending, type TranscriptRow } from '../../src/core/transcript'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
@@ -110,32 +110,63 @@ export default function ChatScreen() {
         </Pressable>
       </View>
 
-      <FlashList
-        data={data}
-        inverted
-        renderItem={({ item }: { item: ChatItem }) => (item.kind === 'approval'
-          ? (
-            <ApprovalCard
-              approval={item.approval}
-              onResolve={approved => void resolveApproval(item.approval.requestId, approved)}
-            />
-          )
-          : (
-            <MessageRow
-              row={item}
-              onRegenerate={() => void regenerate(sessionId)}
-            />
-          ))}
-        keyExtractor={row => row.id}
-        contentContainerStyle={{ paddingVertical: 6 }}
-        ListEmptyComponent={(
-          <View style={{ padding: 32, alignItems: 'center', gap: 8 }}>
-            <Text style={{ color: theme.textWeak, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
-              这个会话还没有消息。发送一条试试。
-            </Text>
+      {transcript.rows.length === 0 && approvals.length === 0 ? (
+        // Grok-style empty state: the product name as the hero, then prompts
+        // that can be sent with one tap instead of a centred "no messages".
+        <View style={{
+          flex: 1,
+          justifyContent: 'flex-end',
+          paddingHorizontal: theme.gutter + 8,
+          paddingBottom: 36,
+        }}>
+          <SparkIcon size={22} color={theme.textWeak} />
+          <Text style={{ color: theme.text, fontSize: 28, fontWeight: '700', letterSpacing: -0.4, marginTop: 10 }}>
+            OpenBuddy
+          </Text>
+          <Text style={{ color: theme.textWeak, fontSize: 14, marginTop: 6, lineHeight: 20 }}>
+            把任务发过来，在电脑上执行。
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 18 }}>
+            {['总结一下今天的改动', '把计划里的未完成项列出来', '这段代码为什么慢？'].map(text => (
+              <Pressable
+                key={text}
+                onPress={() => void send(sessionId, text)}
+                style={({ pressed }) => ({
+                  borderWidth: theme.hairline,
+                  borderColor: theme.cardBorder,
+                  borderRadius: theme.radiusPill,
+                  paddingHorizontal: 14,
+                  paddingVertical: 9,
+                  backgroundColor: pressed ? theme.pressed : 'transparent',
+                })}
+              >
+                <Text style={{ color: theme.textMedium, fontSize: 13 }}>{text}</Text>
+              </Pressable>
+            ))}
           </View>
-        )}
-      />
+        </View>
+      ) : (
+        <FlashList
+          data={data}
+          inverted
+          style={{ flex: 1 }}
+          renderItem={({ item }: { item: ChatItem }) => (item.kind === 'approval'
+            ? (
+              <ApprovalCard
+                approval={item.approval}
+                onResolve={approved => void resolveApproval(item.approval.requestId, approved)}
+              />
+            )
+            : (
+              <MessageRow
+                row={item}
+                onRegenerate={() => void regenerate(sessionId)}
+              />
+            ))}
+          keyExtractor={row => row.id}
+          contentContainerStyle={{ paddingVertical: 6 }}
+        />
+      )}
 
       {!streamingText && (awaiting || (streaming && transcript.rows.every(row => row.kind === 'thinking' || (row.kind === 'text' && row.role === 'user')))) ? (
         <LoadingRow />

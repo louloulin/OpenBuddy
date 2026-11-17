@@ -220,6 +220,25 @@ export function PlayIcon({ size = 16, color, strokeWidth = 1.9 }: IconProps) {
   )
 }
 
+export function VolumeIcon({ size = 16, color, strokeWidth = 1.75 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path d="M11 5 6 9H3v6h3l5 4V5Z" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M15.4 8.7a4.7 4.7 0 0 1 0 6.6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+      <Path d="M18.2 6.2a8.2 8.2 0 0 1 0 11.6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    </Svg>
+  )
+}
+
+export function RefreshIcon({ size = 16, color, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path d="M20.4 12a8.4 8.4 0 1 1-2.46-5.94" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+      <Polyline points="20.6 3.4 20.6 9 15 9" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  )
+}
+
 export function LockIcon({ size = 22, color, strokeWidth = 1.75 }: IconProps) {
   return (
     <Svg {...base(size)}>

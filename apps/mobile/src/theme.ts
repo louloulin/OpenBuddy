@@ -1,15 +1,14 @@
 /**
  * Design tokens for the phone (20261115-mobile.md §4.3).
  *
- * These are the *desktop* tokens from `apps/web/src/styles/polish.css`, ported
- * verbatim: warm neutral canvas, near-white surface, an ink primary action
- * rather than a brand blue, hairline borders and quiet shadows. The phone must
- * look like the same product as the desktop window, so the numbers below are
- * copied rather than invented.
+ * The geometry (radii, 44pt targets, 15–16 body) still follows the desktop,
+ * but the palette moved to the **Grok bot** direction the product now targets:
+ * cool neutral greys, pure-black dark canvas, white-on-black ink actions, and
+ * exactly one blue accent reserved for links/focus/the caret. No warm cream,
+ * no brand colour on primary buttons, no decorative shadows.
  *
  * Differences from the web layer are only those a phone needs: touch targets
- * (44pt), a larger minimum body size (15–16), and one accent reserved for the
- * send button and the streaming caret.
+ * (44pt) and a larger minimum body size (15–16).
  */
 
 export type Scheme = 'light' | 'dark'
@@ -61,22 +60,22 @@ export type Theme = {
 
 const light: Theme = {
   scheme: 'light',
-  canvas: '#f3f2f0',
-  surface: '#f9f8f7',
+  canvas: '#f5f5f5',
+  surface: '#ffffff',
   card: '#ffffff',
-  cardBorder: '#e6e5e3',
-  text: '#121110',
-  textMedium: 'rgba(18, 17, 16, 0.68)',
-  textWeak: 'rgba(18, 17, 16, 0.46)',
-  hover: 'rgba(15, 13, 10, 0.045)',
-  pressed: 'rgba(15, 13, 10, 0.075)',
-  ink: '#121110',
+  cardBorder: '#e6e6e6',
+  text: '#0a0a0a',
+  textMedium: '#525252',
+  textWeak: '#8b8b8b',
+  hover: 'rgba(0, 0, 0, 0.045)',
+  pressed: 'rgba(0, 0, 0, 0.08)',
+  ink: '#0a0a0a',
   inkFg: '#ffffff',
-  bubble: '#ebebeb',
-  bubbleText: 'rgba(0, 0, 0, 0.9)',
-  inlineCode: 'rgba(0, 0, 0, 0.05)',
-  accent: '#3857c7',
-  focus: 'rgba(56, 87, 199, 0.5)',
+  bubble: '#f0f0f0',
+  bubbleText: '#0a0a0a',
+  inlineCode: 'rgba(0, 0, 0, 0.06)',
+  accent: '#2563eb',
+  focus: 'rgba(37, 99, 235, 0.45)',
   danger: '#e5484d',
   warning: '#b26a00',
   ok: '#1f7a4d',
@@ -94,25 +93,25 @@ const light: Theme = {
 
 const dark: Theme = {
   scheme: 'dark',
-  canvas: '#181716',
-  surface: '#131211',
-  card: '#201f1d',
-  cardBorder: 'rgba(252, 252, 252, 0.08)',
-  text: '#f4f3f1',
-  textMedium: 'rgba(244, 243, 241, 0.72)',
-  textWeak: 'rgba(244, 243, 241, 0.48)',
-  hover: 'rgba(252, 252, 252, 0.06)',
-  pressed: 'rgba(252, 252, 252, 0.1)',
-  ink: '#f4f3f1',
-  inkFg: '#141312',
-  bubble: '#2a2927',
-  bubbleText: 'rgba(252, 252, 252, 0.92)',
-  inlineCode: 'rgba(252, 252, 252, 0.09)',
-  accent: '#8199ff',
-  focus: 'rgba(129, 156, 255, 0.6)',
+  canvas: '#000000',
+  surface: '#0b0b0b',
+  card: '#171717',
+  cardBorder: 'rgba(255, 255, 255, 0.08)',
+  text: '#f5f5f5',
+  textMedium: 'rgba(245, 245, 245, 0.66)',
+  textWeak: 'rgba(245, 245, 245, 0.42)',
+  hover: 'rgba(255, 255, 255, 0.06)',
+  pressed: 'rgba(255, 255, 255, 0.1)',
+  ink: '#f5f5f5',
+  inkFg: '#0b0b0b',
+  bubble: '#222222',
+  bubbleText: '#f5f5f5',
+  inlineCode: 'rgba(255, 255, 255, 0.09)',
+  accent: '#93b4ff',
+  focus: 'rgba(147, 180, 255, 0.55)',
   danger: '#ff6b63',
   warning: '#e0a33a',
-  ok: '#4fc98a',
+  ok: '#4ade80',
   radiusBubble: 16,
   radiusCard: 24,
   radiusPill: 999,

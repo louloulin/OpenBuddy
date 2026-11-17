@@ -20,7 +20,6 @@ import {
   nextTip,
 } from '../core/loading'
 import { themeFor } from '../theme'
-import { SparkIcon } from './icons'
 
 /** A band of light travelling across the label. */
 function useShine() {
@@ -70,22 +69,8 @@ export function LoadingRow({ compact = false }: { compact?: boolean }) {
 
   return (
     <View style={{ paddingHorizontal: theme.gutter, paddingVertical: 8 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-        <View
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: 12,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: theme.ink,
-          }}
-        >
-          <SparkIcon size={14} color={theme.inkFg} />
-        </View>
-        <Text style={{ color: theme.text, fontSize: theme.fontMeta, fontWeight: '500' }}>OpenBuddy</Text>
-      </View>
-
+      {/* Grok-style wait: no avatar row, just the phase shimmer. The reply that
+          follows carries the OpenBuddy label once there is text to label. */}
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
         <Animated.Text
           style={{
