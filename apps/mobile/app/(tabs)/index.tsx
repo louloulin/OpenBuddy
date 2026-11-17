@@ -17,7 +17,8 @@ import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Banner } from '../../src/components/Banner'
-import { ChatIcon, PlusIcon } from '../../src/components/icons'
+import { ChatIcon, CheckIcon, PlusIcon } from '../../src/components/icons'
+import { batchSummary, toggleSelection } from '../../src/core/batch'
 import { canRun } from '../../src/core/surface'
 import {
   archivedCount, cleanSessionTitle, groupSessions, MAX_TITLE_LENGTH, sessionActions,
@@ -48,6 +49,8 @@ export default function SessionsScreen() {
   const renameSession = useApp(state => state.renameSession)
   const setSessionArchived = useApp(state => state.setSessionArchived)
   const deleteSession = useApp(state => state.deleteSession)
+  const archiveSessions = useApp(state => state.archiveSessions)
+  const deleteSessions = useApp(state => state.deleteSessions)
   const workspaces = useApp(state => state.workspaces)
   const refreshWorkspaces = useApp(state => state.refreshWorkspaces)
   const forkSession = useApp(state => state.forkSession)
@@ -67,6 +70,9 @@ export default function SessionsScreen() {
   const [menu, setMenu] = useState<CachedSession | null>(null)
   const [renaming, setRenaming] = useState<CachedSession | null>(null)
   const [renameText, setRenameText] = useState('')
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState<string[]>([])
+  const [batchNote, setBatchNote] = useState<string | null>(null)
 
   // A new task starts on the computer: the phone asks it for the working
   // directory and opens the session it creates.
@@ -179,7 +185,40 @@ export default function SessionsScreen() {
     void renameSession(renaming.id, clean)
   }
 
+  const leaveSelectMode = () => {
+    setSelectMode(false)
+    setSelected([])
+  }
+
+  const runBatch = async (kind: 'archive' | 'delete') => {
+    if (!selected.length) return
+    const ids = [...selected]
+    const outcome = kind === 'archive' ? await archiveSessions(ids, true) : await deleteSessions(ids)
+    setBatchNote(batchSummary(kind === 'archive' ? '已归档' : '已删除', outcome))
+    leaveSelectMode()
+  }
+
+  // Alert buttons are ignored on the web build, so the browser path runs the
+  // action directly; native keeps the destructive confirmation.
+  const confirmBatchDelete = () => {
+    if (!selected.length) return
+    if (Platform.OS === 'web') {
+      void runBatch('delete')
+      return
+    }
+    Alert.alert(
+      '删除选中的会话？',
+      `${selected.length} 个会话会从电脑和手机上一起移除，无法撤销。`,
+      [
+        { text: '取消', style: 'cancel' },
+        { text: '删除', style: 'destructive', onPress: () => { void runBatch('delete') } },
+      ],
+    )
+  }
+
   const canCreate = canRun(capabilities, 'agent_new_session') && canRun(capabilities, 'agent_init')
+  const canArchiveBatch = canRun(capabilities, 'agent_set_session_archived')
+  const canDeleteBatch = canRun(capabilities, 'agent_delete_session')
 
   const renderItem = useCallback(({ item }: { item: SessionRow }) => {
     if (item.kind === 'label') {
@@ -190,13 +229,17 @@ export default function SessionsScreen() {
       )
     }
     const session = item.session
+    const isSelected = selectMode && selected.includes(item.id)
     return (
     <Pressable
-      onPress={() => router.push(`/chat/${encodeURIComponent(item.id)}`)}
-      onLongPress={manageable ? () => setMenu(session) : undefined}
+      onPress={() => {
+        if (selectMode) setSelected(list => toggleSelection(list, item.id))
+        else router.push(`/chat/${encodeURIComponent(item.id)}`)
+      }}
+      onLongPress={manageable && !selectMode ? () => setMenu(session) : undefined}
       delayLongPress={350}
       style={({ pressed }) => ({
-        backgroundColor: pressed ? theme.hover : theme.surface,
+        backgroundColor: isSelected ? theme.pressed : pressed ? theme.hover : theme.surface,
         paddingHorizontal: theme.gutter,
         paddingVertical: 13,
         borderBottomWidth: theme.hairline,
@@ -204,6 +247,20 @@ export default function SessionsScreen() {
       })}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {selectMode ? (
+          <View style={{
+            width: 19,
+            height: 19,
+            borderRadius: 10,
+            borderWidth: theme.hairline,
+            borderColor: isSelected ? theme.ink : theme.cardBorder,
+            backgroundColor: isSelected ? theme.ink : 'transparent',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            {isSelected ? <CheckIcon size={12} color={theme.inkFg} strokeWidth={2.6} /> : null}
+          </View>
+        ) : null}
         <Text numberOfLines={1} style={{ flex: 1, color: theme.text, fontSize: 15, fontWeight: '500' }}>
           {session.title}
         </Text>
@@ -239,7 +296,7 @@ export default function SessionsScreen() {
       ) : null}
     </Pressable>
     )
-  }, [theme, router, manageable, setMenu])
+  }, [theme, router, manageable, setMenu, selectMode, selected])
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.surface }}>
@@ -254,6 +311,21 @@ export default function SessionsScreen() {
         <Text style={{ marginLeft: 'auto', marginBottom: 4, color: theme.textWeak, fontSize: 12 }}>
           {connection === 'open' ? '电脑在线' : connection === 'connecting' ? '连接中' : '已断开'}
         </Text>
+        {canArchiveBatch || canDeleteBatch ? (
+          <Pressable
+            onPress={() => {
+              setSelectMode(value => !value)
+              setSelected([])
+              setBatchNote(null)
+            }}
+            hitSlop={10}
+            style={{ marginLeft: 12, marginBottom: 2 }}
+          >
+            <Text style={{ color: theme.textMedium, fontSize: 13, fontWeight: '600' }}>
+              {selectMode ? '取消' : '选择'}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
       <Banner />
       {canCreate ? (
@@ -282,6 +354,11 @@ export default function SessionsScreen() {
           </Text>
           <Text style={{ flex: 1, color: theme.textWeak, fontSize: 12, textAlign: 'right' }}>在电脑上执行</Text>
         </Pressable>
+      ) : null}
+      {batchNote ? (
+        <Text style={{ marginHorizontal: theme.gutter, marginTop: 8, color: theme.textWeak, fontSize: 12 }}>
+          {batchNote}
+        </Text>
       ) : null}
       {archived > 0 ? (
         <Pressable
@@ -338,6 +415,58 @@ export default function SessionsScreen() {
           )}
         />
       )}
+
+      {/* Multi-select bar: one desktop call per row, failures summarised. */}
+      {selectMode ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            borderTopWidth: theme.hairline,
+            borderTopColor: theme.cardBorder,
+            backgroundColor: theme.card,
+            paddingHorizontal: theme.gutter,
+            paddingVertical: 10,
+          }}
+        >
+          <Text style={{ flex: 1, color: theme.textMedium, fontSize: 13 }}>已选 {selected.length} 个</Text>
+          {canArchiveBatch ? (
+            <Pressable
+              disabled={selected.length === 0}
+              onPress={() => void runBatch('archive')}
+              style={({ pressed }) => ({
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                borderRadius: theme.radiusPill,
+                backgroundColor: pressed ? theme.pressed : theme.surface,
+                borderWidth: theme.hairline,
+                borderColor: theme.cardBorder,
+                opacity: selected.length ? 1 : 0.45,
+              })}
+            >
+              <Text style={{ color: theme.text, fontSize: 13, fontWeight: '600' }}>归档</Text>
+            </Pressable>
+          ) : null}
+          {canDeleteBatch ? (
+            <Pressable
+              disabled={selected.length === 0}
+              onPress={confirmBatchDelete}
+              style={({ pressed }) => ({
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                borderRadius: theme.radiusPill,
+                backgroundColor: pressed ? theme.pressed : theme.surface,
+                borderWidth: theme.hairline,
+                borderColor: theme.cardBorder,
+                opacity: selected.length ? 1 : 0.45,
+              })}
+            >
+              <Text style={{ color: theme.danger, fontSize: 13, fontWeight: '600' }}>删除</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       {/* Long-press menu: the desktop sidebar's actions, in the same order. */}
       <Modal visible={menu !== null} transparent animationType="fade" onRequestClose={() => setMenu(null)}>

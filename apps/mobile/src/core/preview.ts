@@ -200,6 +200,7 @@ export function previewState(): PreviewState {
       'experts_load', 'experts_list_roots', 'agent_session_usage',
       'agent_init', 'agent_set_session_pinned', 'agent_rename_session',
       'agent_set_session_archived', 'agent_delete_session', 'agent_tree',
+      'agent_export_jsonl',
       'rewind_points', 'rewind_execute', 'agent_navigate', 'checkpoint_list', 'checkpoint_restore',
     ],
     events: ['agent://event', 'agent://permission', 'agent://update'],

@@ -32,6 +32,8 @@ import {
   checkNewSession, workspaceChoices, type InitAnswer, type WorkspaceChoice, type WorkspaceInfo,
 } from '../core/new-session'
 import { cleanSessionTitle } from '../core/session-actions'
+import { exportFilename, isTruncatedRead, jsonlEntryCount, MAX_EXPORT_BYTES } from '../core/export'
+import type { BatchOutcome } from '../core/batch'
 import { bumpUnread, clearUnread, shouldMarkUnread } from '../core/unread'
 import {
   LOCK_KEY, lockUnavailableReason, parseLockSetting, serializeLockSetting, shouldRelock,
@@ -109,6 +111,8 @@ type AppState = {
   forkSession: (sessionId: string) => Promise<string | null>
   handoffSession: (sessionId: string, goal: string) => Promise<{ sessionId: string; prompt: string } | null>
   compactSession: (sessionId: string, instructions?: string) => Promise<void>
+  /** Pulls the JSONL the desktop exported, for the share sheet. */
+  exportSession: (sessionId: string) => Promise<{ filename: string; content: string; entries: number }>
   send: (sessionId: string, text: string, attachments?: { path: string }[]) => Promise<void>
   /** Interrupts the running turn with new instructions. */
   steer: (sessionId: string, text: string) => Promise<void>
@@ -130,6 +134,9 @@ type AppState = {
   renameSession: (sessionId: string, title: string) => Promise<void>
   setSessionArchived: (sessionId: string, archived: boolean) => Promise<void>
   deleteSession: (sessionId: string) => Promise<void>
+  /** Multi-select: one desktop call per session, failures kept per item. */
+  archiveSessions: (sessionIds: string[], archived: boolean) => Promise<BatchOutcome>
+  deleteSessions: (sessionIds: string[]) => Promise<BatchOutcome>
   markNotificationsRead: () => Promise<void>
   dismissError: () => void
   lockAvailability: () => Promise<LockAvailability>
@@ -399,6 +406,22 @@ export const useApp = create<AppState>((set, get) => ({
     } catch (error) {
       set({ error: errorText(error) })
     }
+  },
+
+  /**
+   * The desktop writes the file (it owns the transcript); the phone reads it
+   * back as text. A read that hit the host's 16MB cap is refused rather than
+   * shared as a silently broken export.
+   */
+  async exportSession(sessionId) {
+    const transport = get().transport
+    if (!transport) throw new Error('电脑未连接')
+    const path = await transport.invoke<string>('agent_export_jsonl', { sessionId })
+    if (typeof path !== 'string' || !path) throw new Error('桌面没有返回导出路径')
+    const content = await transport.invoke<string>('read_text_file', { path, maxBytes: MAX_EXPORT_BYTES })
+    if (isTruncatedRead(content)) throw new Error('会话超过 16MB，请在电脑上导出。')
+    const title = get().sessions.find(session => session.id === sessionId)?.title ?? ''
+    return { filename: exportFilename(title, sessionId), content, entries: jsonlEntryCount(content) }
   },
 
   setDraft(sessionId, text) {
@@ -722,6 +745,50 @@ export const useApp = create<AppState>((set, get) => ({
     }
   },
 
+  /** Batch archive: sequential so one refusal cannot strand the rest. */
+  async archiveSessions(sessionIds, archived) {
+    const transport = get().transport
+    const outcome: BatchOutcome = { ok: [], failed: [] }
+    if (!transport) {
+      return { ok: [], failed: sessionIds.map(id => ({ id, reason: '电脑未连接' })) }
+    }
+    for (const sessionId of sessionIds) {
+      try {
+        await transport.invoke('agent_set_session_archived', { sessionId, archived })
+        await patchSession(get, set, sessionId, { archived })
+        outcome.ok.push(sessionId)
+      } catch (error) {
+        outcome.failed.push({ id: sessionId, reason: errorText(error) })
+      }
+    }
+    return outcome
+  },
+
+  /** Batch delete: local cache is forgotten only for the ids the desktop accepted. */
+  async deleteSessions(sessionIds) {
+    const transport = get().transport
+    const outcome: BatchOutcome = { ok: [], failed: [] }
+    if (!transport) {
+      return { ok: [], failed: sessionIds.map(id => ({ id, reason: '电脑未连接' })) }
+    }
+    for (const sessionId of sessionIds) {
+      try {
+        await transport.invoke('agent_delete_session', { sessionId })
+        forgetSessionLocal(set, sessionId)
+        outcome.ok.push(sessionId)
+      } catch (error) {
+        outcome.failed.push({ id: sessionId, reason: errorText(error) })
+      }
+    }
+    if (outcome.ok.length) {
+      await Promise.all([
+        cacheSessions(get().sessions).catch(() => {}),
+        ...outcome.ok.map(id => forgetCachedSession(id).catch(() => {})),
+      ])
+    }
+    return outcome
+  },
+
   async markNotificationsRead() {
     const transport = get().transport
     set(state => ({ notifications: state.notifications.map(item => ({ ...item, read: true })) }))
@@ -824,6 +891,22 @@ async function patchSession(
   const sessions = get().sessions.map(session => session.id === sessionId ? { ...session, ...patch } : session)
   set({ sessions })
   await cacheSessions(sessions).catch(() => {})
+}
+
+/** Drops a confirmed-deleted session from memory (the cache write is batched). */
+function forgetSessionLocal(
+  set: (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void,
+  sessionId: string,
+): void {
+  set(state => {
+    const transcripts = { ...state.transcripts }
+    delete transcripts[sessionId]
+    return {
+      sessions: state.sessions.filter(session => session.id !== sessionId),
+      transcripts,
+      awaiting: state.awaiting.filter(id => id !== sessionId),
+    }
+  })
 }
 
 type SetState = (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void

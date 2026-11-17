@@ -25,6 +25,7 @@ import {
   type ThinkingLevel,
 } from '../../src/core/session-panel'
 import { isPreview, previewState } from '../../src/core/preview'
+import { shareTextFile } from '../../src/native/share'
 import { useApp } from '../../src/stores/app'
 import { themeFor, type Theme } from '../../src/theme'
 
@@ -88,6 +89,7 @@ export default function SessionPanelScreen() {
   const sessionId = decodeURIComponent(params.sessionId ?? '')
 
   const transport = useApp(state => state.transport)
+  const exportSession = useApp(state => state.exportSession)
   const session = useApp(state => state.sessions.find(item => item.id === sessionId))
   const capabilities = useApp(state => state.capabilities)
   const permissionMode = useApp(state => state.permissionMode)
@@ -98,6 +100,8 @@ export default function SessionPanelScreen() {
   const [artifacts, setArtifacts] = useState<ArtifactEntry[]>([])
   const [usage, setUsage] = useState<string | undefined>()
   const [busy, setBusy] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportNote, setExportNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -164,8 +168,36 @@ export default function SessionPanelScreen() {
     }
   }
 
+  // The desktop writes the JSONL, the phone fetches it back as text and hands
+  // it to the OS share sheet. A truncated read would produce a broken export,
+  // so an over-16MB session is refused with a pointer to the desktop.
+  const runExport = async () => {
+    if (isPreview()) {
+      setExportNote('演示：桌面写入 JSONL 后交给系统分享')
+      return
+    }
+    if (exporting) return
+    setExporting(true)
+    setError(null)
+    setExportNote(null)
+    try {
+      const { filename, content, entries } = await exportSession(sessionId)
+      const result = await shareTextFile(filename, content)
+      setExportNote(
+        result === 'downloaded' ? `已下载 ${entries} 条记录`
+          : result === 'shared' ? '已打开分享面板'
+            : '这台设备不支持文件分享',
+      )
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const canSetExpert = Boolean(capabilities?.commands.includes('agent_set_session_expert'))
   const canSetThinking = Boolean(capabilities?.commands.includes('agent_set_thinking_level'))
+  const canExport = Boolean(capabilities?.commands.includes('agent_export_jsonl'))
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.surface }}>
@@ -286,6 +318,14 @@ export default function SessionPanelScreen() {
       </Section>
 
       <Section theme={theme} label="资料">
+        {canExport ? (
+          <Row
+            theme={theme}
+            label="导出会话"
+            value={exporting ? '导出中…' : 'JSONL'}
+            onPress={exporting ? undefined : () => void runExport()}
+          />
+        ) : null}
         <Row
           theme={theme}
           label="电脑上的文件"
@@ -299,6 +339,11 @@ export default function SessionPanelScreen() {
           onPress={() => router.push(`/branches/${encodeURIComponent(sessionId)}`)}
           last
         />
+        {exportNote ? (
+          <View style={{ paddingHorizontal: 14, paddingVertical: 10 }}>
+            <Text style={{ color: theme.textWeak, fontSize: 12 }}>{exportNote}</Text>
+          </View>
+        ) : null}
       </Section>
 
       {busy ? (

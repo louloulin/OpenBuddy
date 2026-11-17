@@ -195,6 +195,18 @@ const dispatcher: HostDispatcher = {
         if (index >= 0) SESSIONS.splice(index, 1)
         return { ok: true }
       }
+      case 'agent_export_jsonl':
+        return '/tmp/openbuddy-preview-export.jsonl'
+      case 'read_text_file': {
+        if (payload.path !== '/tmp/openbuddy-preview-export.jsonl') {
+          throw new Error(`preview has no file ${String(payload.path)}`)
+        }
+        return [
+          '{"type":"session","version":3,"id":"sess-mobile"}',
+          '{"type":"message","role":"user","content":"手机端现在能直接用了？"}',
+          '{"type":"message","role":"assistant","content":"可以。手机通过网关隧道连到这台电脑。"}',
+        ].join('\n') + '\n'
+      }
       case 'agent_fork_session':
         return 'sess-fork'
       case 'agent_handoff':
@@ -223,6 +235,7 @@ const dispatcher: HostDispatcher = {
     'agent_resolve_ui', 'folder_trust_respond', 'tasks_list', 'task_kill', 'permission_mode_get',
     'agent_init', 'agent_new_session', 'agent_list_workspaces', 'agent_fork_session', 'agent_handoff', 'agent_compact',
     'agent_set_session_pinned', 'agent_rename_session', 'agent_set_session_archived', 'agent_delete_session',
+    'agent_export_jsonl', 'read_text_file',
     'session_search', 'notification_list',
   ],
 }

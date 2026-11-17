@@ -39,6 +39,10 @@ import { bumpUnread, shouldMarkUnread, totalUnread } from '../apps/mobile/src/co
 import { parseLockSetting, shouldRelock } from '../apps/mobile/src/core/app-lock.js'
 import { parseSpeakSetting, serializeSpeakSetting, shouldSpeak, speakableText } from '../apps/mobile/src/core/speech.js'
 import { followUpsFor } from '../apps/mobile/src/core/follow-ups.js'
+import { dispositionFor } from '../apps/mobile/src/core/turn-input.js'
+import { workspaceChoices } from '../apps/mobile/src/core/new-session.js'
+import { exportFilename, isTruncatedRead, jsonlEntryCount, MAX_EXPORT_BYTES } from '../apps/mobile/src/core/export.js'
+import { batchSummary, toggleSelection } from '../apps/mobile/src/core/batch.js'
 
 let failures = 0
 function check(name: string, condition: boolean, detail = ''): void {
@@ -51,7 +55,10 @@ function check(name: string, condition: boolean, detail = ''): void {
 
 const engineListeners = new Set<(event: string, payload: unknown) => void>()
 const sentAttachments: { text: string; attachments: unknown[] }[] = []
-const resolved: { requestId: string; decision?: unknown }[] = []
+const resolved: { requestId: string; optionId?: unknown; reason?: unknown }[] = []
+const uiAnswers: { requestId: string; sessionId?: unknown; value?: unknown; cancelled?: unknown }[] = []
+const trustAnswers: { cwd: string; trusted: unknown }[] = []
+const killedTasks: string[] = []
 const savedMemory: { scope: string; path: string; content: string }[] = []
 const navigated: string[] = []
 const rewound: string[] = []
@@ -59,6 +66,7 @@ const restoredFiles: { path: string; hash: string | null }[] = []
 const newSessionCalls: unknown[] = []
 const sessionMeta: { op: string; sessionId: string; value: unknown }[] = []
 const deletedSessions: string[] = []
+const turnQueue = { steering: [] as string[], followUp: [] as string[] }
 const BRANCH_TREE = {
   sessionId: 'sess-1',
   leafId: 'leaf-2',
@@ -104,6 +112,22 @@ const dispatcher: HostDispatcher = {
       case 'agent_delete_session':
         deletedSessions.push(String(payload.sessionId))
         return { deleted: true }
+      case 'agent_get_queue':
+        return { steering: [...turnQueue.steering], followUp: [...turnQueue.followUp] }
+      case 'agent_follow_up':
+        turnQueue.followUp.push(String(payload.text))
+        return { steering: [...turnQueue.steering], followUp: [...turnQueue.followUp] }
+      case 'agent_steer':
+        turnQueue.steering.push(String(payload.text))
+        return { steering: [...turnQueue.steering], followUp: [...turnQueue.followUp] }
+      case 'agent_set_queue':
+        turnQueue.steering = Array.isArray(payload.steering) ? payload.steering.map(String) : []
+        turnQueue.followUp = Array.isArray(payload.followUp) ? payload.followUp.map(String) : []
+        return { steering: [...turnQueue.steering], followUp: [...turnQueue.followUp] }
+      case 'agent_clear_queue':
+        turnQueue.steering = []
+        turnQueue.followUp = []
+        return { steering: [], followUp: [] }
       case 'agent_load_session':
         return { updates: [] }
       case 'agent_send':
@@ -121,8 +145,49 @@ const dispatcher: HostDispatcher = {
         }, 20)
         return { promptId: 'p1' }
       case 'agent_resolve_permission':
-        resolved.push({ requestId: String(payload.requestId ?? ''), decision: payload.decision })
+        resolved.push({ requestId: String(payload.requestId ?? ''), optionId: payload.optionId, reason: payload.reason })
         return { resolved: true }
+      case 'agent_resolve_ui':
+        uiAnswers.push({
+          requestId: String(payload.requestId ?? ''),
+          sessionId: payload.sessionId,
+          value: payload.value,
+          cancelled: payload.cancelled,
+        })
+        return { resolved: true }
+      case 'folder_trust_respond':
+        trustAnswers.push({ cwd: String(payload.cwd ?? ''), trusted: payload.trusted })
+        return { trusted: payload.trusted }
+      case 'tasks_list':
+        return [
+          { id: 'sess-1', kind: 'bash', title: '跑测试', startedAt: Date.now() - 5_000, pending: 1, sessionId: 'sess-1' },
+          { id: 'sess-2', kind: 'task', title: '另一个会话', startedAt: Date.now() - 9_000, sessionId: 'sess-2' },
+        ]
+      case 'task_kill':
+        killedTasks.push(String(payload.taskId ?? ''))
+        return { killed: true }
+      case 'permission_mode_get':
+        return 'ask'
+      case 'agent_list_workspaces':
+        return [
+          { cwd: '/e2e/workspace', sessionCount: 3, lastTitle: 'App E2E session' },
+          { cwd: '/e2e/other', sessionCount: 1 },
+        ]
+      case 'agent_fork_session':
+        sessionMeta.push({ op: 'fork', sessionId: String(payload.sessionId), value: true })
+        return 'sess-fork'
+      case 'agent_handoff':
+        sessionMeta.push({ op: 'handoff', sessionId: String(payload.sessionId), value: payload.goal })
+        return { sessionId: 'sess-handoff', prompt: '## 背景接手', from: { sessionId: payload.sessionId } }
+      case 'agent_compact':
+        sessionMeta.push({ op: 'compact', sessionId: String(payload.sessionId), value: payload.instructions })
+        return { tokensBefore: 1000, tokensAfter: 400 }
+      case 'agent_export_jsonl':
+        sessionMeta.push({ op: 'export', sessionId: String(payload.sessionId), value: true })
+        return '/e2e/export.jsonl'
+      case 'read_text_file':
+        if (payload.path !== '/e2e/export.jsonl') throw new Error(`no such file ${String(payload.path)}`)
+        return '{"type":"session"}\n{"type":"message"}\n'
       case 'memory_list':
         return [
           { scope: 'global', path: 'MEMORY.md', content: '# 偏好\n\n- 回答用中文', size: 24 },
@@ -167,6 +232,10 @@ const dispatcher: HostDispatcher = {
     'agent_tree', 'rewind_points', 'rewind_execute', 'agent_navigate', 'checkpoint_list', 'checkpoint_restore',
     'agent_init', 'agent_new_session',
     'agent_set_session_pinned', 'agent_rename_session', 'agent_set_session_archived', 'agent_delete_session',
+    'agent_get_queue', 'agent_follow_up', 'agent_steer', 'agent_set_queue', 'agent_clear_queue',
+    'agent_cancel', 'agent_resolve_ui', 'folder_trust_respond', 'tasks_list', 'task_kill', 'permission_mode_get',
+    'agent_list_workspaces', 'agent_fork_session', 'agent_handoff', 'agent_compact',
+    'agent_export_jsonl', 'read_text_file',
     'window_minimize', // must be filtered off the mobile surface
   ],
 }
@@ -330,8 +399,25 @@ unlisten()
 
 // ── 8. Approval resolve (the approve scope path) ───────────────────────────
 
-await transport.invoke('agent_resolve_permission', { requestId: 'req-1', decision: 'allow' })
-check('approval resolves through the tunnel', resolved.some(entry => entry.requestId === 'req-1' && entry.decision === 'allow'))
+await transport.invoke('agent_resolve_permission', { requestId: 'req-1', optionId: 'allow', cancelled: false })
+check('approval resolves through the tunnel', resolved.some(entry => entry.requestId === 'req-1' && entry.optionId === 'allow'))
+
+// ── 8a. Question / folder trust / tasks (v3 阶段 B) ────────────────────────
+
+await transport.invoke('agent_resolve_ui', { requestId: 'q-1', sessionId: 'sess-1', value: 'One' })
+check('a UI question answer reaches the desktop', uiAnswers.some(entry => entry.requestId === 'q-1' && entry.value === 'One'))
+
+await transport.invoke('folder_trust_respond', { cwd: '/e2e/workspace', trusted: true })
+check('folder trust reaches the desktop', trustAnswers.some(entry => entry.cwd === '/e2e/workspace' && entry.trusted === true))
+
+const runningTasks = await transport.invoke<Array<{ id: string; sessionId?: string }>>('tasks_list', {})
+check('running tasks arrive over the tunnel', Array.isArray(runningTasks) && runningTasks.length === 2)
+
+await transport.invoke('task_kill', { taskId: 'sess-1' })
+check('killing a task reaches the desktop', killedTasks.includes('sess-1'))
+
+const mode = await transport.invoke<unknown>('permission_mode_get', {})
+check('permission mode is readable', mode === 'ask')
 
 // ── 8b. Memory notes: list → group → edit → save back to the desktop ───────
 
@@ -432,6 +518,58 @@ check('the speak setting round-trips', parseSpeakSetting(serializeSpeakSetting(t
 check('code answers offer code follow-ups', followUpsFor('```ts\nconst a = 1\n```')[0] === '解释这段代码')
 check('risk answers offer risk follow-ups', followUpsFor('最大的风险是回滚很难。')[0] === '展开风险')
 check('plain answers fall back to three generic chips', followUpsFor('可以。').join(',') === '展开细节,给出例子,总结成要点')
+
+// ── 8j. Busy-turn input: queue by default, steer on request ────────────────
+
+check('busy turns queue the message by default', dispositionFor(true) === 'follow_up')
+check('explicit steer bypasses the queue', dispositionFor(true, true) === 'steer')
+check('idle turns send immediately', dispositionFor(false) === 'send')
+
+await transport.invoke('agent_follow_up', { sessionId: 'sess-1', text: '排队一' })
+const queued = await transport.invoke<{ followUp: string[] }>('agent_get_queue', { sessionId: 'sess-1' })
+check('a queued prompt is visible in the desktop queue', queued.followUp.includes('排队一'))
+
+await transport.invoke('agent_steer', { sessionId: 'sess-1', text: '改方向' })
+await transport.invoke('agent_set_queue', { sessionId: 'sess-1', steering: [], followUp: [] })
+const drained = await transport.invoke<{ steering: string[]; followUp: string[] }>('agent_get_queue', { sessionId: 'sess-1' })
+check('withdrawing a queue item reaches the desktop', drained.steering.length === 0 && drained.followUp.length === 0)
+
+// ── 8k. Workspaces, fork, handoff, compact (v3 阶段 C) ─────────────────────
+
+const workspaces = await transport.invoke<Array<{ cwd: string; sessionCount?: number }>>('agent_list_workspaces', {})
+check('the desktop lists workspaces', Array.isArray(workspaces) && workspaces[0]?.cwd === '/e2e/workspace')
+check('workspace choices put the current directory first', workspaceChoices('/e2e/workspace', workspaces)[0]?.detail === '桌面当前目录')
+
+const forked = await transport.invoke<string>('agent_fork_session', { sessionId: 'sess-1' })
+check('forking reaches the desktop', forked === 'sess-fork' && sessionMeta.some(item => item.op === 'fork'))
+
+const handed = await transport.invoke<{ sessionId: string; prompt: string }>('agent_handoff', { sessionId: 'sess-1', goal: '继续压测' })
+check('handoff returns a new session and a draft', handed.sessionId === 'sess-handoff' && handed.prompt.length > 0)
+
+await transport.invoke('agent_compact', { sessionId: 'sess-1' })
+check('compacting reaches the desktop', sessionMeta.some(item => item.op === 'compact' && item.sessionId === 'sess-1'))
+
+// ── 8l. Export and multi-select (v3 C2/C4) ────────────────────────────────
+
+const exportPath = await transport.invoke<string>('agent_export_jsonl', { sessionId: 'sess-1' })
+const exportText = await transport.invoke<string>('read_text_file', { path: exportPath, maxBytes: MAX_EXPORT_BYTES })
+check('the desktop writes the session JSONL', exportPath === '/e2e/export.jsonl' && sessionMeta.some(item => item.op === 'export'))
+check('the export reads back as shareable text', !isTruncatedRead(exportText) && jsonlEntryCount(exportText) === 2)
+check('the share filename carries the title and stamp',
+  exportFilename('手机端接入设计', 'sess-1', new Date(2026, 10, 17, 9, 5)) === 'openbuddy-手机端接入设计-20261117-0905.jsonl')
+
+await transport.invoke('agent_set_session_archived', { sessionId: 'sess-2', archived: true })
+await transport.invoke('agent_set_session_archived', { sessionId: 'sess-3', archived: true })
+check('batch archive reaches every session',
+  ['sess-2', 'sess-3'].every(id => sessionMeta.some(item => item.op === 'archive' && item.sessionId === id && item.value === true)))
+
+await transport.invoke('agent_delete_session', { sessionId: 'sess-2' })
+await transport.invoke('agent_delete_session', { sessionId: 'sess-3' })
+check('batch delete reaches every session',
+  ['sess-2', 'sess-3'].every(id => deletedSessions.includes(id)))
+check('selection toggles without duplicates', toggleSelection(['a', 'b'], 'a').join(',') === 'b')
+check('batch summary keeps the failure count', batchSummary('已删除', { ok: ['a'], failed: [{ id: 'b', reason: 'x' }] }) === '已删除 1 个，1 个失败')
+check('unknown capabilities keep every tab mounted', Object.values(visibleTabs(null)).every(Boolean))
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 
