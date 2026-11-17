@@ -24,8 +24,9 @@ export function isPairCode(value: unknown): value is string {
  * Normalises a user-typed gateway address.
  *
  * People type `192.168.1.4:8787` or `https://host/`, so: assume https unless a
- * scheme is given, drop a trailing slash and any path — the gateway is an
- * origin, not a route.
+ * scheme is given, drop a trailing slash, and keep a base path when the gateway
+ * is mounted under one (`https://host/openbuddy`). Query and fragment are
+ * dropped: they never belong to the address the phone saves.
  */
 export function normalizeGatewayUrl(input: string): string | null {
   const raw = input.trim()
@@ -39,7 +40,14 @@ export function normalizeGatewayUrl(input: string): string | null {
   }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') return null
   if (!url.hostname) return null
-  return `${url.protocol}//${url.host}`
+  const path = url.pathname.replace(/\/+$/, '')
+  return `${url.protocol}//${url.host}${path}`
+}
+
+/** The QR carries `<gateway>/pair`; the stored address is the gateway itself. */
+function gatewayFromPayload(value: string): string | null {
+  const normalized = normalizeGatewayUrl(value)
+  return normalized ? normalized.replace(/\/pair$/, '') : null
 }
 
 /** Double-encodes nothing: reads the QR text the desktop renders. */
@@ -64,7 +72,7 @@ export function parsePairQr(text: string): PairPayload | null {
       const gateway = typeof body.gatewayUrl === 'string' ? body.gatewayUrl
         : typeof body.gateway === 'string' ? body.gateway : null
       if (!gateway || !isPairCode(body.code)) return null
-      const gatewayUrl = normalizeGatewayUrl(gateway)
+      const gatewayUrl = gatewayFromPayload(gateway)
       return gatewayUrl ? { gatewayUrl, code: String(body.code).trim() } : null
     } catch {
       return null
@@ -78,6 +86,6 @@ export function parsePairQr(text: string): PairPayload | null {
   const gateway = params.get('gateway') ?? params.get('gatewayUrl')
   const code = params.get('code')
   if (!gateway || !isPairCode(code)) return null
-  const gatewayUrl = normalizeGatewayUrl(gateway)
+  const gatewayUrl = gatewayFromPayload(gateway)
   return gatewayUrl ? { gatewayUrl, code: code.trim() } : null
 }

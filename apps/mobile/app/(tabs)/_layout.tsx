@@ -12,6 +12,7 @@ import { useColorScheme } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { visibleTabs } from '../../src/core/surface'
+import { totalUnread } from '../../src/core/unread'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
 import { BellIcon, ChatIcon, ClockIcon, PersonIcon, SearchIcon } from '../../src/components/icons'
@@ -21,6 +22,7 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets()
   const capabilities = useApp(state => state.capabilities)
   const unread = useApp(state => state.notifications.filter(item => !item.read).length)
+  const unreadSessions = useApp(state => totalUnread(state.sessions))
   const tabs = visibleTabs(capabilities)
 
   return (
@@ -54,6 +56,8 @@ export default function TabsLayout() {
         options={{
           title: '会话',
           href: tabs.sessions === false ? null : undefined,
+          tabBarBadge: unreadSessions > 0 ? unreadSessions : undefined,
+          tabBarBadgeStyle: { backgroundColor: theme.ink, color: theme.inkFg, fontSize: 10 },
           tabBarIcon: ({ color }) => <ChatIcon size={22} color={color} />,
         }}
       />

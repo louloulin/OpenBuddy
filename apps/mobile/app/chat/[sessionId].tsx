@@ -33,6 +33,7 @@ export default function ChatScreen() {
   const transcript = useApp(state => state.transcripts[sessionId]) ?? emptyTranscript()
   const session = useApp(state => state.sessions.find(item => item.id === sessionId))
   const openSession = useApp(state => state.openSession)
+  const setActiveSession = useApp(state => state.setActiveSession)
   const send = useApp(state => state.send)
   const sendImage = useApp(state => state.sendImage)
   const sendImages = useApp(state => state.sendImages)
@@ -44,6 +45,13 @@ export default function ChatScreen() {
   useEffect(() => {
     if (sessionId) void openSession(sessionId)
   }, [sessionId, openSession])
+
+  // While this screen is mounted its settles are read, not counted.
+  useEffect(() => {
+    if (!sessionId) return
+    setActiveSession(sessionId)
+    return () => setActiveSession(null)
+  }, [sessionId, setActiveSession])
 
   // Approvals sit inline at the newest end, the way the desktop puts a
   // permission dialog inside the conversation rather than over it.

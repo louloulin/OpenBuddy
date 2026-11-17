@@ -105,7 +105,52 @@ OPENBUDDY_E2E_GATEWAY='{"url":"https://gw.example.com","adminToken":"…","agent
   node scripts/run-desktop-bridge-e2e.mjs
 ```
 
-## 7. 排错
+## 7. 实机部署记录（145 机器，2026-11-17）
+
+145 机器上已有一台 lumos 网关占用 `ai.loulou.world:8787`，且云安全组只放行 80/8787，
+没有 443。新网关因此与它**共用 8787 TLS 入口，用路径前缀区分**：
+
+- 公网地址：`https://ai.loulou.world:8787/openbuddy`
+- 反向代理：Caddy `handle_path /openbuddy/*` → `127.0.0.1:18788`（去前缀）
+- 进程：systemd `openbuddy-gateway.service`（Bun 1.4.4）
+- 源码：`/opt/openbuddy-gateway/app`，数据库 `/opt/openbuddy-gateway/data/gateway.sqlite`
+- 环境：`/opt/openbuddy-gateway/gateway.env`（600；admin/agent token 随机生成）
+
+`gateway.env` 关键项：
+
+```bash
+GATEWAY_HOST=127.0.0.1
+GATEWAY_PORT=18788
+GATEWAY_DB=/opt/openbuddy-gateway/data/gateway.sqlite
+GATEWAY_PUBLIC_URL=https://ai.loulou.world:8787/openbuddy
+GATEWAY_H5=0
+GATEWAY_ADMIN_UI=0
+GATEWAY_TRUST_PROXY=1
+GATEWAY_PAIR_ALLOW_SHARED=1   # 单桌面 + 多手机
+```
+
+桌面与手机都填同一个基路径地址（`GATEWAY_PUBLIC_URL` / 配对页的网关地址）：
+
+```bash
+export OPENBUDDY_GATEWAY_URL="https://ai.loulou.world:8787/openbuddy"
+export OPENBUDDY_GATEWAY_AGENT_TOKEN="<gateway.env 里的 GATEWAY_AGENT_TOKEN>"
+```
+
+验证（在本机跑，指向远端）：
+
+```bash
+curl https://ai.loulou.world:8787/openbuddy/health
+# {"status":"ok","ok":true}
+
+OPENBUDDY_E2E_GATEWAY='{"url":"https://ai.loulou.world:8787/openbuddy","adminToken":"…","agentToken":"…"}' \
+  node scripts/run-desktop-bridge-e2e.mjs
+# DESKTOP BRIDGE E2E: ALL CHECKS PASSED（13/13）
+```
+
+排错：`journalctl -u openbuddy-gateway -f`；Caddy 路由用
+`curl -I https://ai.loulou.world:8787/openbuddy/health` 看是否落到 18788。
+
+## 8. 排错
 
 | 现象 | 多半是 |
 |---|---|

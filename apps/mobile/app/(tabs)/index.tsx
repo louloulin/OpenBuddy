@@ -22,6 +22,7 @@ import {
   archivedCount, cleanSessionTitle, groupSessions, MAX_TITLE_LENGTH, sessionActions,
   type SessionActionKey, type SessionRow,
 } from '../../src/core/session-actions'
+import { unreadLabel } from '../../src/core/unread'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
 import type { CachedSession } from '../../src/db/cache'
@@ -147,6 +148,19 @@ export default function SessionsScreen() {
         {session.archived ? (
           <View style={{ backgroundColor: theme.pressed, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 }}>
             <Text style={{ color: theme.textWeak, fontSize: 10 }}>归档</Text>
+          </View>
+        ) : null}
+        {session.unread > 0 ? (
+          <View style={{
+            minWidth: 18,
+            height: 18,
+            borderRadius: 9,
+            paddingHorizontal: 5,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: theme.ink,
+          }}>
+            <Text style={{ color: theme.inkFg, fontSize: 10, fontWeight: '700' }}>{unreadLabel(session.unread)}</Text>
           </View>
         ) : null}
         <Text style={{ color: theme.textWeak, fontSize: 11 }}>{relative(session.updatedAt)}</Text>

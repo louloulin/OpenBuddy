@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 
-import { createAgentClient, type AgentClient } from '../src/agent.js'
+import { agentRelayUrl, createAgentClient, type AgentClient } from '../src/agent.js'
 import {
   ADMIN_TOKEN,
   AGENT_TOKEN,
@@ -40,6 +40,13 @@ function startAgent(harness: Harness): AgentClient {
 }
 
 describe('agent tunnel', () => {
+  test('the tunnel endpoint hangs off a gateway base path', () => {
+    expect(agentRelayUrl('https://gw.example.com', '/relay/agent', 'tok'))
+      .toBe('https://gw.example.com/relay/agent?token=tok')
+    expect(agentRelayUrl('https://gw.example.com/openbuddy/', '/relay/agent', 'tok', { omitToken: true }))
+      .toBe('https://gw.example.com/openbuddy/relay/agent')
+  })
+
   test('serves HTTP through the outbound desktop connection', async () => {
     harness = startGateway({ upstreamUrl: 'http://127.0.0.1:1' })
     const agent = startAgent(harness)

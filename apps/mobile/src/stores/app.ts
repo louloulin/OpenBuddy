@@ -28,6 +28,7 @@ import { isPreview, previewState } from '../core/preview'
 import type { Capabilities } from '../core/surface'
 import { checkNewSession, type InitAnswer } from '../core/new-session'
 import { cleanSessionTitle } from '../core/session-actions'
+import { bumpUnread, clearUnread, shouldMarkUnread } from '../core/unread'
 import type { Approval, NotificationItem } from '../core/models'
 import type { PairPayload } from '../core/pairing'
 import {
@@ -50,6 +51,8 @@ type AppState = {
   connection: TransportState
   capabilities: Capabilities | null
   sessions: CachedSession[]
+  /** The session on screen; settles for any other one become unread marks. */
+  activeSessionId: string | null
   transcripts: Record<string, Transcript>
   approvals: Approval[]
   notifications: NotificationItem[]
@@ -61,6 +64,8 @@ type AppState = {
   pair: (payload: PairPayload, deviceName: string) => Promise<void>
   unpair: () => Promise<void>
   openSession: (sessionId: string) => Promise<void>
+  setActiveSession: (sessionId: string | null) => void
+  markSessionRead: (sessionId: string) => Promise<void>
   refreshSessions: () => Promise<void>
   /** Creates a session on the desktop and returns its id, for the caller to open. */
   createSession: () => Promise<string | null>
@@ -92,6 +97,7 @@ export const useApp = create<AppState>((set, get) => ({
   connection: 'closed',
   capabilities: null,
   sessions: [],
+  activeSessionId: null,
   transcripts: {},
   approvals: [],
   notifications: [],
@@ -202,6 +208,8 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async openSession(sessionId) {
+    // Reading a conversation clears its badge, even before history arrives.
+    await get().markSessionRead(sessionId)
     // Cached transcript paints immediately.
     if (!get().transcripts[sessionId]) {
       const rows = await readCachedTranscript(sessionId).catch(() => [])
@@ -223,6 +231,25 @@ export const useApp = create<AppState>((set, get) => ({
     } catch (error) {
       set({ error: errorText(error) })
     }
+  },
+
+  /** The chat screen owns this: entering marks read, leaving stops new marks. */
+  setActiveSession(sessionId) {
+    set({ activeSessionId: sessionId })
+    if (sessionId) void get().markSessionRead(sessionId)
+  },
+
+  async markSessionRead(sessionId) {
+    let changed = false
+    const sessions = get().sessions.map(session => {
+      if (session.id !== sessionId) return session
+      const next = clearUnread(session)
+      if (next !== session) changed = true
+      return next
+    })
+    if (!changed) return
+    set({ sessions })
+    await cacheSessions(sessions).catch(() => {})
   },
 
   async createSession() {
@@ -479,9 +506,18 @@ function ingestUpdate(
   const key = sessionId ?? update.sessionId ?? update.__sessionId
   if (!key) return
   if (update.type === 'agent_settled') {
-    set(state => (state.awaiting.includes(key)
-      ? { awaiting: state.awaiting.filter(id => id !== key) }
-      : {}))
+    const markUnread = shouldMarkUnread(key, get().activeSessionId)
+    set(state => {
+      const awaiting = state.awaiting.includes(key)
+        ? state.awaiting.filter(id => id !== key)
+        : state.awaiting
+      if (!markUnread) return awaiting === state.awaiting ? {} : { awaiting }
+      return {
+        awaiting,
+        sessions: state.sessions.map(session => session.id === key ? bumpUnread(session) : session),
+      }
+    })
+    if (markUnread) void cacheSessions(get().sessions).catch(() => {})
   }
   const current = get().transcripts[key] ?? emptyTranscript()
   const next = applyUpdate(current, update, key)

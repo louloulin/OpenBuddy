@@ -138,7 +138,10 @@ export function agentRelayUrl(
   options: { omitToken?: boolean } = {},
 ): string {
   const url = new URL(gatewayUrl)
-  if (url.pathname === '/' || url.pathname === '') url.pathname = agentPath
+  // A gateway may live under a base path (a reverse proxy mounts it at
+  // `/openbuddy`); the tunnel endpoint hangs off that base, not off the root.
+  const base = url.pathname.replace(/\/+$/, '')
+  if (!base.endsWith(agentPath)) url.pathname = `${base}${agentPath}`
   if (!options.omitToken) url.searchParams.set('token', agentToken)
   return url.toString()
 }

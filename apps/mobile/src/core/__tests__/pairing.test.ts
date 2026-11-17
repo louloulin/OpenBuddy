@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { buildPairQr, isPairCode, normalizeGatewayUrl, parsePairQr } from '../pairing'
 
 describe('normalizeGatewayUrl', () => {
-  it('assumes https and keeps the origin only', () => {
+  it('assumes https and keeps a base path', () => {
     expect(normalizeGatewayUrl('192.168.1.4:8787')).toBe('https://192.168.1.4:8787')
-    expect(normalizeGatewayUrl('https://gw.example.com/h5/')).toBe('https://gw.example.com')
+    expect(normalizeGatewayUrl('https://gw.example.com/openbuddy/')).toBe('https://gw.example.com/openbuddy')
+    expect(normalizeGatewayUrl('https://gw.example.com/?x=1')).toBe('https://gw.example.com')
     expect(normalizeGatewayUrl('  http://localhost:8787  ')).toBe('http://localhost:8787')
   })
 
@@ -32,6 +33,11 @@ describe('parsePairQr', () => {
     const qr = buildPairQr({ gatewayUrl: 'https://gw.example.com', code: '12345678' })
     expect(qr.startsWith('openbuddy://pair?')).toBe(true)
     expect(parsePairQr(qr)).toEqual({ gatewayUrl: 'https://gw.example.com', code: '12345678' })
+  })
+
+  it('round-trips a gateway mounted under a base path', () => {
+    const qr = buildPairQr({ gatewayUrl: 'https://gw.example.com/openbuddy', code: '12345678' })
+    expect(parsePairQr(qr)).toEqual({ gatewayUrl: 'https://gw.example.com/openbuddy', code: '12345678' })
   })
 
   it('reads a plain JSON body too', () => {

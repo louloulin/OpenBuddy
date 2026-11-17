@@ -35,6 +35,7 @@ import { groupMemory, memoryPreview, validateMemoryDraft } from '../apps/mobile/
 import { branchLabel, branchTurns, checkpointAction, restoreHash, toCheckpoints, toRewindPoints } from '../apps/mobile/src/core/branches.js'
 import { checkNewSession } from '../apps/mobile/src/core/new-session.js'
 import { cleanSessionTitle, sessionActions } from '../apps/mobile/src/core/session-actions.js'
+import { bumpUnread, shouldMarkUnread, totalUnread } from '../apps/mobile/src/core/unread.js'
 
 let failures = 0
 function check(name: string, condition: boolean, detail = ''): void {
@@ -400,6 +401,16 @@ check('archiving reached the desktop', sessionMeta.some(item => item.op === 'arc
 
 await transport.invoke('agent_delete_session', { sessionId: 'sess-new' })
 check('delete reached the desktop', deletedSessions.includes('sess-new'))
+
+// ── 8f. Unread marks: settles elsewhere count, the open session does not ───
+
+const unreadRows = [
+  { id: 'sess-1', title: 'A', updatedAt: 1, pinned: false, archived: false, preview: '', unread: 0 },
+  { id: 'sess-2', title: 'B', updatedAt: 2, pinned: false, archived: false, preview: '', unread: 2 },
+]
+check('a settle for another session becomes an unread mark', shouldMarkUnread('sess-2', 'sess-1') && bumpUnread(unreadRows[0]!).unread === 1)
+check('the open session never collects a mark', !shouldMarkUnread('sess-1', 'sess-1'))
+check('the tab badge sums the rows', totalUnread(unreadRows) === 2)
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 
