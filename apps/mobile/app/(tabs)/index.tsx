@@ -48,11 +48,21 @@ export default function SessionsScreen() {
   const renameSession = useApp(state => state.renameSession)
   const setSessionArchived = useApp(state => state.setSessionArchived)
   const deleteSession = useApp(state => state.deleteSession)
+  const workspaces = useApp(state => state.workspaces)
+  const refreshWorkspaces = useApp(state => state.refreshWorkspaces)
+  const forkSession = useApp(state => state.forkSession)
+  const handoffSession = useApp(state => state.handoffSession)
+  const compactSession = useApp(state => state.compactSession)
+  const setDraft = useApp(state => state.setDraft)
   const connection = useApp(state => state.connection)
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const [refreshing, setRefreshing] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [workspaceSheet, setWorkspaceSheet] = useState(false)
+  const [handoffTarget, setHandoffTarget] = useState<CachedSession | null>(null)
+  const [handoffGoal, setHandoffGoal] = useState('')
+  const [opsBusy, setOpsBusy] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
   const [menu, setMenu] = useState<CachedSession | null>(null)
   const [renaming, setRenaming] = useState<CachedSession | null>(null)
@@ -64,15 +74,70 @@ export default function SessionsScreen() {
     if (creating) return
     setCreating(true)
     try {
-      const sessionId = await createSession()
+      await refreshWorkspaces()
+      setWorkspaceSheet(true)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const createIn = async (cwd?: string) => {
+    if (creating) return
+    setWorkspaceSheet(false)
+    setCreating(true)
+    try {
+      const sessionId = await createSession(cwd)
       if (sessionId) router.push(`/chat/${encodeURIComponent(sessionId)}`)
     } finally {
       setCreating(false)
     }
   }
 
+  const forkTarget = async (session: CachedSession) => {
+    if (opsBusy) return
+    setOpsBusy(true)
+    try {
+      const forked = await forkSession(session.id)
+      if (forked) router.push(`/chat/${encodeURIComponent(forked)}`)
+    } finally {
+      setOpsBusy(false)
+    }
+  }
+
+  const handoff = async () => {
+    if (!handoffTarget || opsBusy) return
+    setOpsBusy(true)
+    try {
+      const result = await handoffSession(handoffTarget.id, handoffGoal.trim())
+      if (!result) return
+      setHandoffTarget(null)
+      setHandoffGoal('')
+      if (result.prompt) setDraft(result.sessionId, result.prompt)
+      router.push(`/chat/${encodeURIComponent(result.sessionId)}`)
+    } finally {
+      setOpsBusy(false)
+    }
+  }
+
+  const compactTarget = (session: CachedSession) => {
+    Alert.alert(
+      '压缩这段上下文？',
+      '桌面会把较早的对话总结成摘要，保留最近的消息。无法撤销。',
+      [
+        { text: '取消', style: 'cancel' },
+        { text: '压缩', onPress: () => { void compactSession(session.id) } },
+      ],
+    )
+  }
+
   const can = useCallback((command: string) => canRun(capabilities, command), [capabilities])
-  const manageable = ['agent_set_session_pinned', 'agent_rename_session', 'agent_set_session_archived', 'agent_delete_session'].some(can)
+  // The menu is worth opening for any session operation, not just the four
+  // sidebar verbs: a desktop can serve fork/handoff/compact without serving
+  // rename, and the long-press must still work there.
+  const manageable = [
+    'agent_set_session_pinned', 'agent_rename_session', 'agent_set_session_archived', 'agent_delete_session',
+    'agent_fork_session', 'agent_handoff', 'agent_compact',
+  ].some(can)
 
   // The desktop sidebar groups the list; the phone keeps the same two groups
   // with a quiet section label instead of a collapsible tree.
@@ -305,6 +370,30 @@ export default function SessionsScreen() {
                 </Text>
               </Pressable>
             )) : null}
+            {menu && canRun(capabilities, 'agent_fork_session') ? (
+              <Pressable
+                onPress={() => { const target = menu; setMenu(null); void forkTarget(target) }}
+                style={({ pressed }) => ({ paddingVertical: 14, borderTopWidth: theme.hairline, borderTopColor: theme.cardBorder, opacity: pressed ? 0.6 : 1 })}
+              >
+                <Text style={{ color: theme.text, fontSize: 16 }}>分叉会话</Text>
+              </Pressable>
+            ) : null}
+            {menu && canRun(capabilities, 'agent_handoff') ? (
+              <Pressable
+                onPress={() => { setHandoffTarget(menu); setHandoffGoal(''); setMenu(null) }}
+                style={({ pressed }) => ({ paddingVertical: 14, borderTopWidth: theme.hairline, borderTopColor: theme.cardBorder, opacity: pressed ? 0.6 : 1 })}
+              >
+                <Text style={{ color: theme.text, fontSize: 16 }}>交接到新任务</Text>
+              </Pressable>
+            ) : null}
+            {menu && canRun(capabilities, 'agent_compact') ? (
+              <Pressable
+                onPress={() => { const target = menu; setMenu(null); compactTarget(target) }}
+                style={({ pressed }) => ({ paddingVertical: 14, borderTopWidth: theme.hairline, borderTopColor: theme.cardBorder, opacity: pressed ? 0.6 : 1 })}
+              >
+                <Text style={{ color: theme.text, fontSize: 16 }}>压缩上下文</Text>
+              </Pressable>
+            ) : null}
             <Pressable
               onPress={() => setMenu(null)}
               style={({ pressed }) => ({
@@ -367,6 +456,76 @@ export default function SessionsScreen() {
                 style={({ pressed }) => ({ opacity: pressed || !cleanSessionTitle(renameText) ? 0.5 : 1 })}
               >
                 <Text style={{ color: theme.text, fontSize: 15, fontWeight: '600' }}>保存</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* New task: pick the folder the desktop should work in. */}
+      <Modal visible={workspaceSheet} transparent animationType="fade" onRequestClose={() => setWorkspaceSheet(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable style={SHEET_BACKDROP} onPress={() => setWorkspaceSheet(false)} />
+          <View style={{ backgroundColor: theme.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: theme.gutter, paddingTop: 14, paddingBottom: 30 }}>
+            <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700', marginBottom: 4 }}>在哪里开始？</Text>
+            <Text style={{ color: theme.textWeak, fontSize: 12, marginBottom: 8 }}>选择电脑上的一个工作目录。</Text>
+            {workspaces.length === 0 ? (
+              <Pressable onPress={() => void createIn()} style={({ pressed }) => ({ paddingVertical: 14, opacity: pressed ? 0.6 : 1 })}>
+                <Text style={{ color: theme.text, fontSize: 15 }}>使用桌面当前目录</Text>
+              </Pressable>
+            ) : workspaces.map(choice => (
+              <Pressable
+                key={choice.cwd}
+                onPress={() => void createIn(choice.cwd)}
+                style={({ pressed }) => ({ paddingVertical: 12, borderTopWidth: theme.hairline, borderTopColor: theme.cardBorder, opacity: pressed ? 0.6 : 1 })}
+              >
+                <Text numberOfLines={1} style={{ color: theme.text, fontSize: 14 }}>{choice.label}</Text>
+                {choice.detail ? <Text numberOfLines={1} style={{ color: theme.textWeak, fontSize: 12, marginTop: 2 }}>{choice.detail}</Text> : null}
+              </Pressable>
+            ))}
+            <Pressable
+              onPress={() => setWorkspaceSheet(false)}
+              style={({ pressed }) => ({ marginTop: 10, paddingVertical: 12, borderRadius: theme.radiusPill, backgroundColor: pressed ? theme.pressed : theme.card, alignItems: 'center' })}
+            >
+              <Text style={{ color: theme.textMedium, fontSize: 14, fontWeight: '600' }}>取消</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Handoff: what should the new task focus on? */}
+      <Modal visible={handoffTarget !== null} transparent animationType="fade" onRequestClose={() => setHandoffTarget(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: 'rgba(0,0,0,0.35)' }}>
+          <View style={{ backgroundColor: theme.card, borderRadius: 14, padding: 18, gap: 12, borderWidth: theme.hairline, borderColor: theme.cardBorder }}>
+            <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600' }}>交接到新任务</Text>
+            <Text style={{ color: theme.textWeak, fontSize: 12, lineHeight: 18 }}>
+              电脑会创建新会话，并把当前进展整理成草稿。这个目标会写进草稿。
+            </Text>
+            <TextInput
+              value={handoffGoal}
+              onChangeText={setHandoffGoal}
+              autoFocus
+              placeholder="例如：继续把并发压测补完"
+              placeholderTextColor={theme.textWeak}
+              style={{
+                color: theme.text,
+                fontSize: 14,
+                backgroundColor: theme.surface,
+                borderRadius: 8,
+                borderWidth: theme.hairline,
+                borderColor: theme.cardBorder,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+              }}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 18 }}>
+              <Pressable onPress={() => setHandoffTarget(null)}><Text style={{ color: theme.textWeak, fontSize: 15 }}>取消</Text></Pressable>
+              <Pressable
+                onPress={() => void handoff()}
+                disabled={opsBusy || !handoffGoal.trim()}
+                style={({ pressed }) => ({ opacity: pressed || !handoffGoal.trim() ? 0.5 : 1 })}
+              >
+                <Text style={{ color: theme.text, fontSize: 15, fontWeight: '600' }}>创建</Text>
               </Pressable>
             </View>
           </View>

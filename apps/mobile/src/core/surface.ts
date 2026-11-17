@@ -51,6 +51,10 @@ export function visibleTabs(capabilities: Capabilities | null | undefined): {
   notifications: boolean
   automations: boolean
 } {
+  // Before the host has answered, keep every tab in the navigator. Hiding the
+  // initial "sessions" route on the first paint makes expo-router pick another
+  // tab as the starting route, which is why the app used to open on "我".
+  if (!capabilities) return { sessions: true, search: true, notifications: true, automations: true }
   return {
     sessions: canRun(capabilities, 'agent_list_sessions'),
     search: canRun(capabilities, 'session_search'),

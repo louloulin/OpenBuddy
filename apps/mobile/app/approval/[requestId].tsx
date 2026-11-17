@@ -1,16 +1,17 @@
 /**
- * Approval detail (20261115-mobile.md §4.2 P0, §4.3).
+ * Approval detail (20261115-mobile.md §4.2 P0 / 20261117-mobile.md 阶段 B).
  *
  * Reached from a push notification, so it must work as the app's very first
- * screen after launch. The decision pair is the same pill pair the desktop puts
- * on a permission dialog: a bordered "deny" and an ink "allow".
+ * screen after launch. The card is shared with the inline chat row, which keeps
+ * the permission / question / trust answers identical in both places.
  */
 
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Pressable, Text, View, useColorScheme } from 'react-native'
+import { ActivityIndicator, Text, View, useColorScheme } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
-import { CheckIcon, CloseIcon, SparkIcon } from '../../src/components/icons'
+import { RequestCard } from '../../src/components/RequestCard'
+import type { ApprovalAction } from '../../src/core/approvals'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
 
@@ -21,7 +22,9 @@ export default function ApprovalScreen() {
   const requestId = decodeURIComponent(params.requestId ?? '')
 
   const approval = useApp(state => state.approvals.find(item => item.requestId === requestId))
-  const resolve = useApp(state => state.resolveApproval)
+  const resolveApproval = useApp(state => state.resolveApproval)
+  const resolveQuestion = useApp(state => state.resolveQuestion)
+  const resolveTrust = useApp(state => state.resolveTrust)
   const booted = useApp(state => state.booted)
   const transport = useApp(state => state.transport)
   const [busy, setBusy] = useState(false)
@@ -30,10 +33,15 @@ export default function ApprovalScreen() {
     if (booted && !transport) router.replace('/pair')
   }, [booted, transport, router])
 
-  const settle = async (approved: boolean) => {
+  const settle = async (action: ApprovalAction) => {
     setBusy(true)
     try {
-      await resolve(requestId, approved)
+      if (action.type === 'permission') await resolveApproval(requestId, action.approved)
+      else if (action.type === 'question') {
+        await resolveQuestion(requestId, approval?.sessionId ?? '', action.value, action.cancelled)
+      } else if (action.type === 'trust' && approval?.cwd) {
+        await resolveTrust(approval.cwd, action.trusted)
+      }
       router.back()
     } finally {
       setBusy(false)
@@ -52,67 +60,8 @@ export default function ApprovalScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.surface, padding: 16, gap: 16 }}>
-      <View
-        style={{
-          backgroundColor: theme.card,
-          borderRadius: 16,
-          borderWidth: theme.hairline,
-          borderColor: theme.cardBorder,
-          padding: 16,
-          gap: 12,
-        }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <SparkIcon size={18} color={theme.warning} />
-          <Text style={{ flex: 1, color: theme.text, fontSize: 18, fontWeight: '700' }}>{approval.title}</Text>
-        </View>
-        {approval.detail ? (
-          <Text style={{ color: theme.textMedium, fontSize: 14, lineHeight: 21 }} selectable>
-            {approval.detail}
-          </Text>
-        ) : null}
-      </View>
-
-      <View style={{ flexDirection: 'row', gap: 12, marginTop: 'auto' }}>
-        <Pressable
-          onPress={() => void settle(false)}
-          disabled={busy}
-          style={({ pressed }) => ({
-            flex: 1,
-            height: 50,
-            borderRadius: theme.radiusPill,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            backgroundColor: pressed ? theme.pressed : theme.card,
-            borderWidth: theme.hairline,
-            borderColor: theme.cardBorder,
-          })}
-        >
-          <CloseIcon size={16} color={theme.danger} />
-          <Text style={{ color: theme.danger, fontSize: 15, fontWeight: '600' }}>拒绝</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => void settle(true)}
-          disabled={busy}
-          style={({ pressed }) => ({
-            flex: 1,
-            height: 50,
-            borderRadius: theme.radiusPill,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            backgroundColor: busy ? theme.pressed : theme.ink,
-            opacity: pressed ? 0.88 : 1,
-          })}
-        >
-          <CheckIcon size={16} color={theme.inkFg} />
-          <Text style={{ color: theme.inkFg, fontSize: 15, fontWeight: '600' }}>允许</Text>
-        </Pressable>
-      </View>
+    <View style={{ flex: 1, backgroundColor: theme.surface, padding: 16 }}>
+      <RequestCard approval={approval} busy={busy} onAction={action => void settle(action)} />
     </View>
   )
 }

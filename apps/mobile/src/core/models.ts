@@ -15,8 +15,30 @@ export type Approval = {
   sessionId?: string
   title: string
   detail?: string
+  /** Permission options as the desktop sent them (optionId/kind/title). */
+  permissionOptions?: { optionId: string; kind: string; title: string }[]
+  /** Question options, for the select kind. */
   options?: string[]
+  questionKind?: 'select' | 'confirm' | 'input' | 'editor'
+  placeholder?: string
+  initialValue?: string
+  secret?: boolean
+  expiresAt?: number
+  /** Folder-trust requests carry the directory they are about. */
+  cwd?: string
   receivedAt: number
+}
+
+/** One running desktop task (`tasks_list`). */
+export type RunningTask = {
+  id: string
+  kind?: string
+  description?: string
+  status?: string
+  sessionId?: string
+  title?: string
+  startedAt?: number
+  pending?: number
 }
 
 /** One row of the notification centre. */

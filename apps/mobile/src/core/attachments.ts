@@ -13,8 +13,8 @@ export type UploadMime = (typeof UPLOAD_MIME)[number]
 
 /** One upload may be at most 8 MiB (gateway body limit is 20 MiB). */
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024
-/** A message may carry at most this many (contract allows 8). */
-export const MAX_ATTACHMENTS = 4
+/** A message may carry at most this many (protocol `validate.ts` allows 8). */
+export const MAX_ATTACHMENTS = 8
 /** Downscale target: long edge in pixels before compression. */
 export const MAX_EDGE = 1600
 
@@ -47,6 +47,23 @@ export function checkUpload(mime: string, bytes: number, existing: number): Uplo
   if (bytes > MAX_UPLOAD_BYTES) return { ok: false, reason: '图片超过 8MB，请先裁剪。' }
   if (existing >= MAX_ATTACHMENTS) return { ok: false, reason: `一条消息最多附 ${MAX_ATTACHMENTS} 张图片。` }
   return { ok: true }
+}
+
+/**
+ * Adds picked pictures to the composer's draft tray.
+ *
+ * Duplicates (same local uri) are ignored and the cap is enforced here rather
+ * than in the picker, so camera and library entry points behave identically.
+ */
+export function appendAttachments<T extends { uri: string }>(
+  current: readonly T[],
+  incoming: readonly T[],
+  max = MAX_ATTACHMENTS,
+): { list: T[]; dropped: number } {
+  const seen = new Set(current.map(item => item.uri))
+  const room = Math.max(0, max - current.length)
+  const fresh = incoming.filter(item => !seen.has(item.uri)).slice(0, room)
+  return { list: [...current, ...fresh], dropped: incoming.length - fresh.length }
 }
 
 /** `POST {base}/upload` — the same `/api` prefix the bridge serves. */

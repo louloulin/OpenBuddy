@@ -28,7 +28,9 @@ import { applyUpdate, emptyTranscript, transcriptPreview, type Transcript } from
 import { canSendNow } from '../core/connection'
 import { isPreview, previewState } from '../core/preview'
 import type { Capabilities } from '../core/surface'
-import { checkNewSession, type InitAnswer } from '../core/new-session'
+import {
+  checkNewSession, workspaceChoices, type InitAnswer, type WorkspaceChoice, type WorkspaceInfo,
+} from '../core/new-session'
 import { cleanSessionTitle } from '../core/session-actions'
 import { bumpUnread, clearUnread, shouldMarkUnread } from '../core/unread'
 import {
@@ -40,7 +42,14 @@ import {
   parseSpeakSetting, serializeSpeakSetting, shouldSpeak, SPEAK_KEY,
 } from '../core/speech'
 import { speak } from '../native/speech'
-import type { Approval, NotificationItem } from '../core/models'
+import {
+  dispositionFor, withoutQueueItem, type QueueRow, type TurnQueue,
+} from '../core/turn-input'
+import type { Approval, NotificationItem, RunningTask } from '../core/models'
+import {
+  parsePermissionMode, permissionDetail, permissionOptionId, questionApproval, trustApproval,
+  type PermissionMode, type QuestionRequest,
+} from '../core/approvals'
 import type { PairPayload } from '../core/pairing'
 import {
   claimPair,
@@ -67,8 +76,13 @@ type AppState = {
   transcripts: Record<string, Transcript>
   approvals: Approval[]
   notifications: NotificationItem[]
+  /** Running desktop tasks for the task drawer. */
+  tasks: RunningTask[]
+  permissionMode: PermissionMode | null
   /** Sessions that were sent to but have not answered yet. */
   awaiting: string[]
+  /** Desktop turn queues per session (steering / follow-up). */
+  queues: Record<string, TurnQueue>
   error: string | null
   /** Face ID / fingerprint gate (§4.2 P1). */
   appLock: boolean
@@ -84,12 +98,31 @@ type AppState = {
   setActiveSession: (sessionId: string | null) => void
   markSessionRead: (sessionId: string) => Promise<void>
   refreshSessions: () => Promise<void>
+  /** One-shot composer drafts (handoff prefills a new session). */
+  drafts: Record<string, string>
+  setDraft: (sessionId: string, text: string) => void
+  /** Workspaces the desktop offers for a new session (plus its current cwd). */
+  workspaces: WorkspaceChoice[]
+  refreshWorkspaces: () => Promise<void>
   /** Creates a session on the desktop and returns its id, for the caller to open. */
-  createSession: () => Promise<string | null>
+  createSession: (cwd?: string) => Promise<string | null>
+  forkSession: (sessionId: string) => Promise<string | null>
+  handoffSession: (sessionId: string, goal: string) => Promise<{ sessionId: string; prompt: string } | null>
+  compactSession: (sessionId: string, instructions?: string) => Promise<void>
   send: (sessionId: string, text: string, attachments?: { path: string }[]) => Promise<void>
+  /** Interrupts the running turn with new instructions. */
+  steer: (sessionId: string, text: string) => Promise<void>
+  refreshQueue: (sessionId: string) => Promise<void>
+  removeQueued: (sessionId: string, row: QueueRow) => Promise<void>
+  clearQueue: (sessionId: string) => Promise<void>
   sendImage: (sessionId: string, bytes: ArrayBuffer, mime: string, text?: string) => Promise<void>
   sendImages: (sessionId: string, images: { bytes: ArrayBuffer; mime: string }[], text?: string) => Promise<void>
   resolveApproval: (requestId: string, approved: boolean, reason?: string) => Promise<void>
+  resolveQuestion: (requestId: string, sessionId: string, value?: string | boolean, cancelled?: boolean) => Promise<void>
+  resolveTrust: (cwd: string, trusted: boolean) => Promise<void>
+  refreshTasks: () => Promise<void>
+  killTask: (taskId: string) => Promise<void>
+  refreshPermissionMode: () => Promise<void>
   revoked: () => Promise<void>
   resume: () => void
   regenerate: (sessionId: string) => Promise<void>
@@ -120,11 +153,16 @@ export const useApp = create<AppState>((set, get) => ({
   connection: 'closed',
   capabilities: null,
   sessions: [],
+  workspaces: [],
+  drafts: {},
   activeSessionId: null,
   transcripts: {},
   approvals: [],
   notifications: [],
+  tasks: [],
+  permissionMode: null,
   awaiting: [],
+  queues: {},
   error: null,
   appLock: false,
   locked: false,
@@ -174,28 +212,11 @@ export const useApp = create<AppState>((set, get) => ({
     transport.onState(state => set({ connection: state }))
 
     // Subscribe before the first invoke so no turn is missed in the gap.
-    await transport.listen(ASSISTANT_EVENT, payload => {
-      const envelope = payload as { sessionId?: string; event?: SessionUpdate }
-      if (!envelope.event) return
-      ingestUpdate(set, get, envelope.sessionId, envelope.event)
-    })
-    await transport.listen('agent://permission', payload => {
-      const request = payload as Partial<Approval> & { requestId?: string }
-      if (!request.requestId) return
-      const item: Approval = {
-        requestId: request.requestId,
-        kind: 'permission',
-        sessionId: request.sessionId,
-        title: request.title ?? '需要你的批准',
-        detail: request.detail,
-        options: request.options,
-        receivedAt: Date.now(),
-      }
-      set(state => ({ approvals: [...state.approvals.filter(a => a.requestId !== item.requestId), item] }))
-    })
+    await attachListeners(transport, set, get)
 
     await get().refreshSessions()
     await loadCapabilities(get, set)
+    void get().refreshPermissionMode()
     await flushQueue(get)
   },
 
@@ -207,12 +228,10 @@ export const useApp = create<AppState>((set, get) => ({
       const transport = await openTransport(pairing)
       set({ transport, connection: transport.state() })
       transport.onState(state => set({ connection: state }))
-      await transport.listen(ASSISTANT_EVENT, event => {
-        const envelope = event as { sessionId?: string; event?: SessionUpdate }
-        if (envelope.event) ingestUpdate(set, get, envelope.sessionId, envelope.event)
-      })
+      await attachListeners(transport, set, get)
       await get().refreshSessions()
       await loadCapabilities(get, set)
+      void get().refreshPermissionMode()
     } catch (error) {
       set({ error: errorText(error) })
       throw error
@@ -245,6 +264,7 @@ export const useApp = create<AppState>((set, get) => ({
   async openSession(sessionId) {
     // Reading a conversation clears its badge, even before history arrives.
     await get().markSessionRead(sessionId)
+    void get().refreshQueue(sessionId)
     // Cached transcript paints immediately.
     if (!get().transcripts[sessionId]) {
       const rows = await readCachedTranscript(sessionId).catch(() => [])
@@ -287,14 +307,29 @@ export const useApp = create<AppState>((set, get) => ({
     await cacheSessions(sessions).catch(() => {})
   },
 
-  async createSession() {
+  async refreshWorkspaces() {
+    const transport = get().transport
+    if (!transport) return
+    try {
+      const [init, list] = await Promise.all([
+        transport.invoke<InitAnswer>('agent_init', {}).catch(() => null),
+        transport.invoke<WorkspaceInfo[]>('agent_list_workspaces', {}).catch(() => []),
+      ])
+      const current = typeof init?.cwd === 'string' ? init.cwd : null
+      set({ workspaces: workspaceChoices(current, Array.isArray(list) ? list : []) })
+    } catch {
+      // The picker falls back to "current directory only".
+    }
+  },
+
+  async createSession(cwd) {
     const transport = get().transport
     if (!transport) return null
     try {
       // The directory and the model belong to the computer: ask where it works
       // and let the desktop pick its default model.
       const init = await transport.invoke<InitAnswer>('agent_init', {})
-      const check = checkNewSession(init)
+      const check = checkNewSession(cwd ? { ...init, cwd } : init)
       if (!check.ok) {
         set({ error: check.reason })
         return null
@@ -321,6 +356,58 @@ export const useApp = create<AppState>((set, get) => ({
       set({ error: errorText(failure) })
       return null
     }
+  },
+
+  async forkSession(sessionId) {
+    const transport = get().transport
+    if (!transport) return null
+    try {
+      const forked = await transport.invoke<string>('agent_fork_session', { sessionId })
+      if (typeof forked !== 'string' || !forked) throw new Error('桌面没有返回分叉会话 id')
+      await get().refreshSessions()
+      return forked
+    } catch (error) {
+      set({ error: errorText(error) })
+      return null
+    }
+  },
+
+  /** Hands the thread to a fresh session; the draft stays in the caller's hands. */
+  async handoffSession(sessionId, goal) {
+    const transport = get().transport
+    if (!transport) return null
+    try {
+      const result = await transport.invoke<{ sessionId?: unknown; prompt?: unknown }>('agent_handoff', { sessionId, goal })
+      if (typeof result?.sessionId !== 'string' || !result.sessionId) throw new Error('桌面没有返回交接会话')
+      await get().refreshSessions()
+      return { sessionId: result.sessionId, prompt: typeof result.prompt === 'string' ? result.prompt : '' }
+    } catch (error) {
+      set({ error: errorText(error) })
+      return null
+    }
+  },
+
+  async compactSession(sessionId, instructions) {
+    const transport = get().transport
+    if (!transport) return
+    try {
+      await transport.invoke('agent_compact', {
+        sessionId,
+        ...(instructions?.trim() ? { instructions: instructions.trim() } : {}),
+      })
+      await get().refreshSessions()
+    } catch (error) {
+      set({ error: errorText(error) })
+    }
+  },
+
+  setDraft(sessionId, text) {
+    set(state => {
+      const drafts = { ...state.drafts }
+      if (text) drafts[sessionId] = text
+      else delete drafts[sessionId]
+      return { drafts }
+    })
   },
 
   async refreshSessions() {
@@ -364,6 +451,23 @@ export const useApp = create<AppState>((set, get) => ({
       return
     }
 
+    // A running turn rejects `agent_send`; queue it the way the desktop
+    // composer does. Steer is a separate, explicit action.
+    if (dispositionFor(get().awaiting.includes(sessionId)) === 'follow_up') {
+      try {
+        await transport.invoke('agent_follow_up', {
+          sessionId,
+          text: body,
+          ...(attachments.length ? { attachments } : {}),
+        })
+        await get().refreshQueue(sessionId)
+        return
+      } catch {
+        // The turn may have settled between the check and the invoke; fall
+        // through to a normal send instead of losing the message.
+      }
+    }
+
     const local: SessionUpdate = { type: 'message_end', sessionId, message: { role: 'user', content: body } }
     ingestUpdate(set, get, sessionId, local)
     // The desktop shows its waiting row the moment a message is sent; the
@@ -371,6 +475,74 @@ export const useApp = create<AppState>((set, get) => ({
     set(state => ({ awaiting: state.awaiting.includes(sessionId) ? state.awaiting : [...state.awaiting, sessionId] }))
     try {
       await transport.invoke('agent_send', { sessionId, text: body, attachments })
+    } catch (error) {
+      set({ error: errorText(error) })
+    }
+  },
+
+  /** Interrupt the running turn (desktop `agent_steer`). */
+  async steer(sessionId, text) {
+    const transport = get().transport
+    const body = text.trim()
+    if (!transport || !body) return
+    try {
+      await transport.invoke('agent_steer', { sessionId, text: body })
+      await get().refreshQueue(sessionId)
+    } catch (error) {
+      set({ error: errorText(error) })
+    }
+  },
+
+  async refreshQueue(sessionId) {
+    const transport = get().transport
+    if (!transport) return
+    try {
+      const queue = await transport.invoke<TurnQueue | null>('agent_get_queue', { sessionId })
+      set(state => ({
+        queues: {
+          ...state.queues,
+          [sessionId]: {
+            steering: Array.isArray(queue?.steering) ? queue.steering : [],
+            followUp: Array.isArray(queue?.followUp) ? queue.followUp : [],
+          },
+        },
+      }))
+    } catch {
+      // Queue display is best-effort; sending still works without it.
+    }
+  },
+
+  async removeQueued(sessionId, row) {
+    const transport = get().transport
+    const queue = get().queues[sessionId]
+    if (!transport || !queue) return
+    const next = withoutQueueItem(queue, row.kind, row.index)
+    try {
+      const result = await transport.invoke<TurnQueue>('agent_set_queue', {
+        sessionId,
+        steering: next.steering,
+        followUp: next.followUp,
+      })
+      set(state => ({
+        queues: {
+          ...state.queues,
+          [sessionId]: {
+            steering: Array.isArray(result?.steering) ? result.steering : next.steering,
+            followUp: Array.isArray(result?.followUp) ? result.followUp : next.followUp,
+          },
+        },
+      }))
+    } catch (error) {
+      set({ error: errorText(error) })
+    }
+  },
+
+  async clearQueue(sessionId) {
+    const transport = get().transport
+    if (!transport) return
+    try {
+      await transport.invoke('agent_clear_queue', { sessionId })
+      set(state => ({ queues: { ...state.queues, [sessionId]: { steering: [], followUp: [] } } }))
     } catch (error) {
       set({ error: errorText(error) })
     }
@@ -405,15 +577,77 @@ export const useApp = create<AppState>((set, get) => ({
   async resolveApproval(requestId, approved, reason) {
     const transport = get().transport
     if (!transport) return
+    const approval = get().approvals.find(item => item.requestId === requestId)
     try {
       await transport.invoke('agent_resolve_permission', {
         requestId,
-        decision: approved ? 'allow' : 'deny',
-        ...(reason ? { reason } : {}),
+        optionId: permissionOptionId(approval ?? {}, approved),
+        cancelled: false,
+        ...(reason?.trim() ? { reason: reason.trim().slice(0, 500) } : {}),
       })
       set(state => ({ approvals: state.approvals.filter(item => item.requestId !== requestId) }))
     } catch (error) {
       set({ error: errorText(error) })
+    }
+  },
+
+  /** Extension UI question (`agent://ui-request`); one card covers all kinds. */
+  async resolveQuestion(requestId, sessionId, value, cancelled = false) {
+    const transport = get().transport
+    if (!transport) return
+    try {
+      await transport.invoke('agent_resolve_ui', {
+        requestId,
+        sessionId,
+        ...(cancelled ? { cancelled: true } : { value }),
+      })
+      set(state => ({ approvals: state.approvals.filter(item => item.requestId !== requestId) }))
+    } catch (error) {
+      set({ error: errorText(error) })
+    }
+  },
+
+  async resolveTrust(cwd, trusted) {
+    const transport = get().transport
+    if (!transport) return
+    try {
+      await transport.invoke('folder_trust_respond', { cwd, trusted })
+      set(state => ({ approvals: state.approvals.filter(item => item.requestId !== `trust:${cwd}`) }))
+    } catch (error) {
+      set({ error: errorText(error) })
+    }
+  },
+
+  async refreshTasks() {
+    const transport = get().transport
+    if (!transport) return
+    try {
+      const list = await transport.invoke<RunningTask[]>('tasks_list', {})
+      set({ tasks: Array.isArray(list) ? list : [] })
+    } catch {
+      // Task drawer is best-effort; a failed poll keeps the previous list.
+    }
+  },
+
+  async killTask(taskId) {
+    const transport = get().transport
+    if (!transport) return
+    try {
+      await transport.invoke('task_kill', { taskId })
+      await get().refreshTasks()
+    } catch (error) {
+      set({ error: errorText(error) })
+    }
+  },
+
+  async refreshPermissionMode() {
+    const transport = get().transport
+    if (!transport) return
+    try {
+      const raw = await transport.invoke<unknown>('permission_mode_get', {})
+      set({ permissionMode: parsePermissionMode(raw) })
+    } catch {
+      // Desktop not advertising it: leave the row hidden.
     }
   },
 
@@ -592,6 +826,82 @@ async function patchSession(
   await cacheSessions(sessions).catch(() => {})
 }
 
+type SetState = (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void
+
+function upsertApproval(set: SetState, item: Approval): void {
+  set(state => ({
+    approvals: [...state.approvals.filter(entry => entry.requestId !== item.requestId), item],
+  }))
+}
+
+function removeApproval(set: SetState, requestId: string): void {
+  set(state => ({ approvals: state.approvals.filter(item => item.requestId !== requestId) }))
+}
+
+/**
+ * One subscription set for every transport, used by bootstrap and by re-pairing
+ * (re-pairing previously forgot the permission listener, so approvals went
+ * silent until the next launch).
+ */
+async function attachListeners(transport: Transport, set: SetState, get: () => AppState): Promise<void> {
+  await transport.listen(ASSISTANT_EVENT, payload => {
+    const envelope = payload as { sessionId?: string; event?: SessionUpdate }
+    if (envelope.event) ingestUpdate(set, get, envelope.sessionId, envelope.event)
+  })
+
+  await transport.listen('agent://permission', payload => {
+    const request = payload as {
+      requestId?: string
+      sessionId?: string
+      title?: string
+      rawInput?: unknown
+      options?: { optionId?: unknown; kind?: unknown; title?: unknown }[]
+    }
+    if (!request.requestId) return
+    upsertApproval(set, {
+      requestId: request.requestId,
+      kind: 'permission',
+      sessionId: request.sessionId,
+      title: request.title ?? '需要你的批准',
+      detail: permissionDetail(request.rawInput),
+      permissionOptions: Array.isArray(request.options)
+        ? request.options
+          .filter(option => typeof option?.optionId === 'string')
+          .map(option => ({
+            optionId: String(option.optionId),
+            kind: typeof option.kind === 'string' ? option.kind : 'allow',
+            title: typeof option.title === 'string' ? option.title : String(option.optionId),
+          }))
+        : undefined,
+      receivedAt: Date.now(),
+    })
+  })
+  await transport.listen('agent://permission-dismiss', payload => {
+    const id = (payload as { requestId?: string }).requestId
+    if (id) removeApproval(set, id)
+  })
+
+  await transport.listen('agent://ui-request', payload => {
+    const request = payload as QuestionRequest
+    if (!request?.requestId || !request.sessionId) return
+    upsertApproval(set, questionApproval(request))
+  })
+  await transport.listen('agent://ui-dismiss', payload => {
+    const id = (payload as { requestId?: string }).requestId
+    if (id) removeApproval(set, id)
+  })
+
+  await transport.listen('agent://folder-trust', payload => {
+    const cwd = (payload as { cwd?: unknown }).cwd
+    if (typeof cwd === 'string' && cwd) upsertApproval(set, trustApproval(cwd))
+  })
+
+  await transport.listen('agent://permission-mode', payload => {
+    const mode = parsePermissionMode((payload as { mode?: unknown }).mode)
+    if (mode) set({ permissionMode: mode })
+  })
+}
+
 /** Folds one event into the session transcript and persists it. */
 function ingestUpdate(
   set: (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void,
@@ -620,10 +930,12 @@ function ingestUpdate(
       const text = get().transcripts[key]?.lastAssistantText
       if (text) speak(text)
     }
+    // A settled turn drains one queued item; sync the chip row.
+    void get().refreshQueue(key)
   }
   const current = get().transcripts[key] ?? emptyTranscript()
   const next = applyUpdate(current, update, key)
-  if (next === current) return
+    if (next === current) return
 
   const preview = transcriptPreview(next)
   set(state => ({

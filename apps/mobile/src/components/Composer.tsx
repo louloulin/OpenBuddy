@@ -11,13 +11,13 @@
  */
 
 import { useState } from 'react'
-import { Alert, Modal, Pressable, Text, TextInput, View, useColorScheme } from 'react-native'
+import { Alert, Image, Modal, Pressable, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import * as ImageManipulator from 'expo-image-manipulator'
 import * as Speech from 'expo-speech'
 
-import { compressOptions, checkUpload, MAX_ATTACHMENTS } from '../core/attachments'
+import { appendAttachments, compressOptions, checkUpload, MAX_ATTACHMENTS } from '../core/attachments'
 import { mergeTranscript, transcriptOutcome, unavailableMessage } from '../core/voice'
 import { themeFor } from '../theme'
 import { CameraIcon, MicIcon, SendIcon, StopIcon } from './icons'
@@ -28,21 +28,38 @@ export type ComposerProps = {
   /** Several pictures at once, the way Qwen and Kimi accept a batch. */
   onImages?: (images: { bytes: ArrayBuffer; mime: string }[], text: string) => void
   onStop?: () => void
+  /** Interrupt the running turn with this text (long-press the send button). */
+  onSteer?: (text: string) => void
   streaming?: boolean
   placeholder?: string
+  /** Prefilled once at mount (handoff drafts); the field is the user's after. */
+  initialDraft?: string
 }
 
-export function Composer({ onSend, onImage, onImages, onStop, streaming = false, placeholder = '给 OpenBuddy 发消息…' }: ComposerProps) {
+export function Composer({ onSend, onImage, onImages, onStop, onSteer, streaming = false, placeholder = '给 OpenBuddy 发消息…', initialDraft = '' }: ComposerProps) {
   const theme = themeFor(useColorScheme())
   const insets = useSafeAreaInsets()
-  const [draft, setDraft] = useState('')
+  const [draft, setDraft] = useState(initialDraft)
   const [focused, setFocused] = useState(false)
   const [busy, setBusy] = useState(false)
   const hasText = draft.trim().length > 0
 
+  /**
+   * One send action for text and pictures: attachments sit in a draft tray
+   * until the user is ready, the way Grok/Kimi stage them. Text alone still
+   * goes through `onSend`.
+   */
   const submit = () => {
     const text = draft.trim()
-    if (!text) return
+    if (!text && pending.length === 0) return
+    if (pending.length) {
+      const images = pending.map(({ bytes, mime }) => ({ bytes, mime }))
+      setPending([])
+      setDraft('')
+      if (onImages) onImages(images, text)
+      else if (images[0]) onImage(images[0].bytes, images[0].mime, text)
+      return
+    }
     setDraft('')
     onSend(text)
   }
@@ -56,10 +73,11 @@ export function Composer({ onSend, onImage, onImages, onStop, streaming = false,
    * every picture, and hands them to the composer as a batch.
    */
   const [sheet, setSheet] = useState(false)
-  const [pending, setPending] = useState<{ bytes: ArrayBuffer; mime: string }[]>([])
+  const [steerSheet, setSteerSheet] = useState(false)
+  const [pending, setPending] = useState<{ bytes: ArrayBuffer; mime: string; uri: string }[]>([])
 
   const prepare = async (uris: string[], widths: number[], heights: number[]) => {
-    const images: { bytes: ArrayBuffer; mime: string }[] = []
+    const images: { bytes: ArrayBuffer; mime: string; uri: string }[] = []
     for (let index = 0; index < uris.length; index += 1) {
       const uri = uris[index]!
       const options = compressOptions(widths[index] ?? 0, heights[index] ?? 0)
@@ -78,9 +96,18 @@ export function Composer({ onSend, onImage, onImages, onStop, streaming = false,
         Alert.alert('图片无法发送', check.reason)
         continue
       }
-      images.push({ bytes, mime: 'image/jpeg' })
+      images.push({ bytes, mime: 'image/jpeg', uri: saved.uri })
     }
     return images
+  }
+
+  /** Adds pictures to the draft tray instead of sending them immediately. */
+  const stage = (images: { bytes: ArrayBuffer; mime: string; uri: string }[]) => {
+    setPending(current => {
+      const { list, dropped } = appendAttachments(current, images)
+      if (dropped > 0) Alert.alert('附件已达上限', `一条消息最多 ${MAX_ATTACHMENTS} 张图片。`)
+      return list
+    })
   }
 
   const shoot = async () => {
@@ -98,10 +125,7 @@ export function Composer({ onSend, onImage, onImages, onStop, streaming = false,
       if (shot.canceled || !asset) return
       const images = await prepare([asset.uri], [asset.width ?? 0], [asset.height ?? 0])
       if (images.length === 0) return
-      const text = draft.trim()
-      setDraft('')
-      if (onImages) onImages(images, text)
-      else onImage(images[0]!.bytes, images[0]!.mime, text)
+      stage(images)
     } catch (error) {
       Alert.alert('拍照失败', error instanceof Error ? error.message : String(error))
     } finally {
@@ -133,10 +157,7 @@ export function Composer({ onSend, onImage, onImages, onStop, streaming = false,
         assets.map(asset => asset.height ?? 0),
       )
       if (images.length === 0) return
-      const text = draft.trim()
-      setDraft('')
-      if (onImages) onImages(images, text)
-      else onImage(images[0]!.bytes, images[0]!.mime, text)
+      stage(images)
     } catch (error) {
       Alert.alert('选择图片失败', error instanceof Error ? error.message : String(error))
     } finally {
@@ -255,6 +276,43 @@ export function Composer({ onSend, onImage, onImages, onStop, streaming = false,
           elevation: 2,
         }}
       >
+        {pending.length ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginBottom: 8 }}
+            contentContainerStyle={{ gap: 8, alignItems: 'center' }}
+          >
+            {pending.map((image, index) => (
+              <View key={`${image.uri}-${index}`} style={{ width: 56, height: 56 }}>
+                <Image
+                  source={{ uri: image.uri }}
+                  style={{ width: 56, height: 56, borderRadius: 8, backgroundColor: theme.pressed }}
+                />
+                <Pressable
+                  onPress={() => setPending(current => current.filter((_, i) => i !== index))}
+                  hitSlop={8}
+                  accessibilityLabel="移除附件"
+                  style={{
+                    position: 'absolute',
+                    top: -5,
+                    right: -5,
+                    width: 18,
+                    height: 18,
+                    borderRadius: 9,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: theme.ink,
+                  }}
+                >
+                  <Text style={{ color: theme.inkFg, fontSize: 11, lineHeight: 13 }}>×</Text>
+                </Pressable>
+              </View>
+            ))}
+            <Text style={{ color: theme.textWeak, fontSize: 11 }}>{pending.length}/{MAX_ATTACHMENTS}</Text>
+          </ScrollView>
+        ) : null}
+
         <TextInput
           value={draft}
           onChangeText={setDraft}
@@ -281,33 +339,50 @@ export function Composer({ onSend, onImage, onImages, onStop, streaming = false,
           {streaming && onStop ? (
             <Pressable
               onPress={onStop}
+              accessibilityLabel="停止"
               style={{
-                width: 34,
-                height: 34,
-                borderRadius: 17,
+                width: 30,
+                height: 30,
+                borderRadius: 15,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: theme.ink,
+                backgroundColor: theme.pressed,
               }}
             >
-              <StopIcon size={14} color={theme.inkFg} />
+              <StopIcon size={12} color={theme.text} />
             </Pressable>
-          ) : (
+          ) : null}
+          {hasText || pending.length ? (
             <Pressable
               onPress={submit}
-              disabled={!hasText}
+              onLongPress={streaming && onSteer && hasText ? () => setSteerSheet(true) : undefined}
+              delayLongPress={350}
+              accessibilityLabel={streaming ? '发送（排队）' : '发送'}
               style={({ pressed }) => ({
                 width: 34,
                 height: 34,
                 borderRadius: 17,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: hasText ? theme.ink : theme.pressed,
-                transform: [{ scale: pressed && hasText ? 0.92 : 1 }],
+                backgroundColor: theme.ink,
+                transform: [{ scale: pressed ? 0.92 : 1 }],
               })}
             >
-              <SendIcon size={17} color={hasText ? theme.inkFg : theme.textWeak} />
+              <SendIcon size={17} color={theme.inkFg} />
             </Pressable>
+          ) : streaming ? null : (
+            <View
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: theme.pressed,
+              }}
+            >
+              <SendIcon size={17} color={theme.textWeak} />
+            </View>
           )}
         </View>
       </View>
@@ -341,6 +416,56 @@ export function Composer({ onSend, onImage, onImages, onStop, streaming = false,
             </Pressable>
             <Pressable
               onPress={() => setSheet(false)}
+              style={({ pressed }) => ({
+                paddingVertical: 15,
+                paddingHorizontal: 20,
+                backgroundColor: pressed ? theme.hover : 'transparent',
+                borderTopWidth: theme.hairline,
+                borderTopColor: theme.cardBorder,
+                marginTop: 6,
+              })}
+            >
+              <Text style={{ color: theme.textWeak, fontSize: 15 }}>取消</Text>
+            </Pressable>
+          </View>
+        </Modal>
+      ) : null}
+
+      {/* Running turn: normal send queues; this sheet offers the interrupt. */}
+      {steerSheet ? (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setSteerSheet(false)}>
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' }} onPress={() => setSteerSheet(false)} />
+          <View
+            style={{
+              backgroundColor: theme.card,
+              borderTopLeftRadius: 18,
+              borderTopRightRadius: 18,
+              paddingVertical: 8,
+              paddingBottom: 30,
+            }}
+          >
+            <Pressable
+              onPress={() => {
+                const text = draft.trim()
+                setSteerSheet(false)
+                if (!text || !onSteer) return
+                setDraft('')
+                onSteer(text)
+              }}
+              style={({ pressed }) => ({ paddingVertical: 15, paddingHorizontal: 20, backgroundColor: pressed ? theme.hover : 'transparent' })}
+            >
+              <Text style={{ color: theme.text, fontSize: 15 }}>立即插话</Text>
+              <Text style={{ color: theme.textWeak, fontSize: 12, marginTop: 2 }}>打断当前生成，按新指令继续</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => { setSteerSheet(false); submit() }}
+              style={({ pressed }) => ({ paddingVertical: 15, paddingHorizontal: 20, backgroundColor: pressed ? theme.hover : 'transparent' })}
+            >
+              <Text style={{ color: theme.text, fontSize: 15 }}>排队等待</Text>
+              <Text style={{ color: theme.textWeak, fontSize: 12, marginTop: 2 }}>当前回合结束后再发送</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setSteerSheet(false)}
               style={({ pressed }) => ({
                 paddingVertical: 15,
                 paddingHorizontal: 20,

@@ -23,9 +23,11 @@ import { createBridgeServer, type HostDispatcher } from '../packages/pi-bridge/s
 const webDir = resolve(process.argv[2] ?? '/tmp/expo-web')
 
 const listeners = new Set<(event: string, payload: unknown) => void>()
+const demoQueue = { steering: [] as string[], followUp: [] as string[] }
+let demoTaskAlive = true
 const now = Date.now()
 
-const SESSIONS = [
+const SESSIONS: Array<{ id: string; title: string; updatedAt: number; pinned: boolean; archived?: boolean }> = [
   { id: 'sess-mobile', title: '手机端接入设计', updatedAt: now - 60_000, pinned: true },
   { id: 'sess-review', title: '评审：网关隧道改动', updatedAt: now - 3 * 3_600_000, pinned: false },
   { id: 'sess-notes', title: '周会纪要', updatedAt: now - 26 * 3_600_000, pinned: false },
@@ -100,6 +102,7 @@ const dispatcher: HostDispatcher = {
             type: 'toolcall_end', toolCallId: 'tc-live',
             result: { content: [{ type: 'text', text: 'Phase 3 · Expo App 28/28' }] },
           })
+          const askApprovals = text.includes('审批演示')
           const chunks = ['收到：', text, '。这是演示回复，', '流式输出经过网关和桌面桥。']
           chunks.forEach((chunk, index) => {
             setTimeout(() => {
@@ -109,6 +112,23 @@ const dispatcher: HostDispatcher = {
                   type: 'message_end',
                   message: { role: 'assistant', content: `收到：${text}。这是演示回复，流式输出经过网关和桌面桥。` },
                 })
+                if (askApprovals) {
+                  for (const listener of listeners) {
+                    listener('agent://permission', {
+                      requestId: 'perm-demo', sessionId, title: '允许修改 proxy.ts？',
+                      rawInput: { path: 'packages/gateway/src/proxy.ts' },
+                      options: [
+                        { optionId: 'allow-once', kind: 'allow', title: '允许一次' },
+                        { optionId: 'deny', kind: 'deny', title: '拒绝' },
+                      ],
+                    })
+                    listener('agent://ui-request', {
+                      requestId: 'q-demo', sessionId, kind: 'select', title: '选哪种压测？',
+                      options: ['100 并发', '500 并发'], message: '桌面在等你回答。',
+                    })
+                    listener('agent://folder-trust', { cwd: '/demo/workspace' })
+                  }
+                }
                 emit({ type: 'agent_settled' })
               }
             }, 320 * (index + 1))
@@ -120,10 +140,75 @@ const dispatcher: HostDispatcher = {
         return SESSIONS
           .filter(session => session.title.includes(String(payload.query ?? '')))
           .map(session => ({ sessionId: session.id, title: session.title, snippet: '演示搜索结果' }))
+      case 'agent_get_queue':
+        return { steering: [...demoQueue.steering], followUp: [...demoQueue.followUp] }
+      case 'agent_follow_up':
+        demoQueue.followUp.push(String(payload.text ?? ''))
+        return { steering: [...demoQueue.steering], followUp: [...demoQueue.followUp] }
+      case 'agent_steer':
+        demoQueue.steering.push(String(payload.text ?? ''))
+        return { steering: [...demoQueue.steering], followUp: [...demoQueue.followUp] }
+      case 'agent_set_queue':
+        demoQueue.steering = Array.isArray(payload.steering) ? payload.steering.map(String) : []
+        demoQueue.followUp = Array.isArray(payload.followUp) ? payload.followUp.map(String) : []
+        return { steering: [...demoQueue.steering], followUp: [...demoQueue.followUp] }
+      case 'agent_clear_queue':
+        demoQueue.steering = []
+        demoQueue.followUp = []
+        return { steering: [], followUp: [] }
       case 'notification_list':
         return []
       case 'agent_resolve_permission':
+        for (const listener of listeners) listener('agent://permission-dismiss', { requestId: payload.requestId, sessionId: payload.sessionId })
         return { resolved: true }
+      case 'agent_resolve_ui':
+        for (const listener of listeners) listener('agent://ui-dismiss', { requestId: payload.requestId, sessionId: payload.sessionId, reason: 'resolved' })
+        return { resolved: true }
+      case 'folder_trust_respond':
+        return { trusted: payload.trusted }
+      case 'agent_init':
+        return { ok: true, cwd: '/Users/louloulin/stock/OpenBuddy', inbox: '/tmp/inbox' }
+      case 'agent_new_session':
+        return 'sess-new'
+      case 'agent_list_workspaces':
+        return [
+          { cwd: '/Users/louloulin/stock/OpenBuddy', sessionCount: 3, lastTitle: '手机端接入设计' },
+          { cwd: '/tmp/scratch', sessionCount: 1, lastTitle: '临时试验' },
+        ]
+      case 'agent_set_session_pinned': {
+        const session = SESSIONS.find(item => item.id === payload.sessionId)
+        if (session) session.pinned = Boolean(payload.pinned)
+        return { ok: true }
+      }
+      case 'agent_rename_session': {
+        const session = SESSIONS.find(item => item.id === payload.sessionId)
+        if (session) session.title = String(payload.title ?? session.title)
+        return { ok: true }
+      }
+      case 'agent_set_session_archived': {
+        const session = SESSIONS.find(item => item.id === payload.sessionId)
+        if (session) session.archived = Boolean(payload.archived)
+        return { ok: true }
+      }
+      case 'agent_delete_session': {
+        const index = SESSIONS.findIndex(item => item.id === payload.sessionId)
+        if (index >= 0) SESSIONS.splice(index, 1)
+        return { ok: true }
+      }
+      case 'agent_fork_session':
+        return 'sess-fork'
+      case 'agent_handoff':
+        return { sessionId: 'sess-handoff', prompt: `## 背景接手（演示）\n\n下一步：${String(payload.goal ?? '')}`, from: { sessionId: payload.sessionId } }
+      case 'agent_compact':
+        return { tokensBefore: 1000, tokensAfter: 400 }
+      case 'tasks_list':
+        return demoTaskAlive ? [{
+          id: 'sess-mobile', kind: 'bash', title: '演示：跑测试', status: 'running',
+          startedAt: Date.now() - 12_000, pending: 1, sessionId: 'sess-mobile',
+        }] : []
+      case 'task_kill':
+        demoTaskAlive = false
+        return { killed: true }
       default:
         throw new Error(`demo host has no ${command}`)
     }
@@ -134,6 +219,10 @@ const dispatcher: HostDispatcher = {
   },
   servedCommands: () => [
     'agent_list_sessions', 'agent_load_session', 'agent_send', 'agent_resolve_permission',
+    'agent_get_queue', 'agent_follow_up', 'agent_steer', 'agent_set_queue', 'agent_clear_queue',
+    'agent_resolve_ui', 'folder_trust_respond', 'tasks_list', 'task_kill', 'permission_mode_get',
+    'agent_init', 'agent_new_session', 'agent_list_workspaces', 'agent_fork_session', 'agent_handoff', 'agent_compact',
+    'agent_set_session_pinned', 'agent_rename_session', 'agent_set_session_archived', 'agent_delete_session',
     'session_search', 'notification_list',
   ],
 }

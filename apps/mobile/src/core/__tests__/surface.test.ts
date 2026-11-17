@@ -25,8 +25,10 @@ describe('capabilities gating', () => {
     expect(visibleTabs(caps)).toEqual({ sessions: true, search: true, notifications: true, automations: false })
     expect(visibleTabs({ ...caps, commands: ['agent_list_sessions'] }))
       .toEqual({ sessions: true, search: false, notifications: false, automations: false })
+    // Unknown capabilities keep every tab mounted so the first paint cannot
+    // change which route expo-router starts on.
     expect(visibleTabs(null))
-      .toEqual({ sessions: false, search: false, notifications: false, automations: false })
+      .toEqual({ sessions: true, search: true, notifications: true, automations: true })
   })
 
   it('shows the automations tab when the desktop serves scheduled tasks', () => {

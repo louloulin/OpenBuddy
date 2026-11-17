@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  appendAttachments,
   checkUpload,
   compressOptions,
   isUploadMime,
+  MAX_ATTACHMENTS,
   MAX_EDGE,
   MAX_UPLOAD_BYTES,
   uploadPath,
@@ -31,7 +33,29 @@ describe('checkUpload', () => {
     expect(checkUpload('image/gif', 1024, 0)).toMatchObject({ ok: false, reason: expect.stringContaining('JPG') })
     expect(checkUpload('image/png', 0, 0)).toMatchObject({ ok: false, reason: expect.stringContaining('读不出来') })
     expect(checkUpload('image/png', MAX_UPLOAD_BYTES + 1, 0)).toMatchObject({ ok: false, reason: expect.stringContaining('8MB') })
-    expect(checkUpload('image/png', 1024, 4)).toMatchObject({ ok: false, reason: expect.stringContaining('最多附') })
+    expect(checkUpload('image/png', 1024, MAX_ATTACHMENTS)).toMatchObject({ ok: false, reason: expect.stringContaining('最多附') })
+  })
+})
+
+describe('appendAttachments', () => {
+  const image = (uri: string) => ({ uri })
+
+  it('keeps order and ignores duplicates', () => {
+    const first = appendAttachments([image('a')], [image('b'), image('a')])
+    expect(first.list.map(item => item.uri)).toEqual(['a', 'b'])
+    expect(first.dropped).toBe(1)
+  })
+
+  it('enforces the cap and reports drops', () => {
+    const current = Array.from({ length: MAX_ATTACHMENTS - 1 }, (_, i) => image(`i${i}`))
+    const result = appendAttachments(current, [image('x'), image('y')], MAX_ATTACHMENTS)
+    expect(result.list).toHaveLength(MAX_ATTACHMENTS)
+    expect(result.dropped).toBe(1)
+  })
+
+  it('accepts nothing when the tray is full', () => {
+    const full = Array.from({ length: MAX_ATTACHMENTS }, (_, i) => image(`i${i}`))
+    expect(appendAttachments(full, [image('x')]).dropped).toBe(1)
   })
 })
 

@@ -8,19 +8,23 @@
  * at the visual bottom without moving the thumb.
  */
 
-import { useEffect, useMemo } from 'react'
-import { Pressable, ScrollView, Text, View, useColorScheme } from 'react-native'
+import { useEffect, useMemo, useState } from 'react'
+import { Modal, Pressable, ScrollView, Text, View, useColorScheme } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FlashList } from '@shopify/flash-list'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
 import { Composer } from '../../src/components/Composer'
-import { ApprovalCard } from '../../src/components/ApprovalCard'
+import { RequestCard } from '../../src/components/RequestCard'
 import { LoadingRow } from '../../src/components/LoadingRow'
 import { MessageRow } from '../../src/components/MessageRow'
 import { ChevronRightIcon, SparkIcon } from '../../src/components/icons'
 import { emptyTranscript, isTurnPending, type TranscriptRow } from '../../src/core/transcript'
 import { followUpsFor } from '../../src/core/follow-ups'
+import { queueLabel, queueRows } from '../../src/core/turn-input'
+import type { ApprovalAction } from '../../src/core/approvals'
+import type { Approval } from '../../src/core/models'
+import { elapsedLabel, sessionTasks } from '../../src/core/tasks'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
 
@@ -36,10 +40,22 @@ export default function ChatScreen() {
   const openSession = useApp(state => state.openSession)
   const setActiveSession = useApp(state => state.setActiveSession)
   const send = useApp(state => state.send)
+  const steer = useApp(state => state.steer)
+  const removeQueued = useApp(state => state.removeQueued)
+  const queue = useApp(state => state.queues[sessionId])
+  const prefill = useApp(state => state.drafts[sessionId])
+  const setDraft = useApp(state => state.setDraft)
   const sendImage = useApp(state => state.sendImage)
   const sendImages = useApp(state => state.sendImages)
   const approvals = useApp(state => state.approvals.filter(item => !item.sessionId || item.sessionId === sessionId))
   const resolveApproval = useApp(state => state.resolveApproval)
+  const resolveQuestion = useApp(state => state.resolveQuestion)
+  const resolveTrust = useApp(state => state.resolveTrust)
+  const tasks = useApp(state => state.tasks)
+  const refreshTasks = useApp(state => state.refreshTasks)
+  const killTask = useApp(state => state.killTask)
+  const [tasksOpen, setTasksOpen] = useState(false)
+  const [busyRequest, setBusyRequest] = useState<string | null>(null)
   const regenerate = useApp(state => state.regenerate)
   const awaiting = useApp(state => state.awaiting.includes(sessionId))
 
@@ -72,11 +88,44 @@ export default function ChatScreen() {
   // Kimi / Grok put next-question chips under the finished reply. They only
   // make sense once the turn is over and the answer is the latest one.
   const suggestions = useMemo(
-    () => (!streaming && !awaiting && transcript.lastAssistantText
+    () => (!streaming && !awaiting && approvals.length === 0 && transcript.lastAssistantText
       ? followUpsFor(transcript.lastAssistantText)
       : []),
-    [streaming, awaiting, transcript.lastAssistantText],
+    [streaming, awaiting, approvals.length, transcript.lastAssistantText],
   )
+  const queued = useMemo(() => queueRows(queue), [queue])
+  const sessionTaskRows = useMemo(() => sessionTasks(tasks, sessionId), [tasks, sessionId])
+
+  useEffect(() => {
+    if (sessionId) void refreshTasks()
+  }, [sessionId, refreshTasks])
+
+  // The handoff draft is read once by the composer; drop it immediately so a
+  // later remount does not resurrect text the user already sent or cleared.
+  useEffect(() => {
+    if (prefill) setDraft(sessionId, '')
+  }, [prefill, sessionId, setDraft])
+
+  // Poll only while the drawer is open: running tasks are a foreground view.
+  useEffect(() => {
+    if (!tasksOpen) return
+    const timer = setInterval(() => { void refreshTasks() }, 2000)
+    return () => clearInterval(timer)
+  }, [tasksOpen, refreshTasks])
+
+  const handleRequest = async (approval: Approval, action: ApprovalAction) => {
+    setBusyRequest(approval.requestId)
+    try {
+      if (action.type === 'permission') await resolveApproval(approval.requestId, action.approved)
+      else if (action.type === 'question') {
+        await resolveQuestion(approval.requestId, approval.sessionId ?? sessionId, action.value, action.cancelled)
+      } else if (action.type === 'trust' && approval.cwd) {
+        await resolveTrust(approval.cwd, action.trusted)
+      }
+    } finally {
+      setBusyRequest(null)
+    }
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.surface, paddingTop: insets.top }}>
@@ -161,9 +210,10 @@ export default function ChatScreen() {
           style={{ flex: 1 }}
           renderItem={({ item }: { item: ChatItem }) => (item.kind === 'approval'
             ? (
-              <ApprovalCard
+              <RequestCard
                 approval={item.approval}
-                onResolve={approved => void resolveApproval(item.approval.requestId, approved)}
+                busy={busyRequest === item.approval.requestId}
+                onAction={action => void handleRequest(item.approval, action)}
               />
             )
             : (
@@ -176,6 +226,59 @@ export default function ChatScreen() {
           contentContainerStyle={{ paddingVertical: 6 }}
         />
       )}
+
+      {sessionTaskRows.length ? (
+        <Pressable
+          onPress={() => { setTasksOpen(true); void refreshTasks() }}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginHorizontal: theme.gutter,
+            paddingVertical: 7,
+            opacity: pressed ? 0.6 : 1,
+          })}
+        >
+          <Text style={{ flex: 1, color: theme.textMedium, fontSize: 12 }}>
+            运行中 {sessionTaskRows.length}
+          </Text>
+          <Text style={{ color: theme.textWeak, fontSize: 12 }}>
+            {elapsedLabel(Math.min(...sessionTaskRows.map(task => task.startedAt ?? Date.now())))}
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {queued.length ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flexGrow: 0 }}
+          contentContainerStyle={{ gap: 8, paddingHorizontal: theme.gutter, paddingVertical: 6 }}
+        >
+          {queued.map(row => (
+            <View
+              key={`${row.kind}-${row.index}`}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                borderWidth: theme.hairline,
+                borderColor: theme.cardBorder,
+                borderRadius: theme.radiusPill,
+                paddingLeft: 10,
+                paddingRight: 6,
+                paddingVertical: 6,
+                backgroundColor: theme.card,
+              }}
+            >
+              <Text style={{ color: theme.textWeak, fontSize: 10 }}>{queueLabel(row.kind)}</Text>
+              <Text numberOfLines={1} style={{ maxWidth: 160, color: theme.textMedium, fontSize: 12 }}>{row.text}</Text>
+              <Pressable onPress={() => void removeQueued(sessionId, row)} hitSlop={8} accessibilityLabel="移除排队消息">
+                <Text style={{ color: theme.textWeak, fontSize: 13 }}>×</Text>
+              </Pressable>
+            </View>
+          ))}
+        </ScrollView>
+      ) : null}
 
       {suggestions.length ? (
         <ScrollView
@@ -209,13 +312,72 @@ export default function ChatScreen() {
 
       <Composer
         streaming={streaming}
+        initialDraft={prefill ?? ''}
         onSend={text => void send(sessionId, text)}
         onImage={(bytes, mime, text) => void sendImage(sessionId, bytes, mime, text)}
         onImages={(images, text) => void sendImages(sessionId, images, text)}
+        onSteer={text => void steer(sessionId, text)}
         onStop={() => {
           void useApp.getState().transport?.invoke('agent_cancel', { sessionId })
         }}
       />
+
+      <Modal visible={tasksOpen} transparent animationType="fade" onRequestClose={() => setTasksOpen(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }}
+            onPress={() => setTasksOpen(false)}
+          />
+          <View style={{
+            backgroundColor: theme.surface,
+            borderTopLeftRadius: 18,
+            borderTopRightRadius: 18,
+            paddingHorizontal: theme.gutter,
+            paddingTop: 14,
+            paddingBottom: 30,
+            gap: 4,
+          }}>
+            <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>运行中的任务</Text>
+            {sessionTaskRows.length === 0 ? (
+              <Text style={{ color: theme.textWeak, fontSize: 13, paddingVertical: 12 }}>没有运行中的任务。</Text>
+            ) : sessionTaskRows.map(task => (
+              <View
+                key={task.id}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                  paddingVertical: 12,
+                  borderTopWidth: theme.hairline,
+                  borderTopColor: theme.cardBorder,
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text numberOfLines={1} style={{ color: theme.text, fontSize: 14 }}>{task.title || task.description || task.id}</Text>
+                  <Text style={{ color: theme.textWeak, fontSize: 12, marginTop: 2 }}>
+                    {[task.kind, elapsedLabel(task.startedAt), task.pending ? `待确认 ${task.pending}` : ''].filter(Boolean).join(' · ')}
+                  </Text>
+                </View>
+                <Pressable onPress={() => void killTask(task.id)} hitSlop={8}>
+                  <Text style={{ color: theme.danger, fontSize: 13, fontWeight: '600' }}>结束</Text>
+                </Pressable>
+              </View>
+            ))}
+            <Pressable
+              onPress={() => setTasksOpen(false)}
+              style={({ pressed }) => ({
+                marginTop: 10,
+                paddingVertical: 12,
+                borderRadius: theme.radiusPill,
+                backgroundColor: pressed ? theme.pressed : theme.card,
+                alignItems: 'center',
+              })}
+            >
+              <Text style={{ color: theme.textMedium, fontSize: 14, fontWeight: '600' }}>关闭</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }

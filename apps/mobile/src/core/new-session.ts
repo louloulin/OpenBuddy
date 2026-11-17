@@ -23,6 +23,43 @@ export function newSessionCwd(init: InitAnswer | null | undefined): string | nul
   return null
 }
 
+export type WorkspaceChoice = { cwd: string; label: string; detail?: string }
+
+export type WorkspaceInfo = { cwd?: unknown; sessionCount?: unknown; lastTitle?: unknown }
+
+/**
+ * The folders a new session can start in: the desktop's current directory
+ * first, then the workspaces it has seen before. Absolute paths only, de-duped
+ * by cwd, capped so the sheet stays one screen.
+ */
+export function workspaceChoices(
+  current: string | null,
+  workspaces: readonly WorkspaceInfo[] | null | undefined,
+  max = 12,
+): WorkspaceChoice[] {
+  const rows: WorkspaceChoice[] = []
+  const seen = new Set<string>()
+  const add = (choice: WorkspaceChoice) => {
+    if (!choice.cwd.startsWith('/') || choice.cwd.includes('\0') || seen.has(choice.cwd) || rows.length >= max) return
+    seen.add(choice.cwd)
+    rows.push(choice)
+  }
+  if (current) add({ cwd: current, label: current, detail: '桌面当前目录' })
+  for (const item of workspaces ?? []) {
+    if (typeof item?.cwd !== 'string') continue
+    const count = typeof item.sessionCount === 'number' ? item.sessionCount : undefined
+    add({
+      cwd: item.cwd,
+      label: item.cwd,
+      detail: [
+        typeof item.lastTitle === 'string' && item.lastTitle ? item.lastTitle : undefined,
+        count !== undefined ? `${count} 个会话` : undefined,
+      ].filter(Boolean).join(' · ') || undefined,
+    })
+  }
+  return rows
+}
+
 export type NewSessionCheck = { ok: true; cwd: string } | { ok: false; reason: string }
 
 /** Combines the init answer and the auth state into one message the button can show. */

@@ -13,6 +13,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View, useColorScheme } 
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
 import { ChevronRightIcon } from '../../src/components/icons'
+import { permissionModeLabel } from '../../src/core/approvals'
 import {
   thinkingLevelLabel,
   thinkingLevelPayload,
@@ -89,6 +90,7 @@ export default function SessionPanelScreen() {
   const transport = useApp(state => state.transport)
   const session = useApp(state => state.sessions.find(item => item.id === sessionId))
   const capabilities = useApp(state => state.capabilities)
+  const permissionMode = useApp(state => state.permissionMode)
 
   const [experts, setExperts] = useState<ExpertOption[]>([])
   const [expertId, setExpertId] = useState<string | undefined>()
@@ -277,6 +279,10 @@ export default function SessionPanelScreen() {
 
       <Section theme={theme} label="用量">
         <Row theme={theme} label="上下文" value={usage ?? '桌面未提供'} last />
+      </Section>
+
+      <Section theme={theme} label="权限">
+        <Row theme={theme} label="审批模式" value={permissionModeLabel(permissionMode)} last />
       </Section>
 
       <Section theme={theme} label="资料">
