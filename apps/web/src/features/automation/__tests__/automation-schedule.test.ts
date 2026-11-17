@@ -28,6 +28,21 @@ describe("schedule-utils", () => {
     expect(scheduleModeOf({ scheduleType: "recurring", schedule: defaultSchedule() })).toBe("periodic");
   });
 
+  it("文件触发 (W4.7)：fileTrigger 存在即切换，空路径也先展示输入框", () => {
+    const draft = buildDraft();
+    expect(scheduleModeOf(draft)).toBe("periodic");
+    expect(scheduleModeOf({ ...draft, fileTrigger: { path: "" } })).toBe("file");
+    expect(
+      describeSchedule({ scheduleType: "recurring", schedule: draft.schedule, fileTrigger: { path: "/ws/inbox.csv" } }),
+    ).toBe("文件变化 · inbox.csv");
+    expect(validateDraft({ ...draft, name: "n", prompt: "p", fileTrigger: { path: "" } }, { isCreating: true }))
+      .toBe("请填写要监听的文件或目录路径");
+    expect(validateDraft({ ...draft, name: "n", prompt: "p", fileTrigger: { path: "relative/x" } }, { isCreating: true }))
+      .toBe("请填写绝对路径");
+    expect(validateDraft({ ...draft, name: "n", prompt: "p", fileTrigger: { path: "/ws/inbox.csv" } }, { isCreating: true }))
+      .toBeNull();
+  });
+
   it("inferPeriodicMode: WEEKLY interval=2 → biweek", () => {
     expect(inferPeriodicMode(schedule({ freq: "WEEKLY", interval: 2 }))).toBe("biweek");
     expect(inferPeriodicMode(schedule({ freq: "WEEKLY", interval: 1 }))).toBe("week");

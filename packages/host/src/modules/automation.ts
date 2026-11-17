@@ -1,5 +1,6 @@
 import { bool, text } from "@openbuddy/services/settings/settings";
 import { AutomationService, type AutomationExecutor } from "@openbuddy/services/automation/automation";
+import { FileTriggerWatcher, readTriggerContent } from "@openbuddy/services/automation/triggers";
 import { ExpertStore } from "@openbuddy/services/agents/store";
 import { setSessionExpert, type ExpertProfile } from "@openbuddy/engine/features/expert";
 import type { Automation, AutomationStatus } from "@openbuddy/protocol/dto";
@@ -56,7 +57,7 @@ export function automationModule(ctx: HostContext): HostModule {
   };
 
   /** Open a background session, send the prompt, and wait for the turn to settle. */
-  const executor: AutomationExecutor = async (task) => {
+  const executor: AutomationExecutor = async (task, extraPrompt?: string) => {
     const cwd = await engine.validCwd(task.cwds.split(",")[0].trim());
     const sessionId = await engine.newSession(cwd, task.modelId, undefined, undefined, true);
     // 后台任务视图 (W4.5): the 运行中 panel labels this session with its automation name.
@@ -67,7 +68,9 @@ export function automationModule(ctx: HostContext): HostModule {
     engine.emit("agent://automation", { id: task.id, name: task.name, status: "running", sessionId });
     let sendError: unknown;
     try {
-      const prompt = await applyTaskConfig(task, sessionId, cwd);
+      const base = await applyTaskConfig(task, sessionId, cwd);
+      // 文件触发 (W4.7): the changed content is injected, like Pi's file-trigger example.
+      const prompt = extraPrompt ? `${base}\n\n${extraPrompt}` : base;
       engine.send(sessionId, prompt).catch((error) => { sendError = error; });
     } catch (error) {
       sendError = error;
@@ -100,6 +103,7 @@ export function automationModule(ctx: HostContext): HostModule {
   const tickMs = ctx.options.automationTickMs ?? 30_000;
   if (tickMs > 0) {
     timer = setInterval(() => {
+      syncWatchers();
       void automations().tick(executor).catch((error) => {
         engine.emit("agent://error", { message: `自动化调度失败：${error instanceof Error ? error.message : String(error)}` });
       });
@@ -108,11 +112,54 @@ export function automationModule(ctx: HostContext): HostModule {
     (timer as unknown as { unref?: () => void }).unref?.();
   }
 
+  // ---------- 文件触发 (W4.7) ----------
+  // 每个启用中的文件触发任务一个 watcher；文件变化（防抖 5 秒）后立刻跑一次任务。
+  const watcher = new FileTriggerWatcher((change) => {
+    const taskId = typeof change.meta === "string" ? change.meta : undefined;
+    const task = taskId ? automations().get(taskId) : undefined;
+    if (!task || task.status !== "ACTIVE") return;
+    const content = readTriggerContent(change.path);
+    const record = automations().startRecord(task);
+    automations().markRun(task.id);
+    engine.emit("agent://automation", { id: task.id, name: task.name, status: "running" });
+    void executor(task, content ? `文件 ${change.path} 发生变化，内容如下：\n\n${content}` : `文件 ${change.path} 发生变化。`)
+      .then((result) => {
+        automations().finishRecord(record.id, {
+          status: result.ok ? "success" : "failed",
+          ...(result.sessionId ? { sessionId: result.sessionId } : {}),
+          ...(result.error ? { error: result.error } : {}),
+        });
+      })
+      .catch((error) => {
+        automations().finishRecord(record.id, { status: "failed", error: String(error) });
+      });
+  });
+  /** Keep the watchers in sync with the saved tasks (added / removed / paused / path changed). */
+  const syncWatchers = () => {
+    const wanted = new Map<string, Automation>();
+    for (const task of automations().snapshot().automations) {
+      if (task.status === "ACTIVE" && task.fileTrigger?.path) wanted.set(task.fileTrigger.path, task);
+    }
+    for (const path of watcher.watching) if (!wanted.has(path)) watcher.unwatch(path);
+    for (const [path, task] of wanted)
+      watcher.watch(path, { meta: task.id, ...(task.fileTrigger?.debounceMs ? { debounceMs: task.fileTrigger.debounceMs } : {}) });
+  };
+
   const commands: Record<string, Handler> = {
     automations_snapshot: () => automations().snapshot(),
-    automations_save: (p) => automations().save((p.automation ?? {}) as Partial<Automation>),
-    automations_delete: (p) => automations().delete(text(p.id)),
-    automations_set_status: (p) => automations().setStatus(text(p.id), text(p.status) === "PAUSED" ? "PAUSED" : "ACTIVE"),
+    automations_save: (p) => {
+      const saved = automations().save((p.automation ?? {}) as Partial<Automation>);
+      syncWatchers();
+      return saved;
+    },
+    automations_delete: (p) => {
+      automations().delete(text(p.id));
+      syncWatchers();
+    },
+    automations_set_status: (p) => {
+      automations().setStatus(text(p.id), text(p.status) === "PAUSED" ? "PAUSED" : "ACTIVE");
+      syncWatchers();
+    },
     automations_run: async (p) => {
       const task = automations().get(text(p.id));
       if (!task) throw Error("automation_not_found: 找不到这个自动化");

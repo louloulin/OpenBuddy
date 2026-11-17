@@ -376,6 +376,10 @@ async function setSize(w, h) {
 const ctx = {
   get page() { return page; }, get app() { return app; }, fixture, FIXTURE_PORT, profile, home, sleep, shot, setSize, launch,
   consoleLog, pageErrors,
+  // 20261116-pii W4.7: 文件触发 — the e2e writes the watched file to trigger the task.
+  writeFile: (path, content) => writeFile(path, content, 'utf-8'),
+  mkdir: (path) => mkdir(path, { recursive: true }),
+  tmpPath: (name) => join(RUN, name),
   call: (command, payload = {}) => page.evaluate(({ command, payload }) => window.openbuddy.invoke(command, payload), { command, payload }),
   audit: () => app.evaluate(() => ({ main: globalThis.__ipcAudit, renderer: globalThis.__rendererRejects })),
 };

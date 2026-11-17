@@ -806,3 +806,197 @@ body.bench-resizing iframe { pointer-events: none; }
 .task-overview__link:hover { color: var(--wb-text-strong); }
 .task-overview__empty { margin: 0; padding: 2px 6px 4px; font-size: 12px; line-height: 18px; color: var(--wb-text-medium); }
 .task-overview__more { padding: 4px 6px; font-size: 12px; color: var(--wb-text-medium); }
+
+/* ---------- 20261117 · W4 后续：功能页与面板（对齐 Grok 的阅读列与安静表面） ----------
+ * 差距分析：对话页已经采用 24px 作曲卡、墨色主按钮与聚焦光晕；但「更多」里的功能页
+ * （通知渠道 / 用量 / 策略 / 自动化等）仍是 10px 圆角的小卡片，直接漂在大片留白里，
+ * 行高与按钮也偏小。这里把功能页收敛成一条居中的阅读列，并给面板统一卡片语言：
+ * 柔和的斜向高光、18px 圆角、行悬停、胶囊按钮、细滚动条，深浅色共用同一套 token。
+ */
+.placeholder-page--panel {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0;
+  padding: clamp(28px, 5vh, 56px) clamp(20px, 4vw, 48px) 64px;
+  overflow-y: auto;
+  background:
+    radial-gradient(900px 320px at 50% -140px, color-mix(in srgb, var(--ob-focus) 10%, transparent), transparent 70%),
+    var(--ob-surface);
+  animation: ob-fade var(--ob-dur-slow) var(--ob-ease) both;
+}
+.placeholder-page--panel > * {
+  width: 100%;
+  max-width: 860px;
+}
+.placeholder-page--panel::-webkit-scrollbar { width: 10px; }
+.placeholder-page--panel::-webkit-scrollbar-thumb { background: transparent; border: 3px solid transparent; background-clip: padding-box; border-radius: 10px; }
+.placeholder-page--panel:hover::-webkit-scrollbar-thumb { background-color: var(--ob-active); }
+
+/* 面板：同一张卡片语言 */
+.notify-panel,
+.policy-panel {
+  border: 1px solid var(--ob-card-border);
+  border-radius: 18px;
+  background: var(--ob-card);
+  box-shadow: var(--ob-shadow-card);
+  overflow: hidden;
+  animation: ob-rise var(--ob-dur-slow) var(--ob-ease-out) both;
+}
+.notify-panel { font-size: 13px; }
+.notify-panel__head,
+.policy-panel__head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--ob-card-border);
+  background: transparent;
+}
+.notify-panel__title,
+.policy-panel__title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--wb-text-strong);
+}
+.notify-panel__hint,
+.policy-panel__hint {
+  max-width: 62ch;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--wb-text-tertiary);
+}
+
+/* 通知渠道：行卡片 + 胶囊按钮 */
+.notify-panel__list { padding: 6px; }
+.notify-panel__row {
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  transition: background var(--ob-dur-fast) var(--ob-ease);
+}
+.notify-panel__row + .notify-panel__row { margin-top: 2px; }
+.notify-panel__row:hover { background: var(--ob-hover); }
+.notify-panel__row.disabled { opacity: 0.55; }
+.notify-panel__row-kind {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ob-focus) 16%, transparent);
+  color: var(--wb-text-strong);
+  font-weight: 500;
+}
+.notify-panel__row-endpoint {
+  max-width: 280px;
+  font-family: var(--wb-font-code-family, ui-monospace, monospace);
+  font-size: 11px;
+}
+.notify-panel__row-actions { gap: 6px; }
+.notify-panel__btn {
+  height: 26px;
+  min-width: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border-color: var(--ob-card-border);
+  background: transparent;
+  transition: background var(--ob-dur-fast) var(--ob-ease), border-color var(--ob-dur-fast) var(--ob-ease), color var(--ob-dur-fast) var(--ob-ease);
+}
+.notify-panel__btn:hover:not(:disabled) {
+  background: var(--ob-hover);
+  border-color: var(--ob-card-border);
+  color: var(--wb-text-strong);
+}
+.notify-panel__btn--danger:hover { border-color: color-mix(in srgb, #dc2626 45%, var(--ob-card-border)); color: #dc2626; }
+.notify-dot { width: 9px; height: 9px; }
+.notify-dot--on {
+  background: var(--wb-status-success, #1a7f37);
+  border-color: var(--wb-status-success, #1a7f37);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wb-status-success, #1a7f37) 18%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .notify-dot--on { animation: ob-live 2.6s var(--ob-ease) infinite; }
+  @keyframes ob-live {
+    0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--wb-status-success, #1a7f37) 20%, transparent); }
+    50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--wb-status-success, #1a7f37) 6%, transparent); }
+  }
+}
+.notify-panel__empty { padding: 32px 20px; font-size: 13px; color: var(--wb-text-tertiary); }
+.notify-panel__add {
+  gap: 8px;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--ob-card-border);
+  background: color-mix(in srgb, var(--ob-surface) 55%, var(--ob-card));
+}
+.notify-panel__add select,
+.notify-panel__add input,
+.policy-panel__input-row input,
+.policy-panel select {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border-color: var(--ob-card-border);
+  background: var(--ob-card);
+  transition: border-color var(--ob-dur-fast) var(--ob-ease), box-shadow var(--ob-dur-fast) var(--ob-ease);
+}
+.notify-panel__add select:focus-visible,
+.notify-panel__add input:focus-visible,
+.policy-panel__input-row input:focus-visible {
+  outline: none;
+  border-color: transparent;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ob-focus) 30%, transparent);
+}
+.notify-panel__add-btn,
+.policy-panel__input-row button {
+  height: 32px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--ob-ink);
+  color: var(--ob-ink-fg);
+  font-weight: 500;
+  transition: translate var(--ob-dur-fast) var(--ob-ease), scale var(--ob-dur-fast) var(--ob-ease), opacity var(--ob-dur-fast) var(--ob-ease);
+}
+.notify-panel__add-btn:hover:not(:disabled),
+.policy-panel__input-row button:hover:not(:disabled) { translate: 0 -1px; }
+.notify-panel__add-btn:active:not(:disabled),
+.policy-panel__input-row button:active:not(:disabled) { scale: 0.97; translate: 0 0; }
+.notify-panel__add-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* 侧栏「运行中」：与卡片语言一致，行悬停，停止键不抢眼 */
+.tasks-panel {
+  margin: 4px 10px 10px;
+  padding: 10px;
+  border: 1px solid var(--ob-card-border);
+  border-radius: 14px;
+  background: var(--ob-card);
+  box-shadow: var(--ob-shadow-card);
+  animation: ob-pop-in var(--ob-dur) var(--ob-ease-out) both;
+}
+.tasks-panel__header { margin-bottom: 6px; }
+.tasks-panel__title { font-size: 12px; letter-spacing: -0.01em; }
+.tasks-panel__refresh { border-radius: 8px; }
+.tasks-panel__refresh:hover { background: var(--ob-hover); }
+.tasks-panel__item {
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: transparent;
+  transition: background var(--ob-dur-fast) var(--ob-ease);
+}
+.tasks-panel__item:hover { background: var(--ob-hover); }
+.tasks-panel__kill { border-radius: 8px; color: var(--wb-text-tertiary); }
+.tasks-panel__kill:hover { background: var(--ob-active); color: var(--wb-text-strong); }
+
+/* 暗色：面板边缘与悬停更柔和，避免纯白卡片在深色背景上过亮 */
+[data-theme="dark"] .notify-panel,
+[data-theme="dark"] .policy-panel,
+[data-theme="dark"] .tasks-panel {
+  background: var(--ob-card);
+  border-color: var(--ob-card-border);
+}
+[data-theme="dark"] .placeholder-page--panel {
+  background:
+    radial-gradient(900px 320px at 50% -140px, color-mix(in srgb, var(--ob-focus) 12%, transparent), transparent 70%),
+    var(--ob-surface);
+}
+[data-theme="dark"] .notify-panel__add {
+  background: color-mix(in srgb, #000 18%, var(--ob-card));
+}

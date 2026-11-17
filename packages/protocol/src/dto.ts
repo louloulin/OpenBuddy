@@ -673,9 +673,22 @@ export interface Automation {
   validFromDate?: string;
   validUntilDate?: string;
   pushToWeChat: boolean;
+  /**
+   * 文件触发 (pii W4.7)：存在时任务由文件变化触发，不再按时间调度。
+   * 参照 Pi SDK 的 `file-trigger` 示例扩展：监听路径 → 防抖 → 把内容注入这一轮。
+   */
+  fileTrigger?: AutomationFileTrigger;
   lastRunAt?: string;
   nextRunAt?: string;
   createdAt: string;
+}
+
+/** 文件变化触发（pii W4.7）。 */
+export interface AutomationFileTrigger {
+  /** 监听的绝对路径（文件或目录）。 */
+  path: string;
+  /** 防抖窗口（毫秒），默认 5000。 */
+  debounceMs?: number;
 }
 
 /** A single run-history entry (运行记录). */

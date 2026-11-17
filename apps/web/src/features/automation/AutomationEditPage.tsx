@@ -515,10 +515,22 @@ export function AutomationEditPage({
         : false;
 
   const handleScheduleModeChange = (next: ScheduleMode) => {
+    if (next === "file") {
+      // 文件触发 (W4.7): 监听一个文件或目录，变化后运行（不再按时间调度）。
+      setDraft({
+        ...draft,
+        scheduleType: "recurring",
+        fileTrigger: { path: draft.fileTrigger?.path ?? "" },
+        validFromDate: "",
+        validUntilDate: "",
+      });
+      return;
+    }
     if (next === "periodic") {
       setDraft({
         ...draft,
         scheduleType: "recurring",
+        fileTrigger: undefined,
         schedule:
           draft.schedule.freq === "HOURLY"
             ? { ...draft.schedule, freq: "DAILY", interval: 1, byday: [...ALL_DAYS] }
@@ -531,6 +543,7 @@ export function AutomationEditPage({
       setDraft({
         ...draft,
         scheduleType: "recurring",
+        fileTrigger: undefined,
         schedule: {
           ...draft.schedule,
           freq: "HOURLY",
@@ -541,7 +554,7 @@ export function AutomationEditPage({
       });
       return;
     }
-    setDraft({ ...draft, scheduleType: "once", validFromDate: "", validUntilDate: "" });
+    setDraft({ ...draft, scheduleType: "once", validFromDate: "", validUntilDate: "", fileTrigger: undefined });
   };
 
   const handlePeriodicModeChange = (val: PeriodicMode) => {
@@ -731,6 +744,7 @@ export function AutomationEditPage({
               { value: "periodic", label: "周期" },
               { value: "interval", label: "按间隔" },
               { value: "once", label: "单次" },
+              { value: "file", label: "文件变化" },
             ]}
           />
 
@@ -845,8 +859,26 @@ export function AutomationEditPage({
             </div>
           )}
 
+          {scheduleMode === "file" && (
+            <div className="atm-schedule-file">
+              <label className="atm-modal-label" htmlFor="atm-file-trigger-path">
+                监听路径
+                <span className="atm-modal-hint atm-modal-hint-inline">(文件或目录的绝对路径，变化后 5 秒内触发。)</span>
+              </label>
+              <input
+                id="atm-file-trigger-path"
+                type="text"
+                className="atm-modal-input"
+                placeholder="/Users/you/project/data/inbox.csv"
+                value={draft.fileTrigger?.path ?? ""}
+                disabled={saving}
+                onChange={(e) => set({ fileTrigger: { path: e.target.value } })}
+              />
+            </div>
+          )}
+
           {/* 生效日期区间 */}
-          {scheduleMode !== "once" && (
+          {scheduleMode !== "once" && scheduleMode !== "file" && (
             <>
               <label className="atm-modal-label">
                 生效日期区间

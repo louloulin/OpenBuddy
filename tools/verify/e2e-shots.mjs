@@ -701,6 +701,64 @@ try {
     if (!listed.some((c) => c.label === '销售群机器人' && c.enabled)) throw new Error('channel not persisted: ' + JSON.stringify(listed));
     const tested = await ctx.shot('52-notify-channels-tested');
     return { empty, configured, tested, payload: sent.body, channels: listed.map((c) => c.label + ':' + c.kind + ':' + c.enabled) };`);
+  // W4.7: 文件触发 — the automation watches a file; writing it runs the task.
+  await step('文件触发自动化', `
+    await page.locator('.sidebar__nav > [data-feature="automation"]').click();
+    // 前面已经建过任务，工具栏里是「添加自动化」（空态里才是「+ 添加自动化」）。
+    await page.locator('.atm-create-btn').waitFor({ timeout: 10000 });
+    await page.locator('.atm-create-btn').click();
+    await page.getByRole('button', { name: '保存', exact: true }).waitFor({ timeout: 10000 });
+    const watched = ctx.tmpPath('watched-inbox.csv');
+    await ctx.writeFile(watched, 'name,qty\\nwidget,3\\n');
+    // 复用上一个任务的工作空间（收件箱，已信任），否则新的未信任目录会弹出目录信任弹窗。
+    const prior = await ctx.call('automations_snapshot');
+    const workspace = prior.automations.find((a) => a.cwds)?.cwds.split(',')[0].trim();
+    if (!workspace) throw new Error('no existing automation workspace to reuse');
+    await page.locator('.atm-modal-input').first().fill('收件箱文件触发');
+    await page.locator('.atm-workspace-input .atm-modal-input').fill(workspace);
+    await page.locator('.atm-prompt-textarea').fill('根据这个文件生成一行摘要');
+    await page.getByRole('tab', { name: '文件变化' }).click();
+    await page.getByLabel(/监听路径/).fill(watched);
+    await ctx.sleep(400);
+    const form = await ctx.shot('53-automation-file-trigger');
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    const risk = page.getByRole('dialog').filter({ hasText: '完全访问权限' });
+    await risk.waitFor({ timeout: 5000 }).catch(() => {});
+    if (await risk.isVisible().catch(() => false)) {
+      await risk.getByRole('button', { name: /改为「默认权限」运行/ }).click();
+      await page.getByRole('button', { name: '保存', exact: true }).click();
+    }
+    const row = page.locator('.atm-row', { hasText: '收件箱文件触发' }).first();
+    await row.waitFor({ timeout: 15000 });
+    await ctx.sleep(500);
+    const saved = await ctx.shot('54-automation-file-trigger-saved');
+    const summary = await row.innerText();
+    if (!summary.includes('文件变化')) throw new Error('row does not show the file trigger: ' + summary);
+    // 写文件 → 防抖 5 秒 → 任务真的跑了一次。面板不会自己刷新，所以先问宿主，再重进面板截图。
+    await ctx.writeFile(watched, 'name,qty\\nwidget,7\\n');
+    let run;
+    for (let i = 0; i < 60; i += 1) {
+      const snap = await ctx.call('automations_snapshot');
+      run = snap.records.find((r) => r.automationName === '收件箱文件触发');
+      if (run && run.status !== 'running') break;
+      await ctx.sleep(1000);
+    }
+    if (!run || run.status !== 'success') throw new Error('file trigger run did not succeed: ' + JSON.stringify(run));
+    await page.locator('.sidebar__nav > [data-feature="library"]').click();
+    await page.locator('.sidebar__nav > [data-feature="automation"]').click();
+    await page.getByRole('tab', { name: '运行记录' }).click();
+    const record = page.locator('.atm-inbox-row', { hasText: '收件箱文件触发' }).first();
+    await record.waitFor({ timeout: 15000 });
+    await ctx.sleep(800);
+    const records = await ctx.shot('55-automation-file-trigger-record');
+    const text = (await record.innerText()).replace(/\\s+/g, ' ');
+    if (!text.includes('成功')) throw new Error('file trigger record not shown as success: ' + text);
+    const snapshot = await ctx.call('automations_snapshot');
+    const task = snapshot.automations.find((a) => a.name === '收件箱文件触发');
+    if (!task || !task.fileTrigger || task.fileTrigger.path !== watched) throw new Error('file trigger not persisted: ' + JSON.stringify(task));
+    if (task.nextRunAt) throw new Error('a file-triggered task must not have a scheduled run: ' + task.nextRunAt);
+    if (!run.sessionId) throw new Error('file trigger record has no session');
+    return { form, saved, records, text, trigger: task.fileTrigger, recordStatus: run.status, sessionId: run.sessionId, recordCount: snapshot.records.length };`);
   // pii W4.5: the sidebar 运行中 panel lists the running turn with elapsed time; stop cancels it.
   await step('运行中面板（任务 / 用时 / 停止）', `
     ctx.fixture.delayMs = 1500;

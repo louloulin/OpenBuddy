@@ -23,7 +23,7 @@ export interface AutomationExecutorResult {
 }
 
 /** Runs one automation (host: open a background session and send the prompt). */
-export type AutomationExecutor = (automation: Automation) => Promise<AutomationExecutorResult>;
+export type AutomationExecutor = (automation: Automation, extraPrompt?: string) => Promise<AutomationExecutorResult>;
 
 interface AutomationFile {
   automations: Automation[];
@@ -46,7 +46,9 @@ const parseTime = (value: string | undefined): { hour: number; minute: number } 
 };
 
 /** Next wall-clock run strictly after `after` (undefined when the schedule is exhausted). */
-export function nextRunAt(automation: Pick<Automation, "scheduleType" | "schedule" | "scheduledDate" | "scheduledTime" | "validFromDate" | "validUntilDate">, after = new Date()): string | undefined {
+export function nextRunAt(automation: Pick<Automation, "scheduleType" | "schedule" | "scheduledDate" | "scheduledTime" | "validFromDate" | "validUntilDate"> & { fileTrigger?: Automation["fileTrigger"] }, after = new Date()): string | undefined {
+  // 文件触发 (W4.7): the task runs when the file changes, not on a clock.
+  if (automation.fileTrigger) return undefined;
   const { schedule } = automation;
   const until = parseDay(automation.validUntilDate);
   if (until) until.setHours(23, 59, 59, 999);
@@ -145,6 +147,16 @@ export class AutomationService {
     merged.name = text(merged.name, "name").slice(0, 120);
     merged.prompt = text(merged.prompt, "prompt");
     if (!merged.cwds.trim()) throw Error("invalid_payload: cwds");
+    // 文件触发 (W4.7): the trigger path is required and absolute.
+    if (merged.fileTrigger) {
+      const path = text(merged.fileTrigger.path, "fileTrigger.path").trim();
+      if (!path || !path.startsWith("/") || path.includes("\0"))
+        throw Error("invalid_payload: fileTrigger.path");
+      merged.fileTrigger = {
+        path,
+        ...(merged.fileTrigger.debounceMs ? { debounceMs: Math.max(0, Math.min(60000, merged.fileTrigger.debounceMs)) } : {}),
+      };
+    }
     merged.nextRunAt = merged.status === "ACTIVE" ? nextRunAt(merged, now) : undefined;
     const index = file.automations.findIndex((task) => task.id === merged.id);
     if (index >= 0) file.automations[index] = merged;

@@ -28,7 +28,7 @@ export const DAY_LABELS: Record<WeekdayCode, string> = {
 export const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 export const MONTH_DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 
-export type ScheduleMode = "periodic" | "interval" | "once";
+export type ScheduleMode = "periodic" | "interval" | "once" | "file";
 export type PeriodicMode = "day" | "week" | "biweek" | "month" | "year";
 
 /** 表单草稿：保存前与 Automation 同构（id 为空表示新建）。 */
@@ -71,7 +71,9 @@ export function getYearlyMaxDay(month: number): number {
   return 29;
 }
 
-export function scheduleModeOf(draft: Pick<AutomationDraft, "scheduleType" | "schedule">): ScheduleMode {
+export function scheduleModeOf(draft: Pick<AutomationDraft, "scheduleType" | "schedule"> & { fileTrigger?: AutomationDraft["fileTrigger"] }): ScheduleMode {
+  // 文件触发 (pii W4.7): a file trigger replaces the clock (the path may still be empty while editing).
+  if (draft.fileTrigger) return "file";
   if (draft.scheduleType === "once") return "once";
   return draft.schedule.freq === "HOURLY" ? "interval" : "periodic";
 }
@@ -126,6 +128,12 @@ export function buildDraft(template?: AutomationTemplate): AutomationDraft {
   };
 }
 
+/** 文件触发草稿（pii W4.7）：监听 path，变化后运行。 */
+export function buildFileTriggerDraft(path: string): AutomationDraft {
+  const draft = buildDraft();
+  return { ...draft, fileTrigger: { path } };
+}
+
 export function draftFromAutomation(a: Automation): AutomationDraft {
   return {
     id: a.id,
@@ -152,6 +160,8 @@ export function draftFromAutomation(a: Automation): AutomationDraft {
     validFromDate: a.validFromDate ?? "",
     validUntilDate: a.validUntilDate ?? "",
     pushToWeChat: a.pushToWeChat ?? false,
+    // 文件触发 (pii W4.7).
+    ...(a.fileTrigger ? { fileTrigger: { ...a.fileTrigger } } : {}),
   };
 }
 
@@ -182,7 +192,9 @@ function dayListLabel(byday: string[]): string {
 }
 
 /** 列表行上的调度摘要（对齐 automation.schedule.* 文案）。 */
-export function describeSchedule(a: Pick<Automation, "scheduleType" | "schedule" | "scheduledDate" | "scheduledTime">): string {
+export function describeSchedule(a: Pick<Automation, "scheduleType" | "schedule" | "scheduledDate" | "scheduledTime"> & { fileTrigger?: Automation["fileTrigger"] }): string {
+  // 文件触发 (pii W4.7).
+  if (a.fileTrigger?.path) return `文件变化 · ${a.fileTrigger.path.split("/").pop() || a.fileTrigger.path}`;
   if (a.scheduleType === "once") {
     const date = a.scheduledDate ? a.scheduledDate.slice(5).replace("-", "/") : "";
     return `单次 · ${date} ${a.scheduledTime ?? "09:00"}`;
@@ -281,6 +293,12 @@ export function validateDraft(draft: AutomationDraft, opts: ValidateOptions): st
     if ((opts.isCreating || changed) && Date.parse(next) <= Date.now()) {
       return "单次执行时间必须晚于当前时间";
     }
+  }
+  // 文件触发 (pii W4.7): an absolute path is required.
+  if (mode === "file") {
+    const path = draft.fileTrigger?.path?.trim() ?? "";
+    if (!path) return "请填写要监听的文件或目录路径";
+    if (!path.startsWith("/")) return "请填写绝对路径";
   }
   return null;
 }
