@@ -93,6 +93,7 @@ export default function RootLayout() {
               <Stack.Screen name="chat/[sessionId]" options={{ headerShown: false }} />
               <Stack.Screen name="session/[sessionId]" options={{ headerShown: false }} />
               <Stack.Screen name="files" options={{ headerShown: false }} />
+              <Stack.Screen name="library" options={{ headerShown: false }} />
               <Stack.Screen name="memory" options={{ title: '记忆' }} />
               <Stack.Screen name="memory/[path]" options={{ title: '记忆' }} />
               <Stack.Screen name="branches/[sessionId]" options={{ title: '分支与检查点' }} />

@@ -10,7 +10,7 @@
  * fixable before it becomes a turn.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Alert, Image, Modal, Pressable, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
@@ -19,6 +19,8 @@ import * as Speech from 'expo-speech'
 
 import { appendAttachments, compressOptions, checkUpload, MAX_ATTACHMENTS } from '../core/attachments'
 import { mergeTranscript, transcriptOutcome, unavailableMessage } from '../core/voice'
+import { matchCommands, slashQuery, toSlashCommands, type SlashCommand } from '../core/slash'
+import { useApp } from '../stores/app'
 import { themeFor } from '../theme'
 import { CameraIcon, MicIcon, SendIcon, StopIcon } from './icons'
 
@@ -43,6 +45,25 @@ export function Composer({ onSend, onImage, onImages, onStop, onSteer, streaming
   const [focused, setFocused] = useState(false)
   const [busy, setBusy] = useState(false)
   const hasText = draft.trim().length > 0
+
+  // Slash menu: fetched once per composer from the desktop, filtered locally.
+  const transport = useApp(state => state.transport)
+  const capabilities = useApp(state => state.capabilities)
+  const canListCommands = Boolean(capabilities?.commands.includes('commands_list'))
+  const [commands, setCommands] = useState<SlashCommand[]>([])
+  const [commandsLoaded, setCommandsLoaded] = useState(false)
+  const query = canListCommands ? slashQuery(draft) : null
+  const commandMenu = query === null ? [] : matchCommands(commands, query)
+
+  useEffect(() => {
+    if (query === null || commandsLoaded || !transport) return
+    // One attempt: an older desktop without the command should not retry on
+    // every keystroke.
+    setCommandsLoaded(true)
+    transport.invoke<unknown>('commands_list', {})
+      .then(raw => setCommands(toSlashCommands(raw)))
+      .catch(() => {})
+  }, [query, commandsLoaded, transport])
 
   /**
    * One send action for text and pictures: attachments sit in a draft tray
@@ -311,6 +332,34 @@ export function Composer({ onSend, onImage, onImages, onStop, onSteer, streaming
             ))}
             <Text style={{ color: theme.textWeak, fontSize: 11 }}>{pending.length}/{MAX_ATTACHMENTS}</Text>
           </ScrollView>
+        ) : null}
+
+        {commandMenu.length ? (
+          <View style={{ borderTopWidth: theme.hairline, borderTopColor: theme.cardBorder, paddingTop: 4, marginBottom: 2 }}>
+            {commandMenu.map(command => (
+              <Pressable
+                key={command.name}
+                onPress={() => setDraft(`/${command.name} `)}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  paddingVertical: 8,
+                  paddingHorizontal: 2,
+                  opacity: pressed ? 0.6 : 1,
+                })}
+              >
+                <Text numberOfLines={1} style={{ color: theme.text, fontSize: 13, fontWeight: '600' }}>
+                  /{command.name}
+                </Text>
+                {command.description ? (
+                  <Text numberOfLines={1} style={{ flex: 1, color: theme.textWeak, fontSize: 12 }}>
+                    {command.description}
+                  </Text>
+                ) : null}
+              </Pressable>
+            ))}
+          </View>
         ) : null}
 
         <TextInput

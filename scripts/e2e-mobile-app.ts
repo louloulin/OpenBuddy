@@ -34,6 +34,10 @@ import { flushOutbox } from '../apps/mobile/src/core/connection.js'
 import { groupMemory, memoryPreview, validateMemoryDraft } from '../apps/mobile/src/core/memory.js'
 import { branchLabel, branchTurns, checkpointAction, restoreHash, toCheckpoints, toRewindPoints } from '../apps/mobile/src/core/branches.js'
 import { checkNewSession } from '../apps/mobile/src/core/new-session.js'
+import { toSearchHits } from '../apps/mobile/src/core/files.js'
+import { matchCommands, slashQuery, toSlashCommands } from '../apps/mobile/src/core/slash.js'
+import { automationSavePayload, validateAutomationDraft } from '../apps/mobile/src/core/automations.js'
+import { toLibrarySources } from '../apps/mobile/src/core/library.js'
 import { cleanSessionTitle, sessionActions } from '../apps/mobile/src/core/session-actions.js'
 import { bumpUnread, shouldMarkUnread, totalUnread } from '../apps/mobile/src/core/unread.js'
 import { parseLockSetting, shouldRelock } from '../apps/mobile/src/core/app-lock.js'
@@ -65,6 +69,8 @@ const rewound: string[] = []
 const restoredFiles: { path: string; hash: string | null }[] = []
 const newSessionCalls: unknown[] = []
 const sessionMeta: { op: string; sessionId: string; value: unknown }[] = []
+const savedAutomations: Record<string, unknown>[] = []
+const deletedAutomations: string[] = []
 const deletedSessions: string[] = []
 const turnQueue = { steering: [] as string[], followUp: [] as string[] }
 const BRANCH_TREE = {
@@ -185,6 +191,27 @@ const dispatcher: HostDispatcher = {
       case 'agent_export_jsonl':
         sessionMeta.push({ op: 'export', sessionId: String(payload.sessionId), value: true })
         return '/e2e/export.jsonl'
+      case 'files_search':
+        return {
+          cwd: String(payload.cwd),
+          hits: [{ path: 'src/server.ts', name: 'server.ts', size: 10, mtimeMs: 1 }],
+          partial: false,
+        }
+      case 'commands_list':
+        return [
+          { name: 'compact', description: '压缩上下文', source: 'builtin' },
+          { name: 'skill:review', description: '代码评审', source: 'skill' },
+        ]
+      case 'automations_save': {
+        const input = (payload.automation ?? {}) as Record<string, unknown>
+        savedAutomations.push(input)
+        return { id: 'auto-e2e', ...input }
+      }
+      case 'automations_delete':
+        deletedAutomations.push(String(payload.id))
+        return { ok: true }
+      case 'library_list':
+        return [{ id: '/e2e/workspace/docs', kind: 'folder', label: 'docs', path: '/e2e/workspace/docs' }]
       case 'read_text_file':
         if (payload.path !== '/e2e/export.jsonl') throw new Error(`no such file ${String(payload.path)}`)
         return '{"type":"session"}\n{"type":"message"}\n'
@@ -235,7 +262,8 @@ const dispatcher: HostDispatcher = {
     'agent_get_queue', 'agent_follow_up', 'agent_steer', 'agent_set_queue', 'agent_clear_queue',
     'agent_cancel', 'agent_resolve_ui', 'folder_trust_respond', 'tasks_list', 'task_kill', 'permission_mode_get',
     'agent_list_workspaces', 'agent_fork_session', 'agent_handoff', 'agent_compact',
-    'agent_export_jsonl', 'read_text_file',
+    'agent_export_jsonl', 'read_text_file', 'files_search', 'commands_list',
+    'automations_save', 'automations_delete', 'library_list',
     'window_minimize', // must be filtered off the mobile surface
   ],
 }
@@ -570,6 +598,35 @@ check('batch delete reaches every session',
 check('selection toggles without duplicates', toggleSelection(['a', 'b'], 'a').join(',') === 'b')
 check('batch summary keeps the failure count', batchSummary('已删除', { ok: ['a'], failed: [{ id: 'b', reason: 'x' }] }) === '已删除 1 个，1 个失败')
 check('unknown capabilities keep every tab mounted', Object.values(visibleTabs(null)).every(Boolean))
+
+// ── 8m. File search and slash commands (v3 D2/D4) ──────────────────────────
+
+const searchResult = await transport.invoke<unknown>('files_search', { cwd: '/e2e/workspace', query: 'serv' })
+const hitEntries = toSearchHits(searchResult, '/e2e/workspace')
+check('file search returns an absolute path', hitEntries[0]?.path === '/e2e/workspace/src/server.ts')
+
+const commandList = await transport.invoke<unknown>('commands_list', {})
+const slashMenu = matchCommands(toSlashCommands(commandList), 'rev')
+check('slash commands come from the desktop and filter', slashMenu[0]?.name === 'skill:review')
+check('slash menu closes once an argument is typed', slashQuery('/skill:review 试一下') === null)
+
+// ── 8n. Automation editing (v3 D3) ─────────────────────────────────────────
+
+check('automation drafts require absolute workspaces',
+  validateAutomationDraft({ name: '晨报', prompt: '整理', cwds: '/e2e/workspace' }) === null
+  && validateAutomationDraft({ name: '晨报', prompt: '整理', cwds: 'relative' }) !== null)
+await transport.invoke('automations_save', {
+  automation: automationSavePayload({ name: '演示巡检', prompt: '检查 CI', cwds: '/e2e/workspace, /e2e/other' }),
+})
+check('automation save reaches the desktop',
+  savedAutomations.some(item => item.name === '演示巡检' && item.cwds === '/e2e/workspace,/e2e/other'))
+await transport.invoke('automations_delete', { id: 'auto-e2e' })
+check('automation delete reaches the desktop', deletedAutomations.includes('auto-e2e'))
+
+// ── 8o. Library knowledge sources (v3 D1) ──────────────────────────────────
+
+const library = toLibrarySources(await transport.invoke<unknown>('library_list', {}))
+check('library sources keep their label and path', library[0]?.label === 'docs' && library[0]?.path === '/e2e/workspace/docs')
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 

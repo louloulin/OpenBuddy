@@ -63,6 +63,33 @@ export function toDirEntries(raw: unknown): DirEntry[] {
   })
 }
 
+/**
+ * `files_search` returns paths relative to the search root; the screen opens
+ * absolute paths, so join them here and keep the host's order (already ranked).
+ */
+export function toSearchHits(raw: unknown, root: string): DirEntry[] {
+  const result = raw as { hits?: unknown } | null
+  const hits = Array.isArray(result?.hits) ? result.hits : []
+  const base = root.replace(/\/+$/, '')
+  const entries: DirEntry[] = []
+  for (const hit of hits) {
+    if (!hit || typeof hit !== 'object') continue
+    const record = hit as Record<string, unknown>
+    const relative = typeof record.path === 'string' ? record.path.replace(/^\/+/, '') : ''
+    if (!relative) continue
+    const name = typeof record.name === 'string' && record.name
+      ? record.name
+      : relative.split('/').pop() ?? relative
+    entries.push({
+      name,
+      path: `${base}/${relative}`,
+      kind: 'file',
+      size: typeof record.size === 'number' ? record.size : 0,
+    })
+  }
+  return entries
+}
+
 /** A readable size for the file list. */
 export function formatSize(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return ''

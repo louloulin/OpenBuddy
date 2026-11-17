@@ -8,17 +8,24 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View, useColorScheme } from 'react-native'
+import {
+  ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl,
+  ScrollView, Text, TextInput, View, useColorScheme,
+} from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 
 import { ClockIcon, PlayIcon } from '../../src/components/icons'
 import {
+  automationDraft,
+  automationSavePayload,
   promptPreview,
   scheduleLabel,
   toAutomations,
   toggledStatus,
+  validateAutomationDraft,
   type Automation,
+  type AutomationDraft,
 } from '../../src/core/automations'
 import { canRun } from '../../src/core/surface'
 import { isPreview, previewState } from '../../src/core/preview'
@@ -36,6 +43,12 @@ export default function AutomationsScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [draft, setDraft] = useState<AutomationDraft | null>(null)
+  const [draftError, setDraftError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const canSave = canRun(capabilities, 'automations_save') && canRun(capabilities, 'automations_snapshot')
+  const canDelete = canRun(capabilities, 'automations_delete')
 
   const load = useCallback(async () => {
     // The design-review build has no desktop to ask; it renders the same list
@@ -88,6 +101,56 @@ export default function AutomationsScreen() {
     }
   }
 
+  const openDraft = (automation?: Automation) => {
+    setDraftError(null)
+    setDraft(automationDraft(automation))
+  }
+
+  const saveDraft = async () => {
+    if (!draft || !transport || saving) return
+    const problem = validateAutomationDraft(draft)
+    if (problem) {
+      setDraftError(problem)
+      return
+    }
+    setSaving(true)
+    setDraftError(null)
+    try {
+      await transport.invoke('automations_save', { automation: automationSavePayload(draft) })
+      setDraft(null)
+      await load()
+    } catch (failure) {
+      setDraftError(failure instanceof Error ? failure.message : String(failure))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const remove = async (automation: Automation) => {
+    if (!transport) return
+    if (Platform.OS === 'web') {
+      await deleteNow(automation)
+      return
+    }
+    Alert.alert('删除这个定时任务？', `「${automation.name}」会从电脑上移除，运行记录保留。`, [
+      { text: '取消', style: 'cancel' },
+      { text: '删除', style: 'destructive', onPress: () => { void deleteNow(automation) } },
+    ])
+  }
+
+  const deleteNow = async (automation: Automation) => {
+    if (!transport) return
+    setBusyId(automation.id)
+    try {
+      await transport.invoke('automations_delete', { id: automation.id })
+      await load()
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   if (!canRun(capabilities, 'automations_snapshot')) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 }}>
@@ -109,6 +172,28 @@ export default function AutomationsScreen() {
         <View style={{ backgroundColor: theme.card, borderRadius: 12, borderWidth: theme.hairline, borderColor: theme.cardBorder, padding: 12 }}>
           <Text style={{ color: theme.danger, fontSize: 13 }}>{error}</Text>
         </View>
+      ) : null}
+
+      {canSave ? (
+        <Pressable
+          onPress={() => openDraft()}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            borderRadius: theme.radiusPill,
+            backgroundColor: pressed ? theme.pressed : theme.card,
+            borderWidth: theme.hairline,
+            borderColor: theme.cardBorder,
+          })}
+        >
+          <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>+ 新建定时任务</Text>
+          <Text style={{ flex: 1, color: theme.textWeak, fontSize: 12, textAlign: 'right' }}>
+            默认每天 09:00
+          </Text>
+        </Pressable>
       ) : null}
 
       {items.length === 0 && !refreshing ? (
@@ -193,9 +278,89 @@ export default function AutomationsScreen() {
                 {item.status === 'ACTIVE' ? '暂停' : '启用'}
               </Text>
             </Pressable>
+            {canSave ? (
+              <Pressable onPress={() => openDraft(item)} disabled={busyId === item.id} style={{ paddingHorizontal: 10, paddingVertical: 8 }}>
+                <Text style={{ color: theme.textMedium, fontSize: 13 }}>编辑</Text>
+              </Pressable>
+            ) : null}
+            {canDelete ? (
+              <Pressable onPress={() => void remove(item)} disabled={busyId === item.id} style={{ paddingHorizontal: 10, paddingVertical: 8 }}>
+                <Text style={{ color: theme.danger, fontSize: 13 }}>删除</Text>
+              </Pressable>
+            ) : null}
           </View>
         </View>
       ))}
+
+      <Modal visible={draft !== null} transparent animationType="fade" onRequestClose={() => setDraft(null)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: 'rgba(0,0,0,0.35)' }}
+        >
+          <View style={{
+            backgroundColor: theme.card,
+            borderRadius: 14,
+            padding: 16,
+            gap: 10,
+            borderWidth: theme.hairline,
+            borderColor: theme.cardBorder,
+          }}>
+            <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600' }}>
+              {draft?.id ? '编辑定时任务' : '新建定时任务'}
+            </Text>
+            {draftError ? <Text style={{ color: theme.danger, fontSize: 12 }}>{draftError}</Text> : null}
+            <TextInput
+              value={draft?.name ?? ''}
+              onChangeText={name => setDraft(current => current ? { ...current, name } : current)}
+              placeholder="任务名称，例如 每日晨报"
+              placeholderTextColor={theme.textWeak}
+              style={inputStyle(theme)}
+            />
+            <TextInput
+              value={draft?.prompt ?? ''}
+              onChangeText={prompt => setDraft(current => current ? { ...current, prompt } : current)}
+              placeholder="要电脑做什么"
+              placeholderTextColor={theme.textWeak}
+              multiline
+              style={{ ...inputStyle(theme), minHeight: 88, textAlignVertical: 'top' }}
+            />
+            <TextInput
+              value={draft?.cwds ?? ''}
+              onChangeText={cwds => setDraft(current => current ? { ...current, cwds } : current)}
+              placeholder="工作目录（绝对路径，多个用逗号分隔）"
+              placeholderTextColor={theme.textWeak}
+              autoCapitalize="none"
+              style={inputStyle(theme)}
+            />
+            <Text style={{ color: theme.textWeak, fontSize: 11, lineHeight: 16 }}>
+              时间、技能与权限沿用桌面设置；新任务默认每天 09:00。
+            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 18, marginTop: 2 }}>
+              <Pressable onPress={() => setDraft(null)}>
+                <Text style={{ color: theme.textWeak, fontSize: 15 }}>取消</Text>
+              </Pressable>
+              <Pressable onPress={() => void saveDraft()} disabled={saving}>
+                <Text style={{ color: theme.text, fontSize: 15, fontWeight: '600', opacity: saving ? 0.5 : 1 }}>
+                  {saving ? '保存中…' : '保存'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </ScrollView>
   )
+}
+
+function inputStyle(theme: ReturnType<typeof themeFor>) {
+  return {
+    color: theme.text,
+    fontSize: 14,
+    backgroundColor: theme.surface,
+    borderRadius: 8,
+    borderWidth: theme.hairline,
+    borderColor: theme.cardBorder,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  } as const
 }

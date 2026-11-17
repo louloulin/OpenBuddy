@@ -46,6 +46,7 @@ const screens = [
   { name: 'notifications', path: '/notifications', expected: ['通知', '需要你批准', '在等你回答一个问题', '全部标为已读'] },
   { name: 'search', path: '/search', expected: ['搜索', '索引在电脑上'] },
   { name: 'files', path: '/files', expected: ['OpenBuddy', 'apps', 'docs', 'packages', 'README.md'] },
+  { name: 'library', path: '/library', expected: ['资料库', '只读浏览', 'docs', 'packages', 'notes'] },
   { name: 'memory', path: '/memory', expected: ['记忆', '全局记忆', 'MEMORY', 'team', 'openbuddy', '项目记忆'] },
   { name: 'memory-note', path: '/memory/MEMORY.md', expected: ['MEMORY', '内容（Markdown）', '保存', '删除'] },
   { name: 'branches', path: '/branches/sess-refactor', expected: ['分支与检查点', '2/3', '回到某条提问', '文件检查点', 'proxy.ts'] },

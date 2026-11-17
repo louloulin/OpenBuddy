@@ -8,6 +8,7 @@ import {
   parentPath,
   previewContent,
   toDirEntries,
+  toSearchHits,
 } from '../files'
 
 describe('toDirEntries', () => {
@@ -26,6 +27,27 @@ describe('toDirEntries', () => {
 
   it('normalises an unknown kind to "other"', () => {
     expect(toDirEntries([{ name: 'sock', path: '/w/sock', kind: 'symlink' }])[0]).toMatchObject({ kind: 'other' })
+  })
+})
+
+describe('toSearchHits', () => {
+  it('joins relative hits to the search root', () => {
+    expect(toSearchHits({
+      cwd: '/w',
+      hits: [
+        { path: 'packages/pi-bridge/src/server.ts', name: 'server.ts', size: 42, mtimeMs: 1 },
+        { path: 'README.md', size: 7 },
+      ],
+      partial: false,
+    }, '/w/')).toEqual([
+      { name: 'server.ts', path: '/w/packages/pi-bridge/src/server.ts', kind: 'file', size: 42 },
+      { name: 'README.md', path: '/w/README.md', kind: 'file', size: 7 },
+    ])
+  })
+
+  it('ignores malformed rows and a missing result', () => {
+    expect(toSearchHits(null, '/w')).toEqual([])
+    expect(toSearchHits({ hits: [null, {}, { path: '' }] }, '/w')).toEqual([])
   })
 })
 

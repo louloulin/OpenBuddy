@@ -14,6 +14,7 @@ import type { Approval, CachedSession, NotificationItem } from './models'
 import type { DirEntry } from './files'
 import type { Automation } from './automations'
 import type { MemoryEntry } from './memory'
+import type { LibrarySource } from './library'
 import type { BranchTree } from '@openbuddy/protocol/branches'
 import type { RewindPoint } from '@openbuddy/protocol/dto'
 import type { CheckpointRecord } from './branches'
@@ -37,6 +38,8 @@ export type PreviewState = {
   automations: Automation[]
   /** The memory notes the fake computer would inject. */
   memories: MemoryEntry[]
+  /** Knowledge-source folders the fake desktop registered. */
+  library: LibrarySource[]
   /** The session tree with sibling versions. */
   branchTree: BranchTree
   /** The prompts the phone may rewind to. */
@@ -194,13 +197,13 @@ export function previewState(): PreviewState {
       'agent_resolve_permission', 'agent_get_model_state', 'agent_set_thinking_level',
       'agent_set_session_expert', 'agent_regenerate', 'agent_cancel',
       'agents_list', 'artifacts_list', 'agent_session_info', 'session_search',
-      'automations_snapshot', 'automations_run', 'automations_set_status',
+      'automations_snapshot', 'automations_run', 'automations_set_status', 'automations_save', 'automations_delete',
       'notification_list', 'notification_mark_all_read', 'memory_list', 'memory_get',
       'memory_save', 'memory_delete', 'list_dir', 'read_text_file', 'browse_directory',
       'experts_load', 'experts_list_roots', 'agent_session_usage',
       'agent_init', 'agent_set_session_pinned', 'agent_rename_session',
       'agent_set_session_archived', 'agent_delete_session', 'agent_tree',
-      'agent_export_jsonl',
+      'agent_export_jsonl', 'files_search', 'commands_list', 'library_list',
       'rewind_points', 'rewind_execute', 'agent_navigate', 'checkpoint_list', 'checkpoint_restore',
     ],
     events: ['agent://event', 'agent://permission', 'agent://update'],
@@ -367,8 +370,14 @@ export function previewState(): PreviewState {
     },
   ]
 
+  const library: LibrarySource[] = [
+    { id: '/Users/louloulin/stock/OpenBuddy/docs', label: 'docs', path: '/Users/louloulin/stock/OpenBuddy/docs' },
+    { id: '/Users/louloulin/stock/OpenBuddy/packages', label: 'packages', path: '/Users/louloulin/stock/OpenBuddy/packages' },
+    { id: '/Users/louloulin/notes', label: 'notes', path: '/Users/louloulin/notes' },
+  ]
+
   return {
     sessions, transcripts, notifications, approvals, awaiting: ['sess-pending'],
-    capabilities, panel, files, automations, memories, branchTree, rewindPoints, checkpoints,
+    capabilities, panel, files, automations, memories, branchTree, rewindPoints, checkpoints, library,
   }
 }

@@ -167,6 +167,14 @@ export default function MeScreen() {
             ? router.push('/memory')
             : explain('memory_list'))}
         />
+        <Row
+          theme={theme}
+          label="资料库"
+          value={canRun(capabilities, 'library_list') ? '只读浏览' : '未开放'}
+          onPress={() => (canRun(capabilities, 'library_list')
+            ? router.push('/library')
+            : explain('library_list'))}
+        />
         <Row theme={theme} label="模型与密钥" value="仅在电脑上" onPress={() => explain('providers_save_provider')} />
         <Row theme={theme} label="文件写入" value="仅在电脑上" onPress={() => explain('write_text_file')} last />
       </Section>

@@ -33,6 +33,14 @@ const SESSIONS: Array<{ id: string; title: string; updatedAt: number; pinned: bo
   { id: 'sess-notes', title: '周会纪要', updatedAt: now - 26 * 3_600_000, pinned: false },
 ]
 
+const AUTOMATIONS: Array<Record<string, unknown>> = [
+  {
+    id: 'auto-demo', name: '每日晨报', prompt: '整理今天的日程与待办，发一段摘要。',
+    cwds: '/tmp/scratch', status: 'ACTIVE', scheduleType: 'recurring',
+    nextRunAt: new Date(now + 3_600_000).toISOString(), createdAt: new Date(now).toISOString(),
+  },
+]
+
 const HISTORY: Record<string, unknown[]> = {
   'sess-mobile': [
     { type: 'message_end', sessionId: 'sess-mobile', message: { role: 'user', content: '手机端现在能直接用了？' } },
@@ -197,7 +205,64 @@ const dispatcher: HostDispatcher = {
       }
       case 'agent_export_jsonl':
         return '/tmp/openbuddy-preview-export.jsonl'
+      case 'agent_session_info':
+        return { cwd: '/tmp/scratch', usage: { used: 38_400, total: 200_000 } }
+      case 'list_dir':
+        return [
+          { name: 'src', path: '/tmp/scratch/src', kind: 'directory', size: 0 },
+          { name: 'notes.md', path: '/tmp/scratch/notes.md', kind: 'file', size: 120 },
+        ]
+      case 'files_search': {
+        const query = String(payload.query ?? '').toLowerCase()
+        const hits = [
+          { path: 'docs/plan.md', name: 'plan.md', size: 99, mtimeMs: Date.now() },
+          { path: 'src/main.ts', name: 'main.ts', size: 88, mtimeMs: Date.now() },
+        ].filter(hit => !query || hit.path.toLowerCase().includes(query))
+        return { cwd: '/tmp/scratch', hits, partial: false }
+      }
+      case 'commands_list':
+        return [
+          { name: 'compact', description: '压缩上下文：总结较早的对话以释放空间', source: 'builtin' },
+          { name: 'skill:review', description: '代码评审', source: 'skill' },
+          { name: 'skill:weekly', description: '周报整理', source: 'skill' },
+        ]
+      case 'library_list':
+        return [
+          { id: '/Users/louloulin/stock/OpenBuddy/docs', kind: 'folder', label: 'docs', path: '/Users/louloulin/stock/OpenBuddy/docs', addedAt: new Date(now).toISOString() },
+          { id: '/tmp/scratch', kind: 'folder', label: 'scratch', path: '/tmp/scratch', addedAt: new Date(now).toISOString() },
+        ]
+      case 'automations_snapshot':
+        return { automations: AUTOMATIONS.map(item => ({ ...item })), records: [] }
+      case 'automations_save': {
+        const input = (payload.automation ?? {}) as Record<string, unknown>
+        const existing = typeof input.id === 'string' ? AUTOMATIONS.find(item => item.id === input.id) : undefined
+        if (existing) {
+          Object.assign(existing, input)
+          return { ...existing }
+        }
+        const created = {
+          id: `auto-${Date.now()}`, status: 'ACTIVE', scheduleType: 'recurring',
+          nextRunAt: new Date(Date.now() + 3_600_000).toISOString(), createdAt: new Date().toISOString(),
+          ...input,
+        }
+        AUTOMATIONS.push(created)
+        return { ...created }
+      }
+      case 'automations_delete': {
+        const index = AUTOMATIONS.findIndex(item => item.id === payload.id)
+        if (index >= 0) AUTOMATIONS.splice(index, 1)
+        return { ok: true }
+      }
+      case 'automations_set_status': {
+        const task = AUTOMATIONS.find(item => item.id === payload.id)
+        if (task) task.status = payload.status === 'PAUSED' ? 'PAUSED' : 'ACTIVE'
+        return { ok: true }
+      }
+      case 'automations_run':
+        return { recordId: 'rec-demo', ok: true, sessionId: 'sess-mobile' }
       case 'read_text_file': {
+        if (payload.path === '/tmp/scratch/src/main.ts') return 'export const answer = 42\n'
+        if (payload.path === '/tmp/scratch/notes.md') return '# 临时试验\n\n- 验证文件搜索\n'
         if (payload.path !== '/tmp/openbuddy-preview-export.jsonl') {
           throw new Error(`preview has no file ${String(payload.path)}`)
         }
@@ -235,7 +300,9 @@ const dispatcher: HostDispatcher = {
     'agent_resolve_ui', 'folder_trust_respond', 'tasks_list', 'task_kill', 'permission_mode_get',
     'agent_init', 'agent_new_session', 'agent_list_workspaces', 'agent_fork_session', 'agent_handoff', 'agent_compact',
     'agent_set_session_pinned', 'agent_rename_session', 'agent_set_session_archived', 'agent_delete_session',
-    'agent_export_jsonl', 'read_text_file',
+    'agent_export_jsonl', 'read_text_file', 'agent_session_info', 'list_dir', 'files_search', 'commands_list',
+    'automations_snapshot', 'automations_save', 'automations_delete', 'automations_set_status', 'automations_run',
+    'library_list',
     'session_search', 'notification_list',
   ],
 }

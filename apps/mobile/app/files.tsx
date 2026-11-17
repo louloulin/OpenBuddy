@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, Text, View, useColorScheme } from 'react-native'
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
 import { ChevronRightIcon, FileIcon, FolderIcon } from '../src/components/icons'
@@ -23,6 +23,7 @@ import {
   parentPath,
   previewContent,
   toDirEntries,
+  toSearchHits,
   type DirEntry,
 } from '../src/core/files'
 import { isPreview, previewState } from '../src/core/preview'
@@ -38,12 +39,18 @@ export default function FilesScreen() {
 
   const transport = useApp(state => state.transport)
   const send = useApp(state => state.send)
+  const capabilities = useApp(state => state.capabilities)
 
   const [path, setPath] = useState<string | undefined>(initialPath)
   const [entries, setEntries] = useState<DirEntry[]>([])
   const [preview, setPreview] = useState<{ path: string; text: string; truncated: boolean } | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [workspace, setWorkspace] = useState<string | undefined>()
+  const [query, setQuery] = useState('')
+  const [hits, setHits] = useState<DirEntry[] | null>(null)
+
+  const canSearch = Boolean(sessionId && capabilities?.commands.includes('files_search'))
 
   const open = useCallback(async (target?: string) => {
     // The design-review build has no desktop to ask; it renders the same
@@ -79,6 +86,42 @@ export default function FilesScreen() {
   }, [transport, sessionId])
 
   useEffect(() => { void open(initialPath) }, [open, initialPath])
+
+  // `files_search` only accepts an authorized workspace root, so keep the
+  // session's cwd around even when the user browses elsewhere.
+  useEffect(() => {
+    if (isPreview() || !transport || !sessionId) return
+    transport.invoke<{ cwd?: string }>('agent_session_info', { sessionId })
+      .then(info => { if (typeof info?.cwd === 'string') setWorkspace(info.cwd) })
+      .catch(() => {})
+  }, [transport, sessionId])
+
+  const search = async () => {
+    const text = query.trim()
+    if (!text) {
+      setHits(null)
+      return
+    }
+    if (isPreview()) {
+      const demo = previewState().files
+      setHits(demo.entries.filter(entry => entry.name.includes(text)))
+      return
+    }
+    if (!transport || !workspace) {
+      setError('先打开一个会话，才能搜索它的工作区。')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await transport.invoke<unknown>('files_search', { cwd: workspace, query: text, limit: 50 })
+      setHits(toSearchHits(result, workspace))
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure))
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const openFile = async (entry: DirEntry) => {
     if (isPreview()) {
@@ -158,6 +201,35 @@ export default function FilesScreen() {
         </View>
       ) : null}
 
+      {canSearch && !preview ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            paddingHorizontal: 16,
+            paddingVertical: 6,
+            borderBottomWidth: theme.hairline,
+            borderBottomColor: theme.cardBorder,
+          }}
+        >
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            onSubmitEditing={() => void search()}
+            returnKeyType="search"
+            placeholder="搜索这个工作区的文件"
+            placeholderTextColor={theme.textWeak}
+            style={{ flex: 1, color: theme.text, fontSize: 14, paddingVertical: 7 }}
+          />
+          {query ? (
+            <Pressable onPress={() => { setQuery(''); setHits(null) }} hitSlop={8}>
+              <Text style={{ color: theme.textWeak, fontSize: 13 }}>清除</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
       {preview ? (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
           <Text numberOfLines={1} style={{ color: theme.textWeak, fontSize: 12, marginBottom: 10 }}>
@@ -197,6 +269,42 @@ export default function FilesScreen() {
           >
             <Text style={{ color: theme.textWeak, fontSize: 13 }}>返回目录</Text>
           </Pressable>
+        </ScrollView>
+      ) : hits !== null ? (
+        <ScrollView style={{ flex: 1 }}>
+          {hits.length === 0 ? (
+            <View style={{ padding: 32, alignItems: 'center', gap: 10 }}>
+              <FileIcon size={26} color={theme.textWeak} />
+              <Text style={{ color: theme.textWeak, fontSize: 13 }}>没有匹配的文件。</Text>
+            </View>
+          ) : null}
+          {hits.map(entry => (
+            <Pressable
+              key={entry.path}
+              onPress={() => void openFile(entry)}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+                paddingHorizontal: 16,
+                paddingVertical: 11,
+                backgroundColor: pressed ? theme.hover : 'transparent',
+                borderBottomWidth: theme.hairline,
+                borderBottomColor: theme.cardBorder,
+              })}
+            >
+              <FileIcon size={17} color={theme.textWeak} />
+              <View style={{ flex: 1 }}>
+                <Text numberOfLines={1} style={{ color: theme.text, fontSize: 14 }}>{entry.name}</Text>
+                <Text numberOfLines={1} style={{ color: theme.textWeak, fontSize: 11, marginTop: 2 }}>
+                  {entry.path}
+                </Text>
+              </View>
+              {formatSize(entry.size) ? (
+                <Text style={{ color: theme.textWeak, fontSize: 12 }}>{formatSize(entry.size)}</Text>
+              ) : null}
+            </Pressable>
+          ))}
         </ScrollView>
       ) : (
         <ScrollView style={{ flex: 1 }}>
