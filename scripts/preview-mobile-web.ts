@@ -81,17 +81,38 @@ const dispatcher: HostDispatcher = {
       case 'agent_send': {
         const sessionId = String(payload.sessionId ?? 'sess-mobile')
         const text = String(payload.text ?? '')
+        // One turn that exercises the whole chat surface: thinking → tool card
+        // → paced text deltas → settle. The pacing leaves a visible streaming
+        // window so the review screenshots can catch the caret mid-answer.
         setTimeout(() => {
           const emit = (event: unknown) => { for (const listener of listeners) listener('agent://event', { sessionId, event }) }
           emit({ type: 'message_start' })
-          for (const chunk of ['收到：', text, '。', '这是演示回复。']) {
-            emit({ type: 'message_delta', assistantMessageEvent: { type: 'text_delta', delta: chunk } })
-          }
+          emit({ type: 'thinking_delta', assistantMessageEvent: { type: 'thinking_delta', delta: '先看手机端的桥接有没有做缓冲。' } })
           emit({
-            type: 'message_end',
-            message: { role: 'assistant', content: `收到：${text}。这是演示回复。` },
+            type: 'toolcall_start', toolCallId: 'tc-live', toolName: 'read_text_file',
+            assistantMessageEvent: { type: 'toolcall_start', toolCall: { type: 'toolCall', id: 'tc-live', name: 'read_text_file' } },
           })
-          emit({ type: 'agent_settled' })
+          emit({
+            type: 'toolcall_delta', toolCallId: 'tc-live',
+            assistantMessageEvent: { type: 'toolcall_delta', partialArgs: { path: 'docs/plan/20261115-mobile.md' } },
+          })
+          emit({
+            type: 'toolcall_end', toolCallId: 'tc-live',
+            result: { content: [{ type: 'text', text: 'Phase 3 · Expo App 28/28' }] },
+          })
+          const chunks = ['收到：', text, '。这是演示回复，', '流式输出经过网关和桌面桥。']
+          chunks.forEach((chunk, index) => {
+            setTimeout(() => {
+              emit({ type: 'message_delta', assistantMessageEvent: { type: 'text_delta', delta: chunk } })
+              if (index === chunks.length - 1) {
+                emit({
+                  type: 'message_end',
+                  message: { role: 'assistant', content: `收到：${text}。这是演示回复，流式输出经过网关和桌面桥。` },
+                })
+                emit({ type: 'agent_settled' })
+              }
+            }, 320 * (index + 1))
+          })
         }, 30)
         return { promptId: `demo-${Date.now()}` }
       }

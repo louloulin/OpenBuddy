@@ -64,6 +64,10 @@ export default function ChatScreen() {
     return items.reverse()
   }, [transcript.rows, approvals])
   const streaming = isTurnPending(transcript)
+  // The waiting row is for the gap before the first token. Once text is
+  // streaming, its own assistant header is the waiting state; keeping both
+  // puts two "OpenBuddy" identities on screen at once.
+  const streamingText = transcript.rows.some(row => row.kind === 'text' && row.role === 'assistant' && row.streaming)
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.surface, paddingTop: insets.top }}>
@@ -133,7 +137,7 @@ export default function ChatScreen() {
         )}
       />
 
-      {awaiting || (streaming && transcript.rows.every(row => row.kind === 'thinking' || (row.kind === 'text' && row.role === 'user'))) ? (
+      {!streamingText && (awaiting || (streaming && transcript.rows.every(row => row.kind === 'thinking' || (row.kind === 'text' && row.role === 'user')))) ? (
         <LoadingRow />
       ) : null}
 

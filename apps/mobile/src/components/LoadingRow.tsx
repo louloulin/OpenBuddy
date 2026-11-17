@@ -78,10 +78,10 @@ export function LoadingRow({ compact = false }: { compact?: boolean }) {
             borderRadius: 12,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: theme.scheme === 'dark' ? theme.card : '#333333',
+            backgroundColor: theme.ink,
           }}
         >
-          <SparkIcon size={14} color={theme.scheme === 'dark' ? theme.text : '#ffffff'} />
+          <SparkIcon size={14} color={theme.inkFg} />
         </View>
         <Text style={{ color: theme.text, fontSize: theme.fontMeta, fontWeight: '500' }}>OpenBuddy</Text>
       </View>
