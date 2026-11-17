@@ -11,25 +11,28 @@
  */
 
 import { useState } from 'react'
-import { Alert, Pressable, Text, TextInput, View, useColorScheme } from 'react-native'
+import { Alert, Modal, Pressable, Text, TextInput, View, useColorScheme } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import * as ImageManipulator from 'expo-image-manipulator'
 import * as Speech from 'expo-speech'
 
-import { compressOptions, checkUpload } from '../core/attachments'
+import { compressOptions, checkUpload, MAX_ATTACHMENTS } from '../core/attachments'
+import { mergeTranscript, transcriptOutcome, unavailableMessage } from '../core/voice'
 import { themeFor } from '../theme'
 import { CameraIcon, MicIcon, SendIcon, StopIcon } from './icons'
 
 export type ComposerProps = {
   onSend: (text: string) => void
   onImage: (bytes: ArrayBuffer, mime: string, text: string) => void
+  /** Several pictures at once, the way Qwen and Kimi accept a batch. */
+  onImages?: (images: { bytes: ArrayBuffer; mime: string }[], text: string) => void
   onStop?: () => void
   streaming?: boolean
   placeholder?: string
 }
 
-export function Composer({ onSend, onImage, onStop, streaming = false, placeholder = '给 OpenBuddy 发消息…' }: ComposerProps) {
+export function Composer({ onSend, onImage, onImages, onStop, streaming = false, placeholder = '给 OpenBuddy 发消息…' }: ComposerProps) {
   const theme = themeFor(useColorScheme())
   const insets = useSafeAreaInsets()
   const [draft, setDraft] = useState('')
@@ -44,9 +47,46 @@ export function Composer({ onSend, onImage, onStop, streaming = false, placehold
     onSend(text)
   }
 
-  const pickImage = async () => {
+  /**
+   * Pictures, one or several.
+   *
+   * Qwen accepts ten documents in one go and Kimi's camera answers a photo
+   * instantly; the contract allows eight attachments per turn. So the phone
+   * offers "拍一张" and "从相册选" (which allows a multi-select), compresses
+   * every picture, and hands them to the composer as a batch.
+   */
+  const [sheet, setSheet] = useState(false)
+  const [pending, setPending] = useState<{ bytes: ArrayBuffer; mime: string }[]>([])
+
+  const prepare = async (uris: string[], widths: number[], heights: number[]) => {
+    const images: { bytes: ArrayBuffer; mime: string }[] = []
+    for (let index = 0; index < uris.length; index += 1) {
+      const uri = uris[index]!
+      const options = compressOptions(widths[index] ?? 0, heights[index] ?? 0)
+      const manip = ImageManipulator.ImageManipulator.manipulate(uri)
+      if (options.resize) manip.resize({ width: options.resize.width, height: options.resize.height })
+      const rendered = await manip.renderAsync()
+      const saved = await rendered.saveAsync({
+        compress: options.compress,
+        format: ImageManipulator.SaveFormat.JPEG,
+        base64: false,
+      })
+      const response = await fetch(saved.uri)
+      const bytes = await response.arrayBuffer()
+      const check = checkUpload('image/jpeg', bytes.byteLength, images.length)
+      if (!check.ok) {
+        Alert.alert('图片无法发送', check.reason)
+        continue
+      }
+      images.push({ bytes, mime: 'image/jpeg' })
+    }
+    return images
+  }
+
+  const shoot = async () => {
     if (busy) return
     setBusy(true)
+    setSheet(false)
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync()
       if (!permission.granted) {
@@ -56,27 +96,12 @@ export function Composer({ onSend, onImage, onStop, streaming = false, placehold
       const shot = await ImagePicker.launchCameraAsync({ quality: 0.9, exif: false })
       const asset = shot.assets?.[0]
       if (shot.canceled || !asset) return
-
-      const options = compressOptions(asset.width ?? 0, asset.height ?? 0)
-      const manip = ImageManipulator.ImageManipulator.manipulate(asset.uri)
-      if (options.resize) manip.resize({ width: options.resize.width, height: options.resize.height })
-      const rendered = await manip.renderAsync()
-      const saved = await rendered.saveAsync({
-        compress: options.compress,
-        format: ImageManipulator.SaveFormat.JPEG,
-        base64: false,
-      })
-
-      const response = await fetch(saved.uri)
-      const bytes = await response.arrayBuffer()
-      const check = checkUpload('image/jpeg', bytes.byteLength, 0)
-      if (!check.ok) {
-        Alert.alert('图片无法发送', check.reason)
-        return
-      }
+      const images = await prepare([asset.uri], [asset.width ?? 0], [asset.height ?? 0])
+      if (images.length === 0) return
       const text = draft.trim()
       setDraft('')
-      onImage(bytes, 'image/jpeg', text)
+      if (onImages) onImages(images, text)
+      else onImage(images[0]!.bytes, images[0]!.mime, text)
     } catch (error) {
       Alert.alert('拍照失败', error instanceof Error ? error.message : String(error))
     } finally {
@@ -84,9 +109,99 @@ export function Composer({ onSend, onImage, onStop, streaming = false, placehold
     }
   }
 
+  const pickFromLibrary = async () => {
+    if (busy) return
+    setBusy(true)
+    setSheet(false)
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (!permission.granted) {
+        Alert.alert('需要相册权限', '在系统设置里允许 OpenBuddy 访问相册。')
+        return
+      }
+      const picked = await ImagePicker.launchImageLibraryAsync({
+        quality: 0.9,
+        exif: false,
+        allowsMultipleSelection: true,
+        selectionLimit: MAX_ATTACHMENTS,
+      })
+      const assets = picked.assets ?? []
+      if (picked.canceled || assets.length === 0) return
+      const images = await prepare(
+        assets.map(asset => asset.uri),
+        assets.map(asset => asset.width ?? 0),
+        assets.map(asset => asset.height ?? 0),
+      )
+      if (images.length === 0) return
+      const text = draft.trim()
+      setDraft('')
+      if (onImages) onImages(images, text)
+      else onImage(images[0]!.bytes, images[0]!.mime, text)
+    } catch (error) {
+      Alert.alert('选择图片失败', error instanceof Error ? error.message : String(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * Dictation.
+   *
+   * `expo-speech-recognition` needs a development build, so the module is
+   * imported lazily and a missing module is a message, not a crash. The
+   * transcript lands in the draft (never sent directly): a misheard word must
+   * be fixable before it becomes a turn.
+   */
+  const [listening, setListening] = useState(false)
+
+  const dictate = async () => {
+    if (listening || busy) return
+    setBusy(true)
+    try {
+      const { ExpoSpeechRecognitionModule: recognition } = await import('expo-speech-recognition')
+      if (!recognition.isRecognitionAvailable?.()) {
+        Alert.alert('语音输入', unavailableMessage('no_module'))
+        return
+      }
+      const permission = await recognition.requestPermissionsAsync()
+      if (permission.granted !== true) {
+        Alert.alert('语音输入', unavailableMessage('no_permission'))
+        return
+      }
+
+      // The transcript arrives as events; only the final one is the sentence.
+      const subscription = recognition.addListener('result', (event: { isFinal: boolean; results?: { transcript?: string }[] }) => {
+        if (!event.isFinal) return
+        const outcome = transcriptOutcome(event.results?.[0]?.transcript)
+        if (outcome.kind === 'text') setDraft(current => mergeTranscript(current, outcome.text))
+        setListening(false)
+      })
+      const failure = recognition.addListener('error', () => {
+        setListening(false)
+        Alert.alert('语音输入', unavailableMessage('error'))
+      })
+
+      setListening(true)
+      recognition.start({ lang: 'zh-CN', interimResults: true, continuous: false })
+      // The listeners are removed once the recogniser has produced a result;
+      // the error listener also settles the "listening" state.
+      setTimeout(() => {
+        subscription.remove()
+        failure.remove()
+        setListening(false)
+      }, 30_000)
+    } catch {
+      // The module is absent in Expo Go: dictation needs a dev build.
+      Alert.alert('语音输入', unavailableMessage('no_module'))
+      setListening(false)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const speak = async () => {
     if (!hasText) {
-      Alert.alert('语音输入', '语音识别需要开发版构建；这里可以先朗读你写好的草稿。')
+      await dictate()
       return
     }
     Speech.speak(draft, { language: 'zh-CN' })
@@ -158,8 +273,8 @@ export function Composer({ onSend, onImage, onStop, streaming = false, placehold
           }}
         />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-          {roundButton(() => void pickImage(), busy, <CameraIcon size={20} color={theme.textMedium} />)}
-          {roundButton(() => void speak(), false, <MicIcon size={20} color={theme.textMedium} />)}
+          {roundButton(() => setSheet(true), busy, <CameraIcon size={20} color={theme.textMedium} />)}
+          {roundButton(() => void speak(), listening, <MicIcon size={20} color={listening ? theme.danger : theme.textMedium} />)}
           <View style={{ flex: 1 }} />
           {streaming && onStop ? (
             <Pressable
@@ -197,6 +312,47 @@ export function Composer({ onSend, onImage, onStop, streaming = false, placehold
       <Text style={{ color: theme.textWeak, fontSize: 11, textAlign: 'center', marginTop: 6 }}>
         对话在你的电脑上进行，密钥从不离开桌面
       </Text>
+
+      {sheet ? (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setSheet(false)}>
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' }} onPress={() => setSheet(false)} />
+          <View
+            style={{
+              backgroundColor: theme.card,
+              borderTopLeftRadius: 18,
+              borderTopRightRadius: 18,
+              paddingVertical: 8,
+              paddingBottom: 30,
+            }}
+          >
+            <Pressable
+              onPress={() => void shoot()}
+              style={({ pressed }) => ({ paddingVertical: 15, paddingHorizontal: 20, backgroundColor: pressed ? theme.hover : 'transparent' })}
+            >
+              <Text style={{ color: theme.text, fontSize: 15 }}>拍一张</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => void pickFromLibrary()}
+              style={({ pressed }) => ({ paddingVertical: 15, paddingHorizontal: 20, backgroundColor: pressed ? theme.hover : 'transparent' })}
+            >
+              <Text style={{ color: theme.text, fontSize: 15 }}>从相册选择（最多 {MAX_ATTACHMENTS} 张）</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setSheet(false)}
+              style={({ pressed }) => ({
+                paddingVertical: 15,
+                paddingHorizontal: 20,
+                backgroundColor: pressed ? theme.hover : 'transparent',
+                borderTopWidth: theme.hairline,
+                borderTopColor: theme.cardBorder,
+                marginTop: 6,
+              })}
+            >
+              <Text style={{ color: theme.textWeak, fontSize: 15 }}>取消</Text>
+            </Pressable>
+          </View>
+        </Modal>
+      ) : null}
     </View>
   )
 }

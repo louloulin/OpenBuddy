@@ -15,9 +15,11 @@ import { FlashList } from '@shopify/flash-list'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
 import { Composer } from '../../src/components/Composer'
+import { ApprovalCard } from '../../src/components/ApprovalCard'
+import { LoadingRow } from '../../src/components/LoadingRow'
 import { MessageRow } from '../../src/components/MessageRow'
-import { CheckIcon, ChevronRightIcon, CloseIcon, SparkIcon } from '../../src/components/icons'
-import { emptyTranscript, type TranscriptRow } from '../../src/core/transcript'
+import { ChevronRightIcon } from '../../src/components/icons'
+import { emptyTranscript, isTurnPending, type TranscriptRow } from '../../src/core/transcript'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
 
@@ -33,16 +35,27 @@ export default function ChatScreen() {
   const openSession = useApp(state => state.openSession)
   const send = useApp(state => state.send)
   const sendImage = useApp(state => state.sendImage)
+  const sendImages = useApp(state => state.sendImages)
   const approvals = useApp(state => state.approvals.filter(item => !item.sessionId || item.sessionId === sessionId))
   const resolveApproval = useApp(state => state.resolveApproval)
+  const regenerate = useApp(state => state.regenerate)
+  const awaiting = useApp(state => state.awaiting.includes(sessionId))
 
   useEffect(() => {
     if (sessionId) void openSession(sessionId)
   }, [sessionId, openSession])
 
-  // Newest first for the inverted list; memo keeps identity stable per change.
-  const data = useMemo(() => [...transcript.rows].reverse(), [transcript.rows])
-  const streaming = transcript.rows.some(row => row.kind === 'text' && row.streaming)
+  // Approvals sit inline at the newest end, the way the desktop puts a
+  // permission dialog inside the conversation rather than over it.
+  type ChatItem = TranscriptRow | { kind: 'approval'; id: string; approval: typeof approvals[number] }
+  const data = useMemo<ChatItem[]>(() => {
+    const items: ChatItem[] = transcript.rows.map(row => row)
+    for (const approval of approvals) {
+      items.push({ kind: 'approval', id: `approval:${approval.requestId}`, approval })
+    }
+    return items.reverse()
+  }, [transcript.rows, approvals])
+  const streaming = isTurnPending(transcript)
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.surface, paddingTop: insets.top }}>
@@ -74,80 +87,33 @@ export default function ChatScreen() {
             <ChevronRightIcon size={18} color={theme.text} />
           </View>
         </Pressable>
-        <Text numberOfLines={1} style={{ flex: 1, color: theme.text, fontSize: 15, fontWeight: '600' }}>
-          {session?.title ?? '会话'}
-        </Text>
+        <Pressable
+          onPress={() => router.push(`/session/${encodeURIComponent(sessionId)}`)}
+          style={({ pressed }) => ({ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.6 : 1 })}
+        >
+          <Text numberOfLines={1} style={{ color: theme.text, fontSize: 15, fontWeight: '600' }}>
+            {session?.title ?? '会话'}
+          </Text>
+          <ChevronRightIcon size={14} color={theme.textWeak} />
+        </Pressable>
       </View>
-
-      {approvals.length > 0 ? (
-        <View style={{ paddingHorizontal: 12, paddingTop: 10, gap: 10 }}>
-          {approvals.map(approval => (
-            <View
-              key={approval.requestId}
-              style={{
-                backgroundColor: theme.card,
-                borderRadius: 16,
-                borderWidth: theme.hairline,
-                borderColor: theme.cardBorder,
-                padding: 14,
-                gap: 10,
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <SparkIcon size={16} color={theme.warning} />
-                <Text style={{ flex: 1, color: theme.text, fontSize: 14, fontWeight: '600' }}>{approval.title}</Text>
-              </View>
-              {approval.detail ? (
-                <Text style={{ color: theme.textMedium, fontSize: 13, lineHeight: 20 }} selectable>
-                  {approval.detail}
-                </Text>
-              ) : null}
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <Pressable
-                  onPress={() => void resolveApproval(approval.requestId, false)}
-                  style={({ pressed }) => ({
-                    flex: 1,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    height: 38,
-                    borderRadius: theme.radiusPill,
-                    backgroundColor: pressed ? theme.pressed : theme.card,
-                    borderWidth: theme.hairline,
-                    borderColor: theme.cardBorder,
-                  })}
-                >
-                  <CloseIcon size={14} color={theme.danger} />
-                  <Text style={{ color: theme.danger, fontSize: 13, fontWeight: '600' }}>拒绝</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => void resolveApproval(approval.requestId, true)}
-                  style={({ pressed }) => ({
-                    flex: 1,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    height: 38,
-                    borderRadius: theme.radiusPill,
-                    backgroundColor: theme.ink,
-                    opacity: pressed ? 0.85 : 1,
-                  })}
-                >
-                  <CheckIcon size={14} color={theme.inkFg} />
-                  <Text style={{ color: theme.inkFg, fontSize: 13, fontWeight: '600' }}>允许</Text>
-                </Pressable>
-              </View>
-            </View>
-          ))}
-        </View>
-      ) : null}
 
       <FlashList
         data={data}
         inverted
-        renderItem={({ item }: { item: TranscriptRow }) => <MessageRow row={item} />}
+        renderItem={({ item }: { item: ChatItem }) => (item.kind === 'approval'
+          ? (
+            <ApprovalCard
+              approval={item.approval}
+              onResolve={approved => void resolveApproval(item.approval.requestId, approved)}
+            />
+          )
+          : (
+            <MessageRow
+              row={item}
+              onRegenerate={() => void regenerate(sessionId)}
+            />
+          ))}
         keyExtractor={row => row.id}
         contentContainerStyle={{ paddingVertical: 6 }}
         ListEmptyComponent={(
@@ -159,10 +125,15 @@ export default function ChatScreen() {
         )}
       />
 
+      {awaiting || (streaming && transcript.rows.every(row => row.kind === 'thinking' || (row.kind === 'text' && row.role === 'user'))) ? (
+        <LoadingRow />
+      ) : null}
+
       <Composer
         streaming={streaming}
         onSend={text => void send(sessionId, text)}
         onImage={(bytes, mime, text) => void sendImage(sessionId, bytes, mime, text)}
+        onImages={(images, text) => void sendImages(sessionId, images, text)}
         onStop={() => {
           void useApp.getState().transport?.invoke('agent_cancel', { sessionId })
         }}

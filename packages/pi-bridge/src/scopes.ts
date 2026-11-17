@@ -43,6 +43,7 @@ const READ_COMMANDS = new Set([
   'settings_agent_get', 'permission_list', 'permission_mode_get', 'tasks_list', 'rewind_points',
   'checkpoint_list', 'checkpoint_read', 'artifacts_list', 'files_search', 'session_search',
   'notification_prefs_get', 'agent_extensions_list', 'agent_export_html',
+  'automations_snapshot',
 ])
 
 export const APPROVE_COMMANDS = new Set(['agent_resolve_permission', 'agent_resolve_ui', 'agent_resolve_question', 'folder_trust_respond'])

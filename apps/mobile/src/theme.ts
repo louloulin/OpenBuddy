@@ -36,6 +36,8 @@ export type Theme = {
   /** Bubble fills: user is a warm grey on the desktop, assistant has no bubble. */
   bubble: string
   bubbleText: string
+  /** Inline code background (web: rgba(0,0,0,.05) on light, raised on dark). */
+  inlineCode: string
   /** Accent used sparingly: caret + focus ring (web: --ob-focus). */
   accent: string
   focus: string
@@ -72,6 +74,7 @@ const light: Theme = {
   inkFg: '#ffffff',
   bubble: '#ebebeb',
   bubbleText: 'rgba(0, 0, 0, 0.9)',
+  inlineCode: 'rgba(0, 0, 0, 0.05)',
   accent: '#3857c7',
   focus: 'rgba(56, 87, 199, 0.5)',
   danger: '#e5484d',
@@ -81,7 +84,7 @@ const light: Theme = {
   radiusCard: 24,
   radiusPill: 999,
   fontBody: 15,
-  lineBody: 23,
+  lineBody: 24,
   fontMeta: 13,
   mono: 'Menlo',
   gutter: 16,
@@ -104,6 +107,7 @@ const dark: Theme = {
   inkFg: '#141312',
   bubble: '#2a2927',
   bubbleText: 'rgba(252, 252, 252, 0.92)',
+  inlineCode: 'rgba(252, 252, 252, 0.09)',
   accent: '#8199ff',
   focus: 'rgba(129, 156, 255, 0.6)',
   danger: '#ff6b63',
@@ -113,7 +117,7 @@ const dark: Theme = {
   radiusCard: 24,
   radiusPill: 999,
   fontBody: 15,
-  lineBody: 23,
+  lineBody: 24,
   fontMeta: 13,
   mono: 'Menlo',
   gutter: 16,

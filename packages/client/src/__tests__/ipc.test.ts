@@ -104,3 +104,48 @@ describe("Electron renderer bridge", () => {
     expect(await win.isMaximized()).toBe(true);
   });
 });
+
+describe("browser fallback (H5)", () => {
+  afterEach(async () => {
+    const { setBridgeFallback } = await import("../ipc");
+    setBridgeFallback(null);
+  });
+
+  it("routes invoke and listen through the registered transport", async () => {
+    const { setBridgeFallback, hasPreloadBridge } = await import("../ipc");
+    const seen: { command: string; payload: unknown }[] = [];
+    const listeners = new Map<string, (payload: unknown) => void>();
+    setBridgeFallback({
+      invoke: async <T,>(command: string, payload?: unknown) => {
+        seen.push({ command, payload });
+        return ["from-h5"] as T;
+      },
+      listen: <T,>(event: string, callback: (payload: T) => void) => {
+        listeners.set(event, callback as (payload: unknown) => void);
+        return () => listeners.delete(event);
+      },
+    });
+
+    expect(hasPreloadBridge()).toBe(false);
+    await expect(invoke<string[]>("agent_list_sessions", { cwd: "/w" })).resolves.toEqual(["from-h5"]);
+    expect(seen).toEqual([{ command: "agent_list_sessions", payload: { cwd: "/w" } }]);
+
+    const received: unknown[] = [];
+    const unlisten = await listen<{ n: number }>("agent://event", envelope => received.push(envelope));
+    listeners.get("agent://event")?.({ n: 7 });
+    expect(received).toEqual([{ payload: { n: 7 } }]);
+    unlisten();
+    expect(listeners.size).toBe(0);
+  });
+
+  it("prefers the preload bridge when both are present", async () => {
+    const { setBridgeFallback } = await import("../ipc");
+    const bridge = installBridge();
+    setBridgeFallback({
+      invoke: async <T,>() => ["from-h5"] as T,
+      listen: () => () => {},
+    });
+    await expect(invoke<string[]>("agent_list_sessions")).resolves.toEqual(["session"]);
+    expect(bridge.invoke).toHaveBeenCalled();
+  });
+});

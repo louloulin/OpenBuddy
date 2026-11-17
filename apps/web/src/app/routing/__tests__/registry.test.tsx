@@ -59,9 +59,11 @@ describe("FeatureRegistry (pii W0.2)", () => {
   });
 
   it("only mounts the settings sections the host can serve", () => {
-    expect(settingsSections(FEATURES, desktop).map((s) => s.id)).toEqual(["account", "agent-mail", "shortcuts", "model", "agent-settings", "memory", "assistant", "personalize", "security", "help"]); // memory lights up: memory_list / memory_rewrite are contract commands since W5.1
+    // W6.3 order: 通用 → 模型 → 助理 → 智能体 → 安全 → 个性化 → 记忆 → 快捷键 → 邮箱 → 数据 → 帮助 → 关于
+    // (账户管理下线，D8). memory lights up since W5.1.
+    expect(settingsSections(FEATURES, desktop).map((s) => s.id)).toEqual(["general", "model", "assistant", "agent-settings", "security", "personalize", "memory", "shortcuts", "agent-mail", "data", "help", "about"]);
     // Browser-only preview: no host answer, only sections that need no command.
-    expect(settingsSections(FEATURES, snapshot([], [], "unavailable")).map((s) => s.id)).toEqual(["shortcuts", "personalize", "help"]);
+    expect(settingsSections(FEATURES, snapshot([], [], "unavailable")).map((s) => s.id)).toEqual(["general", "personalize", "shortcuts", "data", "help", "about"]);
   });
 
   it("returns false while loading and never shows offline entries", () => {
@@ -71,7 +73,8 @@ describe("FeatureRegistry (pii W0.2)", () => {
     // channel commands (W4.6), so it stays dark while the capabilities are still loading.
     expect(labels(navItems(FEATURES, loading, "more"))).toEqual(["用量统计", "灵感", "策略设置"]);
     const everything = snapshot([...COMMANDS, "inspiration_generate", "open_url"]);
-    for (const id of ["cloud-storage", "assistant", "browser-preview", "settings-data"])
+    // settings-data is live since W6.5 (本地导出/导入/诊断), so it is no longer in this list.
+    for (const id of ["cloud-storage", "assistant", "browser-preview"])
       expect(isAvailable(FEATURES.find((e) => e.id === id)!, everything)).toBe(false);
     expect(FEATURES.filter((e) => e.offline).every((e) => e.offline!.length > 0)).toBe(true);
   });

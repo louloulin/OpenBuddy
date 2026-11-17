@@ -54,6 +54,7 @@ const dispatcher: HostDispatcher = {
 
 const bridge = createBridgeServer(dispatcher, { token: 'bench-secret' })
 const bridgeServer = serve({
+  idleTimeout: 120,
   port: 0,
   hostname: '127.0.0.1',
   fetch: (req, server) => bridge.fetch(req, server),
@@ -85,6 +86,7 @@ const gateway = createGateway({
 } as Parameters<typeof createGateway>[0])
 
 const gatewayServer = serve({
+  idleTimeout: 120,
   port: 0,
   hostname: '127.0.0.1',
   fetch: (req, server) => gateway.app.fetch(req, server),

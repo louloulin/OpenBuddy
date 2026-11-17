@@ -20,6 +20,8 @@ export { HelpSettingsPanel } from "./sections/HelpSettingsPanel";
 export { SecuritySettingsPanel } from "./sections/SecuritySettingsPanel";
 export { DataSettingsPanel } from "./sections/DataSettingsPanel";
 export { GeneralSettingsPanel } from "./sections/GeneralSettingsPanel";
+export { GeneralPreferencesPanel } from "./sections/GeneralPreferencesPanel";
+export { AboutSettingsPanel } from "./sections/AboutSettingsPanel";
 export { AccountSettingsPanel } from "./sections/AccountSettingsPanel";
 export { AgentSettingsPanel } from "./sections/AgentSettingsPanel";
 export { AssistantSettingsPanel } from "./sections/AssistantSettingsPanel";

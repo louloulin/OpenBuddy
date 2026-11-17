@@ -12611,3 +12611,169 @@ button.diff__path {
 .resources-panel__tab { height: 28px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--wb-text-medium); font: inherit; font-size: 12.5px; cursor: pointer; }
 .resources-panel__tab:hover { color: var(--wb-text-strong); }
 .resources-panel__tab--on { background: var(--wb-bg-secondary); color: var(--wb-text-strong); font-weight: 500; }
+
+/* ── H5 hosted by the gateway (20261115-mobile.md Phase 3.5) ────────────────
+   The same bundle runs in a browser: there is no OS window, so the title bar
+   is not rendered (`app--browser`) and pairing happens against the page's own
+   origin before the application mounts. */
+.app--browser {
+  height: 100vh;
+}
+
+.h5-gate {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--ob-canvas, #f3f2f0);
+  color: var(--wb-text-strong, #121110);
+  font-family: inherit;
+}
+
+.h5-gate__card {
+  width: min(400px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 28px 24px 24px;
+  border-radius: 20px;
+  background: var(--ob-card, #ffffff);
+  border: 1px solid var(--ob-border, #e6e5e3);
+  box-shadow: 0 10px 30px rgba(15, 13, 10, 0.08);
+}
+
+.h5-gate__mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 19px;
+  display: grid;
+  place-items: center;
+  background: #121110;
+  color: #ffffff;
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
+.h5-gate__title {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.h5-gate__lead {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--wb-text-weak, rgba(18, 17, 16, 0.5));
+}
+
+.h5-gate__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--wb-text-medium, rgba(18, 17, 16, 0.68));
+  margin-top: 6px;
+}
+
+.h5-gate__input {
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 11px;
+  border: 1px solid var(--ob-border, #e6e5e3);
+  background: var(--ob-surface, #f9f8f7);
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+.h5-gate__input:focus {
+  border-color: var(--ob-focus, rgba(56, 87, 199, 0.55));
+}
+
+.h5-gate__input--code {
+  letter-spacing: 6px;
+  font-family: var(--ob-mono, Menlo, monospace);
+}
+
+.h5-gate__error {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(229, 72, 77, 0.08);
+  color: var(--ob-danger, #e5484d);
+  font-size: 13px;
+}
+
+.h5-gate__submit {
+  margin-top: 12px;
+  height: 46px;
+  border: 0;
+  border-radius: 999px;
+  background: #121110;
+  color: #ffffff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.h5-gate__submit:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── Narrow browser width (20261115-mobile.md Phase 3.5.3) ─────────────────
+   The H5 page is opened on a phone. The desktop sidebar and the conversation
+   cannot share 390px, so they swap: the list is the default screen, selecting a
+   session reveals the conversation, and the top bar's expand button returns. */
+@media (max-width: 720px) {
+  .app--browser .sidebar {
+    width: 100%;
+    border-right: 0;
+  }
+
+  .app--browser .app__main {
+    width: 100%;
+  }
+
+  .app--browser .main-topbar {
+    padding: 0 10px;
+  }
+
+  /* Touch targets: the desktop's 28px icons are too small for a thumb. */
+  .app--browser button,
+  .app--browser [role="button"] {
+    min-height: 36px;
+  }
+}
+
+/* Phone-width chrome: the desktop top bar's right slot carries the workspace
+   picker, share and history — too much for 390px, and the composer already
+   offers the model picker. Keep the back/expand button and the title. */
+@media (max-width: 720px) {
+  .app--browser #chat-topbar-slot,
+  .app--browser .main-topbar-float {
+    display: none;
+  }
+
+  /* The meta row under the card carries mode + model; let it scroll instead
+     of pushing the disclaimer out of the viewport. */
+  .app--browser .wb-composer-meta {
+    overflow-x: auto;
+    gap: 8px;
+  }
+
+  .app--browser .composer-mode {
+    display: none;
+  }
+
+  .app--browser .wb-composer__scene-tag,
+  .app--browser .wb-composer__expert-badge {
+    max-width: 46vw;
+    overflow: hidden;
+  }
+
+  .app--browser .wb-composer {
+    margin: 0 8px 6px;
+  }
+}

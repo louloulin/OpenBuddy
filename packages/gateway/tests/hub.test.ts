@@ -169,3 +169,61 @@ describe('agent hub body stall and buffering bounds', () => {
     expect(MAX_TUNNELLED_BODY_BYTES).toBe(64 * 1024 * 1024)
   })
 })
+
+describe('agent hub tunnel backpressure', () => {
+  test('a frame the socket refuses fails the request at once instead of stalling', async () => {
+    // Bun returns 0 when the frame is dropped. Believing it was delivered is
+    // what used to turn a burst into a 30-second 502 per request.
+    const socket = fakeSocket()
+    let sending = true
+    const hub = new AgentHub({ maxBodyBytes: 1024 })
+    hub.attach('desktop-1', {
+      send(data: string) {
+        if (!sending) return 0 as never
+        socket.sent.push(data)
+      },
+      close() {},
+    } as never)
+
+    sending = false
+    const outcome = await hub
+      .requestHttp('desktop-1', { method: 'POST', path: '/api/cmd/agent_send', headers: {}, body: new Uint8Array([1]) })
+      .then(() => ({ ok: true as const }))
+      .catch((error: unknown) => ({ ok: false as const, error }))
+    expect(outcome.ok).toBe(false)
+    expect((outcome as { error: Error }).error.message).toContain('backpressure')
+  })
+
+  test('a saturated tunnel is refused before the frame is even written', async () => {
+    const hub = new AgentHub({ maxBodyBytes: 1024 })
+    const sent: string[] = []
+    hub.attach('desktop-2', {
+      send(data: string) { sent.push(data) },
+      close() {},
+      bufferedAmount: () => 8 * 1024 * 1024,
+    } as never)
+
+    const outcome = await hub
+      .requestHttp('desktop-2', { method: 'POST', path: '/api/cmd/agent_send', headers: {}, body: new Uint8Array([1]) })
+      .then(() => ({ ok: true as const }))
+      .catch((error: unknown) => ({ ok: false as const, error }))
+    expect(outcome.ok).toBe(false)
+    expect((outcome as { error: Error }).error.message).toContain('backpressure')
+    // The attach handshake writes one `hello` frame; the refused request must
+    // not have added a second.
+    expect(sent).toHaveLength(1)
+    expect(sent[0]).toContain('hello')
+  })
+
+  test('a socket without a verdict is treated as healthy', async () => {
+    const hub = new AgentHub({ maxBodyBytes: 1024 })
+    hub.attach('desktop-3', {
+      send() { /* returns undefined: runtime has no verdict */ },
+      close() {},
+    } as never)
+    // No throw: the request is pending, which is the normal path.
+    const pending = hub.requestHttp('desktop-3', { method: 'GET', path: '/api/capabilities', headers: {} })
+    await Bun.sleep(5)
+    expect(pending).toBeInstanceOf(Promise)
+  })
+})

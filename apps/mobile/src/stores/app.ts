@@ -29,9 +29,11 @@ import type { Approval, NotificationItem } from '../core/models'
 import type { PairPayload } from '../core/pairing'
 import {
   claimPair,
+  clearPairing,
   closeActiveTransport,
   loadPairing,
   openTransport,
+  reconnectTransport,
   savePairing,
   uploadImage,
   type Pairing,
@@ -48,6 +50,8 @@ type AppState = {
   transcripts: Record<string, Transcript>
   approvals: Approval[]
   notifications: NotificationItem[]
+  /** Sessions that were sent to but have not answered yet. */
+  awaiting: string[]
   error: string | null
 
   bootstrap: () => Promise<void>
@@ -57,7 +61,11 @@ type AppState = {
   refreshSessions: () => Promise<void>
   send: (sessionId: string, text: string, attachments?: { path: string }[]) => Promise<void>
   sendImage: (sessionId: string, bytes: ArrayBuffer, mime: string, text?: string) => Promise<void>
+  sendImages: (sessionId: string, images: { bytes: ArrayBuffer; mime: string }[], text?: string) => Promise<void>
   resolveApproval: (requestId: string, approved: boolean, reason?: string) => Promise<void>
+  revoked: () => Promise<void>
+  resume: () => void
+  regenerate: (sessionId: string) => Promise<void>
   markNotificationsRead: () => Promise<void>
   dismissError: () => void
 }
@@ -78,6 +86,7 @@ export const useApp = create<AppState>((set, get) => ({
   transcripts: {},
   approvals: [],
   notifications: [],
+  awaiting: [],
   error: null,
 
   /** Cached paint first, then the connection catches up. */
@@ -95,15 +104,12 @@ export const useApp = create<AppState>((set, get) => ({
         booted: true,
         pairing: { gatewayUrl: 'https://gw.openbuddy.example', deviceToken: 'preview', deviceName: '我的手机' },
         connection: 'open',
-        capabilities: {
-          platform: 'mobile-host',
-          commands: ['agent_list_sessions', 'agent_send', 'agent_load_session', 'session_search', 'notification_list', 'agent_resolve_permission', 'experts_load', 'memory_list'],
-          events: ['agent://event'],
-        },
+        capabilities: demo.capabilities,
         sessions: demo.sessions,
         transcripts: demo.transcripts,
         notifications: demo.notifications,
         approvals: demo.approvals,
+        awaiting: demo.awaiting,
       })
       return
     }
@@ -111,7 +117,9 @@ export const useApp = create<AppState>((set, get) => ({
     set({ pairing, booted: true })
     if (!pairing) return
 
-    const transport = await openTransport(pairing)
+    const transport = await openTransport(pairing, {
+      onUnauthorized: () => { void get().revoked() },
+    })
     set({ transport, connection: transport.state() })
     transport.onState(state => set({ connection: state }))
 
@@ -159,6 +167,24 @@ export const useApp = create<AppState>((set, get) => ({
       set({ error: errorText(error) })
       throw error
     }
+  },
+
+  /** The desktop revoked this device (or the gateway forgot it): pair again. */
+  async revoked() {
+    closeActiveTransport()
+    await clearPairing().catch(() => {})
+    set({
+      transport: null,
+      pairing: null,
+      connection: 'closed',
+      capabilities: null,
+      error: '这台电脑已经解除了这台手机，请重新扫码配对。',
+    })
+  },
+
+  /** Called when the app comes back to the foreground: the tunnel is gone. */
+  resume() {
+    reconnectTransport()
   },
 
   async unpair() {
@@ -233,6 +259,9 @@ export const useApp = create<AppState>((set, get) => ({
 
     const local: SessionUpdate = { type: 'message_end', sessionId, message: { role: 'user', content: body } }
     ingestUpdate(set, get, sessionId, local)
+    // The desktop shows its waiting row the moment a message is sent; the
+    // phone must too, or the gap before the first token looks like a dead app.
+    set(state => ({ awaiting: state.awaiting.includes(sessionId) ? state.awaiting : [...state.awaiting, sessionId] }))
     try {
       await transport.invoke('agent_send', { sessionId, text: body, attachments })
     } catch (error) {
@@ -251,6 +280,21 @@ export const useApp = create<AppState>((set, get) => ({
     }
   },
 
+  /** Several pictures in one turn; each becomes one attachment. */
+  async sendImages(sessionId, images, text = '') {
+    const pairing = get().pairing
+    if (!pairing) return
+    try {
+      const paths: { path: string }[] = []
+      for (const image of images) {
+        paths.push({ path: await uploadImage(pairing, image.bytes, image.mime) })
+      }
+      await get().send(sessionId, text, paths)
+    } catch (error) {
+      set({ error: errorText(error) })
+    }
+  },
+
   async resolveApproval(requestId, approved, reason) {
     const transport = get().transport
     if (!transport) return
@@ -261,6 +305,17 @@ export const useApp = create<AppState>((set, get) => ({
         ...(reason ? { reason } : {}),
       })
       set(state => ({ approvals: state.approvals.filter(item => item.requestId !== requestId) }))
+    } catch (error) {
+      set({ error: errorText(error) })
+    }
+  },
+
+  /** Asks the desktop to run the turn again — the desktop keeps the history. */
+  async regenerate(sessionId) {
+    const transport = get().transport
+    if (!transport) return
+    try {
+      await transport.invoke('agent_regenerate', { sessionId })
     } catch (error) {
       set({ error: errorText(error) })
     }
@@ -306,6 +361,11 @@ function ingestUpdate(
 ): void {
   const key = sessionId ?? update.sessionId ?? update.__sessionId
   if (!key) return
+  if (update.type === 'agent_settled') {
+    set(state => (state.awaiting.includes(key)
+      ? { awaiting: state.awaiting.filter(id => id !== key) }
+      : {}))
+  }
   const current = get().transcripts[key] ?? emptyTranscript()
   const next = applyUpdate(current, update, key)
   if (next === current) return

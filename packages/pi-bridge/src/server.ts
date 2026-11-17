@@ -26,7 +26,7 @@ import { validateCommandPayload, type Payload } from '@openbuddy/protocol/valida
 import { EVENTS, isEvent, type EventName } from '@openbuddy/protocol/events'
 
 import { EventBuffer, type BridgeEvent } from './event-buffer.js'
-import { isAllowedCommand } from './scopes.js'
+import { isAllowedCommand, mobileCapabilities } from './scopes.js'
 
 export type HostDispatcher = {
   /** Runs one host-module handler; same dispatch ipcMain.handle uses. */
@@ -36,6 +36,17 @@ export type HostDispatcher = {
   /** Commands this surface serves; the mobile host_capabilities answer. */
   servedCommands: () => readonly string[]
 }
+
+/**
+ * How often an idle event stream says "still here".
+ *
+ * Two clocks have to be satisfied: a reverse proxy closes an idle response
+ * after roughly a minute (nginx 60s, Cloudflare 100s), and Bun's own server
+ * drops an idle response after 10 seconds unless it is told otherwise. Five
+ * seconds is comfortably inside both, and it gives the phone a frame it can
+ * measure liveness against.
+ */
+export const HEARTBEAT_INTERVAL_MS = 5_000
 
 /** Image types the upload route accepts, mapped to the stored extension. */
 const UPLOAD_TYPES = new Map([
@@ -61,6 +72,11 @@ export type BridgeServerOptions = {
    * temp directory to write to simply does not offer image attachments.
    */
   uploads?: UploadSink
+  /**
+   * How often an idle event stream says "still here". Defaults to 5s; tests
+   * use a much shorter value so the frame arrives within the test's patience.
+   */
+  heartbeatIntervalMs?: number
 }
 
 /** Minimal Bun socket surface the bridge needs (kept structural for tests). */
@@ -91,6 +107,7 @@ export type BridgeServer = {
 
 export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeServerOptions): BridgeServer {
   const buffer = new EventBuffer()
+  const heartbeatIntervalMs = options.heartbeatIntervalMs ?? HEARTBEAT_INTERVAL_MS
   // Only commands this desktop actually serves AND the mobile surface allows.
   const allowed = new Set(
     dispatcher.servedCommands().filter(command => isAllowedCommand(command) && isCommand(command)),
@@ -102,12 +119,25 @@ export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeSe
   const authorized = (header: string | null): boolean =>
     options.noAuth || header === `Bearer ${options.token}`
 
+  /**
+   * `host_capabilities` must describe *this surface*, not the desktop's.
+   *
+   * Asking the desktop would answer with `window_*`, file writes and MCP
+   * management; the web/mobile FeatureRegistry would then render buttons the
+   * bridge immediately refuses. The mobile answer is the filtered set the
+   * bridge actually serves.
+   */
+  const runCommand = (command: string, payload: Payload): unknown | Promise<unknown> =>
+    command === 'host_capabilities'
+      ? mobileCapabilities([...allowed], events)
+      : dispatcher.dispatch(command, payload)
+
   const app = new Hono()
 
   app.on(['GET', 'POST'], ['/health', '/api/health'], (c) => c.json({ ok: true, commands: allowed.size }))
 
   app.on('GET', ['/capabilities', '/api/capabilities'], (c) => {
-    if (!authorized(c.req.header('authorization'))) {
+    if (!authorized((c.req.header('authorization') ?? null))) {
       return c.json({ error: 'unauthorized' }, 401)
     }
     return c.json({
@@ -118,7 +148,7 @@ export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeSe
   })
 
   app.on('POST', ['/cmd/:command', '/api/cmd/:command'], async (c) => {
-    if (!authorized(c.req.header('authorization'))) {
+    if (!authorized((c.req.header('authorization') ?? null))) {
       return c.json({ error: 'unauthorized' }, 401)
     }
     const command = c.req.param('command')
@@ -133,12 +163,12 @@ export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeSe
     }
     let payload: Payload
     try {
-      payload = validateCommandPayload(command, input)
+      payload = validateCommandPayload(command as CommandName, input)
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'invalid_payload' }, 400)
     }
     try {
-      const result = await dispatcher.dispatch(command, payload)
+      const result = await runCommand(command, payload)
       return c.json({ ok: true, result: result ?? null })
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : String(error) }, 500)
@@ -158,7 +188,7 @@ export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeSe
    * already governs.
    */
   app.on('POST', ['/upload', '/api/upload'], async (c) => {
-    if (!authorized(c.req.header('authorization'))) {
+    if (!authorized((c.req.header('authorization') ?? null))) {
       return c.json({ error: 'unauthorized' }, 401)
     }
     if (!options.uploads) {
@@ -192,7 +222,7 @@ export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeSe
   })
 
   app.on('GET', ['/events', '/api/events'], (c) => {
-    if (!authorized(c.req.header('authorization'))) {
+    if (!authorized((c.req.header('authorization') ?? null))) {
       return c.json({ error: 'unauthorized' }, 401)
     }
     const sinceParam = c.req.query('since')
@@ -218,11 +248,24 @@ export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeSe
       const queue: BridgeEvent[] = []
       const deliver = (item: BridgeEvent): void => { queue.push(item) }
       streams.add(deliver)
+      // A quiet conversation must still look alive: every reverse proxy
+      // closes an idle response after a minute or so, and a phone on a mobile
+      // network loses the tunnel long before the user notices. A heartbeat
+      // frame keeps the connection open *and* lets the client measure that the
+      // link is still there (the transport treats a missing heartbeat as dead).
+      let sincePing = 0
       try {
         while (true) {
           while (queue.length > 0) {
             const item = queue.shift()!
             await stream.writeSSE({ id: String(item.seq), event: item.event, data: JSON.stringify(item.payload) })
+            sincePing = 0
+          }
+          if (sincePing >= heartbeatIntervalMs) {
+            await stream.writeSSE({ event: 'ping', data: JSON.stringify({ t: Date.now() }) })
+            sincePing = 0
+          } else {
+            sincePing += 50
           }
           await stream.sleep(50)
           if (c.req.raw.signal.aborted) break
@@ -280,7 +323,7 @@ export function createBridgeServer(dispatcher: HostDispatcher, options: BridgeSe
       return
     }
     try {
-      const result = await dispatcher.dispatch(command, payload)
+      const result = await runCommand(command, payload)
       sendFrame(socket, { t: 'reply', id, ok: true, result: result ?? null })
     } catch (error) {
       sendFrame(socket, { t: 'reply', id, ok: false, error: error instanceof Error ? error.message : String(error) })

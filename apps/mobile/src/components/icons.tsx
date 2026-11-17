@@ -161,3 +161,61 @@ export function TerminalIcon({ size = 16, color, strokeWidth = 1.7 }: IconProps)
     </Svg>
   )
 }
+
+export function CopyIcon({ size = 16, color, strokeWidth = 1.75 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Rect x={9} y={9} width={11} height={11} rx={2.4} stroke={color} strokeWidth={strokeWidth} />
+      <Path
+        d="M5.5 15H5a1.6 1.6 0 0 1-1.6-1.6V5A1.6 1.6 0 0 1 5 3.4h8.4A1.6 1.6 0 0 1 15 5v.5"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+      />
+    </Svg>
+  )
+}
+
+export function FolderIcon({ size = 20, color, strokeWidth = 1.75 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path
+        d="M3.2 7.4a2 2 0 0 1 2-2h3.4l2 2.4h6.2a2 2 0 0 1 2 2v7.8a2 2 0 0 1-2 2H5.2a2 2 0 0 1-2-2z"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+      />
+    </Svg>
+  )
+}
+
+export function FileIcon({ size = 20, color, strokeWidth = 1.75 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path
+        d="M6 3.6h7.2L18 8.4v12a1.6 1.6 0 0 1-1.6 1.6H6A1.6 1.6 0 0 1 4.4 20.4V5.2A1.6 1.6 0 0 1 6 3.6z"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+      />
+      <Path d="M13.2 3.8v4.6H17.6" stroke={color} strokeWidth={strokeWidth} strokeLinejoin="round" />
+    </Svg>
+  )
+}
+
+export function ClockIcon({ size = 20, color, strokeWidth = 1.75 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Circle cx={12} cy={12} r={8.4} stroke={color} strokeWidth={strokeWidth} />
+      <Polyline points="12 7.4 12 12 15.4 13.8" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  )
+}
+
+export function PlayIcon({ size = 16, color, strokeWidth = 1.9 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path d="M8 5.6 18.4 12 8 18.4z" stroke={color} strokeWidth={strokeWidth} strokeLinejoin="round" />
+    </Svg>
+  )
+}

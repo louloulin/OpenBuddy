@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
-  User,
+  Info,
   Mail,
   Keyboard,
   Cpu,
@@ -14,12 +14,12 @@ import {
 } from "lucide-react";
 import { ModelsSettingsPanel } from "../models/settings/ModelsSettingsPanel";
 import {
-  AccountSettingsPanel,
+  AboutSettingsPanel,
   AgentMailSettingsPanel,
   AgentSettingsPanel,
   AssistantSettingsPanel,
   DataSettingsPanel,
-  GeneralSettingsPanel,
+  GeneralPreferencesPanel,
   HelpSettingsPanel,
   MemorySettingsPanel,
   PersonalizeSettingsPanel,
@@ -30,7 +30,7 @@ import {
 
 
 type SectionId =
-  | "account"
+  | "about"
   | "agent-mail"
   | "general"
   | "agent-settings"
@@ -58,7 +58,7 @@ export interface SettingsSection {
 }
 
 const NAV: NavItem[] = [
-  { id: "account", label: "账户管理", icon: User },
+  { id: "general", label: "通用", icon: SlidersHorizontal },
   { id: "agent-mail", label: "智能体邮箱", icon: Mail },
   { id: "shortcuts", label: "快捷键", icon: Keyboard },
   { id: "model", label: "模型", icon: Cpu },
@@ -67,6 +67,7 @@ const NAV: NavItem[] = [
   { id: "personalize", label: "个性化", icon: Palette },
   { id: "security", label: "安全中心", icon: Shield },
   { id: "help", label: "帮助与反馈", icon: HelpCircle },
+  { id: "about", label: "关于", icon: Info },
 ];
 
 export function SettingsPanel({
@@ -172,9 +173,9 @@ export function SettingsPanel({
             ) : active === "data" ? (
               <DataSettingsPanel />
             ) : active === "general" ? (
-              <GeneralSettingsPanel />
-            ) : active === "account" ? (
-              <AccountSettingsPanel />
+              <GeneralPreferencesPanel />
+            ) : active === "about" ? (
+              <AboutSettingsPanel />
             ) : active === "agent-settings" ? (
               <AgentSettingsPanel />
             ) : active === "assistant" ? (

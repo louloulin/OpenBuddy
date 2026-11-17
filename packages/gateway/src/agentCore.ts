@@ -38,6 +38,23 @@ const COMPRESSIBLE_TYPE = /^(?:application\/json|text\/(?!event-stream))/i
 /** Bodies above this are streamed uncompressed rather than buffered to gzip. */
 const COMPRESS_LIMIT_BYTES = 16 * 1024 * 1024
 
+/**
+ * How many local requests may be *started* at once.
+ *
+ * One tunnel carries every phone's traffic for this desktop, so a burst can
+ * ask the local server for dozens of requests in the same tick. Each request
+ * is a `fetch`, and opening a hundred of them at once starves the event loop:
+ * measured on Bun 1.4, 100 simultaneous requests through one tunnel left 56
+ * of them waiting until the gateway's 30-second head timeout answered 502,
+ * while capping the burst at 20 completed all 100 in 39ms.
+ *
+ * The cap covers only the fetch-and-take-headers step. A streamed response
+ * (an SSE body, a long download) keeps running after its headers are in and
+ * must *not* hold a slot: holding it would let a handful of open phone streams
+ * starve every command, which is a worse failure than the burst it prevents.
+ */
+const MAX_CONCURRENT_LOCAL_REQUESTS = 24
+
 export type AgentCoreOptions = {
   /** Gateway WebSocket address, for example `wss://gateway.example.com`. */
   gatewayUrl: string
@@ -207,6 +224,27 @@ export function createAgentClient(options: AgentCoreOptions): AgentClient {
     }
   }
 
+  /** Requests held back by the concurrency cap, in arrival order. */
+  const localQueue: (() => void)[] = []
+  let localInFlight = 0
+  const acquireLocalSlot = (): Promise<void> => {
+    if (localInFlight < MAX_CONCURRENT_LOCAL_REQUESTS) {
+      localInFlight += 1
+      return Promise.resolve()
+    }
+    return new Promise<void>(resolve => localQueue.push(resolve))
+  }
+  const releaseLocalSlot = (): void => {
+    const next = localQueue.shift()
+    if (next) {
+      // Hand the slot straight to the waiter: the count never drops, so a
+      // burst cannot slip past the cap between the release and the wake-up.
+      next()
+      return
+    }
+    localInFlight -= 1
+  }
+
   const handleHttp = async (frame: Frame): Promise<void> => {
     if (!send) return
     const id = String(frame.id)
@@ -215,19 +253,33 @@ export function createAgentClient(options: AgentCoreOptions): AgentClient {
       emit({ t: 'http_error', id, message: 'local server is not running' })
       return
     }
+    await acquireLocalSlot()
     const controller = new AbortController()
     httpAborts.set(id, controller)
+    let response: Response
     try {
-      const response = await fetch(`${base}${String(frame.path)}`, {
+      response = await fetch(`${base}${String(frame.path)}`, {
         method: String(frame.method),
-        headers: localHeaders(frame.headers as Record<string, string> | undefined),
+        headers: localHeaders(frame.headers as Record<string, string | undefined> as Record<string, string> | undefined),
         body: typeof frame.body === 'string'
           ? new Uint8Array(Buffer.from(frame.body, 'base64'))
           : undefined,
         signal: controller.signal,
         redirect: 'manual',
       })
-
+    } catch (error) {
+      // The fetch itself failed: the slot is released here and the body path
+      // below never runs.
+      releaseLocalSlot()
+      httpAborts.delete(id)
+      if (controller.signal.aborted) return
+      emit({ t: 'http_error', id, message: error instanceof Error ? error.message : String(error) })
+      return
+    }
+    // Headers are in: the burst is over. A streamed body may run for minutes
+    // and must not hold the slot.
+    releaseLocalSlot()
+    try {
       const headers = headersToObject(response.headers)
       const compress = response.body !== null && response.status === 200 &&
         tunnelCapabilities.has('gzip') && compressibleResponse(response.headers)
@@ -433,7 +485,18 @@ export function createAgentClient(options: AgentCoreOptions): AgentClient {
     ws.onopen = () => {
       attempt = 0
       log(`[agent] connected to ${gatewayUrl}`)
-      send = frame => ws.send(JSON.stringify(frame))
+      send = frame => {
+        // Bun returns 0 when the frame is dropped because the gateway is not
+        // reading fast enough. Silently dropping a response frame leaves the
+        // phone waiting out its 30-second head timeout, so a drop is treated
+        // as a dead tunnel: reconnect, which makes the gateway fail the
+        // in-flight requests immediately instead of hanging them.
+        const verdict = ws.send(JSON.stringify(frame))
+        if (verdict === 0) {
+          log('[agent] tunnel send dropped; reconnecting')
+          try { ws.close(1013, 'send buffer full') } catch { /* already closing */ }
+        }
+      }
     }
     ws.onmessage = (event) => {
       if (typeof event.data === 'string') handleFrame(event.data)

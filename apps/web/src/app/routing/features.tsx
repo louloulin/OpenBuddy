@@ -1,4 +1,4 @@
-import { Bot, Brain, Cpu, HardDrive, HelpCircle, Keyboard, Mail, Palette, Settings2, Shield, SlidersHorizontal, User } from "lucide-react";
+import { Bot, Brain, Cpu, HardDrive, HelpCircle, Info, Keyboard, Mail, Palette, Settings2, Shield, SlidersHorizontal } from "lucide-react";
 import {
   LibraryIcon, MoreMenuImaKnowledgeIcon, MoreMenuInspirationIcon, MoreMenuTencentDocsIcon, MoreMenuTencentLexiangIcon, MyFilesIconV2,
   WbAssistantNavIcon, WbAutomationNavIcon, WbExpertNavIcon, WbProjectNavIcon,
@@ -22,8 +22,8 @@ import { NotifyChannelsPanel } from "../../features/settings/NotifyChannelsPanel
 import { PolicySettingsPanel } from "../../features/settings/PolicySettingsPanel";
 import { ModelsSettingsPanel } from "../../features/models/settings/ModelsSettingsPanel";
 import {
-  AccountSettingsPanel, AgentMailSettingsPanel, AgentSettingsPanel, AssistantSettingsPanel, DataSettingsPanel,
-  GeneralSettingsPanel, HelpSettingsPanel, MemorySettingsPanel, PersonalizeSettingsPanel, SecuritySettingsPanel,
+  AboutSettingsPanel, AgentMailSettingsPanel, AgentSettingsPanel, AssistantSettingsPanel, DataSettingsPanel,
+  GeneralPreferencesPanel, HelpSettingsPanel, MemorySettingsPanel, PersonalizeSettingsPanel, SecuritySettingsPanel,
   ShortcutsSettingsPanel,
 } from "../../features/settings/SettingsSections";
 import { ExpertsHub } from "./ExpertsHub";
@@ -185,25 +185,21 @@ export const FEATURES: FeatureEntry<FeatureRouteProps>[] = [
     route: { view: "插件·市场", render: (p) => <PluginsMarketTabs sessionId={p.sessionId} onToast={p.onToast} /> },
     requires: ["plugins_list", "marketplace_list"],
   },
-  // ---- settings sections ----
-  { id: "settings-account", settingsSections: [{ id: "account", label: "账户管理", icon: User, order: 10, render: () => <AccountSettingsPanel /> }], requires: ["account_get_api_key", "agent_auth_status"] },
-  { id: "settings-agent-mail", settingsSections: [{ id: "agent-mail", label: "智能体邮箱", icon: Mail, order: 20, render: () => <AgentMailSettingsPanel /> }], requires: ["notification_list"] },
-  { id: "settings-shortcuts", settingsSections: [{ id: "shortcuts", label: "快捷键", icon: Keyboard, order: 30, render: () => <ShortcutsSettingsPanel /> }], requires: [] },
-  { id: "settings-model", settingsSections: [{ id: "model", label: "模型", icon: Cpu, order: 40, render: (p) => <ModelsSettingsPanel onModelsChanged={p.onModelsChanged} /> }], requires: ["providers_list"] },
-  { id: "settings-memory", settingsSections: [{ id: "memory", label: "记忆", icon: Brain, order: 45, render: () => <MemorySettingsPanel /> }], requires: ["memory_list", "memory_rewrite"] },
-  { id: "settings-assistant", settingsSections: [{ id: "assistant", label: "助理设置", icon: Bot, order: 50, render: () => <AssistantSettingsPanel /> }], requires: ["agents_defaults_get"] },
+  // ---- settings sections (20261116-pii W6.3: 通用 → 模型 → 助手/智能体 → 安全 → 个性化 → 记忆 → 输入/邮箱 → 数据 → 帮助 → 关于) ----
+  // 账户管理已下线（D8）：账户密钥统一在 模型 · 提供商里配置。
+  { id: "settings-general", settingsSections: [{ id: "general", label: "通用", icon: SlidersHorizontal, order: 10, render: () => <GeneralPreferencesPanel /> }], requires: [] },
+  { id: "settings-model", settingsSections: [{ id: "model", label: "模型", icon: Cpu, order: 20, render: (p) => <ModelsSettingsPanel onModelsChanged={p.onModelsChanged} /> }], requires: ["providers_list"] },
+  { id: "settings-assistant", settingsSections: [{ id: "assistant", label: "助理设置", icon: Bot, order: 30, render: () => <AssistantSettingsPanel /> }], requires: ["agents_defaults_get"] },
   // pii W0.4: 智能体 = persisted Pi settings (settings_agent_*); its old sub-agent / web-search block stays switched off inside the panel.
-  { id: "settings-agent", settingsSections: [{ id: "agent-settings", label: "智能体", icon: Settings2, order: 42, render: () => <AgentSettingsPanel /> }], requires: ["settings_agent_get", "settings_agent_set"] },
+  { id: "settings-agent", settingsSections: [{ id: "agent-settings", label: "智能体", icon: Settings2, order: 40, render: () => <AgentSettingsPanel /> }], requires: ["settings_agent_get", "settings_agent_set"] },
+  { id: "settings-security", settingsSections: [{ id: "security", label: "安全中心", icon: Shield, order: 50, render: () => <SecuritySettingsPanel /> }], requires: ["permission_list"] },
   { id: "settings-personalize", settingsSections: [{ id: "personalize", label: "个性化", icon: Palette, order: 60, render: () => <PersonalizeSettingsPanel /> }], requires: [] },
-  { id: "settings-security", settingsSections: [{ id: "security", label: "安全中心", icon: Shield, order: 70, render: () => <SecuritySettingsPanel /> }], requires: ["permission_list"] },
-  {
-    id: "settings-data",
-    settingsSections: [{ id: "data", label: "数据管理", icon: HardDrive, order: 75, render: () => <DataSettingsPanel /> }],
-    requires: [],
-    offline: "只清理一个没有任何代码读取的本地缓存键，数据目录也是写死的提示；W6 设置重排时重做",
-  },
-  { id: "settings-help", settingsSections: [{ id: "help", label: "帮助与反馈", icon: HelpCircle, order: 80, render: () => <HelpSettingsPanel /> }], requires: [] },
-  { id: "settings-general", settingsSections: [{ id: "general", label: "系统设置", icon: SlidersHorizontal, order: 85, render: () => <GeneralSettingsPanel /> }], requires: ["internal_reload"] },
+  { id: "settings-memory", settingsSections: [{ id: "memory", label: "记忆", icon: Brain, order: 70, render: () => <MemorySettingsPanel /> }], requires: ["memory_list", "memory_rewrite"] },
+  { id: "settings-shortcuts", settingsSections: [{ id: "shortcuts", label: "快捷键", icon: Keyboard, order: 80, render: () => <ShortcutsSettingsPanel /> }], requires: [] },
+  { id: "settings-agent-mail", settingsSections: [{ id: "agent-mail", label: "智能体邮箱", icon: Mail, order: 85, render: () => <AgentMailSettingsPanel /> }], requires: ["notification_list"] },
+  { id: "settings-data", settingsSections: [{ id: "data", label: "数据管理", icon: HardDrive, order: 90, render: () => <DataSettingsPanel /> }], requires: [] },
+  { id: "settings-help", settingsSections: [{ id: "help", label: "帮助与反馈", icon: HelpCircle, order: 95, render: () => <HelpSettingsPanel /> }], requires: [] },
+  { id: "settings-about", settingsSections: [{ id: "about", label: "关于", icon: Info, order: 100, render: () => <AboutSettingsPanel /> }], requires: [] },
 ];
 
 /**

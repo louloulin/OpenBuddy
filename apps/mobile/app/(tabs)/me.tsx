@@ -144,10 +144,18 @@ export default function MeScreen() {
         />
         <Row
           theme={theme}
+          label="文件"
+          value={canRun(capabilities, 'list_dir') ? '只读浏览' : '未开放'}
+          onPress={() => (canRun(capabilities, 'list_dir')
+            ? router.push('/files')
+            : explain('list_dir'))}
+        />
+        <Row
+          theme={theme}
           label="记忆"
-          value={canRun(capabilities, 'memory_list') ? '只读浏览' : '未开放'}
+          value={canRun(capabilities, 'memory_list') ? '浏览与编辑' : '未开放'}
           onPress={() => (canRun(capabilities, 'memory_list')
-            ? Alert.alert('记忆', '记忆的整理在桌面端完成。')
+            ? router.push('/memory')
             : explain('memory_list'))}
         />
         <Row theme={theme} label="模型与密钥" value="仅在电脑上" onPress={() => explain('providers_save_provider')} />

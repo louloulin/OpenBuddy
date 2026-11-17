@@ -15,9 +15,14 @@
 import { memo } from 'react'
 import { Text, View, useColorScheme } from 'react-native'
 
-import type { TextRow, ToolRow } from '../core/transcript'
+import type { TextRow, ThinkingRow as ThinkingRowData, ToolRow } from '../core/transcript'
 import { themeFor } from '../theme'
-import { CheckIcon, CloseIcon, SparkIcon, TerminalIcon } from './icons'
+import { SparkIcon } from './icons'
+import { Caret } from './Caret'
+import { Markdown } from './Markdown'
+import { MessageActions } from './MessageActions'
+import { ThinkingRow } from './ThinkingRow'
+import { ToolCard } from './ToolCard'
 
 function UserBubble({ row }: { row: TextRow }) {
   const theme = themeFor(useColorScheme())
@@ -32,30 +37,32 @@ function UserBubble({ row }: { row: TextRow }) {
           borderBottomLeftRadius: theme.radiusBubble,
           // The squared corner is the desktop's `16px 16px 0 16px` tail.
           borderBottomRightRadius: 4,
-          paddingHorizontal: 14,
-          paddingVertical: 9,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
         }}
       >
-        <Text
-          selectable
-          style={{
-            color: row.isError ? theme.danger : theme.bubbleText,
-            fontSize: theme.fontBody,
-            lineHeight: theme.lineBody,
-          }}
-        >
-          {row.text}
-        </Text>
+        <MessageActions text={row.text}>
+          <Text
+            selectable
+            style={{
+              color: row.isError ? theme.danger : theme.bubbleText,
+              fontSize: theme.fontBody,
+              lineHeight: theme.lineBody,
+            }}
+          >
+            {row.text}
+          </Text>
+        </MessageActions>
       </View>
     </View>
   )
 }
 
-function AssistantRow({ row }: { row: TextRow }) {
+function AssistantRow({ row, onRegenerate }: { row: TextRow; onRegenerate?: () => void }) {
   const theme = themeFor(useColorScheme())
   return (
     <View style={{ paddingHorizontal: theme.gutter, paddingVertical: 8 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
         <View
           style={{
             width: 24,
@@ -70,17 +77,23 @@ function AssistantRow({ row }: { row: TextRow }) {
         </View>
         <Text style={{ color: theme.text, fontSize: theme.fontMeta, fontWeight: '500' }}>OpenBuddy</Text>
       </View>
-      <Text
-        selectable
-        style={{
-          color: row.isError ? theme.danger : theme.text,
-          fontSize: theme.fontBody,
-          lineHeight: theme.lineBody,
-        }}
+      <MessageActions
+        text={row.text}
+        markdown={row.text}
+        canRegenerate={!row.streaming}
+        onRegenerate={onRegenerate}
       >
-        {row.text}
-        {row.streaming ? <Text style={{ color: theme.accent }}>▍</Text> : null}
-      </Text>
+        {row.isError ? (
+          <Text selectable style={{ color: theme.danger, fontSize: theme.fontBody, lineHeight: theme.lineBody }}>
+            {row.text}
+          </Text>
+        ) : (
+          <Markdown source={row.text} />
+        )}
+        {row.streaming ? (
+          <Caret color={theme.accent} fontSize={theme.fontBody} lineHeight={theme.lineBody} />
+        ) : null}
+      </MessageActions>
     </View>
   )
 }
@@ -94,53 +107,16 @@ function SystemRow({ row }: { row: TextRow }) {
   )
 }
 
-function ToolCard({ row }: { row: ToolRow }) {
-  const theme = themeFor(useColorScheme())
-  const tint = row.status === 'error' ? theme.danger : row.status === 'ok' ? theme.ok : theme.textWeak
-  return (
-    <View style={{ paddingHorizontal: theme.gutter, paddingVertical: 6 }}>
-      <View
-        style={{
-          backgroundColor: theme.card,
-          borderRadius: 12,
-          borderWidth: theme.hairline,
-          borderColor: theme.cardBorder,
-          paddingHorizontal: 12,
-          paddingVertical: 10,
-          gap: 6,
-        }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <TerminalIcon size={14} color={tint} />
-          <Text numberOfLines={1} style={{ flex: 1, color: theme.text, fontSize: 13, fontWeight: '500' }}>
-            {row.name}
-          </Text>
-          {row.status === 'running' ? (
-            <Text style={{ color: theme.textWeak, fontSize: 11 }}>运行中</Text>
-          ) : row.status === 'error' ? (
-            <CloseIcon size={14} color={theme.danger} />
-          ) : (
-            <CheckIcon size={14} color={theme.ok} />
-          )}
-        </View>
-        {row.hint ? (
-          <Text numberOfLines={1} style={{ color: theme.textMedium, fontSize: 12, fontFamily: theme.mono }}>
-            {row.hint}
-          </Text>
-        ) : null}
-        {row.output ? (
-          <Text numberOfLines={8} style={{ color: theme.textWeak, fontSize: 12, lineHeight: 18, fontFamily: theme.mono }}>
-            {row.output}
-          </Text>
-        ) : null}
-      </View>
-    </View>
-  )
-}
-
-export const MessageRow = memo(function MessageRow({ row }: { row: TextRow | ToolRow }) {
+export const MessageRow = memo(function MessageRow({
+  row,
+  onRegenerate,
+}: {
+  row: TextRow | ToolRow | ThinkingRowData
+  onRegenerate?: () => void
+}) {
+  if (row.kind === 'thinking') return <ThinkingRow row={row} />
   if (row.kind === 'tool') return <ToolCard row={row} />
   if (row.role === 'user') return <UserBubble row={row} />
   if (row.role === 'system') return <SystemRow row={row} />
-  return <AssistantRow row={row} />
+  return <AssistantRow row={row} onRegenerate={onRegenerate} />
 })

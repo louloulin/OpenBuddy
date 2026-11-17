@@ -103,15 +103,30 @@ export async function claimPair(payload: PairPayload, deviceName: string): Promi
 let active: { transport: GatewayTransport; gatewayUrl: string; token: string } | null = null
 
 /** Builds the app-wide transport; safe to call twice (the old one is closed). */
-export async function openTransport(pairing: Pairing): Promise<Transport> {
+export async function openTransport(
+  pairing: Pairing,
+  options: { onUnauthorized?: () => void } = {},
+): Promise<Transport> {
   active?.transport.close()
   const transport = new GatewayTransport({
     baseUrl: `${pairing.gatewayUrl}/api`,
     token: pairing.deviceToken,
     fetchImpl: await streamFetch(),
+    ...(options.onUnauthorized ? { onUnauthorized: options.onUnauthorized } : {}),
   })
   active = { transport, gatewayUrl: pairing.gatewayUrl, token: pairing.deviceToken }
   return transport
+}
+
+/**
+ * Reconnects the live transport right away.
+ *
+ * The phone calls this when it comes back to the foreground: the radio was
+ * off and the tunnel is certainly gone, so waiting out a backoff would leave
+ * the user staring at a dead screen.
+ */
+export function reconnectTransport(): void {
+  active?.transport.reconnectNow()
 }
 
 export function currentTransport(): Transport | null {

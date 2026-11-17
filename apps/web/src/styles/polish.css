@@ -1122,3 +1122,84 @@ body.bench-resizing iframe { pointer-events: none; }
   font-family: var(--wb-font-code-family, ui-monospace, monospace); font-size: 11px; line-height: 17px;
   color: var(--wb-text-strong); white-space: pre-wrap; word-break: break-word;
 }
+
+/* ---------- 20261117 · W6.3：设置重排 / 通用偏好 ---------- */
+/* 字号：整壳缩放，避免逐条覆盖散落的 px 字号；高度同步补偿，窗口仍铺满。 */
+html[data-font-size="small"] { --ob-ui-font-scale: 0.94; }
+html[data-font-size="large"] { --ob-ui-font-scale: 1.07; }
+html[data-font-size="small"] .app,
+html[data-font-size="large"] .app {
+  zoom: var(--ob-ui-font-scale);
+  height: calc(100vh / var(--ob-ui-font-scale));
+}
+/* 信息密度：收紧对话正文行高、设置导航与列表行距。 */
+html[data-density="compact"] .turn__body { line-height: 21px; }
+html[data-density="compact"] .turn__head { margin-bottom: 4px; }
+html[data-density="compact"] .settings-navigation__item { padding-top: 5px; padding-bottom: 5px; }
+html[data-density="compact"] .data-card__row,
+html[data-density="compact"] .sec-rule,
+html[data-density="compact"] .pref-row { padding-top: 7px; padding-bottom: 7px; }
+
+.pref-card {
+  border: 1px solid var(--ob-card-border);
+  border-radius: 18px;
+  background: var(--ob-card);
+  box-shadow: var(--ob-shadow-card);
+  overflow: hidden;
+  padding: 4px 0;
+}
+.pref-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 18px;
+}
+.pref-row + .pref-row { border-top: 1px solid var(--ob-card-border); }
+.pref-row__label { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.pref-row__label > svg { flex: none; color: var(--wb-text-tertiary); }
+.pref-row__title { font-size: 13px; color: var(--wb-text-strong); line-height: 20px; }
+.pref-row__hint { font-size: 12px; color: var(--wb-text-tertiary); line-height: 18px; }
+.pref-row--muted .pref-row__title { color: var(--wb-text-medium); }
+.pref-seg {
+  flex: none; display: inline-flex; gap: 2px; padding: 2px;
+  border-radius: 999px; background: var(--wb-bg-tertiary, var(--ob-surface));
+  border: 1px solid var(--ob-card-border);
+}
+.pref-seg__btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: none; border-radius: 999px; padding: 5px 12px;
+  background: transparent; color: var(--wb-text-medium); font: inherit; font-size: 12px;
+  cursor: pointer; transition: background var(--ob-dur-fast) var(--ob-ease), color var(--ob-dur-fast) var(--ob-ease);
+}
+.pref-seg__btn:hover { color: var(--wb-text-strong); }
+.pref-seg__btn.is-on { background: var(--ob-card); color: var(--wb-text-strong); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.pref-value { flex: none; font-size: 12px; color: var(--wb-text-tertiary); }
+.pref-badge {
+  flex: none; padding: 3px 9px; border-radius: 999px;
+  background: color-mix(in srgb, var(--ob-focus) 12%, transparent);
+  color: var(--wb-text-medium); font-size: 11px;
+}
+
+.about-card {
+  border: 1px solid var(--ob-card-border);
+  border-radius: 18px;
+  background: var(--ob-card);
+  box-shadow: var(--ob-shadow-card);
+  padding: 20px;
+}
+.about-card__brand { display: flex; align-items: center; gap: 14px; padding-bottom: 16px; border-bottom: 1px solid var(--ob-card-border); }
+.about-card__logo {
+  width: 46px; height: 46px; flex: none; display: grid; place-items: center;
+  border-radius: 14px; background: var(--ob-ink); color: var(--ob-ink-fg);
+  font-size: 15px; font-weight: 650; letter-spacing: 0.02em;
+}
+.about-card__name { font-size: 16px; font-weight: 600; color: var(--wb-text-strong); line-height: 22px; }
+.about-card__version { font-size: 12px; color: var(--wb-text-tertiary); line-height: 18px; }
+.about-card__facts { margin: 0; padding-top: 6px; }
+.about-card__facts > div { display: flex; gap: 16px; padding: 9px 0; }
+.about-card__facts dt { flex: none; width: 56px; font-size: 12px; color: var(--wb-text-tertiary); line-height: 20px; }
+.about-card__facts dd { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--wb-text-medium); line-height: 20px; flex-wrap: wrap; }
+.about-card__facts dd a { display: inline-flex; align-items: center; gap: 4px; color: var(--wb-text-strong); text-decoration: none; }
+.about-card__facts dd a:hover { text-decoration: underline; }
+.about-card__facts code {
+  padding: 1px 6px; border-radius: 6px; background: var(--wb-bg-tertiary, var(--ob-surface));
+  font-family: var(--wb-font-code-family, ui-monospace, monospace); font-size: 11px; color: var(--wb-text-strong);
+}

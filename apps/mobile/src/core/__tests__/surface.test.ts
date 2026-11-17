@@ -22,10 +22,15 @@ describe('capabilities gating', () => {
   })
 
   it('shows a tab only when its backing command is served', () => {
-    expect(visibleTabs(caps)).toEqual({ sessions: true, search: true, notifications: true })
+    expect(visibleTabs(caps)).toEqual({ sessions: true, search: true, notifications: true, automations: false })
     expect(visibleTabs({ ...caps, commands: ['agent_list_sessions'] }))
-      .toEqual({ sessions: true, search: false, notifications: false })
-    expect(visibleTabs(null)).toEqual({ sessions: false, search: false, notifications: false })
+      .toEqual({ sessions: true, search: false, notifications: false, automations: false })
+    expect(visibleTabs(null))
+      .toEqual({ sessions: false, search: false, notifications: false, automations: false })
+  })
+
+  it('shows the automations tab when the desktop serves scheduled tasks', () => {
+    expect(visibleTabs({ ...caps, commands: [...caps.commands, 'automations_snapshot'] }).automations).toBe(true)
   })
 })
 

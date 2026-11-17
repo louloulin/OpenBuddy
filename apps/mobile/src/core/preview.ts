@@ -11,6 +11,10 @@
  */
 
 import type { Approval, CachedSession, NotificationItem } from './models'
+import type { DirEntry } from './files'
+import type { Automation } from './automations'
+import type { MemoryEntry } from './memory'
+import type { Capabilities } from './surface'
 import type { Transcript } from './transcript'
 
 export function isPreview(): boolean {
@@ -22,6 +26,23 @@ export type PreviewState = {
   transcripts: Record<string, Transcript>
   notifications: NotificationItem[]
   approvals: Approval[]
+  /** Sessions shown as still waiting for the model. */
+  awaiting: string[]
+  /** The fake file tree the phone browses. */
+  files: { path: string; entries: DirEntry[]; preview?: { path: string; text: string } }
+  /** The scheduled tasks the fake computer has. */
+  automations: Automation[]
+  /** The memory notes the fake computer would inject. */
+  memories: MemoryEntry[]
+  /** The surface the fake desktop advertises, so capability gating shows as open. */
+  capabilities: Capabilities
+  /** The session panel's read-only view of one session. */
+  panel?: {
+    experts: { id: string; name: string; description?: string }[]
+    thinkingLevel?: string
+    artifacts: { path: string; kind?: string }[]
+    usage?: { used: number; total: number }
+  }
 }
 
 /** Relative to the run, so a review build never shows stale timestamps. */
@@ -57,6 +78,15 @@ export function previewState(): PreviewState {
       unread: 0,
     },
     {
+      id: 'sess-pending',
+      title: '等待模型响应',
+      updatedAt: now - 5_000,
+      pinned: false,
+      archived: false,
+      preview: '正在压测 100 条并发流…',
+      unread: 0,
+    },
+    {
       id: 'sess-docs',
       title: '补写 README',
       updatedAt: now - 26 * 3_600_000,
@@ -72,10 +102,16 @@ export function previewState(): PreviewState {
       rows: [
         { kind: 'text', id: 'u1', role: 'user', text: '网关的 SSE 直通现在有没有缓冲？' },
         {
+          kind: 'thinking',
+          id: 'th1',
+          live: false,
+          text: '先确认代理层有没有做缓冲。\n看 forwardHttp 的 accept-encoding 处理。\n应该没有，identity 是直通的。',
+        },
+        {
           kind: 'text',
           id: 'a1',
           role: 'assistant',
-          text: '没有缓冲。代理层把 accept-encoding 固定成 identity，上游写一帧就转发一帧，TTFB 等于桌面出第一个 token 的时间加一跳 RTT。',
+          text: '没有缓冲。代理层把 `accept-encoding` 固定成 **identity**，上游写一帧就转发一帧：\n\n- TTFB = 桌面出第一个 token + 一跳 RTT\n- 中间不做任何聚合\n\n```ts\nheaders[\'accept-encoding\'] = \'identity\'\n```',
         },
         { kind: 'tool', id: 't1', name: 'grep', hint: "forwardHttp packages/gateway/src", status: 'ok', output: 'proxy.ts:102  export async function forwardHttp(' },
         { kind: 'text', id: 'u2', role: 'user', text: '那把这块单独抽出来，加一条并发测试。' },
@@ -88,6 +124,13 @@ export function previewState(): PreviewState {
         },
       ],
       lastAssistantText: '好。抽成 relay/sse.ts，保留原来的 identity 头；测试用 100 条并发流读同一份缓冲，断言没有交叉写入。',
+    },
+    // A turn that has only been sent: the waiting row is the whole screen.
+    'sess-pending': {
+      rows: [
+        { kind: 'text', id: 'u1', role: 'user', text: '跑一遍 100 并发的 SSE 压测，看看有没有交叉写入。' },
+      ],
+      lastAssistantText: '',
     },
     'sess-mobile': {
       rows: [
@@ -121,5 +164,132 @@ export function previewState(): PreviewState {
     },
   ]
 
-  return { sessions, transcripts, notifications, approvals }
+  const panel = {
+    experts: [
+      { id: 'e-arch', name: '架构师', description: '擅长系统设计与接口拆解' },
+      { id: 'e-doc', name: '文档工程师', description: '把结论写成可执行的文档' },
+      { id: 'e-test', name: '测试搭子', description: '专盯边界条件与并发' },
+    ],
+    thinkingLevel: 'medium',
+    artifacts: [
+      { path: 'docs/plan/20261115-mobile.md', kind: '文档' },
+      { path: 'packages/pi-bridge/src/server.ts', kind: '代码' },
+    ],
+    usage: { used: 38_400, total: 200_000 },
+  }
+
+  const capabilities: Capabilities = {
+    platform: 'mobile-host',
+    commands: [
+      'agent_list_sessions', 'agent_send', 'agent_load_session', 'agent_new_session',
+      'agent_resolve_permission', 'agent_get_model_state', 'agent_set_thinking_level',
+      'agent_set_session_expert', 'agent_regenerate', 'agent_cancel',
+      'agents_list', 'artifacts_list', 'agent_session_info', 'session_search',
+      'automations_snapshot', 'automations_run', 'automations_set_status',
+      'notification_list', 'notification_mark_all_read', 'memory_list',
+    ],
+    events: ['agent://event', 'agent://permission', 'agent://update'],
+  }
+
+  const files = {
+    path: '/Users/louloulin/stock/OpenBuddy',
+    entries: [
+      { name: 'apps', path: '/Users/louloulin/stock/OpenBuddy/apps', kind: 'directory' as const, size: 0 },
+      { name: 'docs', path: '/Users/louloulin/stock/OpenBuddy/docs', kind: 'directory' as const, size: 0 },
+      { name: 'packages', path: '/Users/louloulin/stock/OpenBuddy/packages', kind: 'directory' as const, size: 0 },
+      { name: 'README.md', path: '/Users/louloulin/stock/OpenBuddy/README.md', kind: 'file' as const, size: 8_420 },
+      { name: 'pnpm-lock.yaml', path: '/Users/louloulin/stock/OpenBuddy/pnpm-lock.yaml', kind: 'file' as const, size: 412_880 },
+      { name: 'tsconfig.json', path: '/Users/louloulin/stock/OpenBuddy/tsconfig.json', kind: 'file' as const, size: 3_140 },
+    ],
+    preview: {
+      path: '/Users/louloulin/stock/OpenBuddy/README.md',
+      text: [
+        '# OpenBuddy',
+        '',
+        'OpenBuddy 是一个由 Pi 驱动的桌面工作台。',
+        '',
+        '## 手机接入',
+        '',
+        '桌面端启动后会在本地开一个桥接端口，手机通过网关连过来：',
+        '',
+        '- `POST /cmd/:command` —— 命令',
+        '- `GET  /events?since=` —— 事件流',
+        '',
+        '密钥只留在桌面。',
+      ].join('\n'),
+    },
+  }
+
+  const automations: Automation[] = [
+    {
+      id: 'auto-morning',
+      name: '每日晨报',
+      prompt: '整理今天的日程、昨天没完成的任务和新的通知',
+      status: 'ACTIVE',
+      nextRunAt: new Date(now + 3 * 3600_000).toISOString(),
+      lastRunAt: new Date(now - 21 * 3600_000).toISOString(),
+    },
+    {
+      id: 'auto-review',
+      name: '每周代码巡检',
+      prompt: '跑一遍测试、看看有没有失败用例，并给出修复建议',
+      status: 'ACTIVE',
+      nextRunAt: new Date(now + 2 * 86_400_000).toISOString(),
+    },
+    {
+      id: 'auto-paused',
+      name: '旧版提醒',
+      prompt: '每天提醒一次旧的提醒事项',
+      status: 'PAUSED',
+    },
+  ]
+
+  const memories: MemoryEntry[] = [
+    {
+      scope: 'global',
+      path: 'MEMORY.md',
+      size: 186,
+      content: [
+        '# 长期偏好',
+        '',
+        '- 回答用中文，先给结论再给理由。',
+        '- 代码改动要配一条能真实跑起来的验证。',
+        '- 不确定的地方直说，不要猜。',
+      ].join('\n'),
+    },
+    {
+      scope: 'global',
+      path: 'people/team.md',
+      size: 132,
+      content: [
+        '# 团队',
+        '',
+        '- 安卓由小林负责，iOS 是我。',
+        '- 发版窗口在周四下午。',
+      ].join('\n'),
+    },
+    {
+      scope: 'global',
+      path: 'projects/openbuddy.md',
+      size: 210,
+      content: [
+        '# OpenBuddy',
+        '',
+        '- 桌面端是 Electron + Pi 引擎，手机端是 Expo。',
+        '- 手机不持有模型密钥，所有工具调用都在电脑上执行。',
+      ].join('\n'),
+    },
+    {
+      scope: 'workspace',
+      path: 'decisions/gateway-sse.md',
+      size: 148,
+      content: [
+        '# 网关流式结论',
+        '',
+        '代理层固定 accept-encoding: identity，SSE 一帧到一帧转发，不做聚合。',
+      ].join('\n'),
+    },
+  ]
+
+  return { sessions, transcripts, notifications, approvals, awaiting: ['sess-pending'], capabilities, panel, files, automations, memories }
 }

@@ -8,6 +8,7 @@ import { ContextUsagePill } from "./ContextUsagePill";
 import { clipboardSaveImage, type AgentMode } from "@openbuddy/client/agent-client";
 import { useInputHistoryKeys } from "./useInputHistoryKeys";
 import { useBangCommand } from "./useBangCommand";
+import { getSendKey } from "./send-key";
 import { BangHint } from "./BangHint";
 import { ConnectorNeededBar } from "./ConnectorNeededBar";
 import { FileMentionPopover, type FileMentionHandle } from "./FileMentionPopover";
@@ -469,11 +470,17 @@ export function Composer({
             if (e.nativeEvent.isComposing) return;
             // The slash menu and the `@` file list (when open) own ↑↓/Enter/Tab/Esc.
             if (!e.shiftKey && (slashRef.current?.handleKey(e) || mentionRef.current?.handleKey(e))) return;
-            if (e.key === "Enter" && !e.shiftKey && !(e.altKey && !streaming)) {
+            // 发送键偏好 (W6.3): Enter 发送（默认）或 Ctrl/Cmd+Enter 发送；Shift+Enter 始终换行。
+            const mod = e.ctrlKey || e.metaKey;
+            const sendKey = getSendKey();
+            // "enter" 下 Ctrl/Cmd+Enter 也发送（并可在流式中 steer），保持旧行为；
+            // "mod+enter" 下只有 Ctrl/Cmd+Enter 发送，Enter 换行。
+            const sendHit = e.key === "Enter" && !e.shiftKey && (sendKey === "mod+enter" ? mod : true);
+            if (sendHit && !(e.altKey && !streaming)) {
               e.preventDefault();
-              // While a reply is running, Enter queues the message instead of doing nothing;
+              // While a reply is running, the send key queues the message instead of doing nothing;
               // Ctrl/Cmd+Enter (or Alt/⌥+Enter) steers the running reply at its next tool step. A `!command` is never queued.
-              if (streaming && onEnqueue && !bash.bang) void enqueue(e.altKey || e.ctrlKey || e.metaKey ? "steer" : undefined);
+              if (streaming && onEnqueue && !bash.bang) void enqueue(e.altKey || mod ? "steer" : undefined);
               else send();
               return;
             }

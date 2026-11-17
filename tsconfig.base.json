@@ -12,6 +12,12 @@
     "noEmit": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
+      "@openbuddy/gateway/*": [
+        "./packages/gateway/src/*"
+      ],
+      "@openbuddy/pi-bridge/*": [
+        "./packages/pi-bridge/src/*"
+      ],
       "@openbuddy/protocol": [
         "./packages/protocol/src/index.ts"
       ],

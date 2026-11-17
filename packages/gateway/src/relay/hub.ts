@@ -12,8 +12,23 @@
 export const LEGACY_ROUTE = 'legacy'
 
 export type AgentSocket = {
-  send(data: string): void
+  /**
+   * Writes one frame. Returns the runtime's verdict: `0`/`false` means the
+   * frame was **dropped** (send buffer full, socket closing), not queued.
+   * A runtime that returns nothing is assumed to have accepted it.
+   */
+  send(data: string): void | number | boolean
   close(code?: number, reason?: string): void
+  /**
+   * Bytes queued in the kernel for this socket, when the runtime can report it.
+   *
+   * One tunnel socket carries every phone's traffic for this desktop. When a
+   * slow consumer (or a burst of heartbeats) fills the buffer, `send` keeps
+   * accepting frames that then sit in memory: the caller sees success, the
+   * phone sees a timeout 30 seconds later. Knowing the number lets the hub
+   * refuse work instead of pretending it was delivered.
+   */
+  bufferedAmount?: () => number
 }
 
 export type TunnelHttpRequest = {
@@ -43,6 +58,18 @@ type PendingHttp = {
   timer: ReturnType<typeof setTimeout>
 }
 
+/**
+ * The desktop's tunnel is carrying more than it can deliver right now.
+ *
+ * Distinct from "offline": the agent is connected, so a retry may work as soon
+ * as the queue drains. The gateway maps it to 503 rather than 502.
+ */
+export class TunnelBackpressureError extends Error {
+  constructor(readonly route: string) {
+    super('agent tunnel is backpressured')
+  }
+}
+
 type WsBridge = {
   route: string
   send: (data: string | Uint8Array) => void
@@ -50,6 +77,17 @@ type WsBridge = {
 }
 
 const HEAD_TIMEOUT_MS = 30_000
+
+/**
+ * How much may queue in one tunnel socket before the hub refuses new work.
+ *
+ * A healthy tunnel holds well under a megabyte; several megabytes means the
+ * agent is not reading (a slow disk, a stalled body) and anything added now
+ * would only wait out the head timeout. Failing fast turns a 30-second hang
+ * into an immediate, retryable error.
+ */
+export const MAX_TUNNEL_BUFFER_BYTES = 4 * 1024 * 1024
+
 
 /**
  * How long a response body may stay silent after its head arrived.
@@ -175,6 +213,10 @@ export class AgentHub {
   async requestHttp(route: string, request: TunnelHttpRequest, signal?: AbortSignal): Promise<Response> {
     const socket = this.sockets.get(route)
     if (!socket) throw new Error('agent not connected')
+    // The tunnel already has more queued than it can drain: adding this
+    // request would only make the phone wait out the head timeout. Fail now,
+    // with an error the gateway turns into a retryable 503.
+    if (this.tunnelSaturated(route)) throw new TunnelBackpressureError(route)
     const id = crypto.randomUUID()
     let controller!: ReadableStreamDefaultController<Uint8Array>
     const stream = new ReadableStream<Uint8Array>({
@@ -208,7 +250,7 @@ export class AgentHub {
       })
     })
 
-    this.sendQuietly(route, {
+    const sent = this.writeFrame(route, {
       t: 'http_req',
       id,
       method: request.method,
@@ -216,6 +258,14 @@ export class AgentHub {
       headers: request.headers,
       body: encodeBody(request.body),
     })
+    if (!sent) {
+      // The frame never left the gateway. Waiting out the head timeout would
+      // report a 502 thirty seconds later; failing now tells the phone to
+      // retry while the queue is still short.
+      clearTimeout((this.pendingHttp.get(id) as PendingHttp | undefined)?.timer)
+      this.pendingHttp.delete(id)
+      throw new TunnelBackpressureError(route)
+    }
 
     const onAbort = () => {
       const pending = this.pendingHttp.get(id)
@@ -419,13 +469,41 @@ export class AgentHub {
     this.sockets.clear()
   }
 
-  private sendQuietly(route: string, frame: Record<string, unknown>): void {
+  /**
+   * True when this route's socket has more queued than the tunnel may hold.
+   *
+   * A runtime that cannot report its buffer (or an older agent) is treated as
+   * healthy: refusing work on a guess would be worse than trying.
+   */
+  private tunnelSaturated(route: string): boolean {
     const socket = this.sockets.get(route)
-    if (!socket) return
+    const queued = socket?.bufferedAmount?.()
+    return typeof queued === 'number' && queued > MAX_TUNNEL_BUFFER_BYTES
+  }
+
+  private sendQuietly(route: string, frame: Record<string, unknown>): void {
+    this.writeFrame(route, frame)
+  }
+
+  /**
+   * Writes a frame and reports whether the runtime accepted it.
+   *
+   * Bun's `send` returns 0 when the frame is dropped because the peer is not
+   * reading fast enough. Ignoring that return value is what turned a burst
+   * into a mystery: the hub believed it had handed a request to the desktop,
+   * nothing arrived, and the phone learned about it 30 seconds later as a
+   * 502. The verdict is returned so callers can fail fast instead.
+   */
+  private writeFrame(route: string, frame: Record<string, unknown>): boolean {
+    const socket = this.sockets.get(route)
+    if (!socket) return false
     try {
-      socket.send(JSON.stringify(frame))
+      const verdict = socket.send(JSON.stringify(frame))
+      // `undefined` (runtimes without a verdict) counts as accepted.
+      return verdict === undefined || verdict === 1 || verdict === true
     } catch {
       // The socket went away between the lookup and the write.
+      return false
     }
   }
 }

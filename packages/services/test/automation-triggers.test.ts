@@ -29,6 +29,8 @@ describe("文件触发 watcher (pii W4.7)", () => {
     const watcher = new FileTriggerWatcher((change) => changes.push(change));
     watchers.push(watcher);
     expect(watcher.watch(file, { debounceMs: 20, meta: "task-1" })).toBe(true);
+    // fs.watch 注册后立刻写文件可能丢事件；给 watcher 一个事件循环的时间。
+    await new Promise((r) => setTimeout(r, 50));
     writeFileSync(file, "a,b\n1,2\n3,4\n");
     await vi.waitFor(() => expect(changes).toHaveLength(1));
     expect(changes[0].path).toBe(file);

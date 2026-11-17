@@ -13,6 +13,10 @@ on:
       - 'packages/gateway/**'
       - 'packages/protocol/**'
       - 'scripts/e2e-mobile*.ts'
+      - 'apps/web/src/app/h5/**'
+      - 'scripts/e2e-desktop-bridge.ts'
+      - 'scripts/e2e-gateway-process.ts'
+      - 'scripts/run-desktop-bridge-e2e.mjs'
       - 'scripts/bench-mobile.ts'
       - '.github/workflows/mobile.yml'
   pull_request:
@@ -72,5 +76,17 @@ jobs:
         run: bun run scripts/e2e-mobile.ts
       - name: Expo logic layer end-to-end
         run: bun run scripts/e2e-mobile-app.ts
+      - name: Build the H5 bundle
+        run: npx vite build --config apps/web/vite.config.ts
+      - name: H5 end-to-end (gateway-served bundle)
+        run: bun run scripts/e2e-mobile-h5.ts
+      - name: Scheduled tasks end-to-end
+        run: bun run scripts/e2e-mobile-automations.ts
+      - name: Weak-network end-to-end (heartbeat, revocation, reconnect)
+        run: bun run scripts/e2e-mobile-weaknet.ts
+      - name: Desktop bridge end-to-end (Bun gateway + Node desktop + phone)
+        run: node scripts/run-desktop-bridge-e2e.mjs
       - name: Mobile-path benchmark (smoke)
         run: bun run scripts/bench-mobile.ts --commands 20 --events 200
+      - name: Multi-phone concurrency (20 clients)
+        run: bun run scripts/bench-mobile-clients.ts --clients 20

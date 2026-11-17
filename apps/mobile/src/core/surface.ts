@@ -49,10 +49,12 @@ export function visibleTabs(capabilities: Capabilities | null | undefined): {
   sessions: boolean
   search: boolean
   notifications: boolean
+  automations: boolean
 } {
   return {
     sessions: canRun(capabilities, 'agent_list_sessions'),
     search: canRun(capabilities, 'session_search'),
     notifications: canRun(capabilities, 'notification_list'),
+    automations: canRun(capabilities, 'automations_snapshot'),
   }
 }

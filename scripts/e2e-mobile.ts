@@ -91,6 +91,7 @@ const gateway = createGateway({
 } as Parameters<typeof createGateway>[0])
 
 const gatewayServer = serve({
+  idleTimeout: 120,
   port: 0,
   hostname: '127.0.0.1',
   fetch: (req, server) => gateway.app.fetch(req, server),
@@ -103,6 +104,7 @@ console.log(`gateway on ${gatewayUrl}`)
 
 const bridge = createBridgeServer(dispatcher, { token: 'bridge-secret' })
 const bridgeServer = serve({
+  idleTimeout: 120,
   port: 0,
   hostname: '127.0.0.1',
   fetch: bridge.app.fetch,

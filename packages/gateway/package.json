@@ -2,6 +2,10 @@
   "name": "@openbuddy/gateway",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  },
   "version": "0.1.0",
   "description": "Self-hosted gateway and relay for OpenBuddy mobile clients (ported from lumos gateway)",
   "scripts": {

@@ -8,7 +8,7 @@
  */
 
 import { useEffect } from 'react'
-import { ActivityIndicator, View, useColorScheme } from 'react-native'
+import { ActivityIndicator, AppState, View, useColorScheme } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
@@ -26,6 +26,7 @@ export default function RootLayout() {
   const booted = useApp(state => state.booted)
   const pairing = useApp(state => state.pairing)
   const bootstrap = useApp(state => state.bootstrap)
+  const resume = useApp(state => state.resume)
   const router = useRouter()
 
   useEffect(() => {
@@ -35,6 +36,16 @@ export default function RootLayout() {
   useEffect(() => {
     if (booted && !pairing) router.replace('/pair')
   }, [booted, pairing, router])
+
+  // Backgrounding the app turns the radio off, so the tunnel is gone when the
+  // user comes back. Reconnecting on the spot is the difference between
+  // "one tap and it works" and "wait a minute for the backoff".
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') resume()
+    })
+    return () => subscription.remove()
+  }, [resume])
 
   // Ask for push permission only after pairing: a prompt on first launch, with
   // nothing to be notified about yet, is noise.
@@ -70,6 +81,10 @@ export default function RootLayout() {
             >
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="chat/[sessionId]" options={{ headerShown: false }} />
+              <Stack.Screen name="session/[sessionId]" options={{ headerShown: false }} />
+              <Stack.Screen name="files" options={{ headerShown: false }} />
+              <Stack.Screen name="memory" options={{ title: '记忆' }} />
+              <Stack.Screen name="memory/[path]" options={{ title: '记忆' }} />
               <Stack.Screen name="pair" options={{ title: '配对电脑', headerShown: false }} />
               <Stack.Screen name="approval/[requestId]" options={{ title: '等待批准' }} />
             </Stack>

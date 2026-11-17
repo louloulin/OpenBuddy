@@ -238,3 +238,87 @@ describe('bridge server', () => {
     expect(unauthorized.status).toBe(401)
   })
 })
+
+describe('event stream heartbeat', () => {
+  test('an idle stream still says it is alive', async () => {
+    // A reverse proxy closes an idle response after about a minute; without a
+    // heartbeat the phone's tunnel dies on a quiet conversation.
+    const dispatcher = fakeDispatcher()
+    const server = createBridgeServer(dispatcher, { token: TOKEN, heartbeatIntervalMs: 100 })
+    const http = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: server.app.fetch })
+    try {
+      const response = await fetch(`http://127.0.0.1:${http.port}/events?since=0`, { headers: auth })
+      expect(response.status).toBe(200)
+      const reader = response.body!.getReader()
+      const decoder = new TextDecoder()
+      let text = ''
+      const deadline = Date.now() + 3_000
+      while (!text.includes('event: ping') && Date.now() < deadline) {
+        const { done, value } = await reader.read()
+        if (done) break
+        text += decoder.decode(value)
+      }
+      expect(text).toContain('event: ping')
+      await reader.cancel()
+    } finally {
+      server.close()
+      http.stop(true)
+    }
+  }, 10_000)
+})
+
+describe('host_capabilities over the bridge', () => {
+  const dispatcher = () => {
+    const fake = fakeDispatcher()
+    // The desktop would answer with its own full surface; the bridge must not
+    // hand that to a phone.
+    fake.handlers.set('host_capabilities', () => ({
+      protocolVersion: 1,
+      platform: 'desktop',
+      commands: ['window_minimize', 'write_text_file'],
+      events: ['agent://event'],
+      features: ['desktop'],
+    }))
+    return fake
+  }
+
+  test('HTTP answers the mobile surface, not the desktop one', async () => {
+    const server = createBridgeServer(dispatcher(), { token: TOKEN })
+    const response = await server.app.request('/api/cmd/host_capabilities', {
+      method: 'POST',
+      headers: { ...auth, 'content-type': 'application/json' },
+      body: '{}',
+    })
+    expect(response.status).toBe(200)
+    const body = await response.json() as { ok: boolean; result: { platform: string; commands: string[] } }
+    expect(body.result.platform).toBe('mobile-host')
+    expect(body.result.commands).toContain('agent_send')
+    expect(body.result.commands).not.toContain('window_minimize')
+  })
+
+  test('the socket path gives the same answer', async () => {
+    const server = createBridgeServer(dispatcher(), { token: TOKEN })
+    const http = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: (req, s) => server.fetch(req, s), websocket: server.websocket as never })
+    try {
+      const socket = new WebSocket(`ws://127.0.0.1:${http.port}/ws?token=${encodeURIComponent(TOKEN)}`)
+      const reply = await new Promise<{ ok?: boolean; result?: { platform?: string; commands?: string[] } }>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('no reply')), 3000)
+        socket.onopen = () => socket.send(JSON.stringify({ t: 'cmd', id: 'c1', command: 'host_capabilities', payload: {} }))
+        socket.onmessage = event => {
+          const frame = JSON.parse(String(event.data)) as { t?: string; id?: string }
+          if (frame.t !== 'reply' || frame.id !== 'c1') return
+          clearTimeout(timer)
+          resolve(frame as never)
+        }
+        socket.onerror = () => { clearTimeout(timer); reject(new Error('socket error')) }
+      })
+      expect(reply.ok).toBe(true)
+      expect(reply.result?.platform).toBe('mobile-host')
+      expect(reply.result?.commands).not.toContain('window_minimize')
+      socket.close()
+    } finally {
+      server.close()
+      http.stop(true)
+    }
+  })
+})

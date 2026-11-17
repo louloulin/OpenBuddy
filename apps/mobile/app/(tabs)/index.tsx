@@ -7,7 +7,7 @@
  * refreshes from the desktop.
  */
 
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Pressable, RefreshControl, Text, View, useColorScheme } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { useRouter } from 'expo-router'
@@ -34,7 +34,33 @@ export default function SessionsScreen() {
   const router = useRouter()
   const [refreshing, setRefreshing] = useState(false)
 
-  const renderItem = useCallback(({ item }: { item: CachedSession }) => (
+  // The desktop sidebar groups the list; the phone keeps the same two groups
+  // with a quiet section label instead of a collapsible tree.
+  const groups = useMemo(() => {
+    const pinned = sessions.filter(item => item.pinned)
+    const rest = sessions.filter(item => !item.pinned)
+    const rows: ({ kind: 'label'; id: string; title: string } | { kind: 'session'; id: string; session: CachedSession })[] = []
+    if (pinned.length) {
+      rows.push({ kind: 'label', id: 'label:pinned', title: '置顶会话' })
+      for (const session of pinned) rows.push({ kind: 'session', id: session.id, session })
+    }
+    if (rest.length) {
+      rows.push({ kind: 'label', id: 'label:recent', title: pinned.length ? '其他会话' : '最近会话' })
+      for (const session of rest) rows.push({ kind: 'session', id: session.id, session })
+    }
+    return rows
+  }, [sessions])
+
+  const renderItem = useCallback(({ item }: { item: { kind: 'label'; id: string; title: string } | { kind: 'session'; id: string; session: CachedSession } }) => {
+    if (item.kind === 'label') {
+      return (
+        <Text style={{ color: theme.textWeak, fontSize: 12, fontWeight: '600', paddingHorizontal: theme.gutter, paddingTop: 14, paddingBottom: 4 }}>
+          {item.title}
+        </Text>
+      )
+    }
+    const session = item.session
+    return (
     <Pressable
       onPress={() => router.push(`/chat/${encodeURIComponent(item.id)}`)}
       style={({ pressed }) => ({
@@ -47,22 +73,23 @@ export default function SessionsScreen() {
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Text numberOfLines={1} style={{ flex: 1, color: theme.text, fontSize: 15, fontWeight: '500' }}>
-          {item.title}
+          {session.title}
         </Text>
-        {item.pinned ? (
+        {session.pinned ? (
           <View style={{ backgroundColor: theme.pressed, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 }}>
             <Text style={{ color: theme.textMedium, fontSize: 10 }}>置顶</Text>
           </View>
         ) : null}
-        <Text style={{ color: theme.textWeak, fontSize: 11 }}>{relative(item.updatedAt)}</Text>
+        <Text style={{ color: theme.textWeak, fontSize: 11 }}>{relative(session.updatedAt)}</Text>
       </View>
-      {item.preview ? (
+      {session.preview ? (
         <Text numberOfLines={1} style={{ color: theme.textWeak, fontSize: 13, marginTop: 3 }}>
-          {item.preview}
+          {session.preview}
         </Text>
       ) : null}
     </Pressable>
-  ), [theme, router])
+    )
+  }, [theme, router])
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.surface }}>
@@ -90,7 +117,7 @@ export default function SessionsScreen() {
         </View>
       ) : (
         <FlashList
-          data={sessions}
+          data={groups}
           renderItem={renderItem}
           keyExtractor={item => item.id}
           refreshControl={(

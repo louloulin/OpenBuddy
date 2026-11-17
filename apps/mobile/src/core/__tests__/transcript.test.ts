@@ -7,6 +7,7 @@ import {
   applyUpdates,
   contentText,
   emptyTranscript,
+  toolCategory,
   transcriptPreview,
   type Transcript,
 } from '../transcript'
@@ -124,5 +125,49 @@ describe('transcriptPreview', () => {
     expect(transcriptPreview(transcript)).toBe('the answer with lines')
     expect(transcriptPreview(transcript, 10)).toBe('the answe…')
     expect(transcriptPreview(emptyTranscript())).toBe('')
+  })
+})
+
+describe('applyUpdate — reasoning', () => {
+  it('folds thinking deltas into one live block, then folds it when the answer starts', () => {
+    let transcript = feed([
+      { type: 'thinking_delta', sessionId, assistantMessageEvent: { type: 'thinking_delta', delta: '先看' } },
+      { type: 'thinking_delta', sessionId, assistantMessageEvent: { type: 'thinking_delta', delta: '代理层' } },
+    ])
+    expect(transcript.rows).toHaveLength(1)
+    expect(transcript.rows[0]).toMatchObject({ kind: 'thinking', text: '先看代理层', live: true })
+
+    transcript = applyUpdate(transcript, {
+      type: 'message_delta', sessionId, assistantMessageEvent: { type: 'text_delta', delta: '答' },
+    }, sessionId)
+    expect(transcript.rows[0]).toMatchObject({ kind: 'thinking', live: false })
+    expect(transcript.rows[1]).toMatchObject({ kind: 'text', text: '答', streaming: true })
+  })
+
+  it('settled folds a reasoning block that never got an answer', () => {
+    let transcript = feed([
+      { type: 'thinking_delta', sessionId, assistantMessageEvent: { type: 'thinking_delta', delta: '想了想' } },
+    ])
+    expect(transcript.rows[0]).toMatchObject({ live: true })
+    transcript = applyUpdate(transcript, { type: 'agent_settled', sessionId }, sessionId)
+    expect(transcript.rows[0]).toMatchObject({ kind: 'thinking', live: false })
+  })
+})
+
+describe('toolCategory', () => {
+  it('tags a tool the way the desktop does', () => {
+    expect(toolCategory('read_text_file')).toBe('read')
+    expect(toolCategory('list_dir')).toBe('list')
+    expect(toolCategory('mcp_fetch')).toBe('mcp')
+  })
+
+  it('drops the agent_ prefix rather than showing it', () => {
+    expect(toolCategory('agent_bash')).toBe('bash')
+    expect(toolCategory('agent_send')).toBe('send')
+  })
+
+  it('never returns an empty tag', () => {
+    expect(toolCategory('')).toBe('tool')
+    expect(toolCategory('agent_')).toBe('agent')
   })
 })

@@ -21,7 +21,7 @@ import {
 } from './auth.js'
 import type { GatewayConfig } from './config.js'
 import { createDeviceRelay } from './relay/deviceRelay.js'
-import { AgentHub, LEGACY_ROUTE } from './relay/hub.js'
+import { AgentHub, LEGACY_ROUTE, TunnelBackpressureError } from './relay/hub.js'
 import {
   BodyTooLargeError,
   DesktopOfflineError,
@@ -799,6 +799,11 @@ export function createGateway(
         socket = {
           send: (data: string) => ws.send(data),
           close: (code?: number, reason?: string) => ws.close(code, reason),
+          // Bun can report the kernel queue; other runtimes leave it undefined
+          // and the hub then treats the tunnel as healthy.
+          bufferedAmount: typeof (ws as { getBufferedAmount?: () => number }).getBufferedAmount === 'function'
+            ? () => (ws as unknown as { getBufferedAmount: () => number }).getBufferedAmount()
+            : undefined,
         }
         hub.attach(route, socket)
         if (desktop) store.touchDesktop(desktop.id)
@@ -961,6 +966,17 @@ export function createGateway(
       return await forwardHttp(c.req.raw, config, hub, device, { body, pathPrefix })
     } catch (err) {
       if (err instanceof DesktopOfflineError) return desktopOffline(c, device, err)
+      if (err instanceof TunnelBackpressureError) {
+        // The desktop is connected but cannot keep up: retryable, and worth a
+        // Retry-After so a well-behaved client backs off instead of hammering.
+        return new Response(
+          JSON.stringify({ error: 'desktop busy', code: 'desktop_busy', retryAfterMs: 1000 }),
+          { status: 503, headers: { 'content-type': 'application/json', 'retry-after': '1' } },
+        )
+      }
+      if (process.env.OPENBUDDY_DEBUG_PROXY === '1') {
+        console.error('[proxy] error:', err instanceof Error ? `${err.name}: ${err.message}` : String(err))
+      }
       store.audit('proxy_error', device.id, new URL(c.req.url).pathname, {
         message: err instanceof Error ? err.message : String(err),
       })

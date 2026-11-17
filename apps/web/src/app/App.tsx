@@ -46,7 +46,7 @@ import {
   providersList,
   flattenModels,
   notificationAppend,
-  subscribeAgentEvents,
+  subscribeAgentEvents, hasPreloadBridge,
   type InitResult,
   type WorkspaceInfo,
 } from "@openbuddy/client/agent-client";
@@ -663,6 +663,12 @@ function Shell() {
 
   const handleSelectSession = async (sessionId: string, sessionCwd?: string) => {
     setPlaceholderView(null);
+    // A phone-width page shows the list and the conversation one at a time, so
+    // picking a session puts the conversation in front. The in-flow top bar's
+    // expand button brings the list back.
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches) {
+      setSidebarCollapsed(true);
+    }
     // Re-selecting the focused session is a no-op (it used to restart the engine session).
     if (sessionsStore.getState().currentSessionId === sessionId && sessionStore.getState().sessionId === sessionId && sessionStore.getState().messages.length) return;
     const operation = ++modelOperation.current; modelPending.current = true; setModelBusy(true);
@@ -859,10 +865,11 @@ function Shell() {
 
   return (
     <ModelRuntimeContext.Provider value={{ busy: modelBusy, unavailableReason: !focusedModelSession && invalidDefault ? "默认模型不可用，请重新选择模型" : undefined, canSend: !!currentModelId && models.some(model => model.id === currentModelId), thinkingLevel: focusedModelSession ? activeModelState?.thinkingLevel : clampThinking(homeThinking, homeLevels), thinkingLevels: focusedModelSession ? activeModelState?.availableThinkingLevels ?? [] : homeLevels, onThinkingChange: focusedModelSession ? (activeModelState ? handleThinkingChange : undefined) : homeLevels.length > 1 ? handleHomeThinkingChange : undefined, sessionId: focusedModelSession ?? undefined, supportsThinking: focusedModelSession ? activeModelState?.supportsThinking : undefined }}>
-    <div className={"app" + (IS_MACOS ? " app--macos" : "")}>
+    <div className={"app" + (IS_MACOS ? " app--macos" : "") + (hasPreloadBridge() ? "" : " app--browser")}>
       {/* macOS 使用系统原生 Overlay 标题栏(红绿灯 + 原生菜单栏),
-          不再渲染自绘 TitleBar;Windows/Linux 保持自绘。 */}
-      {!IS_MACOS && (
+          不再渲染自绘 TitleBar;Windows/Linux 保持自绘。
+          A browser page has no window to control, so it renders none at all. */}
+      {!IS_MACOS && hasPreloadBridge() && (
         <TitleBar onPlaceholder={handlePlaceholder} onShowAbout={() => setAboutOpen(true)} />
       )}
       <div className={"app__body" + (sidebarCollapsed ? " app__body--collapsed" : "")}>

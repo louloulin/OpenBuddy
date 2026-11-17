@@ -229,7 +229,8 @@ try {
     await ctx.sleep(1200);
     return await ctx.shot('06-settings');`);
   // Every settings section, so splitting SettingsSections (R8) is covered by before/after shots.
-  const SETTINGS_SECTIONS = [['account', '账户管理'], ['agent-mail', '智能体邮箱'], ['shortcuts', '快捷键'], ['model', '模型'], ['assistant', '助理设置'], ['personalize', '个性化'], ['security', '安全中心'], ['help', '帮助与反馈']];
+  // W6.3 order: 通用 → 模型 → 助理 → 智能体 → 安全 → 个性化 → 记忆 → 快捷键 → 邮箱 → 数据 → 帮助 → 关于.
+  const SETTINGS_SECTIONS = [['general', '通用'], ['model', '模型'], ['assistant', '助理设置'], ['agent-settings', '智能体'], ['security', '安全中心'], ['personalize', '个性化'], ['memory', '记忆'], ['shortcuts', '快捷键'], ['agent-mail', '智能体邮箱'], ['data', '数据管理'], ['help', '帮助与反馈'], ['about', '关于']];
   await step('settings sections', `
     const out = [];
     for (const [id, label] of ${JSON.stringify(SETTINGS_SECTIONS)}) {
@@ -238,6 +239,38 @@ try {
       out.push(await ctx.shot('07-settings-' + id));
     }
     return out;`);
+  // 20261116-pii W6.3: 通用偏好 — 主题 / 字号 / 密度 / 发送键立即生效并保存在本机。
+  await step('通用偏好（主题 / 字号 / 密度 / 发送键）', `
+    await page.locator('.settings-navigation__label').getByText('通用', { exact: true }).first().click();
+    await page.locator('.pref-card').waitFor({ timeout: 10000 });
+    await ctx.sleep(500);
+    const light = await ctx.shot('59-general');
+    await page.locator('.pref-row', { hasText: '主题' }).getByRole('button', { name: '深色' }).click();
+    // 字号与密度按钮的可访问名就是“大 / 紧凑”。
+    await page.getByRole('group', { name: '字号' }).getByRole('button', { name: '大' }).click();
+    await page.getByRole('group', { name: '信息密度' }).getByRole('button', { name: '紧凑' }).click();
+    await page.getByRole('group', { name: '发送键' }).getByRole('button', { name: 'Ctrl/Cmd+Enter' }).click();
+    await ctx.sleep(700);
+    const attrs = await page.evaluate(() => ({
+      theme: document.documentElement.dataset.theme,
+      fontSize: document.documentElement.dataset.fontSize,
+      density: document.documentElement.dataset.density,
+      sendKey: localStorage.getItem('openbuddy.sendKey'),
+    }));
+    if (attrs.theme !== 'dark' || attrs.fontSize !== 'large' || attrs.density !== 'compact' || attrs.sendKey !== 'mod+enter')
+      throw new Error('preferences not applied: ' + JSON.stringify(attrs));
+    const dark = await ctx.shot('60-general-dark-large');
+    // 复位，避免影响后续截图。
+    await page.locator('.pref-row', { hasText: '主题' }).getByRole('button', { name: '浅色' }).click();
+    await page.getByRole('group', { name: '字号' }).getByRole('button', { name: '标准' }).click();
+    await page.getByRole('group', { name: '信息密度' }).getByRole('button', { name: '宽松' }).click();
+    await page.getByRole('group', { name: '发送键' }).getByRole('button', { name: 'Enter', exact: true }).click();
+    await ctx.sleep(300);
+    await page.locator('.settings-navigation__label').getByText('关于', { exact: true }).first().click();
+    await page.locator('.about-card').waitFor({ timeout: 10000 });
+    await ctx.sleep(400);
+    const about = await ctx.shot('61-about');
+    return { light, dark, about, attrs };`);
   // 20261116-pii W6.1/W6.2: 安全中心 — 分类规则可改，受保护路径可增删并写入本地设置。
   await step('安全中心（受保护路径 + 规则）', `
     await page.locator('.settings-navigation__label').getByText('安全中心', { exact: true }).first().click();

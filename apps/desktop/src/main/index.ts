@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { registerIpc } from '../ipc/register.js';
+import { createEngineEventHub, startMobileBridge, type MobileBridge } from './mobile-bridge.js';
 import { notifier } from './notifier.js';
 import { installMenu } from './menu.js';
 import { confirmQuit, external } from './window.js';
@@ -44,7 +45,11 @@ async function createWindow(): Promise<void> {
   const notify = notifier(win, () => notificationsEnabled());
   // The HostShell port (@openbuddy/kernel) is Electron's shell; trash is injected so the engine never imports electron (R2).
   const hostShell: HostShell = { openPath: path => shell.openPath(path), openExternal: url => shell.openExternal(url), showItemInFolder: path => shell.showItemInFolder(path), trash: path => shell.trashItem(path) };
-  const engine = await createEngineHandlers({ userData: app.getPath('userData'), safeStorage, shell: hostShell, platform: { kind: 'desktop', commands: NATIVE_COMMANDS, events: DESKTOP_EVENTS }, emit: (event: string, payload: unknown) => { if (isEvent(event) && !win.isDestroyed()) { win.webContents.send(event, payload); notify(event, payload); } } });
+  // Engine events feed two consumers: the renderer window and the phone
+  // bridge. The hub is what lets the bridge subscribe without the engine
+  // knowing a phone exists.
+  const events = createEngineEventHub();
+  const engine = await createEngineHandlers({ userData: app.getPath('userData'), safeStorage, shell: hostShell, platform: { kind: 'desktop', commands: NATIVE_COMMANDS, events: DESKTOP_EVENTS }, emit: (event: string, payload: unknown) => { events.emit(event, payload); if (isEvent(event) && !win.isDestroyed()) { win.webContents.send(event, payload); notify(event, payload); } } });
   previewRoots = engine.previewRoots;
   notificationsEnabled = engine.notificationsEnabled;
   cleanup = undefined;
@@ -52,6 +57,18 @@ async function createWindow(): Promise<void> {
   runningTasks = async () => { try { return await engine.handlers.tasks_list({}) as unknown[]; } catch { return []; } };
   const workspaceAccess = await WorkspaceAccess.create(app.getPath('userData'));
   const unregister = registerIpc(win, engine.handlers, trustedURL, workspaceAccess, { attachmentsDir: join(app.getPath('userData'), 'attachments'), exportHtml: engine.exportHtml });
+  // The mobile path is opt-in: without a gateway address the desktop opens no
+  // port and behaves exactly as before (20261115-mobile.md Phase 2.6).
+  let mobileBridge: MobileBridge | null = null;
+  if (process.env.OPENBUDDY_GATEWAY_URL) {
+    mobileBridge = await startMobileBridge({
+      handlers: engine.handlers,
+      hub: events,
+      uploadsDir: join(app.getPath('userData'), 'mobile-uploads'),
+      gatewayUrl: process.env.OPENBUDDY_GATEWAY_URL,
+      agentToken: process.env.OPENBUDDY_GATEWAY_AGENT_TOKEN,
+    });
+  }
   win.on('focus', () => { if (process.platform !== 'win32') app.setBadgeCount(0); });
   win.webContents.setWindowOpenHandler(({ url }) => { external(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (event, url) => { if (url.split('#')[0] !== trustedURL) { event.preventDefault(); external(url); } });
@@ -68,7 +85,7 @@ async function createWindow(): Promise<void> {
       void disposeEngine().then(() => { if (!win.isDestroyed()) win.close(); });
     });
   });
-  win.once('closed', () => { unregister(); window = null; });
+  win.once('closed', () => { unregister(); void mobileBridge?.close(); mobileBridge = null; window = null; });
   await win.loadURL(trustedURL);
   if (process.env.OPENBUDDY_SMOKE_TEST === '1') {
     console.log('OPENBUDDY_RUNTIME', JSON.stringify(process.versions));

@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { visibleTabs } from '../../src/core/surface'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
-import { BellIcon, ChatIcon, PersonIcon, SearchIcon } from '../../src/components/icons'
+import { BellIcon, ChatIcon, ClockIcon, PersonIcon, SearchIcon } from '../../src/components/icons'
 
 export default function TabsLayout() {
   const theme = themeFor(useColorScheme())
@@ -73,6 +73,14 @@ export default function TabsLayout() {
           tabBarBadge: unread > 0 ? unread : undefined,
           tabBarBadgeStyle: { backgroundColor: theme.ink, color: theme.inkFg, fontSize: 10 },
           tabBarIcon: ({ color }) => <BellIcon size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="automations"
+        options={{
+          title: '自动化',
+          href: tabs.automations === false ? null : undefined,
+          tabBarIcon: ({ color }) => <ClockIcon size={22} color={color} />,
         }}
       />
       <Tabs.Screen

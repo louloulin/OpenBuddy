@@ -27,9 +27,21 @@ export type GatewayTransportOptions = {
   maxBackoffMs?: number
   /** Injected fetch (tests); defaults to globalThis.fetch. */
   fetchImpl?: typeof fetch
+  /**
+   * Called when the credential is refused (HTTP 401).
+   *
+   * A revoked device must not keep retrying forever: the phone clears the
+   * token and asks the user to pair again.
+   */
+  onUnauthorized?: () => void
+  /**
+   * How long the stream may stay silent before it counts as dead.
+   *
+   * The bridge sends a heartbeat every 25s, so a silent stream for longer than
+   * that means the tunnel is gone even though the socket looked open.
+   */
+  heartbeatTimeoutMs?: number
 }
-
-type StreamHandle = { controller: ReadableStreamDefaultController<string> }
 
 export class GatewayTransport implements Transport {
   private readonly baseUrl: string
@@ -48,13 +60,31 @@ export class GatewayTransport implements Transport {
   private abort: AbortController | null = null
   private stopped = false
   private attempt = 0
-  private stream: StreamHandle | null = null
+  private readonly onUnauthorized: (() => void) | undefined
+  private readonly heartbeatTimeoutMs: number
+  /** When the last frame of any kind arrived; the liveness measure. */
+  private lastSeenAt = 0
+  /**
+   * Bumped by `reconnectNow`.
+   *
+   * The connect loop compares it with the value it started with: a changed
+   * value means somebody asked for a fresh attempt, so the loop skips the
+   * backoff instead of making the user wait out a delay that no longer makes
+   * sense.
+   */
+  private generation = 0
 
   constructor(options: GatewayTransportOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '')
     this.token = options.token
     this.maxBackoffMs = options.maxBackoffMs ?? 15_000
-    this.fetchImpl = options.fetchImpl ?? fetch
+    // Never store the bare global: browsers implement `fetch` on Window, and
+    // calling a detached reference (`this.fetchImpl(...)`) sets a foreign
+    // receiver, which throws "Illegal invocation". The arrow keeps the call a
+    // plain global one.
+    this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init))
+    this.onUnauthorized = options.onUnauthorized
+    this.heartbeatTimeoutMs = options.heartbeatTimeoutMs ?? 70_000
     void this.connect()
   }
 
@@ -64,6 +94,11 @@ export class GatewayTransport implements Transport {
       headers: { authorization: `Bearer ${this.token}`, 'content-type': 'application/json' },
       body: JSON.stringify(payload ?? {}),
     })
+    if (response.status === 401) {
+      // The credential was refused: the device may have been revoked.
+      this.onUnauthorized?.()
+      throw new Error('unauthorized')
+    }
     const body = (await response.json().catch(() => ({}))) as { ok?: boolean; result?: T; error?: string }
     if (!response.ok || body.error) throw new Error(body.error ?? `http_${response.status}`)
     return body.result as T
@@ -109,6 +144,24 @@ export class GatewayTransport implements Transport {
     this.setState('closed')
   }
 
+  /**
+   * Reconnects right away instead of waiting out the backoff.
+   *
+   * The phone calls this when it comes back to the foreground: the radio was
+   * off, the tunnel is certainly gone, and waiting out a backoff would leave
+   * the user staring at a disconnected screen.
+   */
+  reconnectNow(): void {
+    if (this.stopped) return
+    this.generation += 1
+    this.abort?.abort()
+    this.attempt = 0
+    this.setStateInternal('connecting')
+    // Start the new attempt right away instead of waiting for the old loop to
+    // notice the abort: the old reader may never wake up.
+    void this.connect()
+  }
+
   private setState(state: TransportState): void {
     if (state === this.stateValue) return
     this.stateValue = state
@@ -121,6 +174,7 @@ export class GatewayTransport implements Transport {
 
   private async connect(): Promise<void> {
     while (!this.stopped) {
+      const generation = this.generation
       this.abort = new AbortController()
       this.setStateInternal(this.stateValue === 'open' ? 'open' : 'connecting')
       try {
@@ -129,8 +183,15 @@ export class GatewayTransport implements Transport {
           headers: { authorization: `Bearer ${this.token}`, accept: 'text/event-stream' },
           signal: this.abort.signal,
         })
+        if (response.status === 401) {
+          // The device was revoked: stop retrying and let the app re-pair.
+          this.onUnauthorized?.()
+          this.setStateInternal('closed')
+          return
+        }
         if (!response.ok || !response.body) throw new Error(`events http_${response.status}`)
         this.attempt = 0
+        this.lastSeenAt = Date.now()
         this.setStateInternal('open')
 
         // React Native's Hermes has no TextDecoderStream, so decode by hand
@@ -141,9 +202,14 @@ export class GatewayTransport implements Transport {
         const rawReader = reader ? null : response.body.getReader()
         const decoder = new TextDecoder()
         let bufferText = ''
-        let resync = false
         try {
           while (true) {
+            // A stream that has been silent past the heartbeat window is dead
+            // even though the socket never closed: mobile networks drop idle
+            // connections without a FIN.
+            if (Date.now() - this.lastSeenAt > this.heartbeatTimeoutMs) {
+              throw new Error('heartbeat timeout')
+            }
             let done: boolean
             let value: string | undefined
             if (reader) {
@@ -162,10 +228,16 @@ export class GatewayTransport implements Transport {
               const raw = bufferText.slice(0, boundary)
               bufferText = bufferText.slice(boundary + 2)
               const frame = this.parseFrame(raw)
+              // Any frame proves the link is alive; the heartbeat is one of them.
+              this.lastSeenAt = Date.now()
               if (!frame) continue
+              if (frame.event === 'ping') {
+                // The bridge's keepalive: proof of life, not business.
+                continue
+              }
               if (frame.event === 'hello') {
-                const hello = JSON.parse(frame.data) as { head: number; resync: boolean }
-                if (!frame.id && hello.resync) resync = true
+                // The hello frame names the buffer head; a `resync` event (not
+                // a flag) is what asks the client to reload the session.
                 continue
               }
               if (frame.event === 'resync') {
@@ -187,6 +259,10 @@ export class GatewayTransport implements Transport {
         // fall through to backoff
       }
       if (this.stopped) return
+      // A newer attempt took over: this loop hands the connection over and
+      // stops. Waiting for the old reader to notice the abort is not safe —
+      // a stream that never yields never notices.
+      if (this.generation !== generation) return
       this.setStateInternal('connecting')
       this.attempt += 1
       const delay = Math.min(this.maxBackoffMs, 500 * 2 ** Math.min(this.attempt, 5))

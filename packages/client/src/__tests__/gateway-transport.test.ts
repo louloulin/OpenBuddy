@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { GatewayTransport } from "../gateway-transport";
 
@@ -155,6 +155,107 @@ describe("GatewayTransport", () => {
       expect(seen).toEqual([{ n: 1 }, { n: 2 }]);
     } finally {
       globalWithStream.TextDecoderStream = saved;
+    }
+  });
+});
+
+describe("GatewayTransport — liveness and revocation", () => {
+  it("a heartbeat frame keeps the stream alive and never reaches a listener", async () => {
+    const bridge = fakeBridge();
+    const transport = new GatewayTransport({ baseUrl: "http://bridge.test", token: "t", fetchImpl: bridge.fetchImpl });
+    const seen: unknown[] = [];
+    await transport.listen("agent://event", payload => seen.push(payload));
+    await sleep(50);
+    bridge.push("ping", 0, { t: Date.now() });
+    bridge.push("agent://event", 1, { n: 1 });
+    await sleep(80);
+    expect(seen).toEqual([{ n: 1 }]);
+    transport.close();
+  });
+
+  it("a 401 on the event stream reports the credential as refused", async () => {
+    let unauthorized = false;
+    const transport = new GatewayTransport({
+      baseUrl: "http://bridge.test",
+      token: "t",
+      onUnauthorized: () => { unauthorized = true; },
+      fetchImpl: (async () => new Response("unauthorized", { status: 401 })) as unknown as typeof fetch,
+    });
+    await sleep(80);
+    expect(unauthorized).toBe(true);
+    expect(transport.state()).toBe("closed");
+  });
+
+  it("a 401 on a command reports the credential as refused", async () => {
+    let unauthorized = false;
+    const transport = new GatewayTransport({
+      baseUrl: "http://bridge.test",
+      token: "t",
+      onUnauthorized: () => { unauthorized = true; },
+      fetchImpl: (async () => new Response("unauthorized", { status: 401 })) as unknown as typeof fetch,
+    });
+    await expect(transport.invoke("agent_send")).rejects.toThrow("unauthorized");
+    expect(unauthorized).toBe(true);
+  });
+
+  it("a silent stream past the heartbeat window is treated as dead", async () => {
+    // The stream never sends a frame; the transport must notice on its own.
+    const transport = new GatewayTransport({
+      baseUrl: "http://bridge.test",
+      token: "t",
+      heartbeatTimeoutMs: 60,
+      fetchImpl: (async (input: unknown) => {
+        if (String(input).includes("/events")) {
+          const body = new ReadableStream<Uint8Array>({ start() { /* never writes */ } });
+          return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+        }
+        return new Response(JSON.stringify({ error: "nope" }), { status: 404 });
+      }) as unknown as typeof fetch,
+    });
+    await sleep(200);
+    // The transport gave up on the dead stream and started reconnecting.
+    expect(transport.state()).not.toBe("closed");
+    transport.close();
+  });
+
+  it("reconnectNow drops the backoff and reconnects", async () => {
+    const bridge = fakeBridge();
+    const transport = new GatewayTransport({ baseUrl: "http://bridge.test", token: "t", fetchImpl: bridge.fetchImpl });
+    await sleep(60);
+    transport.reconnectNow();
+    expect(transport.state()).toBe("connecting");
+    await sleep(80);
+    expect(transport.state()).toBe("open");
+    transport.close();
+  });
+});
+
+describe("GatewayTransport default fetch", () => {
+  it("calls the global fetch as a plain function, not as a method of the transport", async () => {
+    // Browsers implement fetch on Window; a detached call with a foreign
+    // `this` throws "Illegal invocation". Node tolerates it, so assert the
+    // receiver explicitly.
+    const original = globalThis.fetch;
+    const receivers: unknown[] = [];
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("event: hello\ndata: {\"head\":0,\"resync\":false}\n\n"));
+      },
+    });
+    globalThis.fetch = function (this: unknown) {
+      receivers.push(this);
+      return Promise.resolve(new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } }));
+    } as typeof fetch;
+    try {
+      const transport = new GatewayTransport({ baseUrl: "http://bridge.test", token: "t" });
+      await sleep(60);
+      transport.close();
+      expect(receivers.length).toBeGreaterThan(0);
+      for (const receiver of receivers) {
+        expect(receiver === undefined || receiver === globalThis).toBe(true);
+      }
+    } finally {
+      globalThis.fetch = original;
     }
   });
 });

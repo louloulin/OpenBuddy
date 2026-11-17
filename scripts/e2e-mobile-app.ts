@@ -31,6 +31,7 @@ import { applyUpdate, emptyTranscript, transcriptPreview, type Transcript } from
 import { canRun, isMobileHost, visibleTabs, type Capabilities } from '../apps/mobile/src/core/surface.js'
 import { checkUpload, compressOptions, MAX_EDGE } from '../apps/mobile/src/core/attachments.js'
 import { flushOutbox } from '../apps/mobile/src/core/connection.js'
+import { groupMemory, memoryPreview, validateMemoryDraft } from '../apps/mobile/src/core/memory.js'
 
 let failures = 0
 function check(name: string, condition: boolean, detail = ''): void {
@@ -44,6 +45,7 @@ function check(name: string, condition: boolean, detail = ''): void {
 const engineListeners = new Set<(event: string, payload: unknown) => void>()
 const sentAttachments: { text: string; attachments: unknown[] }[] = []
 const resolved: { requestId: string; decision?: unknown }[] = []
+const savedMemory: { scope: string; path: string; content: string }[] = []
 const uploadDir = await mkdtemp(join(tmpdir(), 'openbuddy-uploads-'))
 let uploadCount = 0
 
@@ -71,6 +73,17 @@ const dispatcher: HostDispatcher = {
       case 'agent_resolve_permission':
         resolved.push({ requestId: String(payload.requestId ?? ''), decision: payload.decision })
         return { resolved: true }
+      case 'memory_list':
+        return [
+          { scope: 'global', path: 'MEMORY.md', content: '# 偏好\n\n- 回答用中文', size: 24 },
+          { scope: 'workspace', path: 'notes//a.md', content: 'x', size: 1 },
+          { scope: 'global', path: 'people/team.md', content: '- 小林负责安卓', size: 18 },
+        ]
+      case 'memory_get':
+        return '# 偏好\n\n- 回答用中文'
+      case 'memory_save':
+        savedMemory.push({ scope: String(payload.scope), path: String(payload.path), content: String(payload.content) })
+        return { scope: payload.scope, path: payload.path, content: payload.content, size: String(payload.content).length }
       default:
         throw new Error(`unexpected command ${command}`)
     }
@@ -82,6 +95,7 @@ const dispatcher: HostDispatcher = {
   servedCommands: () => [
     'agent_list_sessions', 'agent_load_session', 'agent_send', 'agent_resolve_permission',
     'session_search', 'notification_list',
+    'memory_list', 'memory_get', 'memory_save',
     'window_minimize', // must be filtered off the mobile surface
   ],
 }
@@ -98,7 +112,8 @@ const bridge = createBridgeServer(dispatcher, {
     },
   },
 })
-const bridgeServer = serve({ port: 0, hostname: '127.0.0.1', fetch: bridge.app.fetch })
+const bridgeServer = serve({
+  idleTimeout: 120, port: 0, hostname: '127.0.0.1', fetch: bridge.app.fetch })
 const bridgeUrl = `http://127.0.0.1:${bridgeServer.port}`
 
 // ── 2. Real gateway on an ephemeral port ────────────────────────────────────
@@ -125,6 +140,7 @@ const gateway = createGateway({
 } as Parameters<typeof createGateway>[0])
 
 const gatewayServer = serve({
+  idleTimeout: 120,
   port: 0,
   hostname: '127.0.0.1',
   fetch: (req, server) => gateway.app.fetch(req, server),
@@ -245,6 +261,27 @@ unlisten()
 
 await transport.invoke('agent_resolve_permission', { requestId: 'req-1', decision: 'allow' })
 check('approval resolves through the tunnel', resolved.some(entry => entry.requestId === 'req-1' && entry.decision === 'allow'))
+
+// ── 8b. Memory notes: list → group → edit → save back to the desktop ───────
+
+const memoryEntries = await transport.invoke<Array<{ scope: string; path: string; content: string; size: number }>>('memory_list', {})
+check('memory list arrives over the tunnel', Array.isArray(memoryEntries) && memoryEntries.length === 3)
+
+const memoryGroups = groupMemory(memoryEntries)
+check('memory groups put global first', memoryGroups[0]?.scope === 'global' && memoryGroups[1]?.scope === 'workspace')
+check('global notes stay sorted by path', memoryGroups[0]?.entries.map(item => item.path).join(',') === 'MEMORY.md,people/team.md')
+check('list preview skips headings and markers', memoryGroups[0]?.entries[0] ? memoryPreview(memoryGroups[0].entries[0].content) === '回答用中文' : false)
+
+const fetched = await transport.invoke<string>('memory_get', { scope: 'global', path: 'MEMORY.md' })
+check('memory_get returns the note body', fetched.includes('回答用中文'))
+
+const draft = validateMemoryDraft('MEMORY.md', '# 偏好\n\n- 回答用中文，先给结论')
+check('draft validation accepts a normal note', draft.ok)
+const rejected = validateMemoryDraft('../escape.md', 'x')
+check('draft validation refuses escaping paths', !rejected.ok)
+
+await transport.invoke('memory_save', { scope: 'global', path: 'MEMORY.md', content: '# 偏好\n\n- 回答用中文，先给结论' })
+check('memory_save reached the desktop', savedMemory.some(item => item.path === 'MEMORY.md' && item.content.includes('先给结论')))
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 
