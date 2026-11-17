@@ -14,7 +14,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
-import { ChevronRightIcon, FileIcon, FolderIcon } from '../src/components/icons'
+import { ChevronRightIcon, CloseIcon, FileIcon, FolderIcon, SearchIcon } from '../src/components/icons'
 import { Markdown } from '../src/components/Markdown'
 import {
   basename,
@@ -214,6 +214,7 @@ export default function FilesScreen() {
             borderBottomColor: theme.cardBorder,
           }}
         >
+          <SearchIcon size={16} color={theme.textWeak} />
           <TextInput
             value={query}
             onChangeText={setQuery}
@@ -224,8 +225,12 @@ export default function FilesScreen() {
             style={{ flex: 1, color: theme.text, fontSize: 14, paddingVertical: 7 }}
           />
           {query ? (
-            <Pressable onPress={() => { setQuery(''); setHits(null) }} hitSlop={8}>
-              <Text style={{ color: theme.textWeak, fontSize: 13 }}>清除</Text>
+            <Pressable
+              onPress={() => { setQuery(''); setHits(null) }}
+              hitSlop={8}
+              accessibilityLabel="清除搜索"
+            >
+              <CloseIcon size={14} color={theme.textWeak} />
             </Pressable>
           ) : null}
         </View>
