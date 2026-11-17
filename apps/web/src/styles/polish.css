@@ -1231,3 +1231,35 @@ html[data-density="compact"] .pref-row { padding-top: 7px; padding-bottom: 7px; 
 @media (prefers-reduced-motion: reduce) {
   .settings-modal__panel > .settings-section { animation: none; }
 }
+
+/* W2.4 P2：MCP 工具级权限，接在「测试连接」的工具列表下。 */
+.mcp-tools {
+  margin-top: 10px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--ob-card-border); background: var(--ob-surface);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.mcp-tools__head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  font-size: 11px; color: var(--wb-text-medium); text-transform: none;
+}
+.mcp-tool { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 26px; }
+.mcp-tool code {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--wb-font-code-family, ui-monospace, monospace); font-size: 11px; color: var(--wb-text-strong);
+}
+.mcp-tool__select {
+  flex: none; padding: 2px 6px; border-radius: 8px; border: 1px solid var(--ob-card-border);
+  background: var(--ob-card); color: var(--wb-text-medium); font: inherit; font-size: 11px;
+}
+.mcp-tool__select:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ob-focus) 26%, transparent); }
+
+.mcp-deferred {
+  display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap;
+  margin: 8px 0 12px; padding: 9px 12px; border-radius: 12px;
+  border: 1px solid var(--ob-card-border); background: var(--ob-surface);
+  font-size: 12px; color: var(--wb-text-medium); cursor: pointer;
+}
+.mcp-deferred input { margin-top: 2px; accent-color: var(--ob-ink); }
+.mcp-deferred__title { color: var(--wb-text-strong); }
+.mcp-deferred__hint { flex: 1 1 100%; padding-left: 20px; font-size: 11px; color: var(--wb-text-tertiary); line-height: 17px; }
+.mcp-deferred code { font-family: var(--wb-font-code-family, ui-monospace, monospace); font-size: 11px; }

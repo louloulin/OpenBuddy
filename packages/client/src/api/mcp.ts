@@ -57,3 +57,11 @@ export async function mcpAuthTrigger(
 export async function mcpAuthStatus(sessionId: string): Promise<McpAuthStatusEntry[]> {
   return invoke<McpAuthStatusEntry[]>("mcp_auth_status", { sessionId });
 }
+
+// ---------- 延迟暴露 (W2.4 P2 / S11) ----------
+
+/** Whether any configured server defers its tools behind the built-in `tool_search`. */
+export const mcpDeferredGet = () => invoke<{ deferred: boolean }>("mcp_deferred_get", {});
+
+/** Switch every server between direct and deferred exposure; live sessions reload in place. */
+export const mcpDeferredSet = (deferred: boolean) => invoke<{ deferred: boolean }>("mcp_deferred_set", { deferred });

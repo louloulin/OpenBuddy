@@ -84,3 +84,29 @@ describe("MCP 测试连接 (pii W2.4)", () => {
     expect(mcp.list()).toContainEqual(expect.objectContaining({ name: "remote", needsAuth: true }));
   });
 });
+
+// 20261116-pii W2.4 P2 / S11: 延迟暴露保留用户配置，并可整体切换。
+describe("MCP 延迟暴露 (pii W2.4 P2)", () => {
+  it("defaults to direct and flips every server together", async () => {
+    const { mcp } = await setup();
+    expect(mcp.usesDeferred()).toBe(false);
+    expect(mcp.setDeferred(true)).toBe(true);
+    expect(mcp.usesDeferred()).toBe(true);
+    const saved = JSON.parse(mcp.read().content) as { mcpServers: Record<string, { exposure: string }> };
+    expect(saved.mcpServers.fixture.exposure).toBe("deferred");
+    expect(mcp.setDeferred(false)).toBe(false);
+    expect(mcp.usesDeferred()).toBe(false);
+  });
+
+  it("keeps an explicit per-server exposure from the JSON editor", async () => {
+    const { mcp } = await setup();
+    const config = JSON.parse(mcp.read().content) as { mcpServers: Record<string, unknown> };
+    config.mcpServers.fixture = { ...config.mcpServers.fixture, exposure: "deferred" };
+    mcp.save(JSON.stringify(config));
+    expect(mcp.usesDeferred()).toBe(true);
+    expect(() => {
+      config.mcpServers.fixture = { ...config.mcpServers.fixture, exposure: "sideways" };
+      mcp.save(JSON.stringify(config));
+    }).toThrow(/exposure/);
+  });
+});

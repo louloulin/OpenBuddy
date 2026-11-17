@@ -48,6 +48,27 @@ export class McpService {
       content: JSON.stringify(this.store.read(), null, 2),
     };
   }
+
+  /** 延迟暴露 (W2.4 / S11): true when at least one server defers its tools behind `tool_search`. */
+  usesDeferred(): boolean {
+    return Object.values(this.store.read().mcpServers).some(
+      (server) => server.exposure === "deferred" || server.exposure === "codemode",
+    );
+  }
+
+  /**
+   * Rewrite every server's default exposure. The advanced JSON editor can override a single server
+   * afterwards. Returns the new deferred state.
+   */
+  setDeferred(deferred: boolean): boolean {
+    const config = this.store.read();
+    const exposure = deferred ? "deferred" : "direct";
+    config.mcpServers = Object.fromEntries(
+      Object.entries(config.mcpServers).map(([name, server]) => [name, { ...server, exposure }]),
+    );
+    this.store.write(config);
+    return this.usesDeferred();
+  }
   save(content: string) {
     const parsed = object(JSON.parse(content)),
       servers = object(parsed.mcpServers ?? {}),
@@ -93,7 +114,12 @@ export class McpService {
         throw Error("MCP args必须为字符串数组");
       if (c.enabled !== undefined && typeof c.enabled !== "boolean")
         throw Error("MCP enabled必须为布尔值");
-      const value: Record<string, unknown> = { ...c, exposure: "direct" };
+      // 延迟暴露 (W2.4 / S11): keep the user's exposure. `deferred` needs the built-in tool_search,
+      // which the session adds when any server uses it; default stays `direct`.
+      const exposure = c.exposure ?? "direct";
+      if (!["direct", "deferred", "codemode", "hidden"].includes(String(exposure)))
+        throw Error(`MCP ${name} exposure 无效`);
+      const value: Record<string, unknown> = { ...c, exposure };
       if (c.oauth !== undefined) {
         if (!c.url) throw Error("OAuth只适用于HTTP MCP");
         const oauth = { ...object(c.oauth) };

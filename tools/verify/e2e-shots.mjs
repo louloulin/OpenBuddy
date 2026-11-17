@@ -591,10 +591,38 @@ try {
     // Wait for a result banner either way, so a failure reports its message instead of timing out.
     await page.locator('.mcp-server__badge--ok, .mcp-server__badge--bad').first().waitFor({ timeout: 30000 });
     const testError = await page.locator('.mcp-server__error').first().textContent().catch(() => null);
-    const tools = await page.locator('.mcp-server__tools code').allTextContents();
+    const tools = await page.locator('.mcp-tool code').allTextContents();
     if (!tools.includes('query_sales')) throw new Error('test connect failed: ' + (testError ?? tools.join(',')));
     await ctx.sleep(700);
     const mcp = await ctx.shot('24b-hub-connectors-tested');
+    // W2.4 P2: 工具级规则写进普通权限规则；延迟暴露整体切换并写回 mcp.json。
+    const toolSelect = page.getByRole('combobox', { name: tools[0] + ' 的权限' });
+    await toolSelect.selectOption('deny');
+    await page.waitForFunction((tool) => {
+      const select = [...document.querySelectorAll('.mcp-tool__select')].find((el) => el.getAttribute('aria-label') === tool + " 的权限");
+      return select?.value === 'deny';
+    }, tools[0], { timeout: 10000 });
+    const rules = await ctx.call('permission_list');
+    if (!rules.some((r) => r.tool === 'mcp__销售数据__' + tools[0] && r.action === 'deny')) throw new Error('MCP tool rule not saved: ' + JSON.stringify(rules));
+    await ctx.sleep(300);
+    const toolRules = await ctx.shot('65-mcp-tool-rules');
+    await toolSelect.selectOption('');
+    await page.waitForFunction((tool) => {
+      const select = [...document.querySelectorAll('.mcp-tool__select')].find((el) => el.getAttribute('aria-label') === tool + " 的权限");
+      return select?.value === '';
+    }, tools[0], { timeout: 10000 });
+    const deferredToggle = page.locator('.mcp-deferred input');
+    await deferredToggle.check();
+    await page.waitForFunction(() => {
+      const content = document.querySelector('.mcp-config-editor textarea')?.value ?? '';
+      return content.includes('"exposure": "deferred"');
+    }, null, { timeout: 10000 }).catch(() => {});
+    const deferredConfig = await ctx.call('mcp_config_read');
+    if (!String(deferredConfig.content).includes('"exposure": "deferred"')) throw new Error('deferred exposure not written');
+    await ctx.sleep(300);
+    const deferred = await ctx.shot('66-mcp-deferred');
+    await deferredToggle.uncheck();
+    await ctx.sleep(300);
     await page.getByRole('tab', { name: '扩展' }).click();
     // W2.6: 扩展中心 shows a card per path (or its empty state).
     await page.getByText('扩展中心', { exact: true }).waitFor({ timeout: 10000 });
@@ -618,7 +646,7 @@ try {
     await ctx.sleep(700);
     const saved = await ctx.shot('25d-prompt-saved');
     const templates = await ctx.call('prompts_list');
-    return { tabs, shots: [skills, configured, mcp, extensions, prompts, editor, saved], tools, templates: templates.map(t => t.scope + '/' + t.name) };`);
+    return { tabs, shots: [skills, configured, mcp, toolRules, deferred, extensions, prompts, editor, saved], tools, templates: templates.map(t => t.scope + '/' + t.name) };`);
   // 20261116-pii W3.4: ob_subagent runs two child sessions; the transcript shows their cards.
   await step('subagent cards', `
     await page.locator('.sidebar__nav-item', { hasText: '新建任务' }).first().click();

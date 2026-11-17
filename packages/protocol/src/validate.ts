@@ -76,6 +76,8 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'notification_prefs_set' && typeof payload.system !== 'boolean') throw new Error('invalid_payload: system');
   // 托盘常驻 (W4.4).
   if (command === 'tray_set' && typeof payload.enabled !== 'boolean') throw new Error('invalid_payload: enabled');
+  // MCP 延迟暴露 (W2.4 P2).
+  if (command === 'mcp_deferred_set' && typeof payload.deferred !== 'boolean') throw new Error('invalid_payload: deferred');
   if (command === 'mobile_pair_start' && payload.scopes !== undefined) {
     if (!Array.isArray(payload.scopes) || payload.scopes.length > 8) throw new Error('invalid_payload: scopes');
     for (const scope of payload.scopes) {

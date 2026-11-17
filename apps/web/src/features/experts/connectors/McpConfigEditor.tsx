@@ -44,6 +44,23 @@ export function McpConfigEditor({
   const hasChanges = content !== original;
   const lineCount = content.split("\n").length;
 
+  // Another part of the panel changed mcp.json (tool switch / 延迟暴露). Refresh unless the user
+  // has unsaved edits in this editor — those always win.
+  useEffect(() => {
+    const refresh = () => {
+      if (content !== original) return;
+      mcpConfigRead()
+        .then((file) => {
+          const next = file.content || EMPTY;
+          setContent(next);
+          setOriginal(next);
+        })
+        .catch(() => { /* keep what is shown */ });
+    };
+    window.addEventListener("openbuddy:mcp-config-refresh", refresh);
+    return () => window.removeEventListener("openbuddy:mcp-config-refresh", refresh);
+  }, [content, original]);
+
   const syncGutter = () => {
     if (gutterRef.current && taRef.current) gutterRef.current.scrollTop = taRef.current.scrollTop;
   };

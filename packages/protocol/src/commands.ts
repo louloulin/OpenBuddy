@@ -12,7 +12,8 @@ export const COMMANDS = [
   'read_text_file', 'write_text_file', 'read_file_base64', 'export_text_file', 'list_dir',
   'browse_directory', 'path_stat', 'open_path', 'open_url', 'reveal_in_folder',
   'mcp_list', 'mcp_upsert', 'mcp_toggle', 'mcp_delete', 'mcp_config_read', 'mcp_config_save',
-  'mcp_config_path', 'mcp_test', 'mcp_auth_trigger', 'mcp_auth_status', 'skills_list', 'skills_add',
+  'mcp_config_path', 'mcp_test', 'mcp_auth_trigger', 'mcp_auth_status', 'mcp_deferred_get', 'mcp_deferred_set',
+  'skills_list', 'skills_add',
   'skills_remove', 'skills_toggle', 'commands_list', 'notification_list', 'notification_append',
   'notification_mark_read', 'notification_mark_all_read', 'notification_clear',
   // 通知渠道 (20261116-pii W4.6): configured in the renderer, sent by the host.

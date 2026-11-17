@@ -25,6 +25,14 @@ export function mcpModule(ctx: HostContext): HostModule {
     },
     /** 测试连接 (W2.4): one real connect + tool listing; no session needed. */
     mcp_test: (p) => engine.mcp.testConnect(text(p.name)),
+    // 延迟暴露 (W2.4 P2 / S11): all servers switch together; advanced JSON can override one server.
+    mcp_deferred_get: () => ({ deferred: engine.mcp.usesDeferred() }),
+    mcp_deferred_set: async (p) => {
+      if (typeof p.deferred !== "boolean") throw Error("invalid_payload: deferred");
+      const deferred = engine.mcp.setDeferred(p.deferred);
+      await engine.reload();
+      return { deferred };
+    },
     // Sign-in no longer requires an open task (W2.4): the session id only tags the request so a
     // closing session can cancel its own pending sign-in.
     mcp_auth_trigger: async (p) => {

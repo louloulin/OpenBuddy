@@ -1,5 +1,6 @@
 import {
   createAgentSession,
+  createToolSearchExtension,
   DefaultResourceLoader,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
@@ -85,6 +86,8 @@ export async function open(
       // After the permission gate: only calls that may run get a snapshot.
       engine.checkpoints.extension(sessionId, () => cwd),
       engine.mcp.extension(),
+      // 延迟暴露 (W2.4 P2 / S11): `tool_search` is only useful when a server defers its tools.
+      ...(engine.mcp.usesDeferred() ? [createToolSearchExtension()] : []),
       // Built-in extensions (20261116-pii W0.5): app code, before user extensions.
       ...builtinFactories({ engine, sessionId, cwd }, builtinEnabled),
       ...engine.extensionFactories,
