@@ -43,12 +43,15 @@ export type ComposerProps = {
   onClearQuote?: () => void
   /** Edit-resend: replaces the draft whenever the token changes. */
   prefill?: { text: string; token: number }
+  /** Thinking-level chip: current label, tap cycles (agent_set_thinking_level). */
+  thinkingLabel?: string
+  onCycleThinking?: () => void
 }
 
 export function Composer({
   onSend, onImage, onImages, onStop, onSteer,
   streaming = false, placeholder = '给 OpenBuddy 发消息…', initialDraft = '',
-  quoted = null, onClearQuote, prefill,
+  quoted = null, onClearQuote, prefill, thinkingLabel, onCycleThinking,
 }: ComposerProps) {
   const theme = themeFor(useColorScheme())
   const insets = useSafeAreaInsets()
@@ -431,6 +434,28 @@ export function Composer({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
           {roundButton(() => setSheet(true), busy, <CameraIcon size={20} color={theme.textMedium} />, '添加图片')}
           {roundButton(() => void speak(), listening, <MicIcon size={20} color={listening ? theme.danger : theme.textMedium} />, '语音输入')}
+          {onCycleThinking ? (
+            <Pressable
+              onPress={onCycleThinking}
+              accessibilityLabel="思考深度"
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                marginLeft: 4,
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: theme.radiusPill,
+                borderWidth: theme.hairline,
+                borderColor: theme.cardBorder,
+                backgroundColor: pressed ? theme.pressed : 'transparent',
+              })}
+            >
+              <Text style={{ color: theme.textMedium, fontSize: 11, fontWeight: '600' }}>
+                {thinkingLabel ?? '跟随'}
+              </Text>
+            </Pressable>
+          ) : null}
           <View style={{ flex: 1 }} />
           {streaming && onStop ? (
             <Pressable

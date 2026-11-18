@@ -20,6 +20,7 @@ import { LoadingRow } from '../../src/components/LoadingRow'
 import { MessageRow } from '../../src/components/MessageRow'
 import { ChevronRightIcon, SparkIcon } from '../../src/components/icons'
 import { emptyTranscript, isTurnPending, type TranscriptRow, type ToolRow } from '../../src/core/transcript'
+import { thinkingLevelLabel } from '../../src/core/session-panel'
 import { summarizeRevert } from '../../src/core/revert'
 import { canRun } from '../../src/core/surface'
 import { followUpsFor } from '../../src/core/follow-ups'
@@ -72,6 +73,10 @@ export default function ChatScreen() {
   const [quoted, setQuoted] = useState<string | null>(null)
   const [editToken, setEditToken] = useState(0)
   const [editText, setEditText] = useState('')
+  // Composer chip: the session's thinking level, cycled with one tap.
+  const thinkingLevel = useApp(state => state.thinkingLevels[sessionId])
+  const refreshThinkingLevel = useApp(state => state.refreshThinkingLevel)
+  const cycleThinkingLevel = useApp(state => state.cycleThinkingLevel)
 
   // D5: undo the files one tool call wrote. The desktop owns the checkpoints;
   // the phone reports what it restored and flags conflicts to resolve there.
@@ -140,6 +145,10 @@ export default function ChatScreen() {
   useEffect(() => {
     if (sessionId) void refreshTasks()
   }, [sessionId, refreshTasks])
+
+  useEffect(() => {
+    if (sessionId) void refreshThinkingLevel(sessionId)
+  }, [sessionId, refreshThinkingLevel])
 
   // The handoff draft is read once by the composer; drop it immediately so a
   // later remount does not resurrect text the user already sent or cleared.
@@ -371,6 +380,12 @@ export default function ChatScreen() {
         quoted={quoted}
         onClearQuote={() => setQuoted(null)}
         prefill={editToken ? { text: editText, token: editToken } : undefined}
+        thinkingLabel={canRun(capabilities, 'agent_set_thinking_level')
+          ? (thinkingLevel ? thinkingLevelLabel(thinkingLevel) : '跟随')
+          : undefined}
+        onCycleThinking={canRun(capabilities, 'agent_set_thinking_level')
+          ? () => { void cycleThinkingLevel(sessionId) }
+          : undefined}
         onSend={text => void send(sessionId, text)}
         onImage={(bytes, mime, text) => void sendImage(sessionId, bytes, mime, text)}
         onImages={(images, text) => void sendImages(sessionId, images, text)}

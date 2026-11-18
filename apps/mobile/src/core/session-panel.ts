@@ -97,6 +97,16 @@ export function thinkingLevelPayload(level: string): { level: ThinkingLevel } | 
   return isThinkingLevel(level) ? { level } : null
 }
 
+/**
+ * The next level when the composer chip is tapped. An unknown level starts at
+ * `medium`; `max` wraps back to `off`, so one chip covers the whole scale.
+ */
+export function nextThinkingLevel(current: ThinkingLevel | undefined): ThinkingLevel {
+  if (!current) return 'medium'
+  const index = THINKING_LEVELS.indexOf(current)
+  return THINKING_LEVELS[(index + 1) % THINKING_LEVELS.length] ?? 'off'
+}
+
 /** The human label for a level, the way the desktop writes it. */
 export function thinkingLevelLabel(level: ThinkingLevel | undefined): string {
   switch (level) {

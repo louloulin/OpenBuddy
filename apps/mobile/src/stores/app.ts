@@ -32,6 +32,7 @@ import {
   checkNewSession, workspaceChoices, type InitAnswer, type WorkspaceChoice, type WorkspaceInfo,
 } from '../core/new-session'
 import { cleanSessionTitle } from '../core/session-actions'
+import { isThinkingLevel, nextThinkingLevel, thinkingLevelPayload, type ThinkingLevel } from '../core/session-panel'
 import { exportFilename, isTruncatedRead, jsonlEntryCount, MAX_EXPORT_BYTES } from '../core/export'
 import type { BatchOutcome } from '../core/batch'
 import { toSessionList } from '../core/session-list'
@@ -86,6 +87,8 @@ type AppState = {
   /** Running desktop tasks for the task drawer. */
   tasks: RunningTask[]
   permissionMode: PermissionMode | null
+  /** Thinking level per session, as last read from the desktop. */
+  thinkingLevels: Record<string, ThinkingLevel>
   /** Sessions that were sent to but have not answered yet. */
   awaiting: string[]
   /** Desktop turn queues per session (steering / follow-up). */
@@ -138,6 +141,10 @@ type AppState = {
   refreshNotifications: () => Promise<void>
   killTask: (taskId: string) => Promise<void>
   refreshPermissionMode: () => Promise<void>
+  /** Reads the session's thinking level for the composer chip. */
+  refreshThinkingLevel: (sessionId: string) => Promise<void>
+  /** Cycles the level and tells the desktop; returns the new level. */
+  cycleThinkingLevel: (sessionId: string) => Promise<ThinkingLevel | null>
   revoked: () => Promise<void>
   resume: () => void
   regenerate: (sessionId: string) => Promise<void>
@@ -182,6 +189,7 @@ export const useApp = create<AppState>((set, get) => ({
   notificationsLoaded: false,
   tasks: [],
   permissionMode: null,
+  thinkingLevels: {},
   awaiting: [],
   queues: {},
   error: null,
@@ -210,6 +218,10 @@ export const useApp = create<AppState>((set, get) => ({
         booted: true,
         pairing: { gatewayUrl: 'https://gw.openbuddy.example', deviceToken: 'preview', deviceName: '我的手机' },
         connection: 'open',
+        permissionMode: null,
+        thinkingLevels: demo.panel?.thinkingLevel && isThinkingLevel(demo.panel.thinkingLevel)
+          ? { [demo.sessions[0]?.id ?? 'sess-refactor']: demo.panel.thinkingLevel }
+          : {},
         capabilities: demo.capabilities,
         sessions: demo.sessions,
         projects: demo.projects,
@@ -728,6 +740,41 @@ export const useApp = create<AppState>((set, get) => ({
       set({ permissionMode: parsePermissionMode(raw) })
     } catch {
       // Desktop not advertising it: leave the row hidden.
+    }
+  },
+
+  async refreshThinkingLevel(sessionId) {
+    if (isPreview()) return
+    const transport = get().transport
+    if (!transport) return
+    try {
+      const state = await transport.invoke<{ thinkingLevel?: unknown }>('agent_get_model_state', { sessionId })
+      const level = state?.thinkingLevel
+      if (isThinkingLevel(level)) {
+        set(previous => ({ thinkingLevels: { ...previous.thinkingLevels, [sessionId]: level } }))
+      }
+    } catch {
+      // Desktop without the command: the chip stays hidden.
+    }
+  },
+
+  async cycleThinkingLevel(sessionId) {
+    const current = get().thinkingLevels[sessionId]
+    const next = nextThinkingLevel(current)
+    const payload = thinkingLevelPayload(next)
+    const transport = get().transport
+    if (!payload) return null
+    if (!transport) {
+      set(previous => ({ thinkingLevels: { ...previous.thinkingLevels, [sessionId]: next } }))
+      return next
+    }
+    try {
+      await transport.invoke('agent_set_thinking_level', { sessionId, ...payload })
+      set(previous => ({ thinkingLevels: { ...previous.thinkingLevels, [sessionId]: next } }))
+      return next
+    } catch (error) {
+      set({ error: errorText(error) })
+      return null
     }
   },
 

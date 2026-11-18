@@ -33,6 +33,8 @@ const SESSIONS: Array<{ id: string; title: string; updatedAt: number; pinned: bo
   { id: 'sess-notes', title: '周会纪要', updatedAt: now - 26 * 3_600_000, pinned: false, cwd: '/tmp/scratch' },
 ]
 
+const DEMO_THINKING = { level: 'medium' }
+
 const DEMO_NOTIFICATIONS = [
   { id: 2, kind: 'approval', title: '需要你批准：写入 3 个文件', body: '会话「手机端接入设计」请求修改文档。', sessionId: 'sess-mobile', severity: 'info', read: false, at: new Date(now - 30_000).toISOString() },
   { id: 1, kind: 'done', title: '会话已完成', body: '这一轮已经结束。', sessionId: 'sess-notes', severity: 'info', read: true, at: new Date(now - 3_600_000).toISOString() },
@@ -241,6 +243,11 @@ const dispatcher: HostDispatcher = {
         if (index >= 0) SESSIONS.splice(index, 1)
         return { ok: true }
       }
+      case 'agent_get_model_state':
+        return { thinkingLevel: DEMO_THINKING.level }
+      case 'agent_set_thinking_level':
+        DEMO_THINKING.level = String(payload.level ?? 'medium')
+        return { ok: true }
       case 'agent_export_jsonl':
         return '/tmp/openbuddy-preview-export.jsonl'
       case 'turn_revert':
@@ -368,6 +375,7 @@ const dispatcher: HostDispatcher = {
     'agent_init', 'agent_new_session', 'agent_list_workspaces', 'agent_fork_session', 'agent_handoff', 'agent_compact',
     'agent_set_session_pinned', 'agent_rename_session', 'agent_set_session_archived', 'agent_delete_session',
     'agent_export_jsonl', 'read_text_file', 'agent_session_info', 'list_dir', 'files_search', 'commands_list',
+    'agent_get_model_state', 'agent_set_thinking_level',
     'automations_snapshot', 'automations_save', 'automations_delete', 'automations_set_status', 'automations_run',
     'library_list', 'projects_snapshot', 'turn_revert', 'session_search',
     'memory_list', 'memory_get', 'agent_tree', 'rewind_points', 'checkpoint_list', 'notification_list',

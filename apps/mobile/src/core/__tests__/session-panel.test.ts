@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   isThinkingLevel,
+  nextThinkingLevel,
   thinkingLevelLabel,
   thinkingLevelPayload,
   toArtifacts,
@@ -61,5 +62,12 @@ describe('thinking level', () => {
     expect(thinkingLevelLabel('off')).toBe('关闭')
     expect(thinkingLevelLabel('max')).toBe('最高')
     expect(thinkingLevelLabel(undefined)).toBe('跟随桌面')
+  })
+
+  it('cycles through the scale and wraps', () => {
+    expect(nextThinkingLevel(undefined)).toBe('medium')
+    expect(nextThinkingLevel('medium')).toBe('high')
+    expect(nextThinkingLevel('max')).toBe('off')
+    expect(nextThinkingLevel('off')).toBe('minimal')
   })
 })

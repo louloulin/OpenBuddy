@@ -47,6 +47,7 @@ import { extractSources, isSourceTool } from '../apps/mobile/src/core/sources.js
 import { APPROVE_ACTION, DENY_ACTION, decisionForResponse } from '../apps/mobile/src/core/push-actions.js'
 import { toNotifications } from '../apps/mobile/src/core/notification-list.js'
 import { quotePreview, withQuote } from '../apps/mobile/src/core/quote.js'
+import { nextThinkingLevel } from '../apps/mobile/src/core/session-panel.js'
 import { cleanSessionTitle, sessionActions } from '../apps/mobile/src/core/session-actions.js'
 import { bumpUnread, shouldMarkUnread, totalUnread } from '../apps/mobile/src/core/unread.js'
 import { parseLockSetting, shouldRelock } from '../apps/mobile/src/core/app-lock.js'
@@ -81,6 +82,7 @@ const sessionMeta: { op: string; sessionId: string; value: unknown }[] = []
 const savedAutomations: Record<string, unknown>[] = []
 const deletedAutomations: string[] = []
 const revertedTools: string[] = []
+const thinkingState = { level: 'medium' }
 const deletedSessions: string[] = []
 const turnQueue = { steering: [] as string[], followUp: [] as string[] }
 const BRANCH_TREE = {
@@ -254,6 +256,11 @@ const dispatcher: HostDispatcher = {
       case 'checkpoint_restore':
         restoredFiles.push({ path: String(payload.path), hash: typeof payload.hash === 'string' ? payload.hash : null })
         return { restored: [String(payload.path)], conflicts: [] }
+      case 'agent_get_model_state':
+        return { thinkingLevel: thinkingState.level }
+      case 'agent_set_thinking_level':
+        thinkingState.level = String(payload.level ?? 'medium')
+        return { ok: true }
       case 'notification_list':
         return [
           { id: 2, kind: 'approval', title: '需要批准：写入 3 个文件', body: '会话在等你', sessionId: 'sess-1', read: false, at: new Date().toISOString() },
@@ -283,6 +290,7 @@ const dispatcher: HostDispatcher = {
     'agent_cancel', 'agent_resolve_ui', 'folder_trust_respond', 'tasks_list', 'task_kill', 'permission_mode_get',
     'agent_list_workspaces', 'agent_fork_session', 'agent_handoff', 'agent_compact',
     'agent_export_jsonl', 'read_text_file', 'files_search', 'commands_list',
+    'agent_get_model_state', 'agent_set_thinking_level',
     'automations_save', 'automations_delete', 'library_list', 'turn_revert',
     'window_minimize', // must be filtered off the mobile surface
   ],
@@ -728,6 +736,16 @@ check('the strip preview is one flattened line', quotePreview('第一行\n第二
 await transport.invoke('agent_send', { sessionId: 'sess-1', text: quotedBody })
 check('the quoted reply reaches the desktop',
   sentAttachments.some(entry => entry.text === quotedBody))
+
+// ── 8w. Thinking-level chip (v3 §4.2 P1) ───────────────────────────────────
+
+const before = await transport.invoke<{ thinkingLevel?: string }>('agent_get_model_state', { sessionId: 'sess-1' })
+const level = nextThinkingLevel(before.thinkingLevel as never)
+await transport.invoke('agent_set_thinking_level', { sessionId: 'sess-1', level })
+const after = await transport.invoke<{ thinkingLevel?: string }>('agent_get_model_state', { sessionId: 'sess-1' })
+check('the chip cycles the level and the desktop keeps it',
+  before.thinkingLevel === 'medium' && level === 'high' && after.thinkingLevel === 'high')
+check('the scale wraps after max', nextThinkingLevel('max') === 'off')
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 
