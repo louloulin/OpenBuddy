@@ -5239,13 +5239,23 @@ button.diff__path {
 .home__header {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+}
+.home__brand {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--wb-text-tertiary);
 }
 .home__title,
 .home__subtitle {
   margin: 0;
-  font-size: 36px;
+  font-size: clamp(28px, 3.2vw, 36px);
   font-weight: 600;
-  line-height: 48px;
+  line-height: 1.32;
   /* WorkBuddy uses "PingFang SC" as the primary font for titles. */
   font-family: "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   color: var(--wb-text-strong);
@@ -5257,28 +5267,36 @@ button.diff__path {
   background: var(--wb-palette-gray-4);
   border-radius: 10px;
   height: 36px;
-  align-self: flex-start;
+  align-self: center;
   box-sizing: border-box;
-  margin: 16px 0 48px;
+  margin: 18px 0 40px;
 }
 .home__scene {
   display: flex;
   align-items: center;
   gap: 4px;
   height: 32px;
-  padding: 0 12px;
+  padding: 0 14px;
   border: none;
-  border-radius: var(--wb-radius-lg);
+  border-radius: 8px;
   background: none;
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
   color: var(--wb-text-medium);
 }
+.home__scene:hover { color: var(--wb-text-strong); }
 .home__scene--active {
-  background: var(--wb-bg-pill-active);
-  color: var(--wb-text-white);
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
   font-weight: 600;
+  box-shadow: 0 1px 2px rgba(15, 13, 10, .08), 0 0 0 1px rgba(15, 13, 10, .04);
+}
+.home__disclaimer {
+  margin: 36px 0 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--wb-text-tertiary);
 }
 .home__composer-area {
   display: flex;
@@ -11702,15 +11720,20 @@ button.diff__path {
 
 .um-page { height: 100%; display: flex; flex-direction: column; min-height: 0; }
 
-/* ---- topbar (pills left, controls right) ---- */
+/* ---- topbar (WorkBuddy unified market header: 52px, large text tabs) ---- */
 .um-topbar {
   flex: 0 0 auto;
   display: flex; align-items: center; justify-content: space-between;
-  gap: 16px; padding: 16px 28px 12px;
+  gap: 16px; height: 52px; padding: 0 24px;
+  border-bottom: 1px solid var(--wb-color-border-tertiary);
+  background: var(--wb-bg-secondary);
+  -webkit-app-region: drag;
 }
-.um-topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.um-topbar :where(button, input, a, [role="tab"]) { -webkit-app-region: no-drag; }
+.um-topbar-left { display: flex; align-items: center; gap: 8px; min-width: 0; height: 100%; }
 .um-topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.um-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 28px 48px; }
+.um-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px 24px 48px; }
+.um-page { animation: ob-fade var(--ob-dur-slow) var(--ob-ease) both; }
 
 .um-back {
   display: inline-flex; align-items: center; gap: 4px;
@@ -11719,38 +11742,49 @@ button.diff__path {
 }
 .um-back:hover { background: var(--wb-bg-tertiary); color: var(--wb-text-strong); }
 
-/* ---- pill tab group ---- */
-.um-pills { display: inline-flex; align-items: center; gap: 4px; }
+/* ---- text tabs (WorkBuddy `.um-tab`: 18px, 24px gap, active = primary 600) ---- */
+.um-pills {
+  display: inline-flex; align-items: center; gap: 24px; height: 100%;
+  overflow-x: auto; scrollbar-width: none; min-width: 0;
+}
+.um-pills::-webkit-scrollbar { display: none; }
 .um-pill {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 14px; border: none; background: transparent; cursor: pointer;
-  border-radius: 9px; font-size: 14px; font-weight: 500;
-  color: var(--wb-text-medium); transition: background .15s, color .15s;
+  height: 100%; padding: 0; border: none; background: transparent; cursor: pointer;
+  border-radius: 0; font-family: inherit; font-size: 18px; font-weight: 500; line-height: 26px;
+  color: var(--wb-color-text-tertiary); white-space: nowrap; flex-shrink: 0;
+  transition: color var(--wb-motion-duration-sm, 160ms) var(--wb-motion-easing-standard, ease);
 }
 .um-pill:hover { color: var(--wb-text-strong); }
-.um-pill--active { background: var(--um-pill-active-bg); color: var(--um-pill-active-fg); }
-.um-pill--active:hover { color: var(--um-pill-active-fg); }
+.um-pill--active { color: var(--wb-text-strong); font-weight: 600; }
+.um-pill--active:hover { color: var(--wb-text-strong); }
+@media (max-width: 900px) {
+  .um-pills { gap: 16px; }
+  .um-pill { font-size: 16px; }
+  .um-topbar { padding: 0 16px; }
+  .um-scroll { padding: 10px 16px 40px; }
+}
 
-/* ---- search box ---- */
-.um-search { position: relative; width: 240px; }
+/* ---- search box (32px, WorkBuddy control height) ---- */
+.um-search { position: relative; width: 220px; }
 .um-search--flex { width: auto; flex: 1 1 auto; }
 .um-search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--wb-text-weak); pointer-events: none; }
 .um-search-input {
-  width: 100%; height: 34px; padding: 0 12px 0 32px;
-  border: 1px solid var(--wb-border-default); border-radius: 9px;
+  width: 100%; height: 32px; padding: 0 12px 0 32px;
+  border: 1px solid var(--wb-border-default); border-radius: 8px;
   background: var(--wb-bg-primary); color: var(--wb-text-strong); font-size: 13px; outline: none;
 }
 .um-search-input:focus { border-color: var(--wb-brand); }
 
-/* ---- buttons ---- */
+/* ---- buttons (WorkBuddy control height / radius) ---- */
 .um-btn {
   display: inline-flex; align-items: center; gap: 6px;
-  height: 34px; padding: 0 12px; border-radius: 9px; cursor: pointer;
+  height: 32px; padding: 0 12px; border-radius: 8px; cursor: pointer;
   font-size: 13px; font-weight: 500; white-space: nowrap;
   border: 1px solid var(--wb-border-default); background: var(--wb-bg-primary); color: var(--wb-text-strong);
   transition: background .15s, border-color .15s, color .15s;
 }
-.um-btn:hover { border-color: var(--wb-text-weak); }
+.um-btn:hover { background: var(--wb-bg-tertiary); border-color: var(--wb-border-default); }
 .um-btn:disabled { opacity: .5; cursor: not-allowed; }
 .um-btn--grey { background: var(--wb-bg-tertiary); border-color: transparent; }
 .um-btn--grey:hover { background: var(--wb-bg-tertiary); filter: brightness(0.97); border-color: transparent; }
@@ -13180,4 +13214,49 @@ button.diff__path {
 .pref-shortcut__input:focus {
   outline: none;
   border-color: color-mix(in srgb, var(--wb-color-text-brand-default) 45%, var(--wb-border-default));
+}
+
+/* ---------- WorkBuddy 对齐 (S19)：内容页签统一为大字号文本页签 ----------
+   与 experts hub 的 `.um-pills` 一致：18px / 500，激活为主文本 600，无底色。
+   只作用于资料库与自动化顶部的主页签，不改动它们内部的筛选/周期分段控件。 */
+.resources-panel__tabs {
+  display: flex; align-items: center; gap: 24px;
+  height: 52px; padding: 0 24px;
+  border-bottom: 1px solid var(--wb-color-border-tertiary);
+  background: transparent; border-radius: 0;
+  align-self: stretch; width: 100%;
+  overflow-x: auto; scrollbar-width: none;
+}
+.resources-panel__tabs::-webkit-scrollbar { display: none; }
+.resources-panel__tab {
+  height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent;
+  color: var(--wb-color-text-tertiary); font: inherit; font-size: 18px; font-weight: 500;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  transition: color var(--wb-motion-duration-sm, 160ms) var(--wb-motion-easing-standard, ease);
+}
+.resources-panel__tab:hover { color: var(--wb-text-strong); }
+.resources-panel__tab--on,
+.resources-panel__tab--active { background: transparent; color: var(--wb-text-strong); font-weight: 600; }
+
+/* 自动化顶部「定时任务 / 运行记录」；`atm-schedule-tabs` 等其他分段不受影响。 */
+.atm-toolbar { border-bottom: 1px solid var(--wb-color-border-tertiary); }
+.atm-tabs.atm-segmented {
+  gap: 24px; height: 52px; padding: 0; border-radius: 0; background: transparent;
+}
+.atm-tabs .atm-segmented-item {
+  height: 100%; padding: 0; border-radius: 0; background: transparent; box-shadow: none;
+  font-size: 18px; font-weight: 500; color: var(--wb-color-text-tertiary);
+}
+.atm-tabs .atm-segmented-item:hover:not(.atm-segmented-item--active) { color: var(--wb-text-strong); }
+.atm-tabs .atm-segmented-item--active {
+  background: transparent; box-shadow: none; color: var(--wb-text-strong); font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .resources-panel__tabs, .atm-tabs.atm-segmented { gap: 16px; padding: 0 16px; }
+  .resources-panel__tab, .atm-tabs .atm-segmented-item { font-size: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .um-page { animation: none; }
 }

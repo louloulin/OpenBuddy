@@ -175,8 +175,8 @@ export function HomePage({
     <div className="home">
       <div className="home__inner">
         <header className="home__header">
-          <h1 className="home__title">OpenBuddy</h1>
-          <p className="home__subtitle">{mode.subtitle}</p>
+          <span className="home__brand">OpenBuddy</span>
+          <h1 className="home__title">{mode.subtitle}</h1>
         </header>
 
         <div className="home__scenes" role="tablist" aria-label="场景">
@@ -335,6 +335,7 @@ export function HomePage({
             onClearExpert={pendingExpert ? () => usePendingExpertStore.getState().clear() : undefined}
           />
         </section>
+        <p className="home__disclaimer">内容由 AI 生成，请核实重要信息</p>
       </div>
     </div>
   );

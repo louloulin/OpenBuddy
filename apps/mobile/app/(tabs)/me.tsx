@@ -142,6 +142,33 @@ export default function MeScreen() {
         <Row theme={theme} label="状态" value={statusText} last />
       </Section>
 
+      <Section theme={theme} label="已配对的电脑">
+        {pairings.length === 0 ? (
+          <Row theme={theme} label="还没有配对" value="扫码接入" last />
+        ) : (
+          pairings.map(record => {
+            const active = record.id === activePairingId
+            return (
+              <Row
+                key={record.id}
+                theme={theme}
+                label={record.label}
+                value={active ? (busyPairing ? '切换中…' : '当前') : '切换'}
+                onPress={active || busyPairing ? undefined : () => void switchTo(record.id)}
+                last={false}
+              />
+            )
+          })
+        )}
+        <Row
+          theme={theme}
+          label="接入另一台电脑"
+          value="扫码"
+          onPress={() => router.push('/pair')}
+          last
+        />
+      </Section>
+
       <Section theme={theme} label="桌面功能">
         <Row
           theme={theme}

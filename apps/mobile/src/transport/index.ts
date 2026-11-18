@@ -12,12 +12,17 @@ import { GatewayTransport } from '@openbuddy/client/gateway-transport'
 import type { Transport } from '@openbuddy/client/transport'
 
 import type { PairPayload } from '../core/pairing'
+import {
+  makePairingRecord, resolveActiveId, upsertPairing, type PairingRecord,
+} from '../core/pairings'
 import { deleteItem, getItem, setItem } from './storage'
 
 const KEY_GATEWAY = 'openbuddy.gatewayUrl'
 const KEY_TOKEN = 'openbuddy.deviceToken'
 const KEY_DEVICE = 'openbuddy.deviceId'
 const KEY_NAME = 'openbuddy.deviceName'
+const KEY_LIST = 'openbuddy.pairings'
+const KEY_ACTIVE = 'openbuddy.activePairing'
 
 export type Pairing = {
   gatewayUrl: string
@@ -49,6 +54,68 @@ export async function savePairing(pairing: Pairing): Promise<void> {
   await setItem(KEY_TOKEN, pairing.deviceToken)
   if (pairing.deviceId) await setItem(KEY_DEVICE, pairing.deviceId)
   if (pairing.deviceName) await setItem(KEY_NAME, pairing.deviceName)
+  // Keep the multi-desktop list in step: this is the newly active computer.
+  const record = makePairingRecord(pairing, Date.now())
+  const list = upsertPairing(await readPairingRecords(), record)
+  await savePairingRecords(list)
+  await saveActivePairingId(record.id)
+}
+
+async function readPairingRecords(): Promise<PairingRecord[]> {
+  const raw = await getItem(KEY_LIST).catch(() => null)
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((item): item is PairingRecord =>
+      !!item && typeof item === 'object'
+      && typeof (item as PairingRecord).id === 'string'
+      && typeof (item as PairingRecord).gatewayUrl === 'string'
+      && typeof (item as PairingRecord).deviceToken === 'string'
+      && typeof (item as PairingRecord).label === 'string')
+  } catch {
+    return []
+  }
+}
+
+export async function savePairingRecords(list: readonly PairingRecord[]): Promise<void> {
+  await setItem(KEY_LIST, JSON.stringify(list))
+}
+
+/**
+ * The known desktops, migrating the pre-multi-desktop single pairing once.
+ * Callers get the resolved active id so they need not re-derive it.
+ */
+export async function loadPairings(): Promise<{ list: PairingRecord[]; activeId?: string }> {
+  let list = await readPairingRecords()
+  if (!list.length) {
+    const legacy = await loadPairing()
+    if (legacy) {
+      const record = makePairingRecord(legacy, Date.now())
+      list = [record]
+      await savePairingRecords(list)
+      await saveActivePairingId(record.id)
+    }
+  }
+  const stored = (await getItem(KEY_ACTIVE).catch(() => null)) ?? undefined
+  return { list, activeId: resolveActiveId(list, stored) }
+}
+
+export async function loadActivePairingId(): Promise<string | undefined> {
+  return (await getItem(KEY_ACTIVE).catch(() => null)) ?? undefined
+}
+
+export async function saveActivePairingId(id: string | undefined): Promise<void> {
+  await setItem(KEY_ACTIVE, id ?? '')
+}
+
+export function pairingFromRecord(record: PairingRecord): Pairing {
+  return {
+    gatewayUrl: record.gatewayUrl,
+    deviceToken: record.deviceToken,
+    ...(record.deviceId ? { deviceId: record.deviceId } : {}),
+    ...(record.deviceName ? { deviceName: record.deviceName } : {}),
+  }
 }
 
 export async function loadPairing(): Promise<Pairing | null> {

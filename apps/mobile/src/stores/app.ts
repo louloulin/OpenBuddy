@@ -61,18 +61,28 @@ import {
   claimPair,
   clearPairing,
   closeActiveTransport,
-  loadPairing,
+  loadActivePairingId,
+  loadPairings,
   openTransport,
+  pairingFromRecord,
   reconnectTransport,
+  saveActivePairingId,
   savePairing,
+  savePairingRecords,
   uploadImage,
   type Pairing,
 } from '../transport'
+import {
+  findPairing, removePairing, resolveActiveId, upsertPairing, type PairingRecord,
+} from '../core/pairings'
 
 
 type AppState = {
   booted: boolean
   pairing: Pairing | null
+  /** Every computer this phone has paired with (E3 multi-desktop). */
+  pairings: PairingRecord[]
+  activePairingId: string | null
   transport: Transport | null
   connection: TransportState
   capabilities: Capabilities | null
@@ -104,6 +114,10 @@ type AppState = {
   bootstrap: () => Promise<void>
   pair: (payload: PairPayload, deviceName: string) => Promise<void>
   unpair: () => Promise<void>
+  /** Reconnects to another paired desktop (E3). */
+  switchPairing: (id: string) => Promise<boolean>
+  /** Forgets one pairing; switching to the next when it was the active one. */
+  forgetPairing: (id: string) => Promise<void>
   openSession: (sessionId: string) => Promise<void>
   setActiveSession: (sessionId: string | null) => void
   markSessionRead: (sessionId: string) => Promise<void>
@@ -174,6 +188,8 @@ function errorText(error: unknown): string {
 export const useApp = create<AppState>((set, get) => ({
   booted: false,
   pairing: null,
+  pairings: [],
+  activePairingId: null,
   transport: null,
   connection: 'closed',
   capabilities: null,
@@ -203,7 +219,9 @@ export const useApp = create<AppState>((set, get) => ({
     const cached = await readCachedSessions().catch(() => [])
     set({ sessions: cached })
 
-    const pairing = await loadPairing().catch(() => null)
+    const known = await loadPairings().catch(() => ({ list: [] as PairingRecord[], activeId: undefined }))
+    const activeRecord = findPairing(known.list, known.activeId)
+    const pairing = activeRecord ? pairingFromRecord(activeRecord) : null
     const appLock = parseLockSetting(await getItem(LOCK_KEY).catch(() => null))
     const autoSpeak = parseSpeakSetting(await getItem(SPEAK_KEY).catch(() => null))
     // The lock-screen shot is a separate review build so the other screens are
@@ -217,6 +235,11 @@ export const useApp = create<AppState>((set, get) => ({
       set({
         booted: true,
         pairing: { gatewayUrl: 'https://gw.openbuddy.example', deviceToken: 'preview', deviceName: '我的手机' },
+        pairings: [{
+          id: 'preview#desktop', label: '书房 Mac', gatewayUrl: 'https://gw.openbuddy.example',
+          deviceToken: 'preview', deviceName: '我的手机', lastUsedAt: Date.now(),
+        }],
+        activePairingId: 'preview#desktop',
         connection: 'open',
         permissionMode: null,
         thinkingLevels: demo.panel?.thinkingLevel && isThinkingLevel(demo.panel.thinkingLevel)
@@ -237,7 +260,10 @@ export const useApp = create<AppState>((set, get) => ({
       return
     }
 
-    set({ pairing, booted: true, appLock, locked: appLock, autoSpeak })
+    set({
+      pairing, booted: true, appLock, locked: appLock, autoSpeak,
+      pairings: known.list, activePairingId: known.activeId ?? null,
+    })
     if (!pairing) return
 
     const transport = await openTransport(pairing, {
@@ -260,7 +286,13 @@ export const useApp = create<AppState>((set, get) => ({
     try {
       const pairing = await claimPair(payload, deviceName)
       await savePairing(pairing)
-      set({ pairing, error: null })
+      const known = await loadPairings().catch(() => ({ list: [] as PairingRecord[], activeId: undefined }))
+      set({
+        pairing,
+        pairings: known.list,
+        activePairingId: known.activeId ?? null,
+        error: null,
+      })
       const transport = await openTransport(pairing)
       set({ transport, connection: transport.state() })
       transport.onState(state => set({ connection: state }))
@@ -278,10 +310,19 @@ export const useApp = create<AppState>((set, get) => ({
   /** The desktop revoked this device (or the gateway forgot it): pair again. */
   async revoked() {
     closeActiveTransport()
+    // The desktop refused this credential: forget that pairing only, keeping
+    // any other computers the phone still trusts.
+    const activeId = get().activePairingId
+    const remaining = activeId ? removePairing(get().pairings, activeId) : get().pairings
+    await savePairingRecords(remaining)
+    const nextId = resolveActiveId(remaining)
+    await saveActivePairingId(nextId)
     await clearPairing().catch(() => {})
     set({
       transport: null,
       pairing: null,
+      pairings: remaining,
+      activePairingId: nextId ?? null,
       connection: 'closed',
       capabilities: null,
       error: '这台电脑已经解除了这台手机，请重新扫码配对。',
@@ -294,8 +335,90 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async unpair() {
+    const activeId = get().activePairingId
+    if (activeId) {
+      await get().forgetPairing(activeId)
+      return
+    }
     closeActiveTransport()
     set({ transport: null, pairing: null, connection: 'closed', capabilities: null, sessions: [], transcripts: {}, approvals: [] })
+  },
+
+  /**
+   * E3: one transport, one active pairing. Switching tears the old stream down
+   * and rebuilds state from the new desktop instead of trying to merge them.
+   */
+  async switchPairing(id) {
+    const record = findPairing(get().pairings, id)
+    if (!record) return false
+    const next = upsertPairing(get().pairings, { ...record, lastUsedAt: Date.now() })
+    await savePairingRecords(next)
+    await saveActivePairingId(record.id)
+    const pairing = pairingFromRecord(record)
+    closeActiveTransport()
+    set({
+      pairing,
+      pairings: next,
+      activePairingId: record.id,
+      transport: null,
+      connection: 'connecting',
+      capabilities: null,
+      sessions: [],
+      transcripts: {},
+      approvals: [],
+      notifications: [],
+      notificationsLoaded: false,
+      awaiting: [],
+      queues: {},
+      tasks: [],
+      thinkingLevels: {},
+      projects: [],
+      currentCwd: null,
+      drafts: {},
+      workspaces: [],
+      error: null,
+    })
+    try {
+      const transport = await openTransport(pairing, {
+        onUnauthorized: () => { void get().revoked() },
+      })
+      set({ transport, connection: transport.state() })
+      transport.onState(state => set({ connection: state }))
+      await attachListeners(transport, set, get)
+      await get().refreshSessions()
+      await loadCapabilities(get, set)
+      void get().refreshPermissionMode()
+      void get().refreshNotifications()
+      return true
+    } catch (error) {
+      set({ error: errorText(error), connection: 'closed' })
+      return false
+    }
+  },
+
+  async forgetPairing(id) {
+    const remaining = removePairing(get().pairings, id)
+    await savePairingRecords(remaining)
+    const wasActive = get().activePairingId === id
+    if (!wasActive) {
+      set({ pairings: remaining })
+      return
+    }
+    const nextId = resolveActiveId(remaining)
+    closeActiveTransport()
+    if (!nextId) {
+      await saveActivePairingId(undefined)
+      await clearPairing().catch(() => {})
+      set({
+        pairing: null, pairings: [], activePairingId: null, transport: null,
+        connection: 'closed', capabilities: null, sessions: [], transcripts: {},
+        approvals: [], notifications: [], awaiting: [], queues: {}, tasks: [],
+        thinkingLevels: {}, projects: [], currentCwd: null,
+      })
+      return
+    }
+    set({ pairings: remaining, activePairingId: nextId })
+    await get().switchPairing(nextId)
   },
 
   async openSession(sessionId) {
