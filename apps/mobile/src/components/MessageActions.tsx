@@ -13,7 +13,7 @@ import * as Clipboard from 'expo-clipboard'
 
 import { themeFor } from '../theme'
 
-export type MessageAction = 'copy' | 'copy_markdown' | 'speak' | 'regenerate'
+export type MessageAction = 'copy' | 'copy_markdown' | 'speak' | 'regenerate' | 'quote' | 'edit'
 
 export type MessageActionsProps = {
   /** Plain text of the message. */
@@ -25,10 +25,16 @@ export type MessageActionsProps = {
   onRegenerate?: () => void
   /** Assistant messages can be read out loud (语音播报). */
   onSpeak?: () => void
+  /** Quote-reply: the composer shows the message above the input. */
+  onQuote?: () => void
+  /** Edit-resend: put a user message back in the composer. */
+  onEdit?: () => void
   children: React.ReactNode
 }
 
-export function MessageActions({ text, markdown, canRegenerate, onRegenerate, onSpeak, children }: MessageActionsProps) {
+export function MessageActions({
+  text, markdown, canRegenerate, onRegenerate, onSpeak, onQuote, onEdit, children,
+}: MessageActionsProps) {
   const theme = themeFor(useColorScheme())
   const [open, setOpen] = useState(false)
   const [note, setNote] = useState<string | null>(null)
@@ -50,6 +56,12 @@ export function MessageActions({ text, markdown, canRegenerate, onRegenerate, on
   ]
   if (markdown && markdown !== text) {
     items.push({ key: 'copy_markdown', label: '复制 Markdown', run: () => void copy(markdown, '已复制 Markdown') })
+  }
+  if (onQuote) {
+    items.push({ key: 'quote', label: '引用回复', run: () => { setOpen(false); onQuote() } })
+  }
+  if (onEdit) {
+    items.push({ key: 'edit', label: '编辑重发', run: () => { setOpen(false); onEdit() } })
   }
   if (onSpeak) {
     items.push({ key: 'speak', label: '朗读', run: () => { setOpen(false); onSpeak() } })

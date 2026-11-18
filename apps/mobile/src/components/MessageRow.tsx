@@ -13,7 +13,7 @@
  */
 
 import { memo, useState } from 'react'
-import { Modal, Pressable, Text, View, useColorScheme } from 'react-native'
+import { Pressable, Text, View, useColorScheme } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 
 import type { TextRow, ThinkingRow as ThinkingRowData, ToolRow } from '../core/transcript'
@@ -22,22 +22,17 @@ import { speak } from '../native/speech'
 import { CopyIcon, QuoteIcon, RefreshIcon, ShareIcon, SparkIcon, VolumeIcon } from './icons'
 import { shareTextFile } from '../native/share'
 import { messageFilename, messageMarkdown } from '../core/share'
-import { quotePreview } from '../core/quote'
 import { Caret } from './Caret'
 import { Markdown } from './Markdown'
 import { MessageActions } from './MessageActions'
 import { ThinkingRow } from './ThinkingRow'
 import { ToolCard } from './ToolCard'
 
-function UserBubble({ row, menu }: { row: TextRow; menu: () => void }) {
+function UserBubble({ row, onQuote, onEdit }: { row: TextRow; onQuote?: () => void; onEdit?: () => void }) {
   const theme = themeFor(useColorScheme())
   return (
     <View style={{ alignItems: 'flex-end', paddingHorizontal: theme.gutter, paddingVertical: 8 }}>
-      <Pressable
-        onPress={menu}
-        onLongPress={menu}
-        delayLongPress={350}
-        accessibilityLabel="消息操作"
+      <View
         style={{
           maxWidth: '78%',
           backgroundColor: theme.bubble,
@@ -50,7 +45,7 @@ function UserBubble({ row, menu }: { row: TextRow; menu: () => void }) {
           paddingVertical: 8,
         }}
       >
-        <MessageActions text={row.text}>
+        <MessageActions text={row.text} onQuote={onQuote} onEdit={onEdit}>
           <Text
             selectable
             style={{
@@ -62,7 +57,7 @@ function UserBubble({ row, menu }: { row: TextRow; menu: () => void }) {
             {row.text}
           </Text>
         </MessageActions>
-      </Pressable>
+      </View>
     </View>
   )
 }
@@ -136,6 +131,7 @@ function AssistantRow({ row, onRegenerate, onQuote }: { row: TextRow; onRegenera
         canRegenerate={!row.streaming}
         onRegenerate={onRegenerate}
         onSpeak={row.streaming ? undefined : () => speak(row.text)}
+        onQuote={onQuote}
       >
         {row.isError ? (
           <Text selectable style={{ color: theme.danger, fontSize: theme.fontBody, lineHeight: theme.lineBody }}>
@@ -164,76 +160,6 @@ function SystemRow({ row }: { row: TextRow }) {
   )
 }
 
-/** Long-press sheet: the actions Grok hides behind a press on a message. */
-function MessageMenu({
-  row, visible, onClose, onQuote, onEdit, onRegenerate,
-}: {
-  row: TextRow
-  visible: boolean
-  onClose: () => void
-  onQuote?: () => void
-  onEdit?: () => void
-  onRegenerate?: () => void
-}) {
-  const theme = themeFor(useColorScheme())
-  if (!visible) return null
-  const items: { key: string; label: string; danger?: boolean; run: () => void }[] = [
-    { key: 'copy', label: '复制', run: () => { void Clipboard.setStringAsync(row.text).catch(() => {}) } },
-  ]
-  if (onQuote) items.push({ key: 'quote', label: '引用回复', run: onQuote })
-  if (onEdit && row.role === 'user') items.push({ key: 'edit', label: '编辑重发', run: onEdit })
-  if (onRegenerate && row.role === 'assistant' && !row.streaming) items.push({ key: 'regen', label: '重新生成', run: onRegenerate })
-  return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <Pressable
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }}
-          onPress={onClose}
-        />
-        <View style={{
-          backgroundColor: theme.surface,
-          borderTopLeftRadius: 18,
-          borderTopRightRadius: 18,
-          paddingHorizontal: theme.gutter,
-          paddingTop: 14,
-          paddingBottom: 30,
-        }}>
-          <Text numberOfLines={2} style={{ color: theme.textWeak, fontSize: 12, marginBottom: 6, lineHeight: 17 }}>
-            {quotePreview(row.text, 70)}
-          </Text>
-          {items.map(item => (
-            <Pressable
-              key={item.key}
-              onPress={() => { onClose(); item.run() }}
-              style={({ pressed }) => ({
-                paddingVertical: 14,
-                borderTopWidth: theme.hairline,
-                borderTopColor: theme.cardBorder,
-                opacity: pressed ? 0.6 : 1,
-              })}
-            >
-              <Text style={{ color: item.danger ? theme.danger : theme.text, fontSize: 16 }}>{item.label}</Text>
-            </Pressable>
-          ))}
-          <Pressable
-            onPress={onClose}
-            style={({ pressed }) => ({
-              marginTop: 10,
-              paddingVertical: 13,
-              borderRadius: theme.radiusPill,
-              backgroundColor: theme.card,
-              alignItems: 'center',
-              opacity: pressed ? 0.6 : 1,
-            })}
-          >
-            <Text style={{ color: theme.textMedium, fontSize: 15, fontWeight: '600' }}>取消</Text>
-          </Pressable>
-        </View>
-      </View>
-    </Modal>
-  )
-}
-
 export const MessageRow = memo(function MessageRow({
   row,
   onRegenerate,
@@ -254,7 +180,6 @@ export const MessageRow = memo(function MessageRow({
   /** Edit-resend: put a user message back in the composer. */
   onEdit?: (text: string) => void
 }) {
-  const [menuOpen, setMenuOpen] = useState(false)
   if (row.kind === 'thinking') return <ThinkingRow row={row} />
   if (row.kind === 'tool') {
     return (
@@ -267,25 +192,20 @@ export const MessageRow = memo(function MessageRow({
     )
   }
   if (row.role === 'system') return <SystemRow row={row} />
-  return (
-    <>
-      {row.role === 'user' ? (
-        <UserBubble row={row} menu={() => setMenuOpen(true)} />
-      ) : (
-        <AssistantRow
-          row={row}
-          onRegenerate={onRegenerate}
-          onQuote={onQuote ? () => onQuote(row.text) : undefined}
-        />
-      )}
-      <MessageMenu
+  if (row.role === 'user') {
+    return (
+      <UserBubble
         row={row}
-        visible={menuOpen}
-        onClose={() => setMenuOpen(false)}
         onQuote={onQuote ? () => onQuote(row.text) : undefined}
         onEdit={onEdit ? () => onEdit(row.text) : undefined}
-        onRegenerate={onRegenerate}
       />
-    </>
+    )
+  }
+  return (
+    <AssistantRow
+      row={row}
+      onRegenerate={onRegenerate}
+      onQuote={onQuote ? () => onQuote(row.text) : undefined}
+    />
   )
 })
