@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { toNotifications } from '../notification-list'
+import { numericNotificationId, toNotifications } from '../notification-list'
 
 describe('toNotifications', () => {
   it('normalises the desktop rows and sorts newest first', () => {
@@ -30,5 +30,12 @@ describe('toNotifications', () => {
     expect(toNotifications([{ id: 'a', title: 'A' }, { id: 'a', title: 'A2' }])).toHaveLength(1)
     const many = Array.from({ length: 120 }, (_, index) => ({ id: `n${index}`, title: `T${index}` }))
     expect(toNotifications(many)).toHaveLength(100)
+  })
+
+  it('only numeric ids can be marked read on the desktop', () => {
+    expect(numericNotificationId('1760000000000')).toBe(1760000000000)
+    expect(numericNotificationId('push-1')).toBeNull()
+    expect(numericNotificationId('')).toBeNull()
+    expect(numericNotificationId('99999999999999999999')).toBeNull()
   })
 })

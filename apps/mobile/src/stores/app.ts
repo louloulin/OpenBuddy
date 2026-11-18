@@ -37,7 +37,7 @@ import { exportFilename, isTruncatedRead, jsonlEntryCount, MAX_EXPORT_BYTES } fr
 import type { BatchOutcome } from '../core/batch'
 import { toSessionList } from '../core/session-list'
 import { toProjects, type ProjectRef } from '../core/projects'
-import { toNotifications } from '../core/notification-list'
+import { toNotifications, numericNotificationId } from '../core/notification-list'
 import { bumpUnread, clearUnread, shouldMarkUnread } from '../core/unread'
 import {
   LOCK_KEY, lockUnavailableReason, parseLockSetting, serializeLockSetting, shouldRelock,
@@ -153,6 +153,8 @@ type AppState = {
   refreshTasks: () => Promise<void>
   /** Loads the notification backlog the desktop recorded. */
   refreshNotifications: () => Promise<void>
+  /** Marks one backlog notification read (desktop keeps the numeric id). */
+  markNotificationRead: (id: string) => Promise<void>
   killTask: (taskId: string) => Promise<void>
   refreshPermissionMode: () => Promise<void>
   /** Reads the session's thinking level for the composer chip. */
@@ -1014,6 +1016,16 @@ export const useApp = create<AppState>((set, get) => ({
       ])
     }
     return outcome
+  },
+
+  async markNotificationRead(id) {
+    set(state => ({
+      notifications: state.notifications.map(item => item.id === id ? { ...item, read: true } : item),
+    }))
+    if (isPreview()) return
+    const numeric = numericNotificationId(id)
+    if (numeric === null) return
+    await get().transport?.invoke('notification_mark_read', { id: numeric }).catch(() => {})
   },
 
   async markNotificationsRead() {

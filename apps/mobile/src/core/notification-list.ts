@@ -54,3 +54,13 @@ export function toNotifications(raw: unknown, now = Date.now()): NotificationIte
   }
   return items.sort((a, b) => b.at - a.at).slice(0, 100)
 }
+
+/**
+ * `notification_mark_read` takes the desktop's numeric id; a push-only row
+ * (string id) has no backlog entry to mark.
+ */
+export function numericNotificationId(id: string): number | null {
+  if (!/^\d+$/.test(id)) return null
+  const value = Number(id)
+  return Number.isSafeInteger(value) ? value : null
+}

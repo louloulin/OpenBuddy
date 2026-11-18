@@ -210,6 +210,11 @@ const dispatcher: HostDispatcher = {
       case 'notification_mark_all_read':
         for (const item of DEMO_NOTIFICATIONS) item.read = true
         return { ok: true }
+      case 'notification_mark_read': {
+        const item = DEMO_NOTIFICATIONS.find(entry => entry.id === payload.id)
+        if (item) item.read = true
+        return { ok: true }
+      }
       case 'agent_resolve_permission':
         for (const listener of listeners) listener('agent://permission-dismiss', { requestId: payload.requestId, sessionId: payload.sessionId })
         return { resolved: true }
@@ -383,7 +388,7 @@ const dispatcher: HostDispatcher = {
     'automations_snapshot', 'automations_save', 'automations_delete', 'automations_set_status', 'automations_run',
     'library_list', 'projects_snapshot', 'turn_revert', 'session_search',
     'memory_list', 'memory_get', 'agent_tree', 'rewind_points', 'checkpoint_list', 'notification_list',
-    'notification_mark_all_read',
+    'notification_mark_all_read', 'notification_mark_read',
   ],
 }
 

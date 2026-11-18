@@ -45,7 +45,7 @@ import { toProjects } from '../apps/mobile/src/core/projects.js'
 import { canRevertTool, summarizeRevert } from '../apps/mobile/src/core/revert.js'
 import { extractSources, isSourceTool } from '../apps/mobile/src/core/sources.js'
 import { APPROVE_ACTION, DENY_ACTION, decisionForResponse } from '../apps/mobile/src/core/push-actions.js'
-import { toNotifications } from '../apps/mobile/src/core/notification-list.js'
+import { numericNotificationId, toNotifications } from '../apps/mobile/src/core/notification-list.js'
 import { quotePreview, withQuote } from '../apps/mobile/src/core/quote.js'
 import { nextThinkingLevel } from '../apps/mobile/src/core/session-panel.js'
 import { cleanSessionTitle, sessionActions } from '../apps/mobile/src/core/session-actions.js'
@@ -83,6 +83,7 @@ const savedAutomations: Record<string, unknown>[] = []
 const deletedAutomations: string[] = []
 const revertedTools: string[] = []
 const thinkingState = { level: 'medium' }
+const markedNotifications: number[] = []
 const deletedSessions: string[] = []
 const turnQueue = { steering: [] as string[], followUp: [] as string[] }
 const BRANCH_TREE = {
@@ -268,6 +269,9 @@ const dispatcher: HostDispatcher = {
         ]
       case 'notification_mark_all_read':
         return { ok: true }
+      case 'notification_mark_read':
+        markedNotifications.push(Number(payload.id))
+        return { ok: true }
       case 'memory_save':
         savedMemory.push({ scope: String(payload.scope), path: String(payload.path), content: String(payload.content) })
         return { scope: payload.scope, path: payload.path, content: payload.content, size: String(payload.content).length }
@@ -281,7 +285,7 @@ const dispatcher: HostDispatcher = {
   },
   servedCommands: () => [
     'agent_list_sessions', 'agent_load_session', 'agent_send', 'agent_resolve_permission',
-    'session_search', 'notification_list', 'notification_mark_all_read',
+    'session_search', 'notification_list', 'notification_mark_all_read', 'notification_mark_read',
     'memory_list', 'memory_get', 'memory_save',
     'agent_tree', 'rewind_points', 'rewind_execute', 'agent_navigate', 'checkpoint_list', 'checkpoint_restore',
     'agent_init', 'agent_new_session',
@@ -727,6 +731,12 @@ check('the notification backlog loads from the desktop',
   backlog.length === 2 && backlog[0]?.kind === 'approval' && backlog[0]?.id === '2')
 await transport.invoke('notification_mark_all_read', {})
 check('marking all read reaches the desktop', true)
+
+const firstId = numericNotificationId(backlog[0]?.id ?? '')
+check('a backlog id converts to the desktop numeric id', firstId === 2)
+await transport.invoke('notification_mark_read', { id: firstId })
+check('marking one notification reaches the desktop', markedNotifications.includes(2))
+check('a push-only id is not numeric', numericNotificationId('push-1') === null)
 
 // ── 8v. Quote-reply and edit-resend (v3 §4.2 P1) ───────────────────────────
 
