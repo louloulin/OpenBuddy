@@ -134,6 +134,7 @@ export function previewState(): PreviewState {
           text: '没有缓冲。代理层把 `accept-encoding` 固定成 **identity**，上游写一帧就转发一帧：\n\n- TTFB = 桌面出第一个 token + 一跳 RTT\n- 中间不做任何聚合\n\n```ts\nheaders[\'accept-encoding\'] = \'identity\'\n```',
         },
         { kind: 'tool', id: 't1', name: 'grep', hint: "forwardHttp packages/gateway/src", status: 'ok', output: 'proxy.ts:102  export async function forwardHttp(' },
+        { kind: 'tool', id: 't2', name: 'write_text_file', hint: 'packages/gateway/src/relay/sse.ts', status: 'ok', output: '已写入 42 行' },
         { kind: 'text', id: 'u2', role: 'user', text: '那把这块单独抽出来，加一条并发测试。' },
         {
           kind: 'text',
@@ -211,7 +212,7 @@ export function previewState(): PreviewState {
       'experts_load', 'experts_list_roots', 'agent_session_usage',
       'agent_init', 'agent_set_session_pinned', 'agent_rename_session',
       'agent_set_session_archived', 'agent_delete_session', 'agent_tree',
-      'agent_export_jsonl', 'files_search', 'commands_list', 'library_list', 'projects_snapshot',
+      'agent_export_jsonl', 'files_search', 'commands_list', 'library_list', 'projects_snapshot', 'turn_revert',
       'rewind_points', 'rewind_execute', 'agent_navigate', 'checkpoint_list', 'checkpoint_restore',
     ],
     events: ['agent://event', 'agent://permission', 'agent://update'],

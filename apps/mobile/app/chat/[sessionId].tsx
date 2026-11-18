@@ -19,7 +19,9 @@ import { RequestCard } from '../../src/components/RequestCard'
 import { LoadingRow } from '../../src/components/LoadingRow'
 import { MessageRow } from '../../src/components/MessageRow'
 import { ChevronRightIcon, SparkIcon } from '../../src/components/icons'
-import { emptyTranscript, isTurnPending, type TranscriptRow } from '../../src/core/transcript'
+import { emptyTranscript, isTurnPending, type TranscriptRow, type ToolRow } from '../../src/core/transcript'
+import { summarizeRevert } from '../../src/core/revert'
+import { canRun } from '../../src/core/surface'
 import { followUpsFor } from '../../src/core/follow-ups'
 import { queueLabel, queueRows } from '../../src/core/turn-input'
 import type { ApprovalAction } from '../../src/core/approvals'
@@ -62,7 +64,37 @@ export default function ChatScreen() {
   const [tasksOpen, setTasksOpen] = useState(false)
   const [busyRequest, setBusyRequest] = useState<string | null>(null)
   const regenerate = useApp(state => state.regenerate)
+  const capabilities = useApp(state => state.capabilities)
   const awaiting = useApp(state => state.awaiting.includes(sessionId))
+  const [revertingId, setRevertingId] = useState<string | null>(null)
+  const [revertNotes, setRevertNotes] = useState<Record<string, string>>({})
+
+  // D5: undo the files one tool call wrote. The desktop owns the checkpoints;
+  // the phone reports what it restored and flags conflicts to resolve there.
+  const revertTool = async (row: ToolRow) => {
+    const transport = useApp.getState().transport
+    if (!transport || revertingId) return
+    setRevertingId(row.id)
+    try {
+      const result = await transport.invoke<unknown>('turn_revert', { sessionId, toolCallIds: [row.id] })
+      const summary = summarizeRevert(result)
+      setRevertNotes(notes => ({ ...notes, [row.id]: summary.message }))
+    } catch (error) {
+      setRevertNotes(notes => ({
+        ...notes,
+        [row.id]: error instanceof Error ? error.message : String(error),
+      }))
+    } finally {
+      setRevertingId(null)
+    }
+  }
+  const toolActions = canRun(capabilities, 'turn_revert')
+    ? {
+      onRevert: (row: ToolRow) => void revertTool(row),
+      revertingId: revertingId ?? undefined,
+      noteFor: (row: ToolRow) => revertNotes[row.id],
+    }
+    : undefined
 
   useEffect(() => {
     if (sessionId) void openSession(sessionId)
@@ -236,6 +268,7 @@ export default function ChatScreen() {
               <MessageRow
                 row={item}
                 onRegenerate={() => void regenerate(sessionId)}
+                toolActions={toolActions}
               />
             ))}
           keyExtractor={row => row.id}

@@ -157,12 +157,28 @@ function SystemRow({ row }: { row: TextRow }) {
 export const MessageRow = memo(function MessageRow({
   row,
   onRegenerate,
+  toolActions,
 }: {
   row: TextRow | ToolRow | ThinkingRowData
   onRegenerate?: () => void
+  /** Undo affordance for tool cards (D5). */
+  toolActions?: {
+    onRevert: (row: ToolRow) => void
+    revertingId?: string
+    noteFor?: (row: ToolRow) => string | undefined
+  }
 }) {
   if (row.kind === 'thinking') return <ThinkingRow row={row} />
-  if (row.kind === 'tool') return <ToolCard row={row} />
+  if (row.kind === 'tool') {
+    return (
+      <ToolCard
+        row={row}
+        onRevert={toolActions ? () => toolActions.onRevert(row) : undefined}
+        reverting={toolActions?.revertingId === row.id}
+        revertNote={toolActions?.noteFor?.(row)}
+      />
+    )
+  }
   if (row.role === 'user') return <UserBubble row={row} />
   if (row.role === 'system') return <SystemRow row={row} />
   return <AssistantRow row={row} onRegenerate={onRegenerate} />

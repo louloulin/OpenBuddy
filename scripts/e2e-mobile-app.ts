@@ -42,6 +42,7 @@ import { messageMarkdown, transcriptMarkdown } from '../apps/mobile/src/core/sha
 import { toSessionList } from '../apps/mobile/src/core/session-list.js'
 import { groupSessions } from '../apps/mobile/src/core/session-actions.js'
 import { toProjects } from '../apps/mobile/src/core/projects.js'
+import { canRevertTool, summarizeRevert } from '../apps/mobile/src/core/revert.js'
 import { cleanSessionTitle, sessionActions } from '../apps/mobile/src/core/session-actions.js'
 import { bumpUnread, shouldMarkUnread, totalUnread } from '../apps/mobile/src/core/unread.js'
 import { parseLockSetting, shouldRelock } from '../apps/mobile/src/core/app-lock.js'
@@ -75,6 +76,7 @@ const newSessionCalls: unknown[] = []
 const sessionMeta: { op: string; sessionId: string; value: unknown }[] = []
 const savedAutomations: Record<string, unknown>[] = []
 const deletedAutomations: string[] = []
+const revertedTools: string[] = []
 const deletedSessions: string[] = []
 const turnQueue = { steering: [] as string[], followUp: [] as string[] }
 const BRANCH_TREE = {
@@ -216,6 +218,9 @@ const dispatcher: HostDispatcher = {
         return { ok: true }
       case 'library_list':
         return [{ id: '/e2e/workspace/docs', kind: 'folder', label: 'docs', path: '/e2e/workspace/docs' }]
+      case 'turn_revert':
+        revertedTools.push(...(payload.toolCallIds as string[]))
+        return { restored: ['/e2e/workspace/proxy.ts'], conflicts: [] }
       case 'read_text_file':
         if (payload.path !== '/e2e/export.jsonl') throw new Error(`no such file ${String(payload.path)}`)
         return '{"type":"session"}\n{"type":"message"}\n'
@@ -267,7 +272,7 @@ const dispatcher: HostDispatcher = {
     'agent_cancel', 'agent_resolve_ui', 'folder_trust_respond', 'tasks_list', 'task_kill', 'permission_mode_get',
     'agent_list_workspaces', 'agent_fork_session', 'agent_handoff', 'agent_compact',
     'agent_export_jsonl', 'read_text_file', 'files_search', 'commands_list',
-    'automations_save', 'automations_delete', 'library_list',
+    'automations_save', 'automations_delete', 'library_list', 'turn_revert',
     'window_minimize', // must be filtered off the mobile surface
   ],
 }
@@ -662,6 +667,16 @@ const projectRows = groupSessions(hostRows, false, {
 check('sessions fold into project sections',
   projectRows.some(row => row.kind === 'label' && row.title === '甲项目' && row.count === 1)
   && projectRows.some(row => row.kind === 'label' && row.title === 'b'))
+
+// ── 8r. Reverting one tool call (v3 D5) ────────────────────────────────────
+
+check('revert is offered only on tools that write',
+  canRevertTool('write_text_file') && !canRevertTool('read_text_file'))
+const revertAnswer = await transport.invoke<unknown>('turn_revert', { sessionId: 'sess-1', toolCallIds: ['tc-write-1'] })
+check('the desktop reverts the files of that call',
+  revertedTools.includes('tc-write-1') && summarizeRevert(revertAnswer).message === '已恢复 1 个文件')
+check('a conflict is surfaced to the user',
+  summarizeRevert({ restored: [], conflicts: [{ path: '/w/a', reason: 'changed_since' }] }).ok === false)
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 

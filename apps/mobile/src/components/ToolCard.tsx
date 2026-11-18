@@ -8,13 +8,22 @@
  */
 
 import { useState } from 'react'
-import { Pressable, Text, View, useColorScheme } from 'react-native'
+import { ActivityIndicator, Pressable, Text, View, useColorScheme } from 'react-native'
 
 import { toolCategory, type ToolRow } from '../core/transcript'
+import { canRevertTool } from '../core/revert'
 import { themeFor } from '../theme'
 import { CheckIcon, CloseIcon, TerminalIcon } from './icons'
 
-export function ToolCard({ row }: { row: ToolRow }) {
+export function ToolCard({
+  row, onRevert, reverting = false, revertNote,
+}: {
+  row: ToolRow
+  /** Undo the files this call changed (D5); absent when the host cannot. */
+  onRevert?: () => void
+  reverting?: boolean
+  revertNote?: string
+}) {
   const theme = themeFor(useColorScheme())
   const [open, setOpen] = useState(false)
 
@@ -93,6 +102,33 @@ export function ToolCard({ row }: { row: ToolRow }) {
           ) : (
             <Text style={{ color: theme.textWeak, fontSize: 11 }}>这个工具没有返回内容。</Text>
           )}
+          {onRevert && !running && canRevertTool(row.name) ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 }}>
+              <Pressable
+                onPress={onRevert}
+                disabled={reverting}
+                accessibilityLabel="撤销这一步的改动"
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: theme.radiusPill,
+                  borderWidth: theme.hairline,
+                  borderColor: theme.cardBorder,
+                  backgroundColor: pressed ? theme.pressed : 'transparent',
+                  opacity: reverting ? 0.5 : 1,
+                })}
+              >
+                {reverting ? <ActivityIndicator size="small" color={theme.textWeak} /> : null}
+                <Text style={{ color: theme.textMedium, fontSize: 12 }}>撤销这一步</Text>
+              </Pressable>
+              {revertNote ? (
+                <Text style={{ flex: 1, color: theme.textWeak, fontSize: 11 }}>{revertNote}</Text>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       ) : null}
     </View>

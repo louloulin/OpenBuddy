@@ -61,6 +61,14 @@ const HISTORY: Record<string, unknown[]> = {
       result: { content: [{ type: 'text', text: 'Phase 3 · Expo App —— 会话、聊天、审批、推送' }] },
     },
     {
+      type: 'toolcall_start', sessionId: 'sess-mobile', toolCallId: 'tc-write-1', toolName: 'write_text_file',
+      assistantMessageEvent: { type: 'toolcall_start', toolCall: { type: 'toolCall', id: 'tc-write-1', name: 'write_text_file' } },
+    },
+    {
+      type: 'toolcall_end', sessionId: 'sess-mobile', toolCallId: 'tc-write-1',
+      result: { content: [{ type: 'text', text: '已写入 42 行' }] },
+    },
+    {
       type: 'message_end', sessionId: 'sess-mobile',
       message: { role: 'assistant', content: '计划文档里 Phase 3 已经全部完成，剩下的是 H5 兜底和真机验证。' },
     },
@@ -214,6 +222,8 @@ const dispatcher: HostDispatcher = {
       }
       case 'agent_export_jsonl':
         return '/tmp/openbuddy-preview-export.jsonl'
+      case 'turn_revert':
+        return { restored: ['packages/gateway/src/relay/sse.ts'], conflicts: [] }
       case 'agent_session_info':
         return { cwd: '/tmp/scratch', usage: { used: 38_400, total: 200_000 } }
       case 'list_dir':
@@ -311,7 +321,7 @@ const dispatcher: HostDispatcher = {
     'agent_set_session_pinned', 'agent_rename_session', 'agent_set_session_archived', 'agent_delete_session',
     'agent_export_jsonl', 'read_text_file', 'agent_session_info', 'list_dir', 'files_search', 'commands_list',
     'automations_snapshot', 'automations_save', 'automations_delete', 'automations_set_status', 'automations_run',
-    'library_list', 'projects_snapshot',
+    'library_list', 'projects_snapshot', 'turn_revert',
     'session_search', 'notification_list',
   ],
 }
