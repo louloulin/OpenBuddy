@@ -414,29 +414,34 @@ export default function ChatScreen() {
             <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>运行中的任务</Text>
             {sessionTaskRows.length === 0 ? (
               <Text style={{ color: theme.textWeak, fontSize: 13, paddingVertical: 12 }}>没有运行中的任务。</Text>
-            ) : sessionTaskRows.map(task => (
-              <View
-                key={task.id}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 12,
-                  paddingVertical: 12,
-                  borderTopWidth: theme.hairline,
-                  borderTopColor: theme.cardBorder,
-                }}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text numberOfLines={1} style={{ color: theme.text, fontSize: 14 }}>{task.title || task.description || task.id}</Text>
-                  <Text style={{ color: theme.textWeak, fontSize: 12, marginTop: 2 }}>
-                    {[task.kind, elapsedLabel(task.startedAt), task.pending ? `待确认 ${task.pending}` : ''].filter(Boolean).join(' · ')}
-                  </Text>
-                </View>
-                <Pressable onPress={() => void killTask(task.id)} hitSlop={8}>
-                  <Text style={{ color: theme.danger, fontSize: 13, fontWeight: '600' }}>结束</Text>
-                </Pressable>
-              </View>
-            ))}
+            ) : (
+              // A busy turn can spawn many children; keep the sheet on-screen.
+              <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+                {sessionTaskRows.map(task => (
+                  <View
+                    key={task.id}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
+                      paddingVertical: 12,
+                      borderTopWidth: theme.hairline,
+                      borderTopColor: theme.cardBorder,
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text numberOfLines={1} style={{ color: theme.text, fontSize: 14 }}>{task.title || task.description || task.id}</Text>
+                      <Text style={{ color: theme.textWeak, fontSize: 12, marginTop: 2 }}>
+                        {[task.kind, elapsedLabel(task.startedAt), task.pending ? `待确认 ${task.pending}` : ''].filter(Boolean).join(' · ')}
+                      </Text>
+                    </View>
+                    <Pressable onPress={() => void killTask(task.id)} hitSlop={8}>
+                      <Text style={{ color: theme.danger, fontSize: 13, fontWeight: '600' }}>结束</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
             <Pressable
               onPress={() => setTasksOpen(false)}
               style={({ pressed }) => ({

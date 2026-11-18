@@ -10,7 +10,7 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import {
-  Alert, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, Text, TextInput, View, useColorScheme,
+  Alert, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View, useColorScheme,
 } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { useRouter } from 'expo-router'
@@ -630,16 +630,20 @@ export default function SessionsScreen() {
               <Pressable onPress={() => void createIn()} style={({ pressed }) => ({ paddingVertical: 14, opacity: pressed ? 0.6 : 1 })}>
                 <Text style={{ color: theme.text, fontSize: 15 }}>使用桌面当前目录</Text>
               </Pressable>
-            ) : workspaces.map(choice => (
-              <Pressable
-                key={choice.cwd}
-                onPress={() => void createIn(choice.cwd)}
-                style={({ pressed }) => ({ paddingVertical: 12, borderTopWidth: theme.hairline, borderTopColor: theme.cardBorder, opacity: pressed ? 0.6 : 1 })}
-              >
-                <Text numberOfLines={1} style={{ color: theme.text, fontSize: 14 }}>{choice.label}</Text>
-                {choice.detail ? <Text numberOfLines={1} style={{ color: theme.textWeak, fontSize: 12, marginTop: 2 }}>{choice.detail}</Text> : null}
-              </Pressable>
-            ))}
+            ) : (
+              <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+                {workspaces.map(choice => (
+                  <Pressable
+                    key={choice.cwd}
+                    onPress={() => void createIn(choice.cwd)}
+                    style={({ pressed }) => ({ paddingVertical: 12, borderTopWidth: theme.hairline, borderTopColor: theme.cardBorder, opacity: pressed ? 0.6 : 1 })}
+                  >
+                    <Text numberOfLines={1} style={{ color: theme.text, fontSize: 14 }}>{choice.label}</Text>
+                    {choice.detail ? <Text numberOfLines={1} style={{ color: theme.textWeak, fontSize: 12, marginTop: 2 }}>{choice.detail}</Text> : null}
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
             <Pressable
               onPress={() => setWorkspaceSheet(false)}
               style={({ pressed }) => ({ marginTop: 10, paddingVertical: 12, borderRadius: theme.radiusPill, backgroundColor: pressed ? theme.pressed : theme.card, alignItems: 'center' })}
