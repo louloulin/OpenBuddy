@@ -329,13 +329,20 @@ export class ExpertStore {
    * `experts_import_workbuddy`: import a WorkBuddy expert package (ZIP or an extracted folder) into
    * 我的专家 (S18). Each agent becomes a normal Markdown expert; avatars are copied next to it.
    */
-  importWorkBuddy(path: string): { package: string; imported: ExpertEntry[]; skipped: Array<{ id: string; error: string }> } {
+  importWorkBuddy(path: string): {
+    package: string;
+    imported: ExpertEntry[];
+    skipped: Array<{ id: string; error: string }>;
+    team?: { name: string; leadAgent?: string; members: string[] };
+  } {
     const resolved = real(path);
     if (!resolved) throw new ProtocolError("path_not_authorized", "只能导入存在的 WorkBuddy 专家包");
     const isFile = statSync(resolved).isFile();
     const pkg = readWorkBuddyPackageFrom(resolved, isFile ? readFileSync(resolved) : undefined);
     const imported: ExpertEntry[] = [];
     const skipped: Array<{ id: string; error: string }> = [];
+    /** Package agent id → the unique id actually written (S21 team wiring). */
+    const idMap = new Map<string, string>();
     for (const item of pkg.drafts) {
       try {
         const created = this.save({ ...item.draft, id: item.draft.id }, "create");
@@ -346,12 +353,20 @@ export class ExpertStore {
             this.write(created.id, serializeExpert(draft));
           }
         }
+        if (item.draft.id) idMap.set(item.draft.id, created.id);
         imported.push(this.get(created.id));
       } catch (error) {
         skipped.push({ id: item.draft.id ?? item.draft.name, error: error instanceof Error ? error.message : String(error) });
       }
     }
-    return { package: pkg.name, imported, skipped };
+    const team = pkg.team
+      ? {
+          name: pkg.team.name,
+          ...(pkg.team.leadAgent ? { leadAgent: idMap.get(pkg.team.leadAgent) ?? pkg.team.leadAgent } : {}),
+          members: pkg.team.memberAgents.map((id) => idMap.get(id) ?? id).filter((id) => imported.some((entry) => entry.id === id)),
+        }
+      : undefined;
+    return { package: pkg.name, imported, skipped, ...(team && team.members.length ? { team } : {}) };
   }
 
   /** Copy a WorkBuddy avatar into `<user>/agents/avatars/<id>.<ext>` (bounded, image only). */

@@ -37,6 +37,24 @@ export interface WorkBuddyPackage {
   name: string;
   root: string;
   drafts: WorkBuddyDraft[];
+  /** Present for `expertType: "team"` packages (S21). Agent ids are the draft ids. */
+  team?: WorkBuddyTeam;
+}
+
+export interface WorkBuddyTeam {
+  name: string;
+  leadAgent?: string;
+  memberAgents: string[];
+}
+
+/** Prompt-template body for an imported WorkBuddy team (installed into 我的指令). */
+export function workBuddyTeamPrompt(name: string, members: Array<{ name: string; role?: "lead" | "member"; description?: string }>): string {
+  const lines = [`请以「${name}」的团队方式完成当前任务。`, "", "角色分工："];
+  for (const member of members) {
+    lines.push(`- ${member.name}${member.role === "lead" ? "（负责人）" : ""}：${member.description?.trim() || "按自身专长提供判断"}`);
+  }
+  lines.push("", "先由负责人给出总体方案，再逐项吸收成员的视角，最后输出一份统一的结论与行动清单。");
+  return lines.join("\n");
 }
 
 interface Localized { en?: unknown; zh?: unknown }
@@ -221,11 +239,27 @@ const readJson = (files: Map<string, Uint8Array>, path: string): WorkBuddyPlugin
   }
 };
 
+/** `<plugin>/settings.json` carries `{ "agent": "<lead id>" }` for team packages. */
+const readAgentMarker = (files: Map<string, Uint8Array>, path: string): string | undefined => {
+  const bytes = files.get(path);
+  if (!bytes) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? text((parsed as Record<string, unknown>).agent, 80)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 /** Parse plugin.json + agents into OpenBuddy drafts (no filesystem writes). */
 export function readWorkBuddyPackage(files: Map<string, Uint8Array>): WorkBuddyPackage {
   const root = findWorkBuddyRoot(files);
   const prefix = root ? `${root}/` : "";
-  const plugin = readJson(files, `${prefix}.codebuddy-plugin/plugin.json`) ?? readJson(files, `${prefix}plugin.json`);
+  const plugin = files.has(`${prefix}.codebuddy-plugin/plugin.json`)
+    ? readJson(files, `${prefix}.codebuddy-plugin/plugin.json`)
+    : readJson(files, `${prefix}plugin.json`);
   const packageName = text(plugin.name, 80) ?? root.split("/").pop() ?? "workbuddy-package";
 
   const declared = Array.isArray(plugin.agents)
@@ -240,11 +274,15 @@ export function readWorkBuddyPackage(files: Map<string, Uint8Array>): WorkBuddyP
   const members = Array.isArray(plugin.members)
     ? plugin.members.map((item) => (item && typeof item === "object" ? item as Record<string, unknown> : {}))
     : [];
-  const leadId = text(plugin.agentName, 80) ?? text(plugin.teamInfo?.leadAgent, 80) ?? text(members.find((member) => member.role === "lead")?.id, 80);
+  const agentMarker = readAgentMarker(files, `${prefix}settings.json`);
+  const leadId = text(plugin.agentName, 80) ?? text(plugin.teamInfo?.leadAgent, 80) ??
+    agentMarker ?? text(members.find((member) => member.role === "lead")?.id, 80);
   const tags = localizedList(plugin.tags, EXPERT_LIMITS.tags, EXPERT_LIMITS.tag);
   const quickPrompts = localizedList(plugin.quickPrompts, EXPERT_LIMITS.examples, EXPERT_LIMITS.example);
 
   const drafts: WorkBuddyDraft[] = [];
+  const agentIds: string[] = [];
+  let teamLead: string | undefined;
   for (const path of paths) {
     const raw = new TextDecoder().decode(files.get(path));
     let frontmatter: Record<string, unknown> = {};
@@ -287,9 +325,19 @@ export function readWorkBuddyPackage(files: Map<string, Uint8Array>): WorkBuddyP
         ? { avatar: { name: basename(avatarPath!), bytes: avatarBytes } }
         : {}),
     });
+    agentIds.push(id);
+    if (isLead) teamLead = id;
   }
   if (!drafts.length) invalid("专家包中没有可导入的专家");
-  return { name: packageName, root, drafts };
+  const isTeam = plugin.expertType === "team" || !!plugin.teamInfo || !!agentMarker;
+  const team: WorkBuddyTeam | undefined = isTeam
+    ? {
+        name: localized(plugin.displayName, 80) ?? packageName,
+        ...(teamLead ? { leadAgent: teamLead } : {}),
+        memberAgents: agentIds,
+      }
+    : undefined;
+  return { name: packageName, root, drafts, ...(team ? { team } : {}) };
 }
 
 /** Entry point used by the expert store: directory or `.zip`. */

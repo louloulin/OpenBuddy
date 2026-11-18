@@ -5315,6 +5315,7 @@ button.diff__path {
   gap: 8px;
   flex-wrap: nowrap;
   align-items: center;
+  justify-content: safe center;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;

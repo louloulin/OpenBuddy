@@ -107,11 +107,13 @@ export interface ExpertRootInfo {
   error?: string;
 }
 
-/** `experts_import_workbuddy`: what a WorkBuddy package produced (S18). */
+/** `experts_import_workbuddy`: what a WorkBuddy package produced (S18/S21). */
 export interface WorkBuddyImportResult {
   package: string;
   imported: ExpertEntry[];
   skipped: Array<{ id: string; error: string }>;
+  /** Team packages also install a 我的指令 prompt; `command` is its `/` invocation (S21). */
+  team?: { name: string; command?: string; leadAgent?: string; members: string[]; error?: string };
 }
 
 /** `experts_load`: the merged catalog for one working directory. */

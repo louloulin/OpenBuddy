@@ -31,7 +31,9 @@ mkdirSync(join(WB_FIXTURE, 'agents'), { recursive: true });
 writeFileSync(join(WB_FIXTURE, '.codebuddy-plugin', 'plugin.json'), JSON.stringify({
   name: 'e2e-workbuddy',
   agents: ['./agents/quant-analyst.md', './agents/risk-officer.md'],
+  expertType: 'team',
   agentName: 'quant-analyst',
+  teamInfo: { leadAgent: 'quant-analyst', memberAgents: ['risk-officer'] },
   displayName: { zh: 'E2E 投研团队' },
   displayDescription: { zh: 'E2E 导入夹具' },
   categoryId: '08-FinanceInvestment',
@@ -42,6 +44,7 @@ writeFileSync(join(WB_FIXTURE, '.codebuddy-plugin', 'plugin.json'), JSON.stringi
     { id: 'risk-officer', displayName: { zh: '测试风控官' }, role: 'member' },
   ],
 }));
+writeFileSync(join(WB_FIXTURE, 'settings.json'), JSON.stringify({ agent: 'quant-analyst' }));
 writeFileSync(join(WB_FIXTURE, 'agents', 'quant-analyst.md'), '---\nname: quant-analyst\ndescription: 量化策略师\ndisplayName:\n  zh: 测试量化师\n---\n\n你是量化策略师。\n');
 writeFileSync(join(WB_FIXTURE, 'agents', 'risk-officer.md'), '---\nname: risk-officer\ndescription: 风控官\ndisplayName:\n  zh: 测试风控官\n---\n\n你是风控官。\n');
 const cleanupFixture = () => { try { rmSync(WB_FIXTURE, { recursive: true, force: true }); } catch { /* already gone */ } };
@@ -461,9 +464,15 @@ try {
     const ids = new Set(result.imported.map((expert) => expert.id));
     const found = list.filter((expert) => ids.has(expert.id));
     if (found.length !== 2) throw new Error('agents_list missing imported experts: ' + JSON.stringify(found.map((e) => e.id)));
-    // Keep the later expert-count steps stable.
+    // S21: team packages also install a /team-wb-… prompt.
+    const command = result.team?.command;
+    if (!command) throw new Error('team command missing: ' + JSON.stringify(result.team));
+    const prompts = await ctx.call('prompts_list', {});
+    if (!prompts.some((entry) => entry.name === command)) throw new Error('team prompt not installed: ' + command);
+    // Keep the later expert-count / prompt steps stable.
     for (const expert of result.imported) await ctx.call('agents_delete', { id: expert.id });
-    return { package: result.package, names: result.imported.map((expert) => expert.name) };`);
+    await ctx.call('prompts_delete', { name: command, scope: 'global' });
+    return { package: result.package, names: result.imported.map((expert) => expert.name), team: command };`);
   // W7.1 / W7.2: independent session window + global quick input.
   await step('独立窗口 + 全局快速输入', `
     const init = await ctx.call('agent_init', {});

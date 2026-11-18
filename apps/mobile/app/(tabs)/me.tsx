@@ -161,7 +161,7 @@ export default function MeScreen() {
 
       <Section theme={theme} label="已配对的电脑">
         {pairings.length === 0 ? (
-          <Row theme={theme} label="还没有配对" value="扫码接入" last />
+          <Row theme={theme} label="还没有配对" value="扫码接入" />
         ) : (
           pairings.map(record => {
             const active = record.id === activePairingId

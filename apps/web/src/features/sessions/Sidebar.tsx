@@ -386,9 +386,9 @@ export function Sidebar({
       <TasksPanel />
 
       <div className="sidebar__content">
-        {/* 任务分组: 收件箱(初始目录)下的会话 */}
+        {/* 任务分组: 收件箱(初始目录)下的会话（WorkBuddy 文案：最近） */}
         <button className="sidebar__section-label" onClick={() => setTasksOpen(!tasksOpen)}>
-          <span>任务 ({hasFilter ? `${filteredIndependent.length}/${independent.length}` : independent.length})</span>
+          <span>最近 ({hasFilter ? `${filteredIndependent.length}/${independent.length}` : independent.length})</span>
           <ChevronDownIcon
             size="sm"
             className={"sidebar__chevron" + (tasksOpen ? "" : " sidebar__chevron--collapsed")}

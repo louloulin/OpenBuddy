@@ -139,7 +139,10 @@ export function ExpertsTab({ pills, onGoHome, onToast, views = { center: true, m
       setImporting(true);
       const result = await expertsImportWorkbuddy(path);
       const failed = result.skipped.length ? `，${result.skipped.length} 位失败：${result.skipped[0]?.error ?? ""}` : "";
-      onToast?.(result.imported.length ? `已从「${result.package}」导入 ${result.imported.length} 位专家${failed}` : `没有导入任何专家${failed}`);
+      const team = result.team?.command
+        ? `；已添加团队指令 /${result.team.command}`
+        : result.team?.error ? `；团队指令未创建：${result.team.error}` : "";
+      onToast?.(result.imported.length ? `已从「${result.package}」导入 ${result.imported.length} 位专家${team}${failed}` : `没有导入任何专家${failed}`);
       setView("my");
       reload();
     } catch (e) { onToast?.(`导入失败：${errorText(e)}`); }

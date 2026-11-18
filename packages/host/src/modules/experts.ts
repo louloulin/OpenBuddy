@@ -1,5 +1,6 @@
 import { text } from "@openbuddy/services/settings/settings";
 import { ExpertStore } from "@openbuddy/services/agents/store";
+import { workBuddyTeamPrompt } from "@openbuddy/services/agents/workbuddy";
 import { teamPrompt, teamSeed, teamTemplates } from "@openbuddy/services/agents/teams";
 import { clearSessionExpert, setSessionExpert } from "@openbuddy/engine/features/expert";
 import { ProtocolError } from "@openbuddy/protocol/errors";
@@ -60,8 +61,31 @@ export function expertsModule(ctx: HostContext): HostModule {
       return `data:${image.mime};base64,${image.base64}`;
     },
     experts_link_agents: (p) => experts().importFrom(text(p.root), strings(p.ids)),
-    // WorkBuddy 兼容 (S18): import a WorkBuddy expert package (ZIP or extracted folder).
-    experts_import_workbuddy: (p) => experts().importWorkBuddy(text(p.path)),
+    // WorkBuddy 兼容 (S18/S21): import a WorkBuddy expert package; team packages also install a
+    // `/team-wb-…` prompt so the lead/member roles are usable without a second step.
+    experts_import_workbuddy: async (p) => {
+      const result = experts().importWorkBuddy(text(p.path));
+      if (!result.team) return result;
+      const slug = result.team.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "workbuddy";
+      const saved = new Set((await engine.prompts.list()).map((entry) => entry.name));
+      let command = `team-wb-${slug}`;
+      for (let n = 2; saved.has(command); n++) command = `team-wb-${slug}-${n}`;
+      const team = result.team;
+      const members = team.members.map((id) => {
+        const expert = result.imported.find((entry) => entry.id === id);
+        return { name: expert?.name ?? id, role: id === team.leadAgent ? "lead" as const : "member" as const, description: expert?.description };
+      });
+      try {
+        await engine.prompts.save("global", {
+          name: command,
+          description: `WorkBuddy 团队：${team.name}`,
+          content: workBuddyTeamPrompt(team.name, members),
+        });
+        return { ...result, team: { ...team, command } };
+      } catch (error) {
+        return { ...result, team: { ...team, error: error instanceof Error ? error.message : String(error) } };
+      }
+    },
     // 专家团 (W3.5): preset pipelines, installed as a 我的指令 prompt template.
     teams_list: async () => {
       const saved = new Set((await engine.prompts.list()).map((entry) => entry.name));
