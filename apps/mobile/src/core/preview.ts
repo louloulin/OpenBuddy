@@ -135,6 +135,10 @@ export function previewState(): PreviewState {
         },
         { kind: 'tool', id: 't1', name: 'grep', hint: "forwardHttp packages/gateway/src", status: 'ok', output: 'proxy.ts:102  export async function forwardHttp(' },
         { kind: 'tool', id: 't2', name: 'write_text_file', hint: 'packages/gateway/src/relay/sse.ts', status: 'ok', output: '已写入 42 行' },
+        {
+          kind: 'tool', id: 't3', name: 'web_search', hint: 'SSE 代理缓冲', status: 'ok',
+          output: '1. [MDN: Server-sent events](https://developer.mozilla.org/docs/Web/API/Server-sent_events)\n2. https://www.rfc-editor.org/rfc/rfc9110',
+        },
         { kind: 'text', id: 'u2', role: 'user', text: '那把这块单独抽出来，加一条并发测试。' },
         {
           kind: 'text',

@@ -69,6 +69,19 @@ const HISTORY: Record<string, unknown[]> = {
       result: { content: [{ type: 'text', text: '已写入 42 行' }] },
     },
     {
+      type: 'toolcall_start', sessionId: 'sess-mobile', toolCallId: 'tc-search-1', toolName: 'web_search',
+      assistantMessageEvent: { type: 'toolcall_start', toolCall: { type: 'toolCall', id: 'tc-search-1', name: 'web_search' } },
+    },
+    {
+      type: 'toolcall_end', sessionId: 'sess-mobile', toolCallId: 'tc-search-1',
+      result: {
+        content: [{
+          type: 'text',
+          text: '1. [MDN: Server-sent events](https://developer.mozilla.org/docs/Web/API/Server-sent_events)\n2. https://www.rfc-editor.org/rfc/rfc9110',
+        }],
+      },
+    },
+    {
       type: 'message_end', sessionId: 'sess-mobile',
       message: { role: 'assistant', content: '计划文档里 Phase 3 已经全部完成，剩下的是 H5 兜底和真机验证。' },
     },

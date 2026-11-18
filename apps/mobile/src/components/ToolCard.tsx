@@ -8,10 +8,11 @@
  */
 
 import { useState } from 'react'
-import { ActivityIndicator, Pressable, Text, View, useColorScheme } from 'react-native'
+import { ActivityIndicator, Linking, Pressable, Text, View, useColorScheme } from 'react-native'
 
 import { toolCategory, type ToolRow } from '../core/transcript'
 import { canRevertTool } from '../core/revert'
+import { extractSources, isSourceTool } from '../core/sources'
 import { themeFor } from '../theme'
 import { CheckIcon, CloseIcon, TerminalIcon } from './icons'
 
@@ -32,6 +33,8 @@ export function ToolCard({
   const category = row.category ?? toolCategory(row.name)
   const running = row.status === 'running'
   const tint = row.status === 'error' ? theme.danger : row.status === 'ok' ? theme.ok : theme.textWeak
+  // F4: only web tools carry sources; an empty list renders nothing.
+  const sources = isSourceTool(row.name) ? extractSources(row.output ?? '') : []
 
   return (
     <View style={{ paddingHorizontal: theme.gutter, marginVertical: 3 }}>
@@ -102,6 +105,36 @@ export function ToolCard({
           ) : (
             <Text style={{ color: theme.textWeak, fontSize: 11 }}>这个工具没有返回内容。</Text>
           )}
+          {sources.length ? (
+            <View style={{ marginTop: 10, gap: 6 }}>
+              <Text style={{ color: theme.textWeak, fontSize: 11, fontWeight: '600' }}>来源</Text>
+              {sources.map(source => (
+                <Pressable
+                  key={source.url}
+                  onPress={() => void Linking.openURL(source.url).catch(() => {})}
+                  accessibilityLabel={`打开来源 ${source.title}`}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    paddingVertical: 5,
+                    paddingHorizontal: 8,
+                    borderRadius: 8,
+                    backgroundColor: pressed ? theme.pressed : 'transparent',
+                    borderWidth: theme.hairline,
+                    borderColor: theme.cardBorder,
+                  })}
+                >
+                  <Text numberOfLines={1} style={{ flex: 1, color: theme.textMedium, fontSize: 11 }}>
+                    {source.title}
+                  </Text>
+                  <Text numberOfLines={1} style={{ maxWidth: '45%', color: theme.textWeak, fontSize: 10 }}>
+                    {source.url.replace(/^https?:\/\//, '')}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
           {onRevert && !running && canRevertTool(row.name) ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 }}>
               <Pressable

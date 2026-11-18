@@ -43,6 +43,7 @@ import { toSessionList } from '../apps/mobile/src/core/session-list.js'
 import { groupSessions } from '../apps/mobile/src/core/session-actions.js'
 import { toProjects } from '../apps/mobile/src/core/projects.js'
 import { canRevertTool, summarizeRevert } from '../apps/mobile/src/core/revert.js'
+import { extractSources, isSourceTool } from '../apps/mobile/src/core/sources.js'
 import { cleanSessionTitle, sessionActions } from '../apps/mobile/src/core/session-actions.js'
 import { bumpUnread, shouldMarkUnread, totalUnread } from '../apps/mobile/src/core/unread.js'
 import { parseLockSetting, shouldRelock } from '../apps/mobile/src/core/app-lock.js'
@@ -677,6 +678,15 @@ check('the desktop reverts the files of that call',
   revertedTools.includes('tc-write-1') && summarizeRevert(revertAnswer).message === '已恢复 1 个文件')
 check('a conflict is surfaced to the user',
   summarizeRevert({ restored: [], conflicts: [{ path: '/w/a', reason: 'changed_since' }] }).ok === false)
+
+// ── 8s. Source cards from web tools (v3 F4) ────────────────────────────────
+
+const webOutput = '1. [MDN SSE](https://developer.mozilla.org/docs/Web/API/Server-sent_events)\n2. https://www.rfc-editor.org/rfc/rfc9110'
+check('web tool output yields deduped sources',
+  extractSources(webOutput).length === 2
+  && extractSources(webOutput)[0].title === 'MDN SSE')
+check('only web tools carry sources',
+  isSourceTool('web_search') && !isSourceTool('write_text_file') && extractSources('没有链接').length === 0)
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 
