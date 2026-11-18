@@ -9,10 +9,12 @@
 
 import { useState } from 'react'
 import { ActivityIndicator, Linking, Pressable, Text, View, useColorScheme } from 'react-native'
+import * as Clipboard from 'expo-clipboard'
 
 import { toolCategory, type ToolRow } from '../core/transcript'
 import { canRevertTool } from '../core/revert'
 import { extractSources, isSourceTool } from '../core/sources'
+import { clipToolOutput } from '../core/tool-output'
 import { themeFor } from '../theme'
 import { CheckIcon, CloseIcon, TerminalIcon } from './icons'
 
@@ -35,6 +37,17 @@ export function ToolCard({
   const tint = row.status === 'error' ? theme.danger : row.status === 'ok' ? theme.ok : theme.textWeak
   // F4: only web tools carry sources; an empty list renders nothing.
   const sources = isSourceTool(row.name) ? extractSources(row.output ?? '') : []
+  const clipped = clipToolOutput(row.output ?? '')
+  const [copied, setCopied] = useState(false)
+  const copyFull = async () => {
+    try {
+      await Clipboard.setStringAsync(row.output ?? '')
+      setCopied(true)
+    } catch {
+      setCopied(false)
+    }
+    setTimeout(() => setCopied(false), 1400)
+  }
 
   return (
     <View style={{ paddingHorizontal: theme.gutter, marginVertical: 3 }}>
@@ -99,9 +112,33 @@ export function ToolCard({
             </Text>
           ) : null}
           {row.output ? (
-            <Text selectable style={{ color: theme.textWeak, fontSize: 11, lineHeight: 17, fontFamily: theme.mono }}>
-              {row.output}
-            </Text>
+            <>
+              <Text selectable style={{ color: theme.textWeak, fontSize: 11, lineHeight: 17, fontFamily: theme.mono }}>
+                {clipped.text}
+              </Text>
+              {clipped.truncated ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
+                  <Text style={{ flex: 1, color: theme.textWeak, fontSize: 11 }}>
+                    已截断 · 共 {clipped.total.toLocaleString('zh-CN')} 字符
+                  </Text>
+                  <Pressable
+                    onPress={() => void copyFull()}
+                    hitSlop={8}
+                    accessibilityLabel="复制完整输出"
+                    style={({ pressed }) => ({
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: theme.radiusPill,
+                      borderWidth: theme.hairline,
+                      borderColor: theme.cardBorder,
+                      backgroundColor: pressed ? theme.pressed : 'transparent',
+                    })}
+                  >
+                    <Text style={{ color: theme.textMedium, fontSize: 11 }}>{copied ? '已复制' : '复制完整输出'}</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </>
           ) : (
             <Text style={{ color: theme.textWeak, fontSize: 11 }}>这个工具没有返回内容。</Text>
           )}

@@ -78,6 +78,19 @@ const HISTORY: Record<string, unknown[]> = {
       result: { content: [{ type: 'text', text: '已写入 42 行' }] },
     },
     {
+      type: 'toolcall_start', sessionId: 'sess-mobile', toolCallId: 'tc-big', toolName: 'bash',
+      assistantMessageEvent: { type: 'toolcall_start', toolCall: { type: 'toolCall', id: 'tc-big', name: 'bash' } },
+    },
+    {
+      type: 'toolcall_end', sessionId: 'sess-mobile', toolCallId: 'tc-big',
+      result: {
+        content: [{
+          type: 'text',
+          text: Array.from({ length: 400 }, (_, index) => `[build] step ${index + 1}: bundle module ${index} ok`).join('\n'),
+        }],
+      },
+    },
+    {
       type: 'toolcall_start', sessionId: 'sess-mobile', toolCallId: 'tc-search-1', toolName: 'web_search',
       assistantMessageEvent: { type: 'toolcall_start', toolCall: { type: 'toolCall', id: 'tc-search-1', name: 'web_search' } },
     },

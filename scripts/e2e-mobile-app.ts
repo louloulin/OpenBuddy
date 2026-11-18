@@ -48,6 +48,7 @@ import { APPROVE_ACTION, DENY_ACTION, decisionForResponse } from '../apps/mobile
 import { numericNotificationId, toNotifications } from '../apps/mobile/src/core/notification-list.js'
 import { quotePreview, withQuote } from '../apps/mobile/src/core/quote.js'
 import { nextThinkingLevel } from '../apps/mobile/src/core/session-panel.js'
+import { clipToolOutput } from '../apps/mobile/src/core/tool-output.js'
 import { cleanSessionTitle, sessionActions } from '../apps/mobile/src/core/session-actions.js'
 import { bumpUnread, shouldMarkUnread, totalUnread } from '../apps/mobile/src/core/unread.js'
 import { parseLockSetting, shouldRelock } from '../apps/mobile/src/core/app-lock.js'
@@ -756,6 +757,15 @@ const after = await transport.invoke<{ thinkingLevel?: string }>('agent_get_mode
 check('the chip cycles the level and the desktop keeps it',
   before.thinkingLevel === 'medium' && level === 'high' && after.thinkingLevel === 'high')
 check('the scale wraps after max', nextThinkingLevel('max') === 'off')
+
+// ── 8x. Long tool output (v3 §4.3) ─────────────────────────────────────────
+
+const longOutput = Array.from({ length: 300 }, (_, index) => `line ${index}`).join('\n')
+const clippedOutput = clipToolOutput(longOutput, 500)
+check('long tool output is clipped on a line boundary',
+  clippedOutput.truncated && clippedOutput.text.length <= 500 && clippedOutput.total === longOutput.length)
+check('short tool output is untouched',
+  clipToolOutput('ok').truncated === false)
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 
