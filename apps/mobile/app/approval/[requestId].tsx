@@ -7,11 +7,12 @@
  */
 
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Text, View, useColorScheme } from 'react-native'
+import { ActivityIndicator, ScrollView, Text, View, useColorScheme } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
 import { RequestCard } from '../../src/components/RequestCard'
 import type { ApprovalAction } from '../../src/core/approvals'
+import { isPreview } from '../../src/core/preview'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
 
@@ -30,7 +31,8 @@ export default function ApprovalScreen() {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    if (booted && !transport) router.replace('/pair')
+    // The review build has no tunnel by design; it renders the demo request.
+    if (!isPreview() && booted && !transport) router.replace('/pair')
   }, [booted, transport, router])
 
   const settle = async (action: ApprovalAction) => {
@@ -60,8 +62,12 @@ export default function ApprovalScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.surface, padding: 16 }}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: theme.surface }}
+      contentContainerStyle={{ padding: 16, flexGrow: 1 }}
+      keyboardShouldPersistTaps="handled"
+    >
       <RequestCard approval={approval} busy={busy} onAction={action => void settle(action)} />
-    </View>
+    </ScrollView>
   )
 }

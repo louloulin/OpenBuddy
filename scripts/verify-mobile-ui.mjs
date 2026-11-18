@@ -53,6 +53,7 @@ const screens = [
   { name: 'automations', path: '/automations', expected: ['每日晨报', '每周代码巡检'] },
   { name: 'panel', path: '/session/sess-refactor', expected: ['会话设置', '人格', '思考深度', '本轮产物', '用量'] },
   { name: 'pair', path: '/pair', expected: ['连接你的电脑', '扫描二维码', '8 位配对码'] },
+  { name: 'approval', path: '/approval/req-preview', expected: ['允许修改这 3 个文件', '拒绝', '允许', 'proxy.ts', 'sse.test.ts'] },
 ]
 
 const failures = []
