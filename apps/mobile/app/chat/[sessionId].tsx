@@ -127,6 +127,16 @@ export default function ChatScreen() {
     return items.reverse()
   }, [transcript.rows, approvals])
   const streaming = isTurnPending(transcript)
+  // `agent_regenerate` always redoes the newest answer, so the button belongs
+  // on that row only — offering it on an older message would silently replace
+  // a different turn.
+  const lastAssistantId = useMemo(() => {
+    for (let index = transcript.rows.length - 1; index >= 0; index -= 1) {
+      const row = transcript.rows[index]
+      if (row && row.kind === 'text' && row.role === 'assistant') return row.id
+    }
+    return null
+  }, [transcript.rows])
   // The waiting row is for the gap before the first token. Once text is
   // streaming, its own assistant header is the waiting state; keeping both
   // puts two "OpenBuddy" identities on screen at once.
@@ -283,7 +293,7 @@ export default function ChatScreen() {
             : (
               <MessageRow
                 row={item}
-                onRegenerate={() => void regenerate(sessionId)}
+                onRegenerate={!streaming && item.id === lastAssistantId ? () => void regenerate(sessionId) : undefined}
                 toolActions={toolActions}
                 onQuote={text => setQuoted(text)}
                 onEdit={text => { setQuoted(null); setEditText(text); setEditToken(token => token + 1) }}
