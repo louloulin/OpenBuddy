@@ -9,6 +9,7 @@ import type {
   ExpertEntry,
   ExpertRootInfo,
   SessionExpertInfo,
+  WorkBuddyImportResult,
 } from "@openbuddy/protocol/experts";
 import type { TeamTemplate } from "@openbuddy/protocol/teams";
 import { invoke } from "../ipc";
@@ -103,6 +104,11 @@ export async function expertsImageBytes(path: string): Promise<string> {
 /** Copy experts from a library directory into 我的专家 (new or newer files only); returns how many. */
 export async function expertsLinkAgents(root: string, ids?: string[]): Promise<number> {
   return invoke<number>("experts_link_agents", { root, ids: ids ?? null });
+}
+
+/** Import a WorkBuddy expert package (ZIP or extracted folder) into 我的专家 (S18). */
+export async function expertsImportWorkbuddy(path: string): Promise<WorkBuddyImportResult> {
+  return invoke<WorkBuddyImportResult>("experts_import_workbuddy", { path });
 }
 
 /** Open an experts directory in the system file manager (the `files` module's `open_path`). */

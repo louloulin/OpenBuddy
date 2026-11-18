@@ -2,11 +2,44 @@ import { useCallback, useEffect, useState } from "react";
 import {
   agentExtensionsAdd, agentExtensionsInspect, agentExtensionsList, agentExtensionsRemove,
   agentExtensionsSetEnabled, agentExtensionsSetPathEnabled,
+  agentExtensionsPackages, agentExtensionsInstallPackage, agentExtensionsRemovePackage, agentExtensionsUpdatePackages,
+  agentExtensionsPreviewPackage, agentExtensionsCheckUpdates,
+  agentExtensionsSearchRegistry, agentExtensionsResources,
+  agentExtensionsSetPackageResources,
+  onExtensionProgress,
   type ExtensionReport, type ExtensionsConfig,
 } from "@openbuddy/client/agent-client";
+import type {
+  ExtensionPackage,
+  ExtensionPackagePreview,
+  ExtensionPackageUpdate,
+  ExtensionRegistrySearch,
+  ExtensionResourceKind,
+  ExtensionResources,
+} from "@openbuddy/protocol/extensions";
 import { dialog } from "@openbuddy/client/ipc";
 import { friendlyError } from "@openbuddy/chat-core/error-format";
 import { PuzzlePieceIcon, AddCircleIcon, DeleteIcon, FolderOpenIcon } from "@openbuddy/ui/icon/icons/index";
+
+/** 12 345 → 1.2 万, for npm download counts (S15). */
+const compact = (value: number) => value >= 10_000 ? `${(value / 10_000).toFixed(value >= 100_000 ? 0 : 1)} 万` : String(value);
+
+/** Per-resource switches a Pi package entry can carry (S17). */
+const RESOURCE_KINDS: Array<[ExtensionResourceKind, string]> = [
+  ["extensions", "扩展"], ["skills", "技能"], ["prompts", "指令"], ["themes", "主题"],
+];
+
+/** What one configured package contributes, from Pi's resolved resource list (S15). */
+function packageResources(source: string, resources: ExtensionResources | null) {
+  if (!resources) return "";
+  const pick = (list: ExtensionResources["extensions"]) => list.filter((entry) => entry.source === source);
+  return [
+    [pick(resources.extensions).length, "扩展"],
+    [pick(resources.skills).length, "技能"],
+    [pick(resources.prompts).length, "指令"],
+    [pick(resources.themes).length, "主题"],
+  ].filter(([count]) => (count as number) > 0).map(([count, label]) => `${count} 个${label as string}`).join(" · ");
+}
 
 /**
  * 扩展中心 (pii W2.6 / U7.3): one card per extension — path, per-path switch, the tools / commands /
@@ -16,14 +49,42 @@ import { PuzzlePieceIcon, AddCircleIcon, DeleteIcon, FolderOpenIcon } from "@ope
  */
 export function TrustedExtensionsPanel() {
   const [config, setConfig] = useState<ExtensionsConfig>();
+  const [packages, setPackages] = useState<ExtensionPackage[]>([]);
+  const [resources, setResources] = useState<ExtensionResources | null>(null);
+  const [packagePreview, setPackagePreview] = useState<ExtensionPackagePreview | null>(null);
+  const [updates, setUpdates] = useState<ExtensionPackageUpdate[]>([]);
+  const [source, setSource] = useState("");
+  const [registryQuery, setRegistryQuery] = useState("");
+  const [registry, setRegistry] = useState<ExtensionRegistrySearch | null>(null);
+  const [registryBusy, setRegistryBusy] = useState(false);
+  const [registrySort, setRegistrySort] = useState(false);
+  const [progress, setProgress] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<ExtensionReport | null>(null);
 
   const reload = useCallback(async () => {
-    try { setConfig(await agentExtensionsList()); } catch (error) { setError(friendlyError(error)); }
+    try {
+      const [nextConfig, nextPackages, nextResources] = await Promise.all([
+        agentExtensionsList(),
+        agentExtensionsPackages().catch(() => []),
+        agentExtensionsResources().catch(() => null),
+      ]);
+      setConfig(nextConfig);
+      setPackages(nextPackages);
+      setResources(nextResources);
+    } catch (error) { setError(friendlyError(error)); }
   }, []);
   useEffect(() => { void reload(); }, [reload]);
+  // 扩展包安装 / 更新进度 (W2.6 P2).
+  useEffect(() => {
+    let dispose: (() => void) | undefined;
+    let cancelled = false;
+    void onExtensionProgress((event) => {
+      setProgress(`${event.action === "update" ? "更新" : event.action === "remove" ? "移除" : "安装"} ${event.source}${event.message ? ` · ${event.message}` : ""}`);
+    }).then((unlisten) => { if (cancelled) unlisten(); else dispose = unlisten; }).catch(() => {});
+    return () => { cancelled = true; dispose?.(); };
+  }, []);
 
   const update = async (action: () => Promise<ExtensionsConfig>) => {
     if (busy) return;
@@ -53,8 +114,115 @@ export function TrustedExtensionsPanel() {
     await update(() => agentExtensionsAdd(path));
   };
 
+  const installPackage = async () => {
+    const value = source.trim();
+    if (!value || busy) return;
+    setBusy(true); setError(""); setProgress("");
+    try {
+      setPackages(await agentExtensionsInstallPackage(value));
+      setResources(await agentExtensionsResources().catch(() => null));
+      setConfig(await agentExtensionsList());
+      setSource("");
+      setProgress("安装完成");
+    } catch (error) { setError(friendlyError(error)); }
+    finally { setBusy(false); }
+  };
+  const updatePackages = async (one?: string) => {
+    if (busy) return;
+    setBusy(true); setError(""); setProgress("");
+    try {
+      setPackages(await agentExtensionsUpdatePackages(one));
+      setResources(await agentExtensionsResources().catch(() => null));
+      setConfig(await agentExtensionsList());
+      setProgress("更新完成");
+    } catch (error) { setError(friendlyError(error)); }
+    finally { setBusy(false); }
+  };
+  const removePackage = async (one: string) => {
+    if (busy) return;
+    setBusy(true); setError("");
+    try {
+      setPackages(await agentExtensionsRemovePackage(one));
+      setResources(await agentExtensionsResources().catch(() => null));
+      setConfig(await agentExtensionsList());
+    } catch (error) { setError(friendlyError(error)); }
+    finally { setBusy(false); }
+  };
+  /** 包资源开关 (S17): Pi's object-form filter — `[]` for off, key removed for on. */
+  const setPackageResources = async (one: string, kind: ExtensionResourceKind, enabled: boolean) => {
+    if (busy) return;
+    setBusy(true); setError("");
+    try {
+      setPackages(await agentExtensionsSetPackageResources(one, { [kind]: enabled }));
+      setResources(await agentExtensionsResources().catch(() => null));
+      setConfig(await agentExtensionsList());
+    } catch (error) { setError(friendlyError(error)); }
+    finally { setBusy(false); }
+  };
+  const previewPackage = async (value = source.trim()) => {
+    if (!value || busy) return;
+    setBusy(true); setError(""); setProgress("正在解析包…");
+    try {
+      setPackagePreview(await agentExtensionsPreviewPackage(value));
+      setProgress("");
+    } catch (error) { setError(friendlyError(error)); setProgress(""); }
+    finally { setBusy(false); }
+  };
+  const confirmInstallPackage = async () => {
+    if (!packagePreview) return;
+    const value = packagePreview.source;
+    setPackagePreview(null);
+    setSource("");
+    setBusy(true); setError(""); setProgress("");
+    try {
+      setPackages(await agentExtensionsInstallPackage(value));
+      setResources(await agentExtensionsResources().catch(() => null));
+      setConfig(await agentExtensionsList());
+      setProgress("安装完成");
+    } catch (error) { setError(friendlyError(error)); }
+    finally { setBusy(false); }
+  };
+  const searchRegistry = async () => {
+    if (registryBusy) return;
+    setRegistryBusy(true); setError("");
+    try {
+      setRegistry(await agentExtensionsSearchRegistry(registryQuery.trim()));
+    } catch (error) { setError(friendlyError(error)); }
+    finally { setRegistryBusy(false); }
+  };
+  /** Append the next npm page; rows already shown are dropped by name (S16). */
+  const loadMoreRegistry = async () => {
+    if (!registry || registryBusy) return;
+    setRegistryBusy(true); setError("");
+    try {
+      const next = await agentExtensionsSearchRegistry(registry.query, registry.packages.length);
+      setRegistry((current) => {
+        if (!current) return next;
+        const seen = new Set(current.packages.map((item) => item.name));
+        return { ...next, from: current.from, packages: [...current.packages, ...next.packages.filter((item) => !seen.has(item.name))] };
+      });
+    } catch (error) { setError(friendlyError(error)); }
+    finally { setRegistryBusy(false); }
+  };
+  const checkUpdates = async () => {
+    if (busy) return;
+    setBusy(true); setError(""); setProgress("");
+    try {
+      const found = await agentExtensionsCheckUpdates();
+      setUpdates(found);
+      setProgress(found.length ? `有 ${found.length} 个扩展包可更新` : "已是最新版本");
+    } catch (error) { setError(friendlyError(error)); }
+    finally { setBusy(false); }
+  };
+
   const items = config?.items ?? [];
   const failed = new Map((config?.errors ?? []).map((entry) => [entry.path, entry.error]));
+  const marketPackages = registry
+    ? registrySort
+      ? [...registry.packages].sort((a, b) => (b.weeklyDownloads ?? 0) - (a.weeklyDownloads ?? 0))
+      : registry.packages
+    : [];
+  const canLoadMore = !!registry && registry.packages.length < registry.total && registry.packages.length < 1000;
 
   return <section className="res-panel__body" aria-label="扩展中心">
     <div className="res-panel__card">
@@ -66,6 +234,105 @@ export function TrustedExtensionsPanel() {
       </div> : <>
         <label className="res-panel__switch"><input type="checkbox" checked={config.enabled} disabled={busy} onChange={event => { void update(() => agentExtensionsSetEnabled(event.target.checked)); }} />启用可信扩展</label>
         <p className="res-panel__muted">当前工作空间：{config.projectTrusted ? "已信任" : "尚未信任，项目扩展不会自动加载"}{config.enabled ? "" : "；总开关关闭时不会加载任何扩展"}</p>
+      </>}
+    </div>
+
+    {/* 扩展包 (W2.6 P2 / S14): npm / git sources through Pi's DefaultPackageManager. */}
+    <div className="res-panel__card" aria-label="扩展包">
+      <h3 className="res-panel__card-title">从 npm / git 安装</h3>
+      <p className="res-panel__muted">支持 <code>npm:@scope/pkg</code>、<code>git:https://…</code>、<code>owner/repo</code>。安装与更新使用 Pi 的包管理器，进度会显示在下方。</p>
+      <div className="ext-install">
+        <input
+          className="ext-install__input"
+          aria-label="扩展包来源"
+          value={source}
+          placeholder="npm:pi-extension-example 或 owner/repo"
+          spellCheck={false}
+          onChange={(event) => setSource(event.target.value)}
+          onKeyDown={(event) => { if (event.key === "Enter") void installPackage(); }}
+        />
+        <button type="button" className="res-panel__btn" disabled={busy || !source.trim()} onClick={() => void previewPackage()}>检查</button>
+        <button type="button" className="res-panel__btn res-panel__btn--primary" disabled={busy || !source.trim()} onClick={() => void installPackage()}>安装</button>
+        <button type="button" className="res-panel__btn" disabled={busy || packages.length === 0} onClick={() => void updatePackages()}>全部更新</button>
+        <button type="button" className="res-panel__btn" disabled={busy} onClick={() => void checkUpdates()}>检查更新</button>
+      </div>
+      {progress && <p className="res-panel__muted" role="status">{progress}</p>}
+      {packages.length > 0 && <div className="ext-packages">
+        {packages.map((entry) => {
+          const summary = packageResources(entry.source, resources);
+          const failure = resources?.failures.find((item) => item.source === entry.source);
+          const count = (kind: ExtensionResourceKind) => resources?.[kind].filter((item) => item.source === entry.source).length ?? 0;
+          return (
+            <div key={entry.source} className="ext-package">
+              <div className="ext-package__text">
+                <code className="ext-package__source" title={entry.installedPath ?? entry.source}>{entry.source}</code>
+                <span className="ext-package__meta">{entry.scope === "project" ? "项目" : "用户"}{entry.filtered ? " · 有过滤" : ""}{entry.installedPath ? "" : " · 尚未安装"}{updates.some((update) => update.source === entry.source) ? " · 可更新" : ""}{summary ? ` · ${summary}` : ""}</span>
+                {failure && <span className="ext-package__meta ext-package__meta--bad" role="alert">{failure.message}</span>}
+                <div className="ext-package__filters" aria-label={`${entry.source} 资源开关`}>
+                  {RESOURCE_KINDS.map(([kind, label]) => {
+                    const off = entry.filters?.[kind] === false;
+                    const total = count(kind);
+                    if (!total && !off) return null;
+                    return (
+                      <label key={kind} className={"ext-package__filter" + (off ? " ext-package__filter--off" : "")} title={off ? `已关闭：${label}` : `已启用：${label}`}>
+                        <input type="checkbox" checked={!off} disabled={busy} aria-label={`${entry.source} ${label}`}
+                          onChange={(event) => void setPackageResources(entry.source, kind, event.target.checked)} />
+                        {label}{total ? ` ${total}` : ""}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+              <button type="button" className="res-panel__btn" disabled={busy} onClick={() => void updatePackages(entry.source)}>更新</button>
+              <button type="button" className="res-panel__btn res-panel__btn--danger" disabled={busy} aria-label={`移除扩展包 ${entry.source}`} onClick={() => void removePackage(entry.source)}><DeleteIcon size="sm" /></button>
+            </div>
+          );
+        })}
+      </div>}
+    </div>
+
+    {/* Pi 包市场 (S15): real npm registry results, installed through Pi's package manager. */}
+    <div className="res-panel__card" aria-label="Pi 包市场">
+      <h3 className="res-panel__card-title">发现 Pi 扩展包</h3>
+      <p className="res-panel__muted">搜索 npm 上带 <code>pi-package</code> 标记的包；点「检查并安装」会先在临时目录解析它的扩展、技能和指令，再由你确认。</p>
+      <div className="ext-install">
+        <input
+          className="ext-install__input"
+          aria-label="搜索 Pi 扩展包"
+          value={registryQuery}
+          placeholder="搜索：网页访问、记忆、MCP…"
+          spellCheck={false}
+          onChange={(event) => setRegistryQuery(event.target.value)}
+          onKeyDown={(event) => { if (event.key === "Enter") void searchRegistry(); }}
+        />
+        <button type="button" className="res-panel__btn res-panel__btn--primary" disabled={registryBusy} onClick={() => void searchRegistry()}>{registryBusy ? "搜索中…" : "搜索"}</button>
+      </div>
+      {registry && <>
+        <div className="ext-market__bar">
+          <p className="res-panel__muted">{registry.query ? `“${registry.query}” 找到 ${registry.total} 个包` : `共 ${registry.total} 个 Pi 扩展包`}（npm 实时结果，已加载 {registry.packages.length} 个）</p>
+          <label className="res-panel__switch"><input type="checkbox" checked={registrySort} onChange={(event) => setRegistrySort(event.target.checked)} />按周下载量排序</label>
+        </div>
+        {registry.packages.length === 0 && <div className="res-panel__empty"><PuzzlePieceIcon size="xl" className="ec-empty-icon" /><p>没有匹配的扩展包。</p></div>}
+        <div className="ext-market">
+          {marketPackages.map((item) => (
+            <div key={item.name} className="ext-market__item">
+              <div className="ext-market__head">
+                <code className="ext-market__name">{item.name}</code>
+                {item.version && <span className="ext-market__badge">v{item.version}</span>}
+                {item.weeklyDownloads !== undefined && <span className="ext-market__badge">{compact(item.weeklyDownloads)} 次/周</span>}
+                {item.publisher && <span className="ext-market__meta">@{item.publisher}</span>}
+              </div>
+              {item.description && <p className="ext-market__desc">{item.description}</p>}
+              <div className="ext-market__foot">
+                <span className="ext-market__meta">{item.license ? `${item.license} · ` : ""}{item.keywords.filter((keyword) => keyword !== "pi-package").slice(0, 4).join(" · ")}</span>
+                <button type="button" className="res-panel__btn" disabled={busy || registryBusy} onClick={() => { setSource(`npm:${item.name}`); void previewPackage(`npm:${item.name}`); }}>检查并安装</button>
+              </div>
+            </div>
+          ))}
+        </div>
+        {canLoadMore && <div className="res-panel__toolbar">
+          <button type="button" className="res-panel__btn" disabled={registryBusy} onClick={() => void loadMoreRegistry()}>{registryBusy ? "加载中…" : "加载更多"}</button>
+        </div>}
       </>}
     </div>
 
@@ -112,6 +379,33 @@ export function TrustedExtensionsPanel() {
       </div>
       <p className="res-panel__muted">扩展变更会在任务空闲时自动生效；依赖终端专用界面的扩展暂不支持。</p>
     </>}
+
+    {packagePreview && <div className="ext-preview" role="dialog" aria-label="扩展包预览">
+      <div className="ext-preview__card">
+        <h3 className="res-panel__card-title">安装前确认 · {packagePreview.source}</h3>
+        <p className="res-panel__muted">已在临时目录解析这个包，尚未安装。它会注册：</p>
+        {packagePreview.failures.map((failure) => <p key={failure.source} className="res-panel__error" role="alert">{failure.source}：{failure.message}</p>)}
+        <div className="ext-preview__list">
+          {packagePreview.extensions.length === 0 && packagePreview.failures.length === 0 && <p className="res-panel__muted">这个包没有包含加载成功的扩展。</p>}
+          {packagePreview.extensions.map((extension) => (
+            <div key={extension.path} className="ext-card">
+              <code className="ext-card__path" title={extension.path}>{extension.path}</code>
+              {extension.error && <p className="ext-card__error" role="alert">{extension.error}</p>}
+              {extension.commands.length > 0 && <p className="ext-card__meta"><span>命令</span>{extension.commands.map((name) => <code key={name}>/{name}</code>)}</p>}
+              {extension.tools.length > 0 && <p className="ext-card__meta"><span>工具</span>{extension.tools.map((name) => <code key={name}>{name}</code>)}</p>}
+              {extension.shortcuts.length > 0 && <p className="ext-card__meta"><span>快捷键</span>{extension.shortcuts.map((name) => <code key={name}>{name}</code>)}</p>}
+            </div>
+          ))}
+          {(packagePreview.skills.length > 0 || packagePreview.prompts.length > 0) && (
+            <p className="ext-card__meta"><span>附带资源</span>{packagePreview.skills.length > 0 && <code>{packagePreview.skills.length} 个技能</code>}{packagePreview.prompts.length > 0 && <code>{packagePreview.prompts.length} 个指令</code>}</p>
+          )}
+        </div>
+        <div className="ext-preview__actions">
+          <button type="button" className="res-panel__btn" onClick={() => setPackagePreview(null)}>取消</button>
+          <button type="button" className="res-panel__btn res-panel__btn--primary" disabled={busy || packagePreview.failures.length > 0} onClick={() => void confirmInstallPackage()}>信任并安装</button>
+        </div>
+      </div>
+    </div>}
 
     {preview && <div className="ext-preview" role="dialog" aria-label="扩展预览">
       <div className="ext-preview__card">

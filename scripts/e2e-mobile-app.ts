@@ -46,6 +46,7 @@ import { canRevertTool, summarizeRevert } from '../apps/mobile/src/core/revert.j
 import { extractSources, isSourceTool } from '../apps/mobile/src/core/sources.js'
 import { APPROVE_ACTION, DENY_ACTION, decisionForResponse } from '../apps/mobile/src/core/push-actions.js'
 import { toNotifications } from '../apps/mobile/src/core/notification-list.js'
+import { quotePreview, withQuote } from '../apps/mobile/src/core/quote.js'
 import { cleanSessionTitle, sessionActions } from '../apps/mobile/src/core/session-actions.js'
 import { bumpUnread, shouldMarkUnread, totalUnread } from '../apps/mobile/src/core/unread.js'
 import { parseLockSetting, shouldRelock } from '../apps/mobile/src/core/app-lock.js'
@@ -718,6 +719,15 @@ check('the notification backlog loads from the desktop',
   backlog.length === 2 && backlog[0]?.kind === 'approval' && backlog[0]?.id === '2')
 await transport.invoke('notification_mark_all_read', {})
 check('marking all read reaches the desktop', true)
+
+// ── 8v. Quote-reply and edit-resend (v3 §4.2 P1) ───────────────────────────
+
+const quotedBody = withQuote('手机端现在能直接用了？', '那重连呢')
+check('a quote becomes a > prefix', quotedBody === '> 手机端现在能直接用了？\n\n那重连呢')
+check('the strip preview is one flattened line', quotePreview('第一行\n第二行') === '第一行 第二行')
+await transport.invoke('agent_send', { sessionId: 'sess-1', text: quotedBody })
+check('the quoted reply reaches the desktop',
+  sentAttachments.some(entry => entry.text === quotedBody))
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 

@@ -37,8 +37,7 @@ const main = read(
 
 /** Renderer wrappers whose main-process side is still pending (plan §10.1 / Phase 5). Remove entries as they land. */
 const PENDING_COMMANDS = [
-  "connectors_cli_auth", "connectors_cli_auth_cancel", "connectors_cli_skills_dir", "connectors_cli_status", "connectors_cli_unauth", "connectors_default_root",
-  "connectors_icon", "connectors_list_roots", "connectors_load", "connectors_read_mcp_config",
+  "connectors_cli_auth", "connectors_cli_auth_cancel", "connectors_cli_skills_dir", "connectors_cli_status", "connectors_cli_unauth",
   "inspiration_generate", "internal_reload", "marketplace_action", "marketplace_list",
   "memory_flush",
   "plugins_action", "plugins_list", "prompt_history", "session_fork",
@@ -79,7 +78,7 @@ describe("IPC contract gate", () => {
     expect(PENDING_COMMANDS.filter((name) => commands.has(name))).toEqual([]);
     const used = rendererCommands();
     expect(PENDING_COMMANDS.filter((name) => !used.has(name))).toEqual([]);
-    expect(PENDING_COMMANDS.length).toBeLessThanOrEqual(24); // 55 → 40 (W1.4 + W2.1–W2.3) → 36 (W5 + W2.7) → 24 (W4 自动化：7 条命令不再待实现，automation_tick 直接进契约) (20261116-pii §7: target ≤ 20)
+    expect(PENDING_COMMANDS.length).toBeLessThanOrEqual(19); // 55 → 40 (W1.4 + W2.1–W2.3) → 36 (W5 + W2.7) → 24 (W4 自动化) → 19 (W2.4 连接器目录)
     expect(PENDING_EVENTS.filter((name) => events.has(name))).toEqual([]);
   });
 
@@ -148,6 +147,10 @@ describe("payload validation for new commands", () => {
     bad("experts_image_bytes", { path: "" });
     ok("experts_link_agents", { root: "/data/experts", ids: ["a", "b-2"] });
     bad("experts_link_agents", { root: "/data/experts", ids: ["../a"] });
+    ok("experts_import_workbuddy", { path: "/tmp/wb-package.zip" });
+    bad("experts_import_workbuddy", {});
+    bad("experts_import_workbuddy", { path: "" });
+    bad("experts_import_workbuddy", { path: "x".repeat(4097) });
     bad("experts_load", { cwd: 42 });
     ok("experts_load", { cwd: "/work" });
     // agents_defaults_* are not expert commands and keep their own rules.

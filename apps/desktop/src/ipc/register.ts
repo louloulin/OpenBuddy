@@ -9,7 +9,12 @@ import { dialogCommands } from '../native/dialog.js';
 import { trayCommands } from '../native/tray.js';
 import { mobileAccessCommands } from '../native/mobile-access.js';
 
-export function registerIpc(window: BrowserWindow, handlers: CommandHandlers, trustedURL: string, workspaces?: WorkspaceGrants, options: NativeOptions = {}): () => void {
+/**
+ * Register the single `openbuddy:invoke` handler for every app window (20261116-pii W7.1).
+ * `windows` is read lazily: a sender is accepted only if it is one of those windows, and native
+ * commands act on the window that sent the call.
+ */
+export function registerIpc(windows: () => BrowserWindow[], handlers: CommandHandlers, trustedURL: string, workspaces?: WorkspaceGrants, options: NativeOptions = {}): () => void {
   const exportGrants = new Set<string>();
   const fileAccess = new FileAccess(bytes => {
     const image = nativeImage.createFromBuffer(bytes);
@@ -17,12 +22,21 @@ export function registerIpc(window: BrowserWindow, handlers: CommandHandlers, tr
     const { width, height } = image.getSize();
     return width > 0 && height > 0 && width * height <= 32 * 1024 * 1024;
   });
+  let senderWindow: BrowserWindow | undefined;
   const assertSender = (event: Electron.IpcMainInvokeEvent): void => {
     const frame = event.senderFrame;
-    if (event.sender !== window.webContents || !frame || frame !== window.webContents.mainFrame || frame.url.split('#')[0] !== trustedURL) throw new Error('untrusted_sender');
+    const target = windows().find(candidate => !candidate.isDestroyed() && candidate.webContents === event.sender);
+    if (!target || !frame || frame !== target.webContents.mainFrame || frame.url.split('#')[0] !== trustedURL) throw new Error('untrusted_sender');
+    senderWindow = target;
   };
   // Native commands (dialog / window / clipboard / export) live in ../native; they win over host handlers.
-  const native: NativeContext = { window, fileAccess, exportGrants, workspaces, options };
+  const native: NativeContext = {
+    get window() {
+      if (!senderWindow) throw new Error('window_not_ready');
+      return senderWindow;
+    },
+    fileAccess, exportGrants, workspaces, options,
+  };
   const local: CommandHandlers = { ...exportCommands(native), ...clipboardCommands(native), ...windowCommands(native), ...dialogCommands(native), ...trayCommands(native), ...mobileAccessCommands(native) };
   ipcMain.handle('openbuddy:invoke', async (event, command: unknown, input: unknown) => {
     assertSender(event);
@@ -46,6 +60,21 @@ export function registerIpc(window: BrowserWindow, handlers: CommandHandlers, tr
       payload.text = [payload.text, content.text].filter(Boolean).join('\n\n');
       payload.images = content.images;
       delete payload.attachments;
+    }
+    // 排队图片 (pii W1.8): inline attachments per queued item so re-queueing keeps them.
+    if (command === 'agent_set_queue') {
+      for (const key of ['steering', 'followUp'] as const) {
+        const list = payload[key];
+        if (!Array.isArray(list)) continue;
+        for (const item of list) {
+          if (!item || typeof item !== 'object' || !Array.isArray((item as { attachments?: unknown }).attachments)) continue;
+          const entry = item as { text: string; attachments: AttachmentReference[]; images?: unknown };
+          const content = await fileAccess.attach(entry.attachments);
+          entry.text = [entry.text, content.text].filter(Boolean).join('\n\n');
+          if (content.images?.length) entry.images = content.images;
+          delete (entry as { attachments?: unknown }).attachments;
+        }
+      }
     }
     const handler = local[command] ?? handlers[command];
     if (!handler) throw new Error(`not_implemented: ${command}`);

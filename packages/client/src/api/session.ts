@@ -64,6 +64,8 @@ export interface SessionSnapshot extends ModelState {
   queue: AgentQueue;
   /** Expert bound on the session's current branch (pii W2.2). */
   expert?: SessionExpertInfo | null;
+  /** 交接到新任务 (pii W1.7): the session this one was handed off from. */
+  handoffFrom?: { sessionId: string; title?: string };
 }
 export async function agentLoadSession(sessionId: string, cwd: string): Promise<SessionSnapshot> {
   return invoke<SessionSnapshot>("agent_load_session", { sessionId, cwd });
@@ -87,6 +89,10 @@ export async function agentListWorkspaces(): Promise<WorkspaceInfo[]> {
 }
 
 export const agentForkSession = (sessionId: string) => invoke<string>("agent_fork_session", { sessionId });
+
+/** 交接到新任务 (pii W1.7): new session + draft; nothing is sent. */
+export const agentHandoff = (sessionId: string, goal: string) =>
+  invoke<import("@openbuddy/protocol/handoff").HandoffResult>("agent_handoff", { sessionId, goal });
 
 /** Cleanly shut down the agent so `agentInit` can be called again to restart. */
 export async function agentShutdown(): Promise<void> {

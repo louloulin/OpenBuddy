@@ -71,3 +71,8 @@ export interface McpAuthStatusEntry {
   expiresAt?: number;
 }
 
+/** 本任务连接器开关 (pii W2.4 P2): the globally enabled servers, with each one's per-session state. */
+export interface SessionMcpState {
+  servers: Array<{ name: string; enabled: boolean }>;
+}
+

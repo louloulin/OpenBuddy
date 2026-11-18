@@ -28,6 +28,7 @@ import { errorText, TestLine, type TestState } from "./shared";
 import { ImportModels } from "./ImportModels";
 import { ProviderEditor } from "./ProviderEditor";
 import { ModelEditor } from "./ModelEditor";
+import { LocalModelCard } from "./LocalModelCard";
 import "./models-settings.css";
 
 type Msg = { kind: "ok" | "err"; text: string } | null;
@@ -153,6 +154,8 @@ export function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () 
           <ChevronDown size={14} className="ms-select__arrow" aria-hidden />
         </div>
       </section>
+
+      <LocalModelCard onSaved={() => { void reload(); onModelsChanged?.(); }} />
 
       <div className="ms__section-head">
         <h3 className="ms__section-title">厂商与模型</h3>

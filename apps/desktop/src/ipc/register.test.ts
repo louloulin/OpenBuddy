@@ -10,10 +10,10 @@ const url = 'file:///app/dist/index.html';
 function setup(workspaces?: { grant(path: string): Promise<void>; allows(path: string): Promise<boolean> }, extra: Record<string, (payload: Record<string, unknown>) => unknown> = {}) {
   const mainFrame = { url };
   const webContents = { mainFrame };
-  const window = { webContents } as unknown as BrowserWindow;
+  const window = { webContents, isDestroyed: () => false } as unknown as BrowserWindow;
   const send = vi.fn(() => 'ok');
   const capabilities = Object.fromEntries(['agent_get_model_state', 'agent_set_model', 'agent_set_thinking_level', 'agent_resolve_ui', 'agent_resolve_question', 'agent_steer', 'agent_follow_up', 'agent_get_queue', 'agent_clear_queue', 'agent_fork_session', 'agent_extensions_list', 'agent_extensions_add', 'agent_extensions_remove', 'agent_extensions_set_enabled'].map(command => [command, (payload: Record<string, unknown>) => payload]));
-  const unregister = registerIpc(window, { ...capabilities, agent_send: send, agent_init: send, ...extra }, url, workspaces);
+  const unregister = registerIpc(() => [window], { ...capabilities, agent_send: send, agent_init: send, ...extra }, url, workspaces);
   const dispatch = mocks.handle.mock.calls[0][1];
   return { dispatch, send, unregister, event: { sender: webContents, senderFrame: mainFrame } };
 }

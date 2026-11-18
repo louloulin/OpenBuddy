@@ -23,6 +23,20 @@ const invoke = async (command, payload) => {
       if (pending && !await pending) throw new Error('native_file_grant_failed: select the file again');
     }
   }
+  // 排队图片 (pii W1.8): queued items may carry their own attachment grants.
+  if (command === 'agent_set_queue') {
+    for (const key of ['steering', 'followUp']) {
+      const list = payload?.[key];
+      if (!Array.isArray(list)) continue;
+      for (const item of list) {
+        if (!item || typeof item !== 'object' || !Array.isArray(item.attachments)) continue;
+        for (const reference of item.attachments) {
+          const pending = nativeFileGrants.get(reference?.path);
+          if (pending && !await pending) throw new Error('native_file_grant_failed: select the file again');
+        }
+      }
+    }
+  }
   return ipcRenderer.invoke('openbuddy:invoke', command, payload);
 };
 const listen = (event, callback) => {

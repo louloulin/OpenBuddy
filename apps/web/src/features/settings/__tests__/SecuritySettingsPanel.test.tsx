@@ -68,7 +68,7 @@ describe("安全中心 (pii W6.1 / W6.2)", () => {
     fireEvent.change(screen.getByPlaceholderText(".env / *.pem / .git / config/secrets.json"), {
       target: { value: "config/secrets.json" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "添加", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "添加" }));
     await waitFor(() => expect(protectedSet).toHaveBeenCalledWith([".env", "*.pem", "config/secrets.json"]));
     fireEvent.click(screen.getByRole("button", { name: "移除受保护路径 .env" }));
     await waitFor(() => expect(protectedSet).toHaveBeenLastCalledWith(["*.pem", "config/secrets.json"]));

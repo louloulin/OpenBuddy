@@ -333,6 +333,7 @@ export type {
   McpServerEntry,
   McpTestResult,
   McpUpsertRequest,
+  SessionMcpState,
 } from './mcp.js';
 
 // ---------- CLI-type connector authorization (cli.json driven) ----------

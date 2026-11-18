@@ -122,6 +122,11 @@ export function ArtifactTabsBar({
   const suppressNextClickRef = useRef(false);
   const [visualOrder, setVisualOrder] = useState<string[] | null>(null);
   const [dragSnapshot, setDragSnapshot] = useState<DragSnapshot | null>(null);
+  // 窄窗口标签栏折叠成下拉 (20261116-pii W1.9 / U1.2).
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const collapsed = narrow && tabs.length > 1;
 
   const tabsById = useMemo(
     () => new Map(tabs.map((t) => [t.id, t])),
@@ -135,6 +140,25 @@ export function ArtifactTabsBar({
   const activeTabIdForRender = visualOrder
     ? (dragStateRef.current?.id ?? activeTabId)
     : activeTabId;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const query = window.matchMedia("(max-width: 900px)");
+    const sync = () => setNarrow(query.matches);
+    sync();
+    query.addEventListener?.("change", sync);
+    return () => query.removeEventListener?.("change", sync);
+  }, []);
+
+  // Close the folded picker on an outside click.
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const onDown = (event: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) setPickerOpen(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [pickerOpen]);
 
   // 无拖拽时清理 visual order。
   useEffect(() => {
@@ -150,7 +174,7 @@ export function ArtifactTabsBar({
     if (!activeTabId || dragStateRef.current) return;
     const node = tabRefs.current.get(activeTabId);
     if (!node) return;
-    node.scrollIntoView({ block: "nearest", inline: "nearest" });
+    node.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [activeTabId, tabs]);
 
   const setOrderedIds = useCallback((nextOrder: string[]) => {
@@ -345,6 +369,7 @@ export function ArtifactTabsBar({
   useEffect(() => () => removeDragListeners(), [removeDragListeners]);
 
   if (tabs.length === 0) return null;
+  const activeTab = tabsById.get(activeTabId ?? "") ?? tabs[0];
 
   return (
     // macOS：标签条贴窗口顶边（Overlay 标题栏），容器与最后一个标签右侧的
@@ -355,6 +380,47 @@ export function ArtifactTabsBar({
       role="tablist"
       {...(IS_MACOS ? { "data-window-drag-region": true } : {})}
     >
+      {collapsed ? (
+        <div className="artifact-tabs__picker-wrap" ref={pickerRef}>
+          <button
+            type="button"
+            className="artifact-tabs__picker"
+            aria-haspopup="menu"
+            aria-expanded={pickerOpen}
+            onClick={() => setPickerOpen((value) => !value)}
+          >
+            <span className="artifact-tab__icon">{pickTabIcon(activeTab)}</span>
+            <span className="artifact-tab__name">{activeTab.label}</span>
+            <span className="artifact-tabs__count">{tabs.length}</span>
+            <span className="artifact-tabs__caret" aria-hidden="true">▾</span>
+          </button>
+          {pickerOpen && (
+            <div className="artifact-tabs__menu" role="menu">
+              {renderedTabs.map((tab) => (
+                <div key={tab.id} className={"artifact-tabs__menu-row" + (tab.id === activeTabId ? " artifact-tabs__menu-row--active" : "")}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="artifact-tabs__menu-item"
+                    onClick={() => { setPickerOpen(false); onSelect(tab.id); }}
+                  >
+                    <span className="artifact-tab__icon">{pickTabIcon(tab)}</span>
+                    <span className="artifact-tab__name">{tab.label}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="artifact-tabs__menu-close"
+                    aria-label={`关闭 ${tab.label}`}
+                    onClick={(event) => { event.stopPropagation(); onClose(tab.id); }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
       <div
         ref={listRef}
         className={
@@ -393,6 +459,7 @@ export function ArtifactTabsBar({
           </div>
         ))}
       </div>
+      )}
       {dragSnapshot && draggedTab &&
         createPortal(
           <div

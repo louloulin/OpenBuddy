@@ -8,6 +8,8 @@ export const EVENTS = [
   'agent://plan', 'agent://connector-needed', 'agent://subagent', 'agent://automation',
   // 通知渠道 (pii W4.6): a turn finished that is not the session on screen — notify even in the foreground.
   'agent://background-notice',
+  // 扩展包安装进度 (pii W2.6 P2): npm / git install / update progress.
+  'agent://extension-progress',
 ] as const;
 export type EventName = typeof EVENTS[number];
 export const isEvent = (value: unknown): value is EventName => typeof value === 'string' && (EVENTS as readonly string[]).includes(value);

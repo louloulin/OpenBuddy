@@ -170,8 +170,25 @@ export interface AppSettings {
   folderTrustDecisions?: Record<string, boolean>;
   sessions: Record<
     string,
-    { pinned?: boolean; archived?: boolean; title?: string }
+    {
+      pinned?: boolean;
+      archived?: boolean;
+      title?: string;
+      /** 交接到新任务 (pii W1.7): where this session came from, so the banner survives a reload. */
+      handoffFrom?: { sessionId: string; title?: string };
+    }
   >;
+  /** 本任务连接器开关 (pii W2.4 P2): MCP servers disabled for one session. */
+  sessionMcpDisabled?: Record<string, string[]>;
+  /** 本地模型 (pii W8): llama.cpp / OpenAI-compatible local server. */
+  localModel?: {
+    enabled: boolean;
+    baseUrl: string;
+    model: string;
+    contextWindow: number;
+    maxTokens: number;
+    setDefault: boolean;
+  };
   /** System notifications while the window is in the background (20261115-ui U6.1); on by default. */
   notifyPrefs?: { system?: boolean };
   /** 通知渠道 (pii W4.6): webhook / mail / desktop, sent by the host. */

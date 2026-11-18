@@ -20,6 +20,7 @@ import { ConnectorTokenForm } from "./ConnectorTokenForm";
 import { ConnectorAuthModal } from "./ConnectorAuthModal";
 import { ConnectorQrModal } from "./ConnectorQrModal";
 import { McpModal } from "./McpModal";
+import { McpServersPanel } from "./McpServersPanel";
 import type { ConnectorAuthState } from "./shared";
 
 const LS_ROOT = "connectorsRoot";
@@ -79,6 +80,8 @@ export function ConnectorsTab({ pills, onToast }: Props) {
   // ---- authorization state ----
   
   const [installedServers, setInstalledServers] = useState<Set<string>>(new Set());
+  /** Bumped after an install so the MCP 服务 panel below re-reads mcp.json. */
+  const [mcpVersion, setMcpVersion] = useState(0);
   
   const [needsAuth, setNeedsAuth] = useState<Set<string>>(new Set());
   /** CLI connector probe results, keyed by source (lazy + background). */
@@ -189,14 +192,14 @@ export function ConnectorsTab({ pills, onToast }: Props) {
           ? { ...p, url: e.url, qrModal: e.qrModal }
           : p
       ));
-    }).then((u) => { unUrl = u; });
+    }).then((u) => { unUrl = u; }).catch(() => { /* CLI events unavailable (e.g. browser preview) */ });
     onConnectorCliAuthLog((e) => {
       setAuthPhase((p) => {
         if (p?.kind !== "cli" || p.connector.source !== e.source) return p;
         const logs = [...p.logs, e.line].slice(-50);
         return { ...p, logs };
       });
-    }).then((u) => { unLog = u; });
+    }).then((u) => { unLog = u; }).catch(() => { /* CLI events unavailable */ });
     return () => { unUrl?.(); unLog?.(); };
   }, []);
 
@@ -257,6 +260,7 @@ export function ConnectorsTab({ pills, onToast }: Props) {
       merged[name] = cfg;
     }
     await mcpConfigSave(JSON.stringify({ mcpServers: merged }, null, 2), sessionId);
+    setMcpVersion((value) => value + 1);
     return Object.keys(incomingServers);
   }, [root]);
 
@@ -480,6 +484,9 @@ export function ConnectorsTab({ pills, onToast }: Props) {
             <input className="um-search-input" value={search} placeholder="搜索连接器"
               onChange={(e) => setSearch(e.target.value)} />
           </div>
+          <button type="button" className="um-btn um-btn--grey" onClick={openMcpList}>
+            <McpIcon size="sm" /><span>MCP 服务</span>
+          </button>
           <button type="button" className="um-btn um-btn--grey" onClick={openEditor}>
             <AddCircleIcon size="sm" /><span>自定义连接器</span>
           </button>
@@ -488,10 +495,12 @@ export function ConnectorsTab({ pills, onToast }: Props) {
 
       <div className="um-scroll">
         <div className="ec-source-bar">
-          <span className="ec-source-label" title={root}>来源：{root || "—"}</span>
-          <button type="button" className="ec-source-btn" onClick={chooseDir} title="切换来源目录">
-            <FolderOpenIcon size="sm" /><span>选择目录</span>
-          </button>
+          <span className="ec-source-label" title={root}>来源：{root.startsWith("builtin:") ? "内置目录（真实 MCP 配置模板）" : root || "—"}</span>
+          {!root.startsWith("builtin:") && (
+            <button type="button" className="ec-source-btn" onClick={chooseDir} title="切换来源目录">
+              <FolderOpenIcon size="sm" /><span>选择目录</span>
+            </button>
+          )}
           <button type="button" className="ec-source-btn" onClick={() => root && loadCatalog(root)}
             disabled={loading} title="重新加载">
             <RefreshCwIcon size="sm" />
@@ -530,6 +539,8 @@ export function ConnectorsTab({ pills, onToast }: Props) {
             )}
           </>
         )}
+        {/* 已配置的 MCP 服务 (W2.4): test connection, per-tool rules and deferred exposure. */}
+        <McpServersPanel key={mcpVersion} onToast={onToast} />
       </div>
 
       {modalConnector && (

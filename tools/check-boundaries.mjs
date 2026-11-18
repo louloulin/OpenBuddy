@@ -29,6 +29,8 @@ const SIZE_BUDGET = 600;
 // Deferred features are moved, not split (20261115-md R8); the rest must come down.
 const SIZE_EXEMPT = [
   /features\/automation\//, /components\/automation\//, /AutomationPanel\.tsx$/,
+  // The Expo app is a parallel track with its own review; this gate covers md §5 packages and apps.
+  /^apps\/mobile\//,
 ];
 // P3.2 explicit ceilings: files already over SIZE_BUDGET when the gate was introduced (end of M12).
 // Each may not grow past its recorded line count; splitting them is P2 work (R1/R2/R3/R5/R8).

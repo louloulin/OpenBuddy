@@ -16,6 +16,7 @@ import { WorkspacePicker } from "./WorkspacePicker";
 import { PermissionPicker } from "../approvals/PermissionPicker";
 import { SlashCommands, slashToken, type SlashCommandsHandle } from "./SlashCommands";
 import { InputAddMenu } from "./InputAddMenu";
+import { EMPTY_ANNOTATIONS, useAnnotationStore } from "@/shared/state/annotations-store";
 import {
   collectDroppedPaths,
 } from "@/shared/lib/files/drop-utils";
@@ -159,6 +160,8 @@ export function Composer({
   const modelControls = useContext(ModelRuntimeContext);
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<string[]>([]);
+  // 批注托盘 (pii W1.9): quotes collected from the artifact viewer ride along with the next prompt.
+  const annotations = useAnnotationStore((state) => (usageSessionId ? state.bySession[usageSessionId] ?? EMPTY_ANNOTATIONS : EMPTY_ANNOTATIONS));
   const [sendError, setSendError] = useState("");
   const [queueMode, setQueueMode] = useState<"steer" | "followUp">("followUp");
   const [queueBusy, setQueueBusy] = useState(false);
@@ -245,14 +248,20 @@ export function Composer({
     // `!command`: run it in the task instead of sending a prompt (attachments stay for the next prompt).
     const ran = bash.handle();
     if (ran) { if (ran === "ran") { setSendError(""); history.remember(t); updateText(""); } return; }
-    // Nothing to send: no text, no attachments (a bare scene tag is not a prompt).
-    if (!t && attachments.length === 0) return;
+    // Nothing to send: no text, no attachments, no annotations (a bare scene tag is not a prompt).
+    if (!t && attachments.length === 0 && annotations.length === 0) return;
     if (streaming || disabled || !apiReady || modelControls.busy || modelControls.canSend === false) {
       return;
     }
     if (!validateAttachments()) return;
     setSendError("");
     let body = t;
+    // 批注托盘 (W1.9): the collected quotes go before the prompt, then the tray is emptied.
+    const taken = usageSessionId ? useAnnotationStore.getState().take(usageSessionId) : EMPTY_ANNOTATIONS;
+    if (taken.length) {
+      const block = taken.map((item) => item.text).join("\n\n");
+      body = body ? `${block}\n\n${body}` : block;
+    }
     if (attachments.length > 0) {
       const fileList = attachments.map((p) => `- ${p}`).join("\n");
       body = body
@@ -270,6 +279,7 @@ export function Composer({
         if (scopeRef.current !== sentScope) return;
         updateText(previous => previous || t);
         setAttachments(previous => Array.from(new Set([...attachments, ...previous])));
+        if (taken.length && usageSessionId) useAnnotationStore.getState().restore(usageSessionId, taken);
         setSendError("发送失败，已保留输入与附件，请检查错误后重试。");
       });
     } catch { setSendError("发送失败，请检查错误后重试。"); return; }
@@ -406,6 +416,29 @@ export function Composer({
           </div>
         )}
 
+        {/* 批注托盘 (pii W1.9) */}
+        {annotations.length > 0 && (
+          <div className="composer-annotations" role="group" aria-label={`批注 ${annotations.length}`}>
+            <span className="composer-annotations__title">批注（{annotations.length}）</span>
+            {annotations.map((item) => (
+              <span key={item.id} className="composer-annotations__chip" title={item.text}>
+                <span className="composer-annotations__chip-name">{item.path.split("/").pop()}</span>
+                <button
+                  type="button"
+                  className="composer-annotations__chip-remove"
+                  aria-label={`移除批注 ${item.path}`}
+                  onClick={(e) => { e.stopPropagation(); if (usageSessionId) useAnnotationStore.getState().remove(usageSessionId, item.id); }}
+                >×</button>
+              </span>
+            ))}
+            <button
+              type="button"
+              className="composer-annotations__clear"
+              onClick={() => { if (usageSessionId) useAnnotationStore.getState().clear(usageSessionId); }}
+            >清空</button>
+          </div>
+        )}
+
         {/* "操作类型"黑色标签(首页选中能力分类后插入,× 可删除) */}
         {sceneTag && (
           <div className="wb-composer__scene-tag" role="group" aria-label={`操作类型 ${sceneTag.label}`}>
@@ -532,6 +565,7 @@ export function Composer({
               }
             }}
             onNavigateConnectors={onNavigateConnectors}
+            sessionId={usageSessionId}
           />
           {activeExpertName && (<span className="wb-composer__expert-badge" title={`当前专家：${activeExpertName}`} data-testid="composer-expert"><ThumbImg name={activeExpertName} local={activeExpertAvatar} size={18} shape="circle" />{activeExpertName}
             {onClearExpert && <button type="button" className="wb-composer__expert-x" aria-label={`取消专家 ${activeExpertName}`} onClick={onClearExpert}>×</button>}</span>)}

@@ -68,6 +68,10 @@ export default function ChatScreen() {
   const awaiting = useApp(state => state.awaiting.includes(sessionId))
   const [revertingId, setRevertingId] = useState<string | null>(null)
   const [revertNotes, setRevertNotes] = useState<Record<string, string>>({})
+  // Quote-reply / edit-resend (P1): both are local; a quote rides as a `>` prefix.
+  const [quoted, setQuoted] = useState<string | null>(null)
+  const [editToken, setEditToken] = useState(0)
+  const [editText, setEditText] = useState('')
 
   // D5: undo the files one tool call wrote. The desktop owns the checkpoints;
   // the phone reports what it restored and flags conflicts to resolve there.
@@ -269,6 +273,8 @@ export default function ChatScreen() {
                 row={item}
                 onRegenerate={() => void regenerate(sessionId)}
                 toolActions={toolActions}
+                onQuote={text => setQuoted(text)}
+                onEdit={text => { setQuoted(null); setEditText(text); setEditToken(token => token + 1) }}
               />
             ))}
           keyExtractor={row => row.id}
@@ -362,6 +368,9 @@ export default function ChatScreen() {
       <Composer
         streaming={streaming}
         initialDraft={prefill ?? ''}
+        quoted={quoted}
+        onClearQuote={() => setQuoted(null)}
+        prefill={editToken ? { text: editText, token: editToken } : undefined}
         onSend={text => void send(sessionId, text)}
         onImage={(bytes, mime, text) => void sendImage(sessionId, bytes, mime, text)}
         onImages={(images, text) => void sendImages(sessionId, images, text)}

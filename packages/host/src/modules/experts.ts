@@ -60,6 +60,8 @@ export function expertsModule(ctx: HostContext): HostModule {
       return `data:${image.mime};base64,${image.base64}`;
     },
     experts_link_agents: (p) => experts().importFrom(text(p.root), strings(p.ids)),
+    // WorkBuddy 兼容 (S18): import a WorkBuddy expert package (ZIP or extracted folder).
+    experts_import_workbuddy: (p) => experts().importWorkBuddy(text(p.path)),
     // 专家团 (W3.5): preset pipelines, installed as a 我的指令 prompt template.
     teams_list: async () => {
       const saved = new Set((await engine.prompts.list()).map((entry) => entry.name));

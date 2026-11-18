@@ -1,4 +1,7 @@
-import { discoverAndLoadExtensions } from "@earendil-works/pi-coding-agent";
+import { discoverAndLoadExtensions, type PackageSource, type ResolvedPaths } from "@earendil-works/pi-coding-agent";
+import type { ExtensionPackageFilters } from "@openbuddy/protocol/extensions";
+import { EXTENSION_RESOURCE_KINDS } from "@openbuddy/protocol/extensions";
+import type { ExtensionResources } from "@openbuddy/protocol/extensions";
 import type { EngineContext } from "../engine-context.js";
 import { reserveBuiltinToolNames } from "../builtin/reserved-tools.js";
 
@@ -20,6 +23,87 @@ export interface ExtensionReport {
   shortcuts: string[];
   /** Why this path failed to load (null when it loaded). */
   error: string | null;
+}
+
+/** Turn one package's contribution into the grouped list the 扩展中心 renders (S15). */
+export function packageResources(resolved: ResolvedPaths): ExtensionResources {
+  const map = (entries: ResolvedPaths["extensions"]) =>
+    entries
+      .filter((entry) => entry.metadata.origin === "package")
+      .map((entry) => ({
+        source: entry.metadata.source,
+        scope: entry.metadata.scope === "project" ? "project" as const : "user" as const,
+        path: entry.path,
+        enabled: entry.enabled,
+        ...(entry.metadata.changelogPath ? { changelogPath: entry.metadata.changelogPath } : {}),
+      }));
+  return {
+    extensions: map(resolved.extensions),
+    skills: map(resolved.skills),
+    prompts: map(resolved.prompts),
+    themes: map(resolved.themes),
+    failures: (resolved.installFailures ?? []).map((failure) => ({ source: failure.source, message: failure.message })),
+  };
+}
+
+export function packageSourceOf(entry: PackageSource): string {
+  return typeof entry === "string" ? entry : entry.source;
+}
+
+/**
+ * Read a configured package's per-resource switches (S17). Pi's object form uses `[]` to load
+ * none of a type and omits the key to load all; only explicitly filtered types are reported.
+ */
+export function packageFilterState(entry: PackageSource | undefined): ExtensionPackageFilters | undefined {
+  if (!entry || typeof entry === "string") return undefined;
+  const filters: ExtensionPackageFilters = {};
+  for (const kind of EXTENSION_RESOURCE_KINDS) {
+    const value = entry[kind];
+    if (Array.isArray(value)) filters[kind] = value.length > 0;
+  }
+  return Object.keys(filters).length ? filters : undefined;
+}
+
+/**
+ * Apply enabled/disabled switches to one configured package (S17), keeping any other Pi options
+ * (`autoload`, custom globs). An enabled type drops the filter (load everything); a disabled type
+ * becomes `[]`. Collapses back to the plain string form when nothing else remains.
+ */
+export function applyPackageFilters(entry: PackageSource, enabled: ExtensionPackageFilters): PackageSource {
+  const next: Exclude<PackageSource, string> = typeof entry === "string" ? { source: entry } : { ...entry };
+  for (const kind of EXTENSION_RESOURCE_KINDS) {
+    const on = enabled[kind];
+    if (on === undefined) continue;
+    if (on) delete next[kind];
+    else next[kind] = [];
+  }
+  return Object.keys(next).length === 1 ? next.source : next;
+}
+
+/** Attach each configured package's per-resource switches to the list the UI shows (S17). */
+export function withPackageFilters<T extends { source: string }>(packages: T[], configured: PackageSource[]): T[] {
+  return packages.map((entry) => {
+    const filters = packageFilterState(configured.find((item) => packageSourceOf(item) === entry.source));
+    return filters ? { ...entry, filters } : entry;
+  });
+}
+
+/** Persist per-resource switches through Pi's settings, then rebuild live sessions (S17). */
+export async function setPackageFilters(
+  engine: EngineContext,
+  source: string,
+  enabled: ExtensionPackageFilters,
+  cwd: string,
+): Promise<void> {
+  const sdk = engine.settings.pi.manager(engine.trusted(cwd));
+  const packages = sdk.getPackages();
+  const index = packages.findIndex((item) => packageSourceOf(item) === source);
+  if (index < 0) throw Error("not_found: package");
+  packages[index] = applyPackageFilters(packages[index], enabled);
+  sdk.setPackages(packages);
+  await sdk.flush();
+  engine.extensionsDirty = true;
+  await engine.reload();
 }
 
 /** Load `paths` in an isolated loader and report each one's registrations or error. */

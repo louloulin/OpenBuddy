@@ -341,10 +341,13 @@ export class McpService {
       this.oauthSettings(name, config),
     );
   }
-  extension() {
+  /** `disabled`: 本任务连接器开关 (W2.4 P2) — names this session keeps off. */
+  extension(disabled: string[] = []) {
+    const off = new Set(disabled);
     const loadConfig: NonNullable<McpExtensionOptions["loadConfig"]> = () => ({
-      servers: Object.entries(this.store.read().mcpServers).map(
-        ([name, raw]) => {
+      servers: Object.entries(this.store.read().mcpServers)
+        .filter(([name]) => !off.has(name))
+        .map(([name, raw]) => {
           const config = { ...raw };
           if (config.oauth) config.oauth = this.oauthSettings(name, config);
           for (const field of ["env", "headers"])
@@ -362,8 +365,7 @@ export class McpService {
             source: this.path,
             scope: "global" as const,
           };
-        },
-      ),
+        }),
       errors: [],
       autoEnableCodemode: false,
     });

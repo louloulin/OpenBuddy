@@ -8,6 +8,8 @@ const trayState = { enabled: false };
 vi.mock("@openbuddy/client/agent-client", () => ({
   trayGet: vi.fn(async () => ({ enabled: trayState.enabled })),
   traySet: vi.fn(async (enabled: boolean) => { trayState.enabled = enabled; return { enabled }; }),
+  quickShortcutGet: vi.fn(async () => "CommandOrControl+Shift+Space"),
+  quickShortcutSet: vi.fn(async (accelerator: string) => accelerator),
 }));
 import { GeneralPreferencesPanel } from "../sections/GeneralPreferencesPanel";
 import { AboutSettingsPanel } from "../sections/AboutSettingsPanel";

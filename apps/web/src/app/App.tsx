@@ -12,6 +12,7 @@ import { AboutDialog } from "../features/settings/AboutDialog";
 import { FolderTrustDialog } from "../features/approvals/FolderTrustDialog";
 import { TopbarActions } from "./shell/TopbarActions";
 import { setPendingAutomationDraft } from "../features/automation/pending-draft";
+import { useSessionNavigation, useSessionRoute } from "./state/use-session-navigation";
 import { SidebarToggleIcon, WbNewTaskIcon } from "@openbuddy/ui/icon/icons/index";
 import { ModelRuntimeContext, type ModelOption } from "../features/models/ModelSelector";
 import { useExtensionUiStore } from "../features/approvals/state/extension-ui-store";
@@ -627,6 +628,7 @@ function Shell() {
     setPlaceholderView(null);
     sessionsStore.getState().setCurrent(null);
     sessionStore.getState().reset();
+    setHandoffFrom(null);
   };
 
   /** Navigate to home page without resetting session state (used after expert summon). */
@@ -654,6 +656,7 @@ function Shell() {
     useAgentModelStore.getState().apply(snapshot);
     sessionStore.getState().hydrate(sessionId, snapshot.messages, snapshot.busy, force);
     usePiQueueStore.getState().apply(sessionId, snapshot.queue);
+    setHandoffFrom(snapshot.handoffFrom ?? null);
     showLoadedExpert(sessionId, snapshot);
     sessionsStore.getState().upsert({ sessionId, status: sessionStatusOf(snapshot.status) });
     // Artifacts need the loaded session; ChatView's own request may have raced the load.
@@ -684,6 +687,7 @@ function Shell() {
   };
 
   selectSessionRef.current = handleSelectSession;
+  useSessionRoute(Boolean(init), (id) => void selectSessionRef.current?.(id));
 
   // Rewind rewrites the backend history, so the cached transcript is rebuilt from the engine.
   const handleRewound = async () => {
@@ -694,21 +698,13 @@ function Shell() {
     );
   };
 
-  // Fork copies the session to a new id (the engine already opened it) — jump to it.
-  const handleForked = async (newId: string) => {
-    const cwd = currentEntry?.cwd ?? cwdRef.current;
-    const title = currentEntry?.title ? `${currentEntry.title}（分叉）` : "分叉任务";
-    setPlaceholderView(null);
-    sessionsStore.getState().setCurrent(newId);
-    sessionsStore.getState().upsert({ sessionId: newId, title, cwd, updatedAt: new Date().toISOString() });
-    sessionStore.getState().setSession(newId);
-    try {
-      await openSession(newId, cwd, true);
-      await agentRenameSession(newId, title, cwd).catch(() => {});
-    } catch (e) {
-      sessionStore.getState().setError(friendlyError(e), newId);
-    }
-  };
+  // 分叉 / 交接到新任务 (W1.7): the engine opened a new session; navigate and (for handoff) pre-fill the draft.
+  const { handoffFrom, setHandoffFrom, openForked, openHandoff } = useSessionNavigation({
+    getCwd: () => currentEntry?.cwd ?? cwdRef.current,
+    getSourceTitle: () => currentEntry?.title,
+    setPlaceholderView,
+    openSession,
+  });
 
   // An expert picked from the + menu: an open task switches to it now; on the home page it becomes
   // the pending expert, bound when the new task is sent (the user types the message first).
@@ -919,7 +915,8 @@ function Shell() {
                   <TopbarActions
                     sessionId={currentSessionId}
                     title={currentTitle}
-                    onForked={handleForked}
+                    onForked={openForked}
+                    onHandoffed={openHandoff}
                     pinned={currentEntry?.pinned}
                     cwd={currentEntry?.cwd ?? cwdRef.current}
                     onToast={showToast}
@@ -999,7 +996,9 @@ function Shell() {
               workspaces={workspaces}
               onSelectWorkspace={handleSelectWorkspace}
               onRewound={handleRewound}
-              onForked={handleForked}
+              onForked={openForked}
+              handoffFrom={handoffFrom}
+              onOpenSession={(sessionId) => { void handleSelectSession(sessionId); }}
               onToast={showToast}
               onSelectExpert={handleStartWithExpert}
               onNavigateConnectors={openConnectors}

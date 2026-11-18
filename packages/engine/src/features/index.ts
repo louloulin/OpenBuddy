@@ -5,6 +5,7 @@ export * from "./compact.js";
 export * from "./export.js";
 export * from "./transfer.js";
 export * from "./fork.js";
+export * from "./handoff.js";
 export * from "./mode.js";
 export * from "./rewind.js";
 export * from "./branches.js";

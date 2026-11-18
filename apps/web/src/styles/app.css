@@ -305,6 +305,38 @@
   width: 100%;
   box-sizing: border-box;
 }
+/* 交接到新任务 (pii W1.7): a quiet pill at the top of the handed-off transcript. */
+.chatview__handoff {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--wb-bg-tertiary);
+  border: 1px solid var(--wb-border-default);
+  color: var(--wb-text-tertiary);
+  font-size: 12px;
+  animation: quiet-rise 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+@keyframes quiet-rise {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chatview__handoff, .composer-annotations__chip, .bench__tabs-picker, .bench__tabs-menu { animation: none !important; transition: none !important; }
+}
+.chatview__handoff-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--wb-color-text-brand-default);
+  font-size: 12px;
+  cursor: pointer;
+}
+.chatview__handoff-link:hover {
+  text-decoration: underline;
+}
 .chatview__footer {
   max-width: 800px;
   width: 100%;
@@ -1324,6 +1356,17 @@
   font-weight: 400;
   color: var(--wb-text-light);
   font-size: 11px;
+}
+/* 排队图片 (pii W1.8): how many attachments ride with a queued prompt. */
+.queue-panel__images {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-default);
+  color: var(--wb-text-tertiary);
+  font-size: 10px;
+  line-height: 16px;
 }
 .queue-row {
   display: flex;
@@ -2448,6 +2491,112 @@
 }
 .artifact-tabs__list--dragging {
   cursor: grabbing;
+}
+/* 窄窗口标签栏折叠成下拉 (pii W1.9 / U1.2). */
+.artifact-tabs__picker-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 4px 2px;
+}
+.artifact-tabs__picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 280px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-text-medium);
+  font-size: 11px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.artifact-tabs__picker:hover {
+  background: var(--wb-bg-primary);
+}
+.artifact-tabs__picker .artifact-tab__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.artifact-tabs__count {
+  flex: none;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-tertiary);
+  font-size: 10px;
+  line-height: 15px;
+}
+.artifact-tabs__caret {
+  flex: none;
+  color: var(--wb-text-tertiary);
+  font-size: 9px;
+}
+.artifact-tabs__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 60;
+  min-width: 220px;
+  max-width: 320px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-default);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+}
+.artifact-tabs__menu-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 7px;
+}
+.artifact-tabs__menu-row:hover,
+.artifact-tabs__menu-row--active {
+  background: var(--wb-bg-tertiary);
+}
+.artifact-tabs__menu-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--wb-text-medium);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.artifact-tabs__menu-item .artifact-tab__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.artifact-tabs__menu-close {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-right: 2px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--wb-text-tertiary);
+  cursor: pointer;
+  line-height: 1;
+}
+.artifact-tabs__menu-close:hover {
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-medium);
 }
 .artifact-tab {
   display: flex;
@@ -4435,6 +4584,43 @@ button.diff__path {
   font-size: 12px;
   color: var(--wb-text-tertiary);
   text-align: center;
+}
+/* 本任务连接器开关 (pii W2.4 P2). */
+.iam-sub-heading {
+  padding: 6px 12px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--wb-text-tertiary);
+}
+.iam-switch {
+  flex: none;
+  width: 28px;
+  height: 16px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--wb-bg-tertiary);
+  border: 1px solid var(--wb-border-default);
+  box-sizing: border-box;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.iam-switch__dot {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--wb-text-tertiary);
+  transition: transform 140ms cubic-bezier(0.2, 0, 0, 1), background 140ms ease;
+}
+.iam-switch--on {
+  background: color-mix(in srgb, var(--wb-color-text-brand-default) 22%, transparent);
+  border-color: color-mix(in srgb, var(--wb-color-text-brand-default) 40%, transparent);
+}
+.iam-switch--on .iam-switch__dot {
+  transform: translateX(12px);
+  background: var(--wb-color-text-brand-default);
+}
+@media (prefers-reduced-motion: reduce) {
+  .iam-switch, .iam-switch__dot { transition: none; }
 }
 .iam-sub-footer {
   padding: 8px 12px;
@@ -12483,6 +12669,31 @@ button.diff__path {
 
 /* 扩展中心 (pii W2.6 / U7.3): one card per extension. */
 .ext-cards { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+/* 扩展包 (pii W2.6 P2): npm / git install row + configured packages. */
+.ext-install { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.ext-install__input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--wb-border-default); border-radius: 8px; background: var(--wb-bg-primary); color: var(--wb-text-strong); font-size: 12px; }
+.ext-install__input:focus { outline: none; border-color: var(--wb-color-text-brand-default); box-shadow: 0 0 0 3px color-mix(in srgb, var(--wb-color-text-brand-default) 14%, transparent); }
+.ext-packages { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.ext-package { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--wb-border-default); border-radius: 9px; background: var(--wb-bg-primary); }
+.ext-package__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ext-package__source { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ext-package__meta { font-size: 11px; color: var(--wb-text-tertiary); }
+.ext-package__meta--bad { color: var(--wb-text-error, #b42318); overflow-wrap: anywhere; }
+.ext-package__filters { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; }
+.ext-package__filter { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--wb-text-medium); cursor: pointer; }
+.ext-package__filter input { width: 13px; height: 13px; margin: 0; }
+.ext-package__filter--off { color: var(--wb-text-tertiary); text-decoration: line-through; }
+.ext-market { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.ext-market__bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
+.ext-market__bar .res-panel__muted { margin: 0; }
+.ext-market__item { border: 1px solid var(--wb-border-default); border-radius: 10px; padding: 10px 12px; background: var(--wb-bg-primary); }
+.ext-market__head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.ext-market__name { font-size: 12.5px; color: var(--wb-text-strong); overflow-wrap: anywhere; }
+.ext-market__badge { padding: 1px 7px; border-radius: 999px; font-size: 10.5px; background: var(--wb-bg-secondary); color: var(--wb-text-medium); }
+.ext-market__meta { font-size: 11px; color: var(--wb-text-tertiary); }
+.ext-market__desc { margin: 6px 0 0; font-size: 12px; line-height: 1.45; color: var(--wb-text-medium); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ext-market__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+.ext-market__foot .ext-market__meta { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ext-card { border: 1px solid var(--wb-border-default); border-radius: 10px; padding: 10px 12px; background: var(--wb-bg-primary); }
 .ext-card--broken { border-color: color-mix(in oklab, var(--wb-text-error, #b42318) 45%, var(--wb-border-default)); }
 .ext-card__head { display: flex; align-items: center; gap: 8px; }
@@ -12858,4 +13069,115 @@ button.diff__path {
   margin-top: 2px;
   font-size: 11px;
   color: var(--wb-text-medium);
+}
+
+/* ---------- 批注托盘 (pii W1.9) ---------- */
+.composer-annotations {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 2px 8px;
+}
+.composer-annotations__title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--wb-text-tertiary);
+}
+.composer-annotations__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 220px;
+  padding: 2px 3px 2px 8px;
+  border-radius: 999px;
+  background: var(--wb-bg-tertiary);
+  border: 1px solid var(--wb-border-default);
+  color: var(--wb-text-medium);
+  font-size: 11px;
+}
+.composer-annotations__chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composer-annotations__chip-remove {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--wb-text-tertiary);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.composer-annotations__chip-remove:hover {
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-medium);
+}
+.composer-annotations__clear {
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  color: var(--wb-text-tertiary);
+  font-size: 11px;
+  cursor: pointer;
+}
+.composer-annotations__clear:hover {
+  color: var(--wb-text-medium);
+}
+
+/* ---------- 全局快速输入 (pii W7.2) ---------- */
+.quick-input {
+  height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+}
+.quick-input__head { display: flex; align-items: baseline; gap: 10px; }
+.quick-input__title { font-size: 13px; font-weight: 600; }
+.quick-input__hint { flex: 1; font-size: 11px; color: var(--wb-text-tertiary); }
+.quick-input__close {
+  border: 0; background: none; color: var(--wb-text-tertiary);
+  font-size: 18px; line-height: 1; cursor: pointer; padding: 0 2px;
+}
+.quick-input__close:hover { color: var(--wb-text-medium); }
+.quick-input__box {
+  flex: 1; min-height: 56px; resize: none; outline: none;
+  padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-primary); color: inherit;
+  font: inherit; font-size: 14px; line-height: 1.5;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.quick-input__box:focus {
+  border-color: color-mix(in srgb, var(--wb-color-text-brand-default) 55%, var(--wb-border-default));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wb-color-text-brand-default) 14%, transparent);
+}
+.quick-input__error { margin: 0; font-size: 12px; color: #d93f3f; }
+.quick-input__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.quick-input__meta { font-size: 11px; color: var(--wb-text-tertiary); }
+.quick-input__send {
+  padding: 6px 16px; border: 0; border-radius: 999px;
+  background: var(--wb-text-strong); color: var(--wb-bg-primary);
+  font-size: 12px; cursor: pointer;
+}
+.quick-input__send:disabled { opacity: 0.4; cursor: default; }
+
+/* 通用 · 快速输入快捷键 */
+.pref-shortcut { display: flex; align-items: center; gap: 6px; }
+.pref-shortcut__input {
+  width: 190px; padding: 6px 10px; border-radius: 8px;
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-primary); color: inherit; font-size: 12px;
+}
+.pref-shortcut__input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--wb-color-text-brand-default) 45%, var(--wb-border-default));
 }

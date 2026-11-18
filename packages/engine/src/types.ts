@@ -20,6 +20,11 @@ export function validateThinkingLevel(value: unknown): ThinkingLevel {
 export type PromptImages = NonNullable<
   Parameters<AgentSession["prompt"]>[1]
 >["images"];
+/** One pending steering / follow-up prompt (排队图片保留, pii W1.8). */
+export interface QueueItem {
+  text: string;
+  images?: PromptImages;
+}
 
 /**
  * How per-branch state (mode, bound expert) follows a move of the session leaf (20261116-pii §5):

@@ -1,6 +1,7 @@
 // §5.3 `providers` module: providers_*, agent_auth_status, account_get_api_key / account_set_api_key.
 import { invoke } from "../ipc";
 import type { AuthStatus } from "./session";
+import type { LocalModelConfig, LocalModelProbe, LocalModelState } from "@openbuddy/protocol/local-model";
 
 export async function agentAuthStatus(): Promise<AuthStatus> {
   return invoke<AuthStatus>("agent_auth_status");
@@ -209,3 +210,22 @@ export async function accountGetApiKey(): Promise<string | null> {
 export async function accountSetApiKey(key: string | null): Promise<void> {
   await invoke<void>("account_set_api_key", { key });
 }
+
+// ---------- 本地模型 (pii W8) ----------
+
+/** Current local-model config + the models materialized from it. */
+export const providersLocalGet = () => invoke<LocalModelState>("providers_local_get", {});
+
+/** Probe an OpenAI-compatible llama-server (`GET /v1/models`); never throws for a bad server. */
+export const providersLocalProbe = (baseUrl: string) => invoke<LocalModelProbe>("providers_local_probe", { baseUrl });
+
+/** Enable / disable the local model, persist the config and register it as a provider. */
+export const providersLocalSet = (config: LocalModelConfig) =>
+  invoke<LocalModelState>("providers_local_set", {
+    enabled: config.enabled,
+    baseUrl: config.baseUrl,
+    model: config.model,
+    contextWindow: config.contextWindow,
+    maxTokens: config.maxTokens,
+    setDefault: config.setDefault,
+  });

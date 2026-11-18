@@ -5,6 +5,7 @@ import { isExpertId, type ExpertCenterCatalog, type ExpertDraft, type ExpertEntr
 import { ProtocolError } from "@openbuddy/protocol/errors";
 import { JsonStore } from "../settings/settings.js";
 import { avatarImage, IMAGE_EXT, normalizeDraft, parseExpertMarkdown, serializeExpert, slugify } from "./expert-file.js";
+import { readWorkBuddyPackageFrom } from "./workbuddy.js";
 import { EXPERT_CATEGORIES, EXPERT_SCENES, SEED_EXPERTS } from "./seeds.js";
 
 /**
@@ -322,6 +323,45 @@ export class ExpertStore {
       copied++;
     }
     return copied;
+  }
+
+  /**
+   * `experts_import_workbuddy`: import a WorkBuddy expert package (ZIP or an extracted folder) into
+   * 我的专家 (S18). Each agent becomes a normal Markdown expert; avatars are copied next to it.
+   */
+  importWorkBuddy(path: string): { package: string; imported: ExpertEntry[]; skipped: Array<{ id: string; error: string }> } {
+    const resolved = real(path);
+    if (!resolved) throw new ProtocolError("path_not_authorized", "只能导入存在的 WorkBuddy 专家包");
+    const isFile = statSync(resolved).isFile();
+    const pkg = readWorkBuddyPackageFrom(resolved, isFile ? readFileSync(resolved) : undefined);
+    const imported: ExpertEntry[] = [];
+    const skipped: Array<{ id: string; error: string }> = [];
+    for (const item of pkg.drafts) {
+      try {
+        const created = this.save({ ...item.draft, id: item.draft.id }, "create");
+        if (item.avatar) {
+          const avatar = this.writeAvatar(created.id, item.avatar.name, item.avatar.bytes);
+          if (avatar) {
+            const draft = { ...item.draft, avatar, id: undefined };
+            this.write(created.id, serializeExpert(draft));
+          }
+        }
+        imported.push(this.get(created.id));
+      } catch (error) {
+        skipped.push({ id: item.draft.id ?? item.draft.name, error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    return { package: pkg.name, imported, skipped };
+  }
+
+  /** Copy a WorkBuddy avatar into `<user>/agents/avatars/<id>.<ext>` (bounded, image only). */
+  private writeAvatar(id: string, name: string, bytes: Uint8Array): string | undefined {
+    if (!IMAGE_EXT.test(name) || bytes.length === 0 || bytes.length > 2 * 1024 * 1024) return undefined;
+    const ext = extname(name).toLowerCase();
+    const dir = join(this.ensureUserDir(), "avatars");
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    writeFileSync(join(dir, `${id}${ext}`), bytes, { mode: 0o600 });
+    return `avatars/${id}${ext}`;
   }
 
   toDraft(expert: ExpertEntry): ExpertDraft {

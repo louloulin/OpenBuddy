@@ -14,10 +14,13 @@ import {
   exportTextFile,
   saveFileDialog,
   agentForkSession,
+  agentHandoff,
   agentSetSessionPinned,
   agentSetSessionArchived,
   agentExportJsonl,
+  openSessionWindow,
 } from "@openbuddy/client/agent-client";
+import { appPrompt } from "@/shared/ui/AppDialog";
 import { buildSessionMarkdown, sanitizeFilename } from "@openbuddy/chat-core/export-markdown";
 import type { Automation } from "@openbuddy/protocol/dto";
 import { TaskOverview } from "./TaskOverview";
@@ -29,6 +32,8 @@ interface TopbarActionsProps {
   cwd?: string;
   onToast?: (msg: string) => void;
   onForked?: (sessionId: string) => void | Promise<void>;
+  /** 交接到新任务 (pii W1.7): navigate to the new session; the draft is pre-filled, never sent. */
+  onHandoffed?: (sessionId: string, prompt: string) => void | Promise<void>;
   /** After archive/pin mutations, parent merges the patch into the sessions store. */
   onSessionsChanged?: (patch?: Record<string, unknown>) => void;
   /** 保存为自动化 (pii W4.3): hand a pre-filled draft to the automation panel. */
@@ -43,6 +48,7 @@ export function TopbarActions({
   onToast,
   onSessionsChanged,
   onForked,
+  onHandoffed,
   onSaveAsAutomation,
 }: TopbarActionsProps) {
   const streaming = useSessionStore(state => state.streaming);
@@ -154,6 +160,26 @@ export function TopbarActions({
     finally { setBusy(false); }
   };
 
+  /** 交接到新任务 (W1.7): ask for the goal, then open a new session with a self-contained draft. */
+  const handleHandoff = async () => {
+    if (streaming || busy || !onHandoffed) return;
+    setOpen(false);
+    const goal = await appPrompt({
+      title: "交接到新任务",
+      message: "带上当前任务的背景，开一个新会话继续。新会话只会预填草稿，不会自动发送。",
+      placeholder: "例如：把这套方案实现到团队版里",
+      confirmLabel: "生成交接草稿",
+    });
+    if (!goal) return;
+    setBusy(true);
+    try {
+      const result = await agentHandoff(sessionId, goal);
+      await onHandoffed(result.sessionId, result.prompt);
+      onToast?.(`已交接「${result.from.title ?? "原任务"}」，草稿已填好`);
+    } catch (error) { onToast?.(`交接失败：${friendlyError(error)}`); }
+    finally { setBusy(false); }
+  };
+
 
   return (
     <>
@@ -177,6 +203,8 @@ export function TopbarActions({
       {open && (
         <div className="topbar-actions__menu" onClick={(e) => e.stopPropagation()}>
           {onForked && <button type="button" className="topbar-actions__item" disabled={streaming || busy} onClick={() => { void handleFork(); }}>分叉为新会话</button>}
+          <button type="button" className="topbar-actions__item" onClick={() => { setOpen(false); void openSessionWindow(sessionId).catch(error => onToast?.(`打开窗口失败：${friendlyError(error)}`)); }}>在新窗口打开</button>
+          {onHandoffed && <button type="button" className="topbar-actions__item" disabled={streaming || busy} onClick={() => { void handleHandoff(); }}>交接到新任务…</button>}
           {onSaveAsAutomation && (
             <button type="button" className="topbar-actions__item" onClick={handleSaveAsAutomation}>
               <span>保存为自动化</span>

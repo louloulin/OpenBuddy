@@ -176,6 +176,19 @@ export function CopyIcon({ size = 16, color, strokeWidth = 1.75 }: IconProps) {
   )
 }
 
+export function QuoteIcon({ size = 16, color, strokeWidth = 1.75 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path
+        d="M9.2 6.4c-2.6.9-4.2 2.8-4.2 5.4 0 1.9 1.1 3.1 2.7 3.1 1.4 0 2.4-1 2.4-2.4 0-1.3-.9-2.2-2.1-2.2-.2 0-.4 0-.6.1.3-1.2 1.3-2.1 2.6-2.6zM18.4 6.4c-2.6.9-4.2 2.8-4.2 5.4 0 1.9 1.1 3.1 2.7 3.1 1.4 0 2.4-1 2.4-2.4 0-1.3-.9-2.2-2.1-2.2-.2 0-.4 0-.6.1.3-1.2 1.3-2.1 2.6-2.6z"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+      />
+    </Svg>
+  )
+}
+
 export function ShareIcon({ size = 16, color, strokeWidth = 1.75 }: IconProps) {
   return (
     <Svg {...base(size)}>

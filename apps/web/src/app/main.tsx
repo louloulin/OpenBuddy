@@ -10,10 +10,13 @@ import { webMarkdownHost } from "../shared/markdown-host";
 import { PairingGate } from "./h5/PairingGate";
 import { installPairing, isBrowserHost, savedPairing } from "./h5/boot";
 import { applyUiPreferences } from "../features/settings/preferences";
+import { QuickInput } from "./quick/QuickInput";
 
 applyUiPreferences();
 
 const container = document.getElementById("root")!;
+/** 全局快速输入窗口 (W7.2): only the small composer, never the full app. */
+const isQuickWindow = window.location.hash.startsWith("#/quick");
 
 /**
  * Boot order matters: the renderer's api calls run as soon as App mounts, so
@@ -25,7 +28,7 @@ function renderApp() {
   const root = ReactDOM.createRoot(container);
   root.render(
     <MarkdownHostProvider host={webMarkdownHost}>
-      <App />
+      {isQuickWindow ? <QuickInput /> : <App />}
     </MarkdownHostProvider>
   );
   return root;

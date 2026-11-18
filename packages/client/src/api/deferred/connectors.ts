@@ -1,6 +1,7 @@
-// Deferred (20261115-md Appendix B, 连接器): connectors_* commands and connector://cli-auth-* events. Not in the
-// protocol COMMANDS list; the wrappers are kept until the feature gets a host module.
-import type { ConnectorCatalog, ConnectorCliAuthDoneEvent, ConnectorCliAuthLogEvent, ConnectorCliAuthResult, ConnectorCliAuthUrlEvent, ConnectorCliStatus } from "@openbuddy/protocol/dto";
+// Deferred (20261115-md Appendix B, 连接器): CLI-type connector authorization only.
+// The marketplace catalog (`connectors_default_root/list_roots/load/read_mcp_config/icon`) is now
+// implemented by `api/mcp.ts` (pii W2.4 P2).
+import type { ConnectorCliAuthDoneEvent, ConnectorCliAuthLogEvent, ConnectorCliAuthResult, ConnectorCliAuthUrlEvent, ConnectorCliStatus } from "@openbuddy/protocol/dto";
 import { invoke, listen, type UnlistenFn } from "../../ipc";
 
 // ---------- CLI-type connector authorization (cli.json driven) ----------
@@ -59,31 +60,4 @@ export function onConnectorCliAuthDone(
   cb: (e: ConnectorCliAuthDoneEvent) => void,
 ): Promise<UnlistenFn> {
   return listen<ConnectorCliAuthDoneEvent>("connector://cli-auth-done", (ev) => cb(ev.payload));
-}
-
-// ---------- connector marketplace (live local data dir) ----------
-
-/** First existing candidate marketplace root ("" if none found). */
-export async function connectorsDefaultRoot(): Promise<string> {
-  return invoke<string>("connectors_default_root");
-}
-
-/** Marketplace roots under `root` that contain the connectors manifest. */
-export async function connectorsListRoots(root: string): Promise<string[]> {
-  return invoke<string[]>("connectors_list_roots", { root });
-}
-
-/** Load categories + connectors from the marketplace manifest. */
-export async function connectorsLoad(root?: string): Promise<ConnectorCatalog> {
-  return invoke<ConnectorCatalog>("connectors_load", { root: root ?? null });
-}
-
-/** Read a local icon file as a `data:` URL (svg/png). */
-export async function connectorsIcon(path: string): Promise<string> {
-  return invoke<string>("connectors_icon", { path });
-}
-
-/** Read `<root>/connectors/<source>/mcp.json` raw text ("" if missing). */
-export async function connectorsReadMcpConfig(root: string, source: string): Promise<string> {
-  return invoke<string>("connectors_read_mcp_config", { root, source });
 }

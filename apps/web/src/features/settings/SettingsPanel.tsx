@@ -43,6 +43,7 @@ type SectionId =
   | "personalize"
   | "data"
   | "security"
+  | "mobile"
   | "help";
 
 interface NavItem {

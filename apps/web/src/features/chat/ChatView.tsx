@@ -26,6 +26,9 @@ import { FindBar, isFindHit } from "./FindBar";
 import { ShareMenu } from "./ShareMenu";
 import { QueuePanel } from "../composer/QueuePanel";
 import { usePiQueueStore } from "@/features/composer/state/pi-queue-store";
+import { useAnnotationStore } from "@/shared/state/annotations-store";
+import { HandoffBanner } from "./chat-view/HandoffBanner";
+import { askEdit } from "./chat-view/annotation";
 import { buildNodes } from "@openbuddy/chat-core/turns";
 import { openLightbox } from "@openbuddy/ui/ImageLightbox";
 import { matchShortcut } from "@/shared/lib/shortcuts";
@@ -58,6 +61,7 @@ export function ChatView({
   onSelectMode,
   onSelectExpert,
   onNavigateConnectors,
+  handoffFrom, onOpenSession,
 }: {
   onSend: (text: string, attachments?: { path: string }[]) => void | Promise<void>;
   onCancel: () => void;
@@ -75,6 +79,9 @@ export function ChatView({
   onSelectMode?: (modeId: HomeModeId) => void;
   onSelectExpert?: (agent: AgentEntry) => void;
   onNavigateConnectors?: (tab?: "experts" | "connectors") => void;
+  /** 交接到新任务 (pii W1.7): the session this one was handed off from. */
+  handoffFrom?: { sessionId: string; title?: string } | null;
+  onOpenSession?: (sessionId: string) => void;
 }) {
   const toast = useStableCallback((msg: string) => onToast?.(msg));
   const messages = useSessionStore((s) => s.messages);
@@ -267,13 +274,8 @@ export function ChatView({
     const current = sessionId ? useSessionsStore.getState().drafts[sessionId] ?? "" : "";
     putInComposer(`${current}${current && !current.endsWith(" ") ? " " : ""}\`${relPath(path)}\` `);
   });
-  // 选中文字 → 让 Buddy 改这段 / 批注: quote it into the composer with the file reference.
-  const handleAskEdit = useStableCallback((path: string, selected: string, mode: "edit" | "comment") => {
-    const quote = selected.trim().split("\n").slice(0, 40).map((l) => `> ${l}`).join("\n");
-    const head = mode === "edit" ? `请修改 \`${relPath(path)}\` 中的这段内容：` : `关于 \`${relPath(path)}\` 中的这段：`;
-    const current = sessionId ? useSessionsStore.getState().drafts[sessionId] ?? "" : "";
-    putInComposer(`${current ? current + "\n\n" : ""}${head}\n${quote}\n\n${mode === "edit" ? "修改要求：" : "批注："}`);
-  });
+  // 选中文字 → 让 Buddy 改这段 / 批注: 改这段 quotes into the composer; 批注 goes to the tray (pii W1.9).
+  const handleAskEdit = useStableCallback((path: string, selected: string, mode: "edit" | "comment") => askEdit({ sessionId, relPath, draft: () => (sessionId ? useSessionsStore.getState().drafts[sessionId] ?? "" : ""), putInComposer, addAnnotation: (sid, rel, text) => useAnnotationStore.getState().add(sid, rel, text) }, path, selected, mode));
 
   const markdownConfig = useMemo(() => createMarkdownHostConfig({ cwd, sessionId, onToast: toast }), [cwd, sessionId, toast]);
 
@@ -514,6 +516,7 @@ export function ChatView({
         <div className="chatview__scroll" ref={scrollRef} onScroll={onScroll} onClick={onImageClick}>
           <ArtifactsContext.Provider value={artifactsApi}>
           <div className="chatview__inner">
+            {handoffFrom && <HandoffBanner from={handoffFrom} onOpen={onOpenSession} />}
             {start > 0 && (
               <div ref={moreRef} className="chatview__more">
                 <button type="button" className="chatview__more-btn" onClick={loadEarlier}>显示更早的对话（还有 {start} 条）</button>
@@ -548,6 +551,7 @@ export function ChatView({
                     onOpenTool={handleOpenTool}
                     onRetry={isLast && !streaming ? handleRetry : undefined}
                     onFork={!streaming ? handleFork : undefined}
+                    onInsertPrompt={putInComposer}
                     onToast={toast}
                   />
                 </div>
@@ -596,7 +600,8 @@ export function ChatView({
             onAgentModeChange={sessionId ? changeMode : undefined}
             onEnqueue={sessionId ? async (text, attachments, mode) => {
               const actual = await (mode === "steer" ? agentSteer : agentFollowUp)(sessionId, text, attachments);
-              usePiQueueStore.getState().apply(sessionId, actual);
+              // Keep the queued attachments on the UI item (pii W1.8).
+              usePiQueueStore.getState().applyEnqueued(sessionId, actual, text, attachments ?? [], mode === "steer" ? "steer" : "followUp");
             } : undefined}
             onCancel={onCancel}
             modelId={modelId}

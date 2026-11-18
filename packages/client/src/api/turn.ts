@@ -8,10 +8,13 @@ export async function agentSend(sessionId: string, text: string, attachments?: {
 }
 
 export interface AgentQueue { steering: string[]; followUp: string[] }
+/** A queued prompt as sent by the renderer: text plus (optionally) native attachments (pii W1.8). */
+export interface QueueItemInput { text: string; attachments?: { path: string }[] }
+export type QueueEntry = string | QueueItemInput;
 export const agentGetQueue = (sessionId: string) => invoke<AgentQueue>("agent_get_queue", { sessionId });
 export const agentClearQueue = (sessionId: string) => invoke<AgentQueue>("agent_clear_queue", { sessionId });
-/** Replace the pending queue (one item withdrawn, moved, or turned into 插话). */
-export const agentSetQueue = (sessionId: string, steering: string[], followUp: string[]) => invoke<AgentQueue>("agent_set_queue", { sessionId, steering, followUp });
+/** Replace the pending queue (one item withdrawn, moved, or turned into 插话); attachments stay attached. */
+export const agentSetQueue = (sessionId: string, steering: QueueEntry[], followUp: QueueEntry[]) => invoke<AgentQueue>("agent_set_queue", { sessionId, steering, followUp });
 export const agentSteer = (sessionId: string, text: string, attachments?: { path: string }[]) => invoke<AgentQueue>("agent_steer", { sessionId, text, ...(attachments?.length ? { attachments } : {}) });
 export const agentFollowUp = (sessionId: string, text: string, attachments?: { path: string }[]) => invoke<AgentQueue>("agent_follow_up", { sessionId, text, ...(attachments?.length ? { attachments } : {}) });
 

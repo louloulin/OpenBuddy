@@ -1,6 +1,6 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { EngineContext } from "./engine-context.js";
-import type { PromptImages, SessionRunStatus, Slot } from "./types.js";
+import type { PromptImages, QueueItem, SessionRunStatus, Slot } from "./types.js";
 
 export function emitStatus(engine: EngineContext, slot: Slot) {
   engine.flushDelta(slot);
@@ -91,15 +91,16 @@ export function clearQueue(engine: EngineContext, id: string) {
 }
 /**
  * Replace the pending queue (撤回一条 / 改成插话 / 调整顺序, 20261115-ui U4.5). Pi only offers
- * clear + append, so the new order is re-queued; queued images are not kept.
+ * clear + append, so the new order is re-queued; queued images travel with their item (pii W1.8).
  */
-export async function setQueue(engine: EngineContext, id: string, steering: string[], followUp: string[]) {
+export async function setQueue(engine: EngineContext, id: string, steering: Array<QueueItem | string>, followUp: Array<QueueItem | string>) {
   const slot = engine.slot(id),
     session = slot.session;
+  const normalized = (list: Array<QueueItem | string>): QueueItem[] => list.map((item) => (typeof item === "string" ? { text: item } : item));
   session.clearQueue();
   if (slot.busy) {
-    for (const text of steering) await session.steer(text);
-    for (const text of followUp) await session.followUp(text);
+    for (const item of normalized(steering)) await session.steer(item.text, item.images);
+    for (const item of normalized(followUp)) await session.followUp(item.text, item.images);
   }
   return engine.queueState(id);
 }

@@ -1,8 +1,10 @@
 import { bool, text } from "@openbuddy/services/settings/settings";
+import { ConnectorCatalogService } from "@openbuddy/services/mcp/catalog";
 import type { Handler, HostContext, HostModule } from "../module.js";
 /** §5.3 `mcp` module. MCP servers, config file, test-connect and OAuth sign-in (pii W2.4). */
 export function mcpModule(ctx: HostContext): HostModule {
   const { engine } = ctx;
+  const catalog = new ConnectorCatalogService();
   const commands: Record<string, Handler> = {
     mcp_list: () => engine.mcp.list(),
     mcp_config_path: () => engine.mcp.path,
@@ -46,6 +48,16 @@ export function mcpModule(ctx: HostContext): HostModule {
       if (id && !engine.has(id)) throw Error("会话未加载");
       return engine.mcp.authStatus();
     },
+    // 连接器目录 (W2.4 P2): built-in catalog with real MCP config templates.
+    connectors_default_root: () => catalog.root,
+    connectors_list_roots: () => [catalog.root],
+    connectors_load: () => catalog.catalog(),
+    connectors_read_mcp_config: (p) => catalog.mcpConfig(text(p.source)),
+    // No local icon files: the UI falls back to the first letter.
+    connectors_icon: () => "",
+    // 本任务连接器开关 (W2.4 P2).
+    session_mcp_get: (p) => engine.sessionMcp(text(p.sessionId)),
+    session_mcp_set: (p) => engine.setSessionMcp(text(p.sessionId), text(p.name), bool(p.enabled)),
   };
   return { id: "mcp", commands };
 }

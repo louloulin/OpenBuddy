@@ -5,6 +5,23 @@ export function strings(value: unknown): string[] {
   if (!Array.isArray(value) || value.some((v) => typeof v !== "string" || !v.trim())) throw Error("invalid_payload: list");
   return value as string[];
 }
+/**
+ * Queued prompts (pii W1.8): a string, or `{ text, images }` after the desktop inline step.
+ * The engine re-queues them through Pi's steer / followUp, images included.
+ */
+export function queueItems(value: unknown): Array<{ text: string; images?: ReturnType<typeof trustedImages> }> {
+  if (!Array.isArray(value) || value.length > 50) throw Error("invalid_payload: queue");
+  return value.map((raw) => {
+    if (typeof raw === "string") {
+      if (!raw.trim()) throw Error("invalid_payload: queue");
+      return { text: raw };
+    }
+    const item = object(raw);
+    if (typeof item.text !== "string" || !item.text.trim()) throw Error("invalid_payload: queue");
+    const images = trustedImages(item.images);
+    return images?.length ? { text: item.text, images } : { text: item.text };
+  });
+}
 export function trustedImages(
   value: unknown,
 ): NonNullable<Parameters<PiEngine["send"]>[2]> | undefined {

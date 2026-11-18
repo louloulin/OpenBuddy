@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AgentResourcesPanel } from "../AgentResourcesPanel";
-import { agentExtensionsSetEnabled, mcpAuthTrigger, mcpList, mcpTest } from "@openbuddy/client/agent-client";
+import { agentExtensionsPreviewPackage, agentExtensionsSearchRegistry, agentExtensionsSetEnabled, mcpAuthTrigger, mcpList, mcpTest } from "@openbuddy/client/agent-client";
 
 vi.mock("@openbuddy/client/agent-client", () => ({
   skillsList: vi.fn(async () => []), skillsAdd: vi.fn(), skillsRemove: vi.fn(), skillsToggle: vi.fn(),
@@ -16,6 +16,14 @@ vi.mock("@openbuddy/client/agent-client", () => ({
   agentExtensionsList: vi.fn(async () => ({ enabled: false, paths: ["/trusted/extension.ts"], projectTrusted: true })),
   agentExtensionsSetEnabled: vi.fn(async () => ({ enabled: true, paths: ["/trusted/extension.ts"], projectTrusted: true })),
   agentExtensionsAdd: vi.fn(), agentExtensionsRemove: vi.fn(), agentExtensionsInspect: vi.fn(), agentExtensionsSetPathEnabled: vi.fn(),
+  agentExtensionsPackages: vi.fn(async () => []), agentExtensionsInstallPackage: vi.fn(async () => []),
+  agentExtensionsRemovePackage: vi.fn(async () => []), agentExtensionsUpdatePackages: vi.fn(async () => []),
+  agentExtensionsPreviewPackage: vi.fn(async () => ({ source: "", extensions: [], skills: [], prompts: [], failures: [] })),
+  agentExtensionsCheckUpdates: vi.fn(async () => []),
+  agentExtensionsResources: vi.fn(async () => ({ extensions: [], skills: [], prompts: [], themes: [], failures: [] })),
+  agentExtensionsSetPackageResources: vi.fn(async () => []),
+  agentExtensionsSearchRegistry: vi.fn(async () => ({ query: "", source: "npm", total: 1, fetchedAt: 0, packages: [{ name: "pi-web-access", version: "1.2.0", description: "Web search", publisher: "pi", weeklyDownloads: 1234, keywords: ["pi-package"] }] })),
+  onExtensionProgress: vi.fn(async () => () => {}),
 }));
 vi.mock("../../experts/connectors/McpConfigEditor", () => ({ McpConfigEditor: () => <div>MCP editor</div> }));
 beforeEach(() => vi.clearAllMocks());
@@ -61,5 +69,18 @@ describe("MCP explicit OAuth", () => {
     await waitFor(() => expect(mcpAuthTrigger).toHaveBeenCalled());
     // The card stays usable: 授权 can be retried.
     expect(screen.getByRole("button", { name: "授权" })).toBeEnabled();
+  });
+
+  it("searches npm for Pi packages and previews the install (S15)", async () => {
+    render(<AgentResourcesPanel sessionId="A" />);
+    fireEvent.click(screen.getByRole("button", { name: "可信扩展" }));
+    const input = await screen.findByLabelText("搜索 Pi 扩展包");
+    fireEvent.change(input, { target: { value: "web" } });
+    fireEvent.click(screen.getByRole("button", { name: "搜索" }));
+    expect(await screen.findByText("pi-web-access")).toBeInTheDocument();
+    expect(agentExtensionsSearchRegistry).toHaveBeenCalledWith("web");
+    expect(screen.getByText("1234 次/周")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "检查并安装" }));
+    await waitFor(() => expect(agentExtensionsPreviewPackage).toHaveBeenCalledWith("npm:pi-web-access"));
   });
 });

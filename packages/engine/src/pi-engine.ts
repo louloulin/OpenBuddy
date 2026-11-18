@@ -1,5 +1,6 @@
 import {
   SessionManager,
+  DefaultPackageManager,
   type AgentSession,
   type AgentSessionEvent,
   type SessionInfo,
@@ -24,6 +25,7 @@ import { CheckpointStore } from "./checkpoints/store.js";
 import { validateThinkingLevel, type AgentMode, type PoolLimits, type PromptImages, type SessionRunStatus, type Slot, type ThinkingLevel } from "./types.js";
 import { PI_VERSION } from "./version.js";
 import type { AgentSettingsPatch } from "@openbuddy/protocol/agent-settings";
+import type { ExtensionPackageFilters, ExtensionPackagePreview, ExtensionResources } from "@openbuddy/protocol/extensions";
 import * as pipeline from "./event-pipeline.js";
 import * as runtime from "./session-runtime.js";
 import * as pool from "./session-pool.js";
@@ -212,6 +214,7 @@ export class PiEngine {
       status: this.runStatus(slot),
       queue: this.queueState(id),
       expert: features.sessionExpert(this, id),
+      handoffFrom: this.settings.config.read().sessions[id]?.handoffFrom,
     };
   }
   /** @internal */ savedModel(item: SessionInfo) { return catalog.savedModel(this, item); }
@@ -251,9 +254,11 @@ export class PiEngine {
   previewRoots(): string[] { return pool.previewRoots(this); }
   queueState(id: string) { return runtime.queueState(this, id); }
   clearQueue(id: string) { return runtime.clearQueue(this, id); }
-  setQueue(id: string, steering: string[], followUp: string[]) { return runtime.setQueue(this, id, steering, followUp); }
+  setQueue(id: string, steering: Array<import("./types.js").QueueItem | string>, followUp: Array<import("./types.js").QueueItem | string>) { return runtime.setQueue(this, id, steering, followUp); }
   queue(id: string, kind: "steer" | "followUp", prompt: string, images?: PromptImages) { return runtime.queue(this, id, kind, prompt, images); }
   fork(id: string) { return features.fork(this, id); }
+  /** 交接到新任务 (W1.7): a fresh session plus a self-contained draft; nothing is sent. */
+  handoff(id: string, goal: string) { return features.handoff(this, id, goal); }
   cancel(id: string) { return runtime.cancel(this, id); }
   compact(id: string, instructions?: string) { return features.compact(this, id, instructions); }
   /** 设置 · 智能体 (pi-settings.json, 20261116-pii W0.4). */
@@ -261,12 +266,32 @@ export class PiEngine {
   setAgentSettings(patch: AgentSettingsPatch) { return features.setAgentSettings(this, patch); }
   /** Ctrl/Cmd+P over the favourite models (W1.6). */
   cycleModel(id: string, direction?: "forward" | "backward") { return features.cycleModel(this, id, direction); }
+  /** 本任务连接器开关 (W2.4 P2): enabled MCP servers, minus the ones this session turned off. */
+  sessionMcp(id: string) {
+    const disabled = new Set(this.settings.config.read().sessionMcpDisabled?.[id] ?? []);
+    return {
+      servers: this.mcp
+        .list()
+        .filter((server) => server.enabled)
+        .map((server) => ({ name: server.name, enabled: !disabled.has(server.name) })),
+    };
+  }
+  async setSessionMcp(id: string, name: string, enabled: boolean) {
+    if (!this.mcp.list().some((server) => server.name === name)) throw Error("mcp_server_not_found");
+    const config = this.settings.config.read();
+    const disabled = new Set(config.sessionMcpDisabled?.[id] ?? []);
+    if (enabled) disabled.delete(name); else disabled.add(name);
+    config.sessionMcpDisabled = { ...(config.sessionMcpDisabled ?? {}), [id]: [...disabled] };
+    this.settings.config.write(config);
+    await this.reload((slot) => slot.id === id);
+    return this.sessionMcp(id);
+  }
   close(id: string) { return pool.close(this, id); }
   shutdown() { return pool.shutdown(this); }
   /** @internal */ evictOverflow(keep: string) { return pool.evictOverflow(this, keep); }
   evictIdle(now = Date.now()) { return pool.evictIdle(this, now); }
   rename(id: string, title: string) { return catalog.rename(this, id, title); }
-  metadata(id: string, patch: { title?: string; pinned?: boolean; archived?: boolean }) { return catalog.metadata(this, id, patch); }
+  metadata(id: string, patch: { title?: string; pinned?: boolean; archived?: boolean; handoffFrom?: { sessionId: string; title?: string } | null }) { return catalog.metadata(this, id, patch); }
   delete(id: string) { return catalog.deleteSession(this, id); }
   modelState(id: string) {
     const s = this.live(id),
@@ -364,15 +389,17 @@ export class PiEngine {
     };
   }
   commands() {
-    const skills = this.skills
-      .list(this.currentCwd)
-      .filter((s) => s.enabled)
-      .map((s) => ({
-        name: `skill:${s.name}`,
-        description: s.description,
-        source: "skill",
-      }));
     const focused = this.focusedId ? this.slots.get(this.focusedId) : undefined;
+    // The focused loader already merged app skills with Pi-discovered package / CLI skills (S16);
+    // without a session only the app-managed list exists.
+    const skillEntries = focused
+      ? focused.session.resourceLoader.getSkills().skills
+      : this.skills.active(this.currentCwd);
+    const skills = skillEntries.map((s) => ({
+      name: `skill:${s.name}`,
+      description: s.description,
+      source: "skill",
+    }));
     const extensions =
       focused?.session.extensionRunner.getRegisteredCommands().map((c) => ({
         name: c.invocationName,
@@ -392,6 +419,75 @@ export class PiEngine {
       disabled: c.extensionDisabled ?? [],
       projectTrusted: this.trusted(this.currentCwd),
     };
+  }
+  /** 扩展包 (W2.6 P2 / S14): Pi's DefaultPackageManager, one per cwd, progress on the event bus. */
+  private packageManagers = new Map<string, DefaultPackageManager>();
+  private packageManager(cwd = this.currentCwd) {
+    let manager = this.packageManagers.get(cwd);
+    if (!manager) {
+      manager = new DefaultPackageManager({
+        cwd,
+        agentDir: this.settings.dir,
+        settingsManager: this.settings.pi.manager(this.trusted(cwd)),
+      });
+      manager.setProgressCallback((event) => this.emit("agent://extension-progress", event));
+      this.packageManagers.set(cwd, manager);
+    }
+    return manager;
+  }
+  extensionPackages(cwd?: string) {
+    const configured = this.settings.pi.manager(this.trusted(cwd ?? this.currentCwd)).getPackages();
+    return features.withPackageFilters(this.packageManager(cwd).listConfiguredPackages(), configured);
+  }
+  /** 包资源开关 (S17): write Pi's object-form filters, then rebuild sessions so loading changes apply. */
+  async setExtensionPackageResources(source: string, resources: ExtensionPackageFilters, cwd?: string) {
+    const root = cwd ?? this.currentCwd;
+    await features.setPackageFilters(this, source, resources, root);
+    this.packageManagers.delete(root);
+    return this.extensionPackages(cwd);
+  }
+  async installExtensionPackage(source: string, cwd?: string) {
+    await this.packageManager(cwd).installAndPersist(source);
+    this.extensionsDirty = true;
+    await this.reload();
+    return this.extensionPackages(cwd);
+  }
+  async removeExtensionPackage(source: string, cwd?: string) {
+    await this.packageManager(cwd).removeAndPersist(source);
+    this.extensionsDirty = true;
+    await this.reload();
+    return this.extensionPackages(cwd);
+  }
+  async updateExtensionPackages(source?: string, cwd?: string) {
+    await this.packageManager(cwd).update(source);
+    this.extensionsDirty = true;
+    await this.reload();
+    return this.extensionPackages(cwd);
+  }
+  /** 安装前预览 (W2.6 P2): resolve into a temporary folder, inspect, then throw it away. */
+  async previewExtensionPackage(source: string, cwd?: string): Promise<ExtensionPackagePreview> {
+    const root = cwd ?? this.currentCwd;
+    const resolved = await this.packageManager(root).resolveExtensionSources([source], { temporary: true });
+    const reports = await features.inspectExtensions(this, resolved.extensions.map((entry) => entry.path), root);
+    return {
+      source,
+      extensions: reports.map((report) => ({ path: report.path, tools: report.tools, commands: report.commands, shortcuts: report.shortcuts, error: report.error })),
+      skills: resolved.skills.map((entry) => entry.path),
+      prompts: resolved.prompts.map((entry) => entry.path),
+      failures: (resolved.installFailures ?? []).map((failure) => ({ source: failure.source, message: failure.message })),
+    };
+  }
+  extensionUpdates(cwd?: string) {
+    return this.packageManager(cwd).checkForAvailableUpdates();
+  }
+  /**
+   * What configured packages contribute (S15): Pi resolves each package into extensions,
+   * skills, prompts and themes. Missing sources are skipped (`"skip"`) so a read-only panel
+   * never triggers an install or a network round-trip. Top-level local paths are not packages
+   * and stay in `extensionsList`.
+   */
+  async extensionResources(cwd?: string): Promise<ExtensionResources> {
+    return features.packageResources(await this.packageManager(cwd).resolve(async () => "skip"));
   }
   /** 扩展中心 (W2.6): the configured paths plus what each one registers and why it failed. */
   async extensionsList(cwd?: string) {

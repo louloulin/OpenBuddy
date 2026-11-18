@@ -9,10 +9,16 @@ export const COMMANDS = [
   'permission_protected_get', 'permission_protected_set',
   'providers_list', 'providers_save_provider', 'providers_save_model', 'providers_delete_provider',
   'providers_delete_model', 'providers_fetch_models', 'providers_test', 'account_get_api_key', 'account_set_api_key',
+  // 本地模型 (pii W8): llama.cpp / OpenAI-compatible local server.
+  'providers_local_get', 'providers_local_probe', 'providers_local_set',
   'read_text_file', 'write_text_file', 'read_file_base64', 'export_text_file', 'list_dir',
   'browse_directory', 'path_stat', 'open_path', 'open_url', 'reveal_in_folder',
   'mcp_list', 'mcp_upsert', 'mcp_toggle', 'mcp_delete', 'mcp_config_read', 'mcp_config_save',
   'mcp_config_path', 'mcp_test', 'mcp_auth_trigger', 'mcp_auth_status', 'mcp_deferred_get', 'mcp_deferred_set',
+  // 连接器目录 (pii W2.4 P2): real MCP config templates; CLI auth commands stay unimplemented.
+  'connectors_default_root', 'connectors_list_roots', 'connectors_load', 'connectors_read_mcp_config', 'connectors_icon',
+  // 本任务连接器开关 (pii W2.4 P2): session-scoped enable list.
+  'session_mcp_get', 'session_mcp_set',
   'skills_list', 'skills_add',
   'skills_remove', 'skills_toggle', 'commands_list', 'notification_list', 'notification_append',
   'notification_mark_read', 'notification_mark_all_read', 'notification_clear',
@@ -20,6 +26,8 @@ export const COMMANDS = [
   'notify_channels_list', 'notify_channels_save', 'notify_channels_delete', 'notify_channels_test',
   'agents_defaults_get', 'agents_defaults_save', 'usage_snapshot', 'dialog_open', 'dialog_save', 'dialog_ask',
   'window_minimize', 'window_toggle_maximize', 'window_close', 'window_is_maximized', 'window_edit', 'clipboard_write_text',
+  // 窗口与唤起 (20261116-pii W7): independent session windows + global quick input.
+  'window_open_session', 'window_open_quick', 'quick_shortcut_get', 'quick_shortcut_set',
   // 托盘常驻 (20261116-pii W4.4): desktop native, persisted in tray.json.
   'tray_get', 'tray_set',
   // 手机接入 (20261115-mobile.md §4.4): desktop-only pairing management.
@@ -28,6 +36,13 @@ export const COMMANDS = [
   'agent_steer', 'agent_follow_up', 'agent_get_queue', 'agent_clear_queue',
   'agent_fork_session', 'agent_extensions_list', 'agent_extensions_inspect', 'agent_extensions_add',
   'agent_extensions_remove', 'agent_extensions_set_enabled', 'agent_extensions_set_path_enabled', 'tasks_list', 'task_kill',
+  // 扩展包 (pii W2.6 P2 / S14): Pi DefaultPackageManager — npm / git install, remove, update.
+  'agent_extensions_packages', 'agent_extensions_install_package', 'agent_extensions_remove_package', 'agent_extensions_update_packages',
+  'agent_extensions_preview_package', 'agent_extensions_check_updates',
+  // Pi 包市场与包资源 (S15): npm registry search + what each configured package contributes.
+  'agent_extensions_search_registry', 'agent_extensions_resources',
+  // 包资源开关 (S17): Pi object-form package filters (`[]` = load none of that type).
+  'agent_extensions_set_package_resources',
   'rewind_points', 'rewind_execute', 'agent_regenerate', 'agent_compact',
   'artifacts_list', 'checkpoint_list', 'checkpoint_read', 'checkpoint_restore', 'turn_revert', 'artifact_save',
   'agent_export_html', 'agent_export_jsonl', 'agent_import_jsonl', 'agent_set_mode', 'agent_abort_retry', 'clipboard_save_image',
@@ -37,13 +52,15 @@ export const COMMANDS = [
   'agent_diagnose',
   // 20261116-pii W1.1 branch switcher, W1.2 `!command`, W1.3 `@` file mention.
   'agent_tree', 'agent_navigate', 'agent_bash', 'agent_bash_abort', 'files_search',
+  // 20261116-pii W1.7 交接到新任务: builds a self-contained draft, never auto-sends.
+  'agent_handoff',
   // 20261116-pii W0.4 / W1.6 (host module `model`).
   'settings_agent_get', 'settings_agent_set', 'agent_cycle_model',
   // 专家 (20261116-pii W2.1–W2.3): the experts host module.
   'agents_list', 'agents_get', 'agents_save', 'agents_delete', 'agents_template',
   'agent_set_session_expert', 'agent_clear_session_expert',
   'experts_default_root', 'experts_list_roots', 'experts_set_roots', 'experts_load', 'experts_read_agent_prompt',
-  'experts_thumbnail', 'experts_image_bytes', 'experts_link_agents', 'teams_list', 'teams_install',
+  'experts_thumbnail', 'experts_image_bytes', 'experts_link_agents', 'experts_import_workbuddy', 'teams_list', 'teams_install',
   // 自动化 (20261116-pii W4.1–W4.3): the automation host module.
   'automations_snapshot', 'automations_save', 'automations_delete', 'automations_set_status', 'automations_run',
   'automation_tick', 'automation_records_archive', 'automation_records_delete',

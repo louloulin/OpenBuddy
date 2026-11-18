@@ -40,3 +40,17 @@ export const trayGet = () => invoke<{ enabled: boolean }>("tray_get", {});
 
 /** 开关托盘常驻；主进程写入 userData/tray.json，下次启动仍生效。 */
 export const traySet = (enabled: boolean) => invoke<{ enabled: boolean }>("tray_set", { enabled });
+
+// ---------- 窗口与唤起 (pii W7) ----------
+
+/** 在独立窗口打开一个会话（主进程按 `#/session/<id>` 路由新建窗口）。 */
+export const openSessionWindow = (sessionId: string) => invoke<void>("window_open_session", { sessionId });
+
+/** 打开全局快速输入小窗。 */
+export const openQuickWindow = () => invoke<void>("window_open_quick", {});
+
+/** 当前全局快速输入快捷键。 */
+export const quickShortcutGet = () => invoke<string>("quick_shortcut_get", {});
+
+/** 修改全局快速输入快捷键；注册失败时主进程保留旧值并抛错。 */
+export const quickShortcutSet = (accelerator: string) => invoke<string>("quick_shortcut_set", { accelerator });

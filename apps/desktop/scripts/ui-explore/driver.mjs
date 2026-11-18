@@ -380,6 +380,8 @@ const ctx = {
   consoleLog, pageErrors,
   // 20261116-pii W4.7: 文件触发 — the e2e writes the watched file to trigger the task.
   writeFile: (path, content) => writeFile(path, content, 'utf-8'),
+  /** Save a base64 PNG returned by a secondary window's capturePage (pii W7). */
+  savePng: async (name, base64) => { const path = join(OUT, `${name}.png`); await writeFile(path, Buffer.from(base64, 'base64')); return path; },
   mkdir: (path) => mkdir(path, { recursive: true }),
   tmpPath: (name) => join(RUN, name),
   call: (command, payload = {}) => page.evaluate(({ command, payload }) => window.openbuddy.invoke(command, payload), { command, payload }),

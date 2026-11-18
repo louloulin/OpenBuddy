@@ -88,6 +88,30 @@ export function Workbench({ sessionId, cwd, artifacts, version, toolCall, focus,
     ...files.map((p) => ({ id: `file:${p}` as TabId, label: baseName(p), title: p, closable: true })),
   ], [artifacts.length, files, toolCall]);
 
+  // 窄窗口标签栏折叠成下拉 (pii W1.9 / U1.2): a hidden copy measures real overflow.
+  const measureRef = useRef<HTMLDivElement>(null);
+  const [overflow, setOverflow] = useState(false);
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches);
+  const [tabsMenuOpen, setTabsMenuOpen] = useState(false);
+  const activeTab = tabs.find((tab) => tab.id === active) ?? tabs[0];
+  const collapsed = overflow || (narrow && tabs.length > 2);
+  useEffect(() => {
+    const el = measureRef.current;
+    if (!el) return;
+    const measure = () => setOverflow(el.scrollWidth > el.clientWidth + 2);
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(el);
+    return () => observer?.disconnect();
+  }, [tabs]);
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 900px)");
+    const sync = () => setNarrow(query.matches);
+    sync();
+    query.addEventListener?.("change", sync);
+    return () => query.removeEventListener?.("change", sync);
+  }, []);
+
   const closeTab = useCallback((id: TabId) => {
     const index = tabs.findIndex((t) => t.id === id);
     if (id.startsWith("file:")) setFiles((list) => list.filter((p) => `file:${p}` !== id));
@@ -150,6 +174,35 @@ export function Workbench({ sessionId, cwd, artifacts, version, toolCall, focus,
     >
       {!full && <div className="bench__sash" onPointerDown={startResize} role="separator" aria-orientation="vertical" aria-label="调整宽度" />}
       <header className="bench__head" {...drag}>
+        <div ref={measureRef} className="bench__tabs bench__tabs--measure" aria-hidden="true">
+          {tabs.map((t) => (
+            <div key={t.id} className="bench-tab">
+              <button type="button" className="bench-tab__btn" tabIndex={-1}><span className="bench-tab__label">{t.label}</span>{t.badge ? <span className="bench-tab__badge">{t.badge}</span> : null}</button>
+              {t.closable && <button type="button" className="bench-tab__close" tabIndex={-1}><CloseIcon size={12} /></button>}
+            </div>
+          ))}
+        </div>
+        {collapsed ? (
+          <div className="bench__tabs-picker-wrap">
+            <button type="button" className="bench__tabs-picker" aria-haspopup="menu" aria-expanded={tabsMenuOpen} onClick={() => setTabsMenuOpen((value) => !value)}>
+              <span className="bench-tab__label">{activeTab?.label ?? "标签"}</span>
+              <span className="bench-tab__badge">{tabs.length}</span>
+              <span className="bench__tabs-caret" aria-hidden="true">▾</span>
+            </button>
+            {tabsMenuOpen && (
+              <div className="bench__tabs-menu" role="menu">
+                {tabs.map((t) => (
+                  <div key={t.id} className={"bench__tabs-menu-row" + (active === t.id ? " is-active" : "")}>
+                    <button type="button" role="menuitem" className="bench__tabs-menu-item" onClick={() => { setActive(t.id); setTabsMenuOpen(false); }}>
+                      <span>{t.label}</span>{t.badge ? <span className="bench-tab__badge">{t.badge}</span> : null}
+                    </button>
+                    {t.closable && <button type="button" className="bench__tabs-menu-close" aria-label={`关闭 ${t.label}`} onClick={() => { closeTab(t.id); setTabsMenuOpen(false); }}>×</button>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
         <div className="bench__tabs" role="tablist" aria-label="工作台标签" {...drag}>
           {tabs.map((t) => (
             <div key={t.id} className={"bench-tab" + (active === t.id ? " bench-tab--active" : "") + (t.closable ? " bench-tab--closable" : "")}>
@@ -173,6 +226,7 @@ export function Workbench({ sessionId, cwd, artifacts, version, toolCall, focus,
             </div>
           ))}
         </div>
+        )}
         <div className="bench__actions">
           <button type="button" className="bench-icon" onClick={() => setFull((v) => !v)} aria-label={full ? "退出全屏" : "全屏"} data-tip={full ? "退出全屏 (Esc)" : "全屏"}>
             {full ? <RestoreIcon size="sm" /> : <MaximizeIcon size="sm" />}

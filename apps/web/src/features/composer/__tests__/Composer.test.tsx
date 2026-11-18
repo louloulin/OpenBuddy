@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Composer } from "../Composer";
+import { useAnnotationStore } from "@/shared/state/annotations-store";
 
 const base = { streaming: false, onSend: vi.fn(), onCancel: vi.fn() };
 
@@ -44,6 +45,26 @@ describe("Composer", () => {
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "x" } });
     fireEvent.click(screen.getByRole("button", { name: "停止生成" }));
     expect(onCancel).toHaveBeenCalled();
+  });
+
+  // ---------- 批注托盘 (pii W1.9) ----------
+  it("批注进入托盘，随下一条消息一起发送并清空", () => {
+    const onSend = vi.fn();
+    useAnnotationStore.getState().add("s-anno", "report.md", "关于 `report.md` 中的这段：\n> 旧文案");
+    render(<Composer {...base} onSend={onSend} usageSessionId="s-anno" />);
+    expect(screen.getByText("批注（1）")).toBeInTheDocument();
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "改成新文案" } });
+    fireEvent.keyDown(input, { key: "Enter", shiftKey: false });
+    expect(onSend).toHaveBeenCalledWith("关于 `report.md` 中的这段：\n> 旧文案\n\n改成新文案");
+    expect(useAnnotationStore.getState().bySession["s-anno"]).toEqual([]);
+  });
+
+  it("批注可以单条移除", () => {
+    useAnnotationStore.getState().add("s-anno-2", "a.md", "关于 `a.md` 中的这段：\n> x");
+    render(<Composer {...base} usageSessionId="s-anno-2" />);
+    fireEvent.click(screen.getByRole("button", { name: "移除批注 a.md" }));
+    expect(screen.queryByText("批注（1）")).toBeNull();
   });
 
   // ---------- 按会话持久化草稿 ----------

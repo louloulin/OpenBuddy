@@ -18,12 +18,13 @@ import * as ImageManipulator from 'expo-image-manipulator'
 import * as Speech from 'expo-speech'
 
 import { appendAttachments, compressOptions, checkUpload, MAX_ATTACHMENTS } from '../core/attachments'
+import { quotePreview, withQuote } from '../core/quote'
 import { mergeTranscript, transcriptOutcome, unavailableMessage } from '../core/voice'
 import { haptic } from '../native/haptics'
 import { matchCommands, slashQuery, toSlashCommands, type SlashCommand } from '../core/slash'
 import { useApp } from '../stores/app'
 import { themeFor } from '../theme'
-import { CameraIcon, MicIcon, SendIcon, StopIcon } from './icons'
+import { CameraIcon, CloseIcon, MicIcon, SendIcon, StopIcon } from './icons'
 
 export type ComposerProps = {
   onSend: (text: string) => void
@@ -37,9 +38,18 @@ export type ComposerProps = {
   placeholder?: string
   /** Prefilled once at mount (handoff drafts); the field is the user's after. */
   initialDraft?: string
+  /** The message being quoted; sent as a `>` prefix (see core/quote). */
+  quoted?: string | null
+  onClearQuote?: () => void
+  /** Edit-resend: replaces the draft whenever the token changes. */
+  prefill?: { text: string; token: number }
 }
 
-export function Composer({ onSend, onImage, onImages, onStop, onSteer, streaming = false, placeholder = '给 OpenBuddy 发消息…', initialDraft = '' }: ComposerProps) {
+export function Composer({
+  onSend, onImage, onImages, onStop, onSteer,
+  streaming = false, placeholder = '给 OpenBuddy 发消息…', initialDraft = '',
+  quoted = null, onClearQuote, prefill,
+}: ComposerProps) {
   const theme = themeFor(useColorScheme())
   const insets = useSafeAreaInsets()
   const [draft, setDraft] = useState(initialDraft)
@@ -66,24 +76,33 @@ export function Composer({ onSend, onImage, onImages, onStop, onSteer, streaming
       .catch(() => {})
   }, [query, commandsLoaded, transport])
 
+  // Edit-resend replaces the field each time the caller bumps the token.
+  useEffect(() => {
+    if (!prefill) return
+    setDraft(prefill.text)
+  }, [prefill?.token])
+
   /**
    * One send action for text and pictures: attachments sit in a draft tray
    * until the user is ready, the way Grok/Kimi stage them. Text alone still
-   * goes through `onSend`.
+   * goes through `onSend`. A quoted message rides along as a `>` prefix.
    */
   const submit = () => {
-    const text = draft.trim()
-    if (!text && pending.length === 0) return
+    const raw = draft.trim()
+    if (!raw && pending.length === 0) return
+    const text = withQuote(quoted, raw)
     void haptic('send')
     if (pending.length) {
       const images = pending.map(({ bytes, mime }) => ({ bytes, mime }))
       setPending([])
       setDraft('')
+      onClearQuote?.()
       if (onImages) onImages(images, text)
       else if (images[0]) onImage(images[0].bytes, images[0].mime, text)
       return
     }
     setDraft('')
+    onClearQuote?.()
     onSend(text)
   }
 
@@ -335,6 +354,31 @@ export function Composer({ onSend, onImage, onImages, onStop, onSteer, streaming
             ))}
             <Text style={{ color: theme.textWeak, fontSize: 11 }}>{pending.length}/{MAX_ATTACHMENTS}</Text>
           </ScrollView>
+        ) : null}
+
+        {quoted ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 6,
+              paddingLeft: 10,
+              paddingRight: 6,
+              paddingVertical: 6,
+              borderRadius: 8,
+              borderLeftWidth: 2,
+              borderLeftColor: theme.textMedium,
+              backgroundColor: theme.surface,
+            }}
+          >
+            <Text numberOfLines={2} style={{ flex: 1, color: theme.textWeak, fontSize: 12, lineHeight: 17 }}>
+              {quotePreview(quoted)}
+            </Text>
+            <Pressable onPress={onClearQuote} hitSlop={8} accessibilityLabel="取消引用">
+              <CloseIcon size={13} color={theme.textWeak} />
+            </Pressable>
+          </View>
         ) : null}
 
         {commandMenu.length ? (

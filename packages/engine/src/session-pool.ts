@@ -13,6 +13,18 @@ import { readPromptTemplatesSync } from "./builtin/prompts-sync.js";
 import { restoreMode } from "./features/mode.js";
 import { favoriteScope } from "./features/agent-settings.js";
 
+/** OpenBuddy's own resources first, then what Pi discovered (packages / CLI / extensions). */
+export function mergeByName<T extends { name: string }>(primary: T[], secondary: T[], blocked: ReadonlySet<string> = new Set()) {
+  const seen = new Set(primary.map((item) => item.name));
+  const merged = [...primary];
+  for (const item of secondary) {
+    if (!item.name || seen.has(item.name) || blocked.has(item.name)) continue;
+    seen.add(item.name);
+    merged.push(item);
+  }
+  return merged;
+}
+
 /** Create a live session for `manager` without touching any other session. */
 export async function open(
   engine: EngineContext,
@@ -67,25 +79,33 @@ export async function open(
     // 我的指令 (pii W2.7 / S8): the loader's own scan is replaced by the PromptsService view, so
     // the `/` menu sees exactly the global + trusted-project templates the settings panel edits.
     // The override is synchronous (Pi calls it during reload), so read the files with node:fs.
-    noPromptTemplates: true,
-    promptsOverride: () => ({
-      prompts: readPromptTemplatesSync([
-        { dir: join(engine.settings.dir, "prompts"), scope: "global" },
-        ...(trusted ? [{ dir: join(cwd, ".pi", "prompts"), scope: "workspace" as const }] : []),
-      ]),
-      diagnostics: [],
+    // Pi's base result still contributes package / CLI / extension prompts (S16); OpenBuddy's
+    // own templates win on a name clash so toggles and scope stay authoritative.
+    noPromptTemplates: false,
+    promptsOverride: (base) => ({
+      prompts: mergeByName(
+        readPromptTemplatesSync([
+          { dir: join(engine.settings.dir, "prompts"), scope: "global" },
+          ...(trusted ? [{ dir: join(cwd, ".pi", "prompts"), scope: "workspace" as const }] : []),
+        ]),
+        base.prompts,
+      ),
+      diagnostics: base.diagnostics,
     }),
+    // Themes are the web app's own; a Pi package theme cannot restyle the renderer.
     noThemes: true,
-    noSkills: true,
-    skillsOverride: () => ({
-      skills: engine.skills.active(cwd),
-      diagnostics: [],
+    // Package / CLI skills must reach the session (S16): keep Pi's discovery, then merge the
+    // app-managed list (which honours per-skill switches) over it.
+    noSkills: false,
+    skillsOverride: (base) => ({
+      skills: mergeByName(engine.skills.active(cwd), base.skills, new Set(config.disabledSkills ?? [])),
+      diagnostics: base.diagnostics,
     }),
     extensionFactories: [
       engine.permissions.extension(sessionId),
       // After the permission gate: only calls that may run get a snapshot.
       engine.checkpoints.extension(sessionId, () => cwd),
-      engine.mcp.extension(),
+      engine.mcp.extension(config.sessionMcpDisabled?.[sessionId] ?? []),
       // 延迟暴露 (W2.4 P2 / S11): `tool_search` is only useful when a server defers its tools.
       ...(engine.mcp.usesDeferred() ? [createToolSearchExtension()] : []),
       // Built-in extensions (20261116-pii W0.5): app code, before user extensions.

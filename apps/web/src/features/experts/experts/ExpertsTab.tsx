@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { open as openDialog } from "@openbuddy/client/ipc";
 import { SearchIcon, MyExpertIcon, SparklesIcon, FolderOpenIcon, RefreshCwIcon } from "@openbuddy/ui/icon/icons/index";
-import { agentsDelete, agentsGet, agentsList, expertsLinkAgents, expertsLoad, expertsSetRoots } from "@openbuddy/client/agent-client";
+import { agentsDelete, agentsGet, agentsList, expertsImportWorkbuddy, expertsLinkAgents, expertsLoad, expertsSetRoots } from "@openbuddy/client/agent-client";
 import type { ExpertCenterCatalog, ExpertDraft, ExpertEntry, ExpertSceneInfo } from "@openbuddy/protocol/experts";
 import { appConfirm } from "../../../shared/ui/AppDialog";
 import { FEATURED_SCENES } from "../data/featured-scenes";
@@ -57,6 +57,7 @@ export function ExpertsTab({ pills, onGoHome, onToast, views = { center: true, m
   const [detail, setDetail] = useState<ExpertEntry | null>(null);
   const [editing, setEditing] = useState<ExpertDraft | null>(null);
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
   const setPending = usePendingExpertStore((s) => s.set);
 
   const loadCatalog = useCallback(async () => {
@@ -128,6 +129,22 @@ export function ExpertsTab({ pills, onGoHome, onToast, views = { center: true, m
       return (Array.isArray(sel) ? sel[0] : sel) || undefined;
     } catch { return undefined; }
   };
+  /** WorkBuddy 兼容 (S18): pick its exported .zip and convert every agent into 我的专家. */
+  const importWorkbuddy = useCallback(async () => {
+    if (importing) return;
+    try {
+      const sel = await openDialog({ directory: false, multiple: false, title: "选择 WorkBuddy 专家包", filters: [{ name: "WorkBuddy 专家包", extensions: ["zip"] }] });
+      const path = (Array.isArray(sel) ? sel[0] : sel) || undefined;
+      if (!path) return;
+      setImporting(true);
+      const result = await expertsImportWorkbuddy(path);
+      const failed = result.skipped.length ? `，${result.skipped.length} 位失败：${result.skipped[0]?.error ?? ""}` : "";
+      onToast?.(result.imported.length ? `已从「${result.package}」导入 ${result.imported.length} 位专家${failed}` : `没有导入任何专家${failed}`);
+      setView("my");
+      reload();
+    } catch (e) { onToast?.(`导入失败：${errorText(e)}`); }
+    finally { setImporting(false); }
+  }, [importing, onToast, reload]);
 
   const overlays = (
     <>
@@ -149,6 +166,7 @@ export function ExpertsTab({ pills, onGoHome, onToast, views = { center: true, m
     return (
       <>
         <MyExperts experts={mine} categories={categories} loading={mineLoading} userDir={catalog?.userDir}
+          importing={importing} onImportWorkbuddy={importWorkbuddy}
           onBack={() => setView("center")} onCreate={() => setEditing(emptyDraft())} onOpen={setDetail}
           onSummon={(e) => summon(e)} onEdit={edit} onDuplicate={duplicate} onDelete={remove} />
         {overlays}

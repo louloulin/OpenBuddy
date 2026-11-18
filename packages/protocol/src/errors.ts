@@ -30,6 +30,9 @@ export const PROTOCOL_ERROR_CODES = [
   'expert_readonly',
   // 20261116-pii W3.5
   'team_not_found',
+  // S15: Pi package marketplace (npm registry search).
+  'registry_unreachable',
+  'registry_invalid_response',
 ] as const;
 export type ProtocolErrorCode = typeof PROTOCOL_ERROR_CODES[number];
 

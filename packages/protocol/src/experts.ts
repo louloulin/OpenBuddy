@@ -107,6 +107,13 @@ export interface ExpertRootInfo {
   error?: string;
 }
 
+/** `experts_import_workbuddy`: what a WorkBuddy package produced (S18). */
+export interface WorkBuddyImportResult {
+  package: string;
+  imported: ExpertEntry[];
+  skipped: Array<{ id: string; error: string }>;
+}
+
 /** `experts_load`: the merged catalog for one working directory. */
 export interface ExpertCenterCatalog {
   /** The user's own experts directory (`<pi>/agents`). */

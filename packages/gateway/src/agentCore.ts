@@ -494,7 +494,8 @@ export function createAgentClient(options: AgentCoreOptions): AgentClient {
         // phone waiting out its 30-second head timeout, so a drop is treated
         // as a dead tunnel: reconnect, which makes the gateway fail the
         // in-flight requests immediately instead of hanging them.
-        const verdict = ws.send(JSON.stringify(frame))
+        // DOM typings say `void`; Bun returns the number of bytes queued (0 = dropped).
+        const verdict = ws.send(JSON.stringify(frame)) as unknown as number
         if (verdict === 0) {
           log('[agent] tunnel send dropped; reconnecting')
           try { ws.close(1013, 'send buffer full') } catch { /* already closing */ }

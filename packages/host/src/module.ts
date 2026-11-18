@@ -8,6 +8,12 @@ export interface EngineOptions {
   safeStorage: SafeStorage;
   /** Host shell port; its optional `trash` is handed to the engine (desktop: Electron `shell.trashItem`). */
   shell: HostShell;
+  /**
+   * Network port for host-originated HTTP (desktop: Electron `net.fetch`, which follows the
+   * system proxy). Defaults to the runtime's global fetch (tests / gateway). The Pi package
+   * market uses this so a proxied desktop can reach npm (S15).
+   */
+  fetchImpl?: typeof fetch;
   /** Trusted host-provided extensions; never accepted in renderer IPC. */
   extensionFactories?: ExtensionFactory[];
   /**

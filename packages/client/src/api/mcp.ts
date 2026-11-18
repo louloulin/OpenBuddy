@@ -1,6 +1,6 @@
 // §5.3 `mcp` module: mcp_list / upsert / toggle / delete, mcp_config_read / save / path,
 // mcp_test (pii W2.4), mcp_auth_trigger / status.
-import type { McpAuthStatusEntry, McpAuthTriggerResult, McpConfigFile, McpServerEntry, McpTestResult, McpUpsertRequest } from "@openbuddy/protocol/dto";
+import type { ConnectorCatalog, McpAuthStatusEntry, McpAuthTriggerResult, McpConfigFile, McpServerEntry, McpTestResult, McpUpsertRequest, SessionMcpState } from "@openbuddy/protocol/dto";
 import { invoke } from "../ipc";
 
 /** 测试连接 (W2.4): connect once, list the tools, close; returns the duration or the error. */
@@ -65,3 +65,18 @@ export const mcpDeferredGet = () => invoke<{ deferred: boolean }>("mcp_deferred_
 
 /** Switch every server between direct and deferred exposure; live sessions reload in place. */
 export const mcpDeferredSet = (deferred: boolean) => invoke<{ deferred: boolean }>("mcp_deferred_set", { deferred });
+
+// ---------- 连接器目录 (pii W2.4 P2) ----------
+
+/** Built-in catalog root (sentinel; the service ignores external directories). */
+export const connectorsDefaultRoot = () => invoke<string>("connectors_default_root");
+export const connectorsListRoots = (root: string) => invoke<string[]>("connectors_list_roots", { root });
+export const connectorsLoad = (root?: string) => invoke<ConnectorCatalog>("connectors_load", { root: root ?? null });
+export const connectorsReadMcpConfig = (root: string, source: string) => invoke<string>("connectors_read_mcp_config", { root, source });
+export const connectorsIcon = (path: string) => invoke<string>("connectors_icon", { path });
+
+// ---------- 本任务连接器开关 (pii W2.4 P2) ----------
+
+export const sessionMcpGet = (sessionId: string) => invoke<SessionMcpState>("session_mcp_get", { sessionId });
+export const sessionMcpSet = (sessionId: string, name: string, enabled: boolean) =>
+  invoke<SessionMcpState>("session_mcp_set", { sessionId, name, enabled });

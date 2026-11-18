@@ -13,26 +13,31 @@
  */
 
 import { memo, useState } from 'react'
-import { Pressable, Text, View, useColorScheme } from 'react-native'
+import { Modal, Pressable, Text, View, useColorScheme } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 
 import type { TextRow, ThinkingRow as ThinkingRowData, ToolRow } from '../core/transcript'
 import { themeFor } from '../theme'
 import { speak } from '../native/speech'
-import { CopyIcon, RefreshIcon, ShareIcon, SparkIcon, VolumeIcon } from './icons'
+import { CopyIcon, QuoteIcon, RefreshIcon, ShareIcon, SparkIcon, VolumeIcon } from './icons'
 import { shareTextFile } from '../native/share'
 import { messageFilename, messageMarkdown } from '../core/share'
+import { quotePreview } from '../core/quote'
 import { Caret } from './Caret'
 import { Markdown } from './Markdown'
 import { MessageActions } from './MessageActions'
 import { ThinkingRow } from './ThinkingRow'
 import { ToolCard } from './ToolCard'
 
-function UserBubble({ row }: { row: TextRow }) {
+function UserBubble({ row, menu }: { row: TextRow; menu: () => void }) {
   const theme = themeFor(useColorScheme())
   return (
     <View style={{ alignItems: 'flex-end', paddingHorizontal: theme.gutter, paddingVertical: 8 }}>
-      <View
+      <Pressable
+        onPress={menu}
+        onLongPress={menu}
+        delayLongPress={350}
+        accessibilityLabel="消息操作"
         style={{
           maxWidth: '78%',
           backgroundColor: theme.bubble,
@@ -57,7 +62,7 @@ function UserBubble({ row }: { row: TextRow }) {
             {row.text}
           </Text>
         </MessageActions>
-      </View>
+      </Pressable>
     </View>
   )
 }
@@ -67,7 +72,7 @@ function UserBubble({ row }: { row: TextRow }) {
  * / retry one tap away instead of hidden behind a long press. The long-press
  * sheet still exists for discoverability and for the Markdown variant.
  */
-function InlineActions({ row, onRegenerate }: { row: TextRow; onRegenerate?: () => void }) {
+function InlineActions({ row, onRegenerate, onQuote }: { row: TextRow; onRegenerate?: () => void; onQuote?: () => void }) {
   const theme = themeFor(useColorScheme())
   const [note, setNote] = useState<string | null>(null)
 
@@ -102,6 +107,11 @@ function InlineActions({ row, onRegenerate }: { row: TextRow; onRegenerate?: () 
       <Pressable hitSlop={10} onPress={() => speak(row.text)} accessibilityLabel="朗读">
         <VolumeIcon size={15} color={theme.textWeak} />
       </Pressable>
+      {onQuote ? (
+        <Pressable hitSlop={10} onPress={onQuote} accessibilityLabel="引用回复">
+          <QuoteIcon size={15} color={theme.textWeak} />
+        </Pressable>
+      ) : null}
       {onRegenerate ? (
         <Pressable hitSlop={10} onPress={onRegenerate} accessibilityLabel="重新生成">
           <RefreshIcon size={15} color={theme.textWeak} />
@@ -112,7 +122,7 @@ function InlineActions({ row, onRegenerate }: { row: TextRow; onRegenerate?: () 
   )
 }
 
-function AssistantRow({ row, onRegenerate }: { row: TextRow; onRegenerate?: () => void }) {
+function AssistantRow({ row, onRegenerate, onQuote }: { row: TextRow; onRegenerate?: () => void; onQuote?: () => void }) {
   const theme = themeFor(useColorScheme())
   return (
     <View style={{ paddingHorizontal: theme.gutter, paddingVertical: 10 }}>
@@ -139,7 +149,7 @@ function AssistantRow({ row, onRegenerate }: { row: TextRow; onRegenerate?: () =
         ) : null}
       </MessageActions>
       {!row.streaming && !row.isError && row.text ? (
-        <InlineActions row={row} onRegenerate={onRegenerate} />
+        <InlineActions row={row} onRegenerate={onRegenerate} onQuote={onQuote} />
       ) : null}
     </View>
   )
@@ -154,10 +164,82 @@ function SystemRow({ row }: { row: TextRow }) {
   )
 }
 
+/** Long-press sheet: the actions Grok hides behind a press on a message. */
+function MessageMenu({
+  row, visible, onClose, onQuote, onEdit, onRegenerate,
+}: {
+  row: TextRow
+  visible: boolean
+  onClose: () => void
+  onQuote?: () => void
+  onEdit?: () => void
+  onRegenerate?: () => void
+}) {
+  const theme = themeFor(useColorScheme())
+  if (!visible) return null
+  const items: { key: string; label: string; danger?: boolean; run: () => void }[] = [
+    { key: 'copy', label: '复制', run: () => { void Clipboard.setStringAsync(row.text).catch(() => {}) } },
+  ]
+  if (onQuote) items.push({ key: 'quote', label: '引用回复', run: onQuote })
+  if (onEdit && row.role === 'user') items.push({ key: 'edit', label: '编辑重发', run: onEdit })
+  if (onRegenerate && row.role === 'assistant' && !row.streaming) items.push({ key: 'regen', label: '重新生成', run: onRegenerate })
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Pressable
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }}
+          onPress={onClose}
+        />
+        <View style={{
+          backgroundColor: theme.surface,
+          borderTopLeftRadius: 18,
+          borderTopRightRadius: 18,
+          paddingHorizontal: theme.gutter,
+          paddingTop: 14,
+          paddingBottom: 30,
+        }}>
+          <Text numberOfLines={2} style={{ color: theme.textWeak, fontSize: 12, marginBottom: 6, lineHeight: 17 }}>
+            {quotePreview(row.text, 70)}
+          </Text>
+          {items.map(item => (
+            <Pressable
+              key={item.key}
+              onPress={() => { onClose(); item.run() }}
+              style={({ pressed }) => ({
+                paddingVertical: 14,
+                borderTopWidth: theme.hairline,
+                borderTopColor: theme.cardBorder,
+                opacity: pressed ? 0.6 : 1,
+              })}
+            >
+              <Text style={{ color: item.danger ? theme.danger : theme.text, fontSize: 16 }}>{item.label}</Text>
+            </Pressable>
+          ))}
+          <Pressable
+            onPress={onClose}
+            style={({ pressed }) => ({
+              marginTop: 10,
+              paddingVertical: 13,
+              borderRadius: theme.radiusPill,
+              backgroundColor: theme.card,
+              alignItems: 'center',
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <Text style={{ color: theme.textMedium, fontSize: 15, fontWeight: '600' }}>取消</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
 export const MessageRow = memo(function MessageRow({
   row,
   onRegenerate,
   toolActions,
+  onQuote,
+  onEdit,
 }: {
   row: TextRow | ToolRow | ThinkingRowData
   onRegenerate?: () => void
@@ -167,7 +249,12 @@ export const MessageRow = memo(function MessageRow({
     revertingId?: string
     noteFor?: (row: ToolRow) => string | undefined
   }
+  /** Quote-reply from the long-press menu. */
+  onQuote?: (text: string) => void
+  /** Edit-resend: put a user message back in the composer. */
+  onEdit?: (text: string) => void
 }) {
+  const [menuOpen, setMenuOpen] = useState(false)
   if (row.kind === 'thinking') return <ThinkingRow row={row} />
   if (row.kind === 'tool') {
     return (
@@ -179,7 +266,26 @@ export const MessageRow = memo(function MessageRow({
       />
     )
   }
-  if (row.role === 'user') return <UserBubble row={row} />
   if (row.role === 'system') return <SystemRow row={row} />
-  return <AssistantRow row={row} onRegenerate={onRegenerate} />
+  return (
+    <>
+      {row.role === 'user' ? (
+        <UserBubble row={row} menu={() => setMenuOpen(true)} />
+      ) : (
+        <AssistantRow
+          row={row}
+          onRegenerate={onRegenerate}
+          onQuote={onQuote ? () => onQuote(row.text) : undefined}
+        />
+      )}
+      <MessageMenu
+        row={row}
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onQuote={onQuote ? () => onQuote(row.text) : undefined}
+        onEdit={onEdit ? () => onEdit(row.text) : undefined}
+        onRegenerate={onRegenerate}
+      />
+    </>
+  )
 })

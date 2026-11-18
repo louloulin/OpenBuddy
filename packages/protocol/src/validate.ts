@@ -6,6 +6,7 @@ import type { Payload } from './types.js';
 export type { Payload };
 import { validateAgentSettingsPatch } from './agent-settings.js';
 import { EXPERT_LIMITS, isExpertId } from './experts.js';
+import { validExtensionSource, validPackageFilters, validRegistryQuery } from './extensions.js';
 
 /** Bound structured-clone input before dispatch; services validate their domain fields. */
 export function validatePayload(input: unknown): Payload {
@@ -65,6 +66,11 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
     if (payload.outputPath !== undefined && payload.outputPath !== null) string('outputPath', 4096);
   }
   if (command === 'agent_import_jsonl') string('path', 4096);
+  // 交接到新任务 (W1.7): a short goal for the next thread.
+  if (command === 'agent_handoff') {
+    string('sessionId', 256);
+    if (typeof payload.goal !== 'string' || !payload.goal.trim() || payload.goal.length > 4000) throw new Error('invalid_payload: goal');
+  }
   // 反馈诊断 (W6.5): bounded free text; the renderer never sends keys.
   if (command === 'agent_diagnose') {
     if (payload.sessionId !== undefined && payload.sessionId !== null) string('sessionId', 256);
@@ -76,6 +82,27 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'notification_prefs_set' && typeof payload.system !== 'boolean') throw new Error('invalid_payload: system');
   // 托盘常驻 (W4.4).
   if (command === 'tray_set' && typeof payload.enabled !== 'boolean') throw new Error('invalid_payload: enabled');
+  // 窗口与唤起 (W7).
+  if (command === 'window_open_session') string('sessionId', 256);
+  if (command === 'quick_shortcut_set') {
+    if (typeof payload.accelerator !== 'string' || !payload.accelerator.trim() || payload.accelerator.length > 100) throw new Error('invalid_payload: accelerator');
+  }
+  // 连接器目录 (W2.4 P2).
+  if (command === 'connectors_load') {
+    if (payload.root !== undefined && payload.root !== null) string('root', 4096);
+  }
+  if (command === 'connectors_list_roots') string('root', 4096);
+  if (command === 'connectors_icon') string('path', 4096);
+  if (command === 'connectors_read_mcp_config') {
+    string('root', 4096);
+    string('source', 128);
+  }
+  if (command === 'session_mcp_get') string('sessionId', 256);
+  if (command === 'session_mcp_set') {
+    string('sessionId', 256);
+    string('name', 128);
+    if (typeof payload.enabled !== 'boolean') throw new Error('invalid_payload: enabled');
+  }
   // MCP 延迟暴露 (W2.4 P2).
   if (command === 'mcp_deferred_set' && typeof payload.deferred !== 'boolean') throw new Error('invalid_payload: deferred');
   if (command === 'mobile_pair_start' && payload.scopes !== undefined) {
@@ -106,9 +133,25 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   }
   if (command === 'agent_set_queue') {
     string('sessionId', 256);
+    // Items are strings, or `{ text, attachments }` so queued images survive reordering (pii W1.8).
     for (const key of ['steering', 'followUp']) {
       const list = payload[key];
-      if (!Array.isArray(list) || list.length > 50 || list.some((t) => typeof t !== 'string' || !t.trim() || t.length > 200_000)) throw new Error(`invalid_payload: ${key}`);
+      if (!Array.isArray(list) || list.length > 50) throw new Error(`invalid_payload: ${key}`);
+      for (const item of list) {
+        if (typeof item === 'string') {
+          if (!item.trim() || item.length > 200_000) throw new Error(`invalid_payload: ${key}`);
+          continue;
+        }
+        if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error(`invalid_payload: ${key}`);
+        const entry = item as Record<string, unknown>;
+        if (typeof entry.text !== 'string' || !entry.text.trim() || entry.text.length > 200_000) throw new Error(`invalid_payload: ${key}`);
+        if (entry.attachments !== undefined) {
+          if (!Array.isArray(entry.attachments) || entry.attachments.length > 8) throw new Error(`invalid_payload: ${key}.attachments`);
+          for (const reference of entry.attachments) {
+            if (!reference || typeof reference !== 'object' || typeof (reference as { path?: unknown }).path !== 'string' || !(reference as { path: string }).path) throw new Error(`invalid_payload: ${key}.attachments`);
+          }
+        }
+      }
     }
   }
   if (command === 'agent_set_mode' && !['craft', 'plan', 'ask'].includes(String(payload.mode))) throw new Error('invalid_payload: mode');
@@ -123,6 +166,24 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'providers_test' || command === 'providers_fetch_models') {
     string('providerId', 64, true); string('modelId', 512, true); string('providerKind', 64, true);
     string('apiBackend', 64, true); string('baseUrl', 2048, true); string('apiKey', 4096, true);
+  }
+  // 本地模型 (W8).
+  if (command === 'providers_local_probe' || command === 'providers_local_set') {
+    if (command === 'providers_local_probe') string('baseUrl', 2048);
+    if (command === 'providers_local_set') {
+      if (typeof payload.enabled !== 'boolean') throw new Error('invalid_payload: enabled');
+      string('baseUrl', 2048);
+      if (typeof payload.model !== 'string' || payload.model.length > 512) throw new Error('invalid_payload: model');
+      for (const key of ['contextWindow', 'maxTokens']) {
+        const value = payload[key];
+        if (value !== undefined && (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0 || value > 2_000_000)) throw new Error(`invalid_payload: ${key}`);
+      }
+      if (payload.setDefault !== undefined && typeof payload.setDefault !== 'boolean') throw new Error('invalid_payload: setDefault');
+      try {
+        const url = new URL(payload.baseUrl as string);
+        if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw new Error('invalid');
+      } catch { throw new Error('invalid_payload: baseUrl'); }
+    }
   }
   if (command === 'agent_set_thinking_level') thinking('level');
   if (command === 'agent_resolve_ui' || command === 'agent_resolve_question') {
@@ -143,6 +204,25 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
     }
   }
   if (command === 'agent_extensions_add' || command === 'agent_extensions_remove') string('path');
+  // 扩展包 (W2.6 P2): npm / git sources only; local paths go through agent_extensions_add.
+  if (command === 'agent_extensions_install_package' && !validExtensionSource(payload.source)) throw new Error('invalid_payload: source');
+  if (command === 'agent_extensions_preview_package' && !validExtensionSource(payload.source)) throw new Error('invalid_payload: source');
+  if (command === 'agent_extensions_remove_package' && !validExtensionSource(payload.source)) throw new Error('invalid_payload: source');
+  if (command === 'agent_extensions_update_packages' && payload.source !== undefined && !validExtensionSource(payload.source)) throw new Error('invalid_payload: source');
+  // Pi 包市场 (S15): an optional bounded query; empty browses the keyword.
+  if (command === 'agent_extensions_search_registry') {
+    const query = payload.query ?? '';
+    if (!validRegistryQuery(query)) throw new Error('invalid_payload: query');
+    if (payload.offset !== undefined && payload.offset !== null && (typeof payload.offset !== 'number' || !Number.isInteger(payload.offset) || payload.offset < 0 || payload.offset > 1000)) throw new Error('invalid_payload: offset');
+    if (payload.cwd !== undefined && payload.cwd !== null) string('cwd', 4096, true);
+  }
+  if (command === 'agent_extensions_resources' && payload.cwd !== undefined && payload.cwd !== null) string('cwd', 4096, true);
+  // 包资源开关 (S17): Pi object-form filters; only known resource kinds and booleans.
+  if (command === 'agent_extensions_set_package_resources') {
+    if (!validExtensionSource(payload.source)) throw new Error('invalid_payload: source');
+    if (!validPackageFilters(payload.resources)) throw new Error('invalid_payload: resources');
+    if (payload.cwd !== undefined && payload.cwd !== null) string('cwd', 4096, true);
+  }
   // 测试连接 (W2.4): the server name in mcp.json.
   if (command === 'mcp_test') string('name', 256);
   // 专家团 (W3.5): install a preset by id.
@@ -327,6 +407,9 @@ function expertPayload(command: CommandName, payload: Payload) {
     case 'experts_set_roots':
       list(payload.roots, 20, 4096, 'roots');
       if (!Array.isArray(payload.roots)) fail('roots');
+      break;
+    case 'experts_import_workbuddy':
+      text(payload.path, 4096, 'path', false);
       break;
     case 'experts_thumbnail': case 'experts_image_bytes':
       text(payload.path, 4096, 'path', false);

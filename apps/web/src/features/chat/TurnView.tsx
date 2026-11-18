@@ -127,6 +127,8 @@ export interface TurnViewProps {
   onOpenTool?: (tc: ToolCallView) => void;
   onRetry?: () => void;
   onFork?: () => void;
+  /** 逐条回答 (pii W1.8): put the questions found in this answer back into the composer. */
+  onInsertPrompt?: (text: string) => void;
   onToast?: (msg: string) => void;
 }
 
@@ -144,7 +146,7 @@ export const TurnView = memo(TurnViewInner, (prev, next) => {
 });
 
 function TurnViewInner(props: TurnViewProps) {
-  const { messages, user, running, isLast, sessionId, cwd, markdownConfig, retry, compacting, turnStartedAt, error, onOpenTool, onRetry, onFork, onToast } = props;
+  const { messages, user, running, isLast, sessionId, cwd, markdownConfig, retry, compacting, turnStartedAt, error, onOpenTool, onRetry, onFork, onInsertPrompt, onToast } = props;
   const concise = useUiPrefs((s) => s.conciseMode);
   const [expanded, setExpanded] = useState(!concise);
   useEffect(() => setExpanded(!concise), [concise]);
@@ -203,6 +205,17 @@ function TurnViewInner(props: TurnViewProps) {
               ? "正在处理"
               : "";
   const answerText = content.answer || messages.flatMap((m) => m.parts).filter((p) => p.kind === "text").map((p) => (p.kind === "text" ? p.text : "")).join("\n\n");
+  /** 逐条回答 (W1.8): collect question lines from this answer into a numbered prompt. */
+  const askOneByOne = () => {
+    if (!onInsertPrompt) return;
+    const questions = answerText
+      .split("\n")
+      .map((line) => line.trim().replace(/^(?:[-*+]|\d+[.)])\s+/, ""))
+      .filter((line) => /[?？]$/.test(line))
+      .slice(0, 20);
+    if (!questions.length) { onToast?.("这条回答里没有找到问题"); return; }
+    onInsertPrompt(["请逐条回答以下问题：", ...questions.map((question, index) => `${index + 1}. ${question}`)].join("\n"));
+  };
   const model = turnModel(messages);
   const turnKey = `t${user?.meta?.timestamp ?? messages[0]?.meta?.timestamp ?? messages[0]?.id}`;
 
@@ -271,6 +284,7 @@ function TurnViewInner(props: TurnViewProps) {
                 <div className="turn-menu" role="menu">
                   <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void copyText(turnMarkdown(messages)).then(() => onToast?.("已复制 Markdown"), () => onToast?.("复制失败")); }}>复制 Markdown</button>
                   {onFork && <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onFork(); }}>分叉为新任务</button>}
+                  {onInsertPrompt && <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); askOneByOne(); }}>逐条回答</button>}
                   <BranchMenuItems sessionId={sessionId} userTimestamp={userTimestamp} onToast={onToast} onDone={() => setMenuOpen(false)} />
                   {artifactsApi && turnArtifacts.length > 0 && (
                     <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); artifactsApi.revert(turnToolIds, turnArtifacts); }}>撤销本轮的文件改动（{turnArtifacts.length}）</button>

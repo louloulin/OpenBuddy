@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AppWindow, Monitor, Moon, Sun, Type, Rows3 } from "lucide-react";
 import { useTheme } from "@openbuddy/ui/ThemeProvider";
-import { trayGet, traySet } from "@openbuddy/client/agent-client";
+import { trayGet, traySet, quickShortcutGet, quickShortcutSet } from "@openbuddy/client/agent-client";
 import { SectionShell } from "./shared";
 import { loadDensity, loadFontSize, setDensity, setFontSize, type Density, type FontSize } from "../preferences";
 import { getSendKey, setSendKey, type SendKey } from "../../composer/send-key";
@@ -32,6 +32,27 @@ export function GeneralPreferencesPanel() {
   const [sendKey, setSendKeyState] = useState<SendKey>(() => getSendKey());
   // 托盘常驻 (W4.4): read from the main process; null = 本环境没有托盘（浏览器预览）。
   const [trayOn, setTrayOn] = useState<boolean | null>(null);
+  // 全局快速输入 (W7.2): read the accelerator from the main process; null = 不支持（浏览器）。
+  const [quickKey, setQuickKey] = useState<string | null>(null);
+  const [quickDraft, setQuickDraft] = useState("");
+  const [quickError, setQuickError] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    quickShortcutGet()
+      .then((key) => { if (!cancelled) { setQuickKey(key); setQuickDraft(key); } })
+      .catch(() => { if (!cancelled) setQuickKey(null); });
+    return () => { cancelled = true; };
+  }, []);
+  const saveQuick = async () => {
+    setQuickError("");
+    try {
+      const key = await quickShortcutSet(quickDraft.trim());
+      setQuickKey(key);
+      setQuickDraft(key);
+    } catch (error) {
+      setQuickError(String(error).replace(/^Error:\s*/, ""));
+    }
+  };
   useEffect(() => {
     let cancelled = false;
     trayGet()
@@ -201,6 +222,35 @@ export function GeneralPreferencesPanel() {
               >
                 开启
               </button>
+            </div>
+          )}
+        </div>
+
+        {/* 全局快速输入 (W7.2): a system-wide shortcut opens a small composer. */}
+        <div className="pref-row">
+          <div className="pref-row__label">
+            <Type size={16} />
+            <div>
+              <div className="pref-row__title">快速输入</div>
+              <div className="pref-row__hint">
+                {quickKey === null ? "当前环境不支持全局快捷键。" : "在任意应用里按下这个组合键，弹出小输入框并新建任务。"}
+              </div>
+              {quickError && <div className="pref-row__hint" role="alert">{quickError}</div>}
+            </div>
+          </div>
+          {quickKey === null ? (
+            <span className="pref-badge">不可用</span>
+          ) : (
+            <div className="pref-shortcut">
+              <input
+                className="pref-shortcut__input"
+                aria-label="快速输入快捷键"
+                value={quickDraft}
+                onChange={(event) => setQuickDraft(event.target.value)}
+                onKeyDown={(event) => { if (event.key === "Enter") void saveQuick(); }}
+                spellCheck={false}
+              />
+              <button type="button" className="pref-seg__btn" onClick={() => void saveQuick()} disabled={!quickDraft.trim() || quickDraft === quickKey}>保存</button>
             </div>
           )}
         </div>

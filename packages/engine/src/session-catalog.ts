@@ -110,10 +110,23 @@ export async function rename(engine: EngineContext, id: string, title: string) {
 export function metadata(
   engine: EngineContext,
   id: string,
-  patch: { title?: string; pinned?: boolean; archived?: boolean },
+  patch: {
+    title?: string;
+    pinned?: boolean;
+    archived?: boolean;
+    /** 交接到新任务 (W1.7). */
+    handoffFrom?: { sessionId: string; title?: string } | null;
+  },
 ) {
   const c = engine.settings.config.read();
-  c.sessions[id] = { ...c.sessions[id], ...patch };
+  const next: NonNullable<(typeof c.sessions)[string]> = { ...c.sessions[id] };
+  if (patch.title !== undefined) next.title = patch.title;
+  if (patch.pinned !== undefined) next.pinned = patch.pinned;
+  if (patch.archived !== undefined) next.archived = patch.archived;
+  // `handoffFrom: null` clears the banner; do not persist a nullable field.
+  if (patch.handoffFrom === null) delete next.handoffFrom;
+  else if (patch.handoffFrom !== undefined) next.handoffFrom = patch.handoffFrom;
+  c.sessions[id] = next;
   engine.settings.config.write(c);
 }
 export async function deleteSession(engine: EngineContext, id: string) {

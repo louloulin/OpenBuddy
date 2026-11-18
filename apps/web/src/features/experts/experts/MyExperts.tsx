@@ -9,6 +9,9 @@ interface Props {
   categories: ExpertCategoryInfo[];
   loading: boolean;
   userDir?: string;
+  /** WorkBuddy package import (S18): ZIP picker + conversion progress. */
+  importing?: boolean;
+  onImportWorkbuddy?: () => void;
   onBack: () => void;
   onCreate: () => void;
   onOpen: (expert: ExpertEntry) => void;
@@ -19,7 +22,7 @@ interface Props {
 }
 
 /** 我的专家: the user's own experts (and the trusted project's, read-only) with 召唤 / 编辑 / 复制 / 删除. */
-export function MyExperts({ experts, categories, loading, userDir, onBack, onCreate, onOpen, onSummon, onEdit, onDuplicate, onDelete }: Props) {
+export function MyExperts({ experts, categories, loading, userDir, importing, onImportWorkbuddy, onBack, onCreate, onOpen, onSummon, onEdit, onDuplicate, onDelete }: Props) {
   return (
     <div className="um-page">
       <header className="um-topbar">
@@ -30,6 +33,11 @@ export function MyExperts({ experts, categories, loading, userDir, onBack, onCre
           <span className="ex-page-title">我的专家</span>
         </div>
         <div className="um-topbar-right">
+          {onImportWorkbuddy && (
+            <button type="button" className="um-btn um-btn--grey" disabled={importing} onClick={onImportWorkbuddy} title="导入 WorkBuddy 导出的 .zip 专家包">
+              {importing ? "导入中…" : "导入 WorkBuddy"}
+            </button>
+          )}
           <button type="button" className="um-btn um-btn--primary" onClick={onCreate}>+ 创建专家</button>
         </div>
       </header>

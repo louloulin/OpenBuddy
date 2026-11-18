@@ -48,8 +48,24 @@ describe("Pi queue panel", () => {
     expect(screen.getByText("steer item")).toBeInTheDocument();
   });
 
+  it("keeps queued attachments when a row moves (pii W1.8)", async () => {
+    vi.mocked(agentSetQueue).mockResolvedValue({ steering: ["第二条"], followUp: ["第一条"] });
+    act(() => usePiQueueStore.getState().applyEnqueued("A", { steering: [], followUp: ["第一条", "第二条"] }, "第二条", [{ path: "/tmp/shot.png" }], "followUp"));
+    render(<QueuePanel sessionId="A" />);
+    expect(screen.getByText("图 1")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "上移：第二条" }));
+    await waitFor(() => expect(agentSetQueue).toHaveBeenLastCalledWith(
+      "A",
+      [],
+      [{ text: "第二条", attachments: [{ path: "/tmp/shot.png" }] }, "第一条"],
+    ));
+  });
+
   it("edits, sends now, moves and withdraws single rows (U4.5)", async () => {
-    vi.mocked(agentSetQueue).mockImplementation(async (_sid, steering, followUp) => ({ steering, followUp }));
+    vi.mocked(agentSetQueue).mockImplementation(async (_sid, steering, followUp) => ({
+      steering: steering.map((item) => (typeof item === "string" ? item : item.text)),
+      followUp: followUp.map((item) => (typeof item === "string" ? item : item.text)),
+    }));
     act(() => usePiQueueStore.getState().apply("A", { steering: [], followUp: ["第一条", "第二条", "第三条"] }));
     const onEdit = vi.fn();
     render(<QueuePanel sessionId="A" onEdit={onEdit} />);

@@ -74,6 +74,8 @@ export interface EngineContext {
   onEvent(slot: Slot, event: AgentSessionEvent): void;
   ensureTitle(slot: Slot, text: string): void;
   open(manager: SessionManager, modelId?: string, providerId?: string, thinkingLevel?: ThinkingLevel, subagent?: { parentId: string; agentName?: string }): Promise<Slot>;
+  /** Create a fresh session (W1.7 handoff, W4 automation); returns its id. */
+  newSession(cwd: string, modelId?: string, providerId?: string, thinkingLevel?: ThinkingLevel, background?: boolean): Promise<string>;
   focus(id: string): void;
   all(): Promise<SessionInfo[]>;
   resolve(id: string, cwd?: string): Promise<SessionInfo>;
@@ -91,7 +93,7 @@ export interface EngineContext {
   reload(filter?: (slot: Slot) => boolean): Promise<void>;
   /** Duplicate a live session onto a new id (features/fork.ts; also used by 会话导入, W6.5). */
   fork(id: string): Promise<string>;
-  metadata(id: string, patch: { title?: string; pinned?: boolean; archived?: boolean }): void;
+  metadata(id: string, patch: { title?: string; pinned?: boolean; archived?: boolean; handoffFrom?: { sessionId: string; title?: string } | null }): void;
   /** Only forwarded as an event payload by the split-out modules. */
   modelState(id: string): unknown;
 }

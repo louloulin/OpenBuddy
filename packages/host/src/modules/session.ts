@@ -45,6 +45,8 @@ export function sessionModule(ctx: HostContext): HostModule {
         limit: typeof p.limit === "number" ? p.limit : undefined,
       }),
     agent_fork_session: (p) => engine.fork(text(p.sessionId)),
+    // 交接到新任务 (W1.7): creates a session and returns the draft; never sends.
+    agent_handoff: (p) => engine.handoff(text(p.sessionId), text(p.goal, "goal")),
     agent_shutdown: () => engine.shutdown(),
     agent_delete_session: async (p) => {
       const id = text(p.sessionId);

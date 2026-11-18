@@ -10,7 +10,7 @@
 // Usage: node tools/verify/e2e-shots.mjs <outDir>
 //   requires a fresh `pnpm build:electron`; Linux needs xvfb-run.
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -23,6 +23,29 @@ const RUN_DIR = join(tmpdir(), `openbuddy-e2e-${process.pid}`);
 const driver = ['apps/desktop/scripts/ui-explore/driver.mjs', 'scripts/ui-explore/driver.mjs'].map(p => join(REPO, p)).find(existsSync);
 if (!driver) throw new Error('ui-explore driver not found');
 await mkdir(OUT, { recursive: true });
+
+// S18: a WorkBuddy-format package written on disk so the expert import is verified for real.
+const WB_FIXTURE = join(tmpdir(), `openbuddy-e2e-workbuddy-${process.pid}`);
+mkdirSync(join(WB_FIXTURE, '.codebuddy-plugin'), { recursive: true });
+mkdirSync(join(WB_FIXTURE, 'agents'), { recursive: true });
+writeFileSync(join(WB_FIXTURE, '.codebuddy-plugin', 'plugin.json'), JSON.stringify({
+  name: 'e2e-workbuddy',
+  agents: ['./agents/quant-analyst.md', './agents/risk-officer.md'],
+  agentName: 'quant-analyst',
+  displayName: { zh: 'E2E 投研团队' },
+  displayDescription: { zh: 'E2E 导入夹具' },
+  categoryId: '08-FinanceInvestment',
+  tags: [{ zh: '测试' }],
+  quickPrompts: [{ zh: '回测一下这个策略' }],
+  members: [
+    { id: 'quant-analyst', displayName: { zh: '测试量化师' }, role: 'lead' },
+    { id: 'risk-officer', displayName: { zh: '测试风控官' }, role: 'member' },
+  ],
+}));
+writeFileSync(join(WB_FIXTURE, 'agents', 'quant-analyst.md'), '---\nname: quant-analyst\ndescription: 量化策略师\ndisplayName:\n  zh: 测试量化师\n---\n\n你是量化策略师。\n');
+writeFileSync(join(WB_FIXTURE, 'agents', 'risk-officer.md'), '---\nname: risk-officer\ndescription: 风控官\ndisplayName:\n  zh: 测试风控官\n---\n\n你是风控官。\n');
+const cleanupFixture = () => { try { rmSync(WB_FIXTURE, { recursive: true, force: true }); } catch { /* already gone */ } };
+process.on('exit', cleanupFixture);
 
 const env = { ...process.env, SHOTS_DIR: OUT, RUN_DIR, CONTROL_PORT: String(CONTROL_PORT), FIXTURE_PORT: String(FIXTURE_PORT) };
 const useXvfb = process.platform === 'linux' && !process.env.DISPLAY;
@@ -247,6 +270,245 @@ try {
     const shot = await ctx.shot('14-task-overview');
     await page.keyboard.press('Escape');
     return [shot, label];`);
+  // W1.8: 逐条回答 lives in the turn ⋯ menu.
+  await step('turn menu: 逐条回答', `
+    const menuButton = page.locator('.turn--last .turn-action__menu button[aria-label="更多"]').first();
+    await menuButton.scrollIntoViewIfNeeded();
+    await menuButton.click();
+    const item = page.getByRole('menuitem', { name: '逐条回答' });
+    await item.waitFor({ timeout: 5000 });
+    await ctx.sleep(300);
+    const shot = await ctx.shot('68-qna-menu');
+    await item.click();
+    await ctx.sleep(300);
+    const input = page.locator('.wb-composer__input');
+    const value = await input.inputValue();
+    await input.fill('');
+    return [shot, value.slice(0, 80)];`);
+  // W1.9: 批注 goes to the tray and rides along with the next prompt.
+  await step('批注托盘 + 窄窗口标签下拉', `
+    await ctx.sleep(2600);
+    const openPanel = page.getByRole('button', { name: '展开右侧栏', exact: true });
+    if (await openPanel.isVisible()) await openPanel.click();
+    await page.locator('.bench-item__main').first().click();
+    await page.locator('.bench-viewer').waitFor({ timeout: 10000 });
+    const preview = page.locator('.bench-preview--text').first();
+    await preview.waitFor({ timeout: 10000 });
+    await preview.evaluate((node) => {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      node.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    });
+    const comment = page.getByRole('button', { name: '批注', exact: true });
+    await comment.waitFor({ timeout: 5000 });
+    await comment.click();
+    const tray = page.locator('.composer-annotations');
+    await tray.waitFor({ timeout: 5000 });
+    await tray.scrollIntoViewIfNeeded();
+    const annotated = await ctx.shot('69-annotation-tray');
+    // A second tab + a narrow window folds the tab bar into a dropdown (U1.2).
+    const items = page.locator('.bench-item__main');
+    if (await items.count() > 1) await items.nth(1).click();
+    // Shrink the panel so the tab strip really overflows, then narrow the window.
+    const sash = page.locator('.bench__sash');
+    if (await sash.isVisible()) {
+      const box = await sash.boundingBox();
+      if (box) {
+        await page.mouse.move(box.x + 2, box.y + box.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(box.x + 170, box.y + box.height / 2, { steps: 8 });
+        await page.mouse.up();
+      }
+    }
+    const size = await ctx.setSize(880, 820);
+    const state = await page.evaluate(() => ({
+      width: innerWidth,
+      media: matchMedia('(max-width: 900px)').matches,
+      tabs: document.querySelectorAll('.bench-tab').length,
+      picker: !!document.querySelector('.bench__tabs-picker'),
+      bar: !!document.querySelector('.bench__tabs'),
+    }));
+    const picker = page.locator('.bench__tabs-picker').first();
+    if (!state.picker) {
+      const debug = await ctx.shot('70-debug-tabs');
+      throw new Error('picker missing: ' + JSON.stringify({ ...state, size, debug }));
+    }
+    await picker.waitFor({ timeout: 8000 });
+    await picker.click();
+    await page.locator('.bench__tabs-menu').waitFor({ timeout: 5000 });
+    await ctx.sleep(300);
+    const narrow = await ctx.shot('70-tabs-dropdown');
+    await page.keyboard.press('Escape');
+    await ctx.setSize(1440, 900);
+    return [annotated, narrow];`);
+  // W1.7: 交接到新任务 builds a self-contained draft and never auto-sends.
+  await step('交接到新任务', `
+    const collapse = page.getByRole('button', { name: '收起右侧栏', exact: true });
+    if (await collapse.isVisible()) await collapse.click();
+    await page.locator('.topbar-actions button[aria-label="更多操作"]').click();
+    await page.getByRole('button', { name: '交接到新任务…' }).click();
+    const dialog = page.locator('.app-dialog');
+    await dialog.waitFor({ timeout: 5000 });
+    await dialog.locator('.app-dialog__input').fill('把这套方案实现到团队版里');
+    await dialog.getByRole('button', { name: '生成交接草稿' }).click();
+    await page.locator('.chatview__handoff').waitFor({ timeout: 20000 });
+    const value = await page.locator('.wb-composer__input').inputValue();
+    if (!value.includes('## 背景接手') || !value.includes('把这套方案实现到团队版里')) throw new Error('handoff draft missing: ' + value.slice(0, 120));
+    await ctx.sleep(500);
+    const shot = await ctx.shot('71-handoff');
+    await page.locator('.wb-composer__input').fill('');
+    return [shot, value.slice(0, 120)];`);
+  // W2.4 P2: built-in connector catalog installs a real MCP config; the "+" menu toggles it per task.
+  await step('连接器目录 + 本任务连接器开关', `
+    await page.getByRole('button', { name: /专家·技能·连接器/ }).first().click();
+    await page.getByRole('tab', { name: '连接器' }).click();
+    const card = page.locator('.cn-card', { hasText: '本地文件系统' });
+    await card.waitFor({ timeout: 10000 });
+    await ctx.sleep(500);
+    const catalog = await ctx.shot('72-connectors-catalog');
+    await card.locator('.sk-add').click();
+    await page.getByText('已连接「本地文件系统」', { exact: false }).first().waitFor({ timeout: 15000 });
+    const servers = await ctx.call('mcp_list');
+    if (!servers.some((s) => s.name === 'filesystem')) throw new Error('filesystem not installed: ' + JSON.stringify(servers));
+    await page.locator('.cn-card', { hasText: '本地文件系统' }).getByText('已连接').first().waitFor({ timeout: 8000 });
+    await ctx.sleep(400);
+    const installed = await ctx.shot('73-connectors-installed');
+    // Back to the task: the "+" menu lists this session's connectors with a switch.
+    await page.locator('.sidebar__conv').filter({ hasText: '交接任务' }).first().click();
+    await page.locator('.wb-composer__input').waitFor({ timeout: 10000 });
+    await page.getByRole('button', { name: '添加' }).click();
+    const connectorItem = page.locator('.iam-item', { hasText: '连接器' }).first();
+    await connectorItem.hover();
+    const toggle = page.getByRole('button', { name: /filesystem/ }).first();
+    await toggle.waitFor({ timeout: 8000 });
+    if ((await toggle.getAttribute('aria-pressed')) !== 'true') throw new Error('connector not enabled for the task');
+    await ctx.sleep(400);
+    const tray = await ctx.shot('74-session-connectors');
+    await toggle.click();
+    await page.waitForFunction(() => {
+      const button = [...document.querySelectorAll('.iam-sub-item')].find((node) => node.textContent?.includes('filesystem'));
+      return button?.getAttribute('aria-pressed') === 'false';
+    }, undefined, { timeout: 8000 });
+    return [catalog, installed, tray];`);
+  // W2.6 P2 / S14 + S15: Pi package install entry and the npm-backed package market.
+  await step('扩展中心 · npm / git 安装入口与包市场', `
+    await page.getByRole('button', { name: /专家·技能·连接器/ }).first().click();
+    await page.getByRole('tab', { name: '扩展' }).click();
+    await page.getByText('从 npm / git 安装', { exact: true }).waitFor({ timeout: 10000 });
+    await page.getByLabel('扩展包来源').waitFor({ timeout: 5000 });
+    await page.getByText('发现 Pi 扩展包', { exact: true }).waitFor({ timeout: 10000 });
+    await page.getByLabel('搜索 Pi 扩展包').waitFor({ timeout: 5000 });
+    const packages = await ctx.call('agent_extensions_packages', {});
+    if (!Array.isArray(packages)) throw new Error('packages not an array: ' + JSON.stringify(packages));
+    const resources = await ctx.call('agent_extensions_resources', {});
+    if (!resources || !Array.isArray(resources.extensions) || !Array.isArray(resources.skills)) throw new Error('resources malformed: ' + JSON.stringify(resources));
+    // S17: the per-package filter command is wired; an unknown package is refused, not written.
+    let rejected = false;
+    try {
+      await ctx.call('agent_extensions_set_package_resources', { source: 'npm:openbuddy-e2e-missing-package', resources: { skills: false } });
+    } catch (error) {
+      rejected = /not_found/.test(String(error));
+    }
+    if (!rejected) throw new Error('package resource filter command did not reject an unknown package');
+    // S15: the market renders real npm rows. Offline runs show the friendly alert instead.
+    const market = page.locator('.res-panel__card').filter({ hasText: '发现 Pi 扩展包' });
+    await market.getByLabel('搜索 Pi 扩展包').fill('web');
+    await market.getByRole('button', { name: '搜索', exact: true }).click();
+    const row = market.locator('.ext-market__item').first();
+    const alert = page.locator('.res-panel__error').first();
+    await Promise.race([row.waitFor({ timeout: 20000 }), alert.waitFor({ timeout: 20000 })]);
+    if (await alert.count()) {
+      const message = await alert.innerText();
+      if (!/包市场/.test(message)) throw new Error('market search failed: ' + message);
+    } else {
+      if (!(await row.locator('.ext-market__name').innerText())) throw new Error('market row has no package name');
+      // S16: sort toggle + a real second npm page.
+      await market.getByRole('checkbox', { name: '按周下载量排序' }).check();
+      const before = await market.locator('.ext-market__item').count();
+      await market.getByRole('button', { name: '加载更多' }).click();
+      await page.waitForFunction((count) => document.querySelectorAll('.ext-market__item').length > count, before, { timeout: 20000 });
+    }
+    await ctx.sleep(400);
+    const shot = await ctx.shot('78-extension-packages');
+    // Back to the task: later steps use the composer and model menu.
+    await page.locator('.sidebar__conv').filter({ hasText: '交接任务' }).first().click();
+    await page.locator('.wb-composer__input').waitFor({ timeout: 10000 });
+    return shot;`);
+  // S15: the market goes through the real npm registry. Offline runs skip it explicitly
+  // instead of failing the suite; online runs must return real packages.
+  await step('扩展包市场 · npm 实时搜索', `
+    let result;
+    try {
+      result = await ctx.call('agent_extensions_search_registry', { query: 'web' });
+    } catch (error) {
+      const message = String(error);
+      if (message.includes('registry_unreachable')) return { skipped: 'registry unreachable' };
+      throw error;
+    }
+    if (!result || !Array.isArray(result.packages) || result.packages.length === 0) throw new Error('no registry packages: ' + JSON.stringify(result).slice(0, 500));
+    const first = result.packages[0];
+    if (!first.name || !first.version) throw new Error('registry row missing name/version: ' + JSON.stringify(first));
+    return { total: result.total, packages: result.packages.length, first: first.name + '@' + first.version };`);
+  // S18: import a WorkBuddy-format expert package (fixture written on disk before launch).
+  await step('专家 · WorkBuddy 包导入', `
+    const result = await ctx.call('experts_import_workbuddy', { path: ${JSON.stringify(WB_FIXTURE)} });
+    if (!result || !Array.isArray(result.imported) || result.imported.length !== 2) throw new Error('workbuddy import: ' + JSON.stringify(result).slice(0, 500));
+    if (!result.imported.some((expert) => expert.name === '测试量化师')) throw new Error('workbuddy display name missing: ' + JSON.stringify(result.imported.map((e) => e.name)));
+    const list = await ctx.call('agents_list', {});
+    const ids = new Set(result.imported.map((expert) => expert.id));
+    const found = list.filter((expert) => ids.has(expert.id));
+    if (found.length !== 2) throw new Error('agents_list missing imported experts: ' + JSON.stringify(found.map((e) => e.id)));
+    // Keep the later expert-count steps stable.
+    for (const expert of result.imported) await ctx.call('agents_delete', { id: expert.id });
+    return { package: result.package, names: result.imported.map((expert) => expert.name) };`);
+  // W7.1 / W7.2: independent session window + global quick input.
+  await step('独立窗口 + 全局快速输入', `
+    const init = await ctx.call('agent_init', {});
+    const list = await ctx.call('agent_list_sessions', { cwd: init.cwd });
+    const sessionId = list[0]?.sessionId;
+    if (!sessionId) throw new Error('no session for window test');
+    await ctx.call('window_open_session', { sessionId });
+    await ctx.sleep(1500);
+    const opened = await ctx.app.evaluate(async ({ BrowserWindow }) => {
+      const wins = BrowserWindow.getAllWindows();
+      const urls = [];
+      for (const win of wins) {
+        const hash = await win.webContents.executeJavaScript('window.location.hash');
+        urls.push({ url: win.webContents.getURL(), hash });
+        if (hash.includes('/session/')) {
+          const png = (await win.webContents.capturePage()).toPNG().toString('base64');
+          return { count: wins.length, url: win.webContents.getURL(), hash, png, urls };
+        }
+      }
+      return { count: wins.length, url: '', hash: '', png: '', urls };
+    });
+    if (opened.count < 2 || !opened.hash.includes('/session/')) throw new Error('session window missing: ' + JSON.stringify(opened));
+    await ctx.savePng('75-session-window', opened.png);
+    await ctx.call('window_open_quick', {});
+    await ctx.sleep(1200);
+    const quick = await ctx.app.evaluate(async ({ BrowserWindow }) => {
+      const wins = BrowserWindow.getAllWindows();
+      const win = wins.find(w => w.webContents.getURL().includes('#/quick'));
+      if (!win) return { count: wins.length, url: '', png: '' };
+      const png = (await win.webContents.capturePage()).toPNG().toString('base64');
+      return { count: wins.length, url: win.webContents.getURL(), png };
+    });
+    if (!quick.url.includes('#/quick')) throw new Error('quick window missing: ' + JSON.stringify(quick));
+    await ctx.savePng('76-quick-window', quick.png);
+    // The system-wide accelerator really registers in the main process.
+    const shortcut = await ctx.call('quick_shortcut_get');
+    const applied = await ctx.call('quick_shortcut_set', { accelerator: shortcut });
+    if (!shortcut || applied !== shortcut) throw new Error('quick shortcut registration failed: ' + shortcut + ' / ' + applied);
+    await ctx.app.evaluate(async ({ BrowserWindow }) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        const hash = await win.webContents.executeJavaScript('window.location.hash').catch(() => '');
+        if (hash.startsWith('#/session/') || hash.startsWith('#/quick')) win.close();
+      }
+    });
+    return { sessionWindow: opened.url, quickWindow: quick.url, windows: opened.count };`);
   await step('settings', `
     await page.getByRole('button', { name: '设置', exact: true }).first().click();
     await ctx.sleep(1200);
@@ -263,6 +525,25 @@ try {
     }
     return out;`);
   // 20261116-pii W6.3: 通用偏好 — 主题 / 字号 / 密度 / 发送键立即生效并保存在本机。
+  // W8: point the local-model card at the fixture's OpenAI-compatible server, probe and enable it.
+  await step('本地模型（W8）', `
+    await page.locator('.settings-navigation__label').getByText('模型', { exact: true }).first().click();
+    const url = page.locator('.ms-local__field--wide input');
+    await url.waitFor({ timeout: 10000 });
+    await url.fill('http://127.0.0.1:${FIXTURE_PORT}/v1');
+    await page.getByRole('button', { name: /探测/ }).click();
+    await page.getByText(/发现 \\d+ 个模型/).waitFor({ timeout: 10000 });
+    const modelSelect = page.locator('.ms-local__field select');
+    await modelSelect.waitFor({ timeout: 10000 });
+    await modelSelect.selectOption('fixture-model');
+    await page.locator('.ms-local__switch input').check();
+    await page.getByRole('button', { name: /保存/ }).click();
+    await page.getByText('本地模型已启用', { exact: false }).waitFor({ timeout: 10000 });
+    const list = await ctx.call('providers_list');
+    if (!list.providers.some((provider) => provider.id === 'llama.cpp')) throw new Error('local provider missing: ' + JSON.stringify(list.providers.map((p) => p.id)));
+    if (!list.models.some((model) => model.providerId === 'llama.cpp' && model.modelId === 'fixture-model')) throw new Error('local model missing');
+    await ctx.sleep(500);
+    return await ctx.shot('77-local-model');`);
   await step('通用偏好（主题 / 字号 / 密度 / 发送键）', `
     await page.locator('.settings-navigation__label').getByText('通用', { exact: true }).first().click();
     await page.locator('.pref-card').waitFor({ timeout: 10000 });
@@ -598,7 +879,7 @@ try {
     // W2.4: configure a real MCP-over-HTTP server (the driver's fixture), then 测试连接 against it.
     await ctx.call('mcp_upsert', { server: { name: '销售数据', transport: 'streamable_http', target: 'http://127.0.0.1:${FIXTURE_PORT}/mcp', headers: { Authorization: 'Bearer local-fixture-only' }, enabled: true } });
     await page.getByRole('tab', { name: '连接器' }).click();
-    await page.getByText('MCP 服务', { exact: true }).waitFor({ timeout: 10000 });
+    await page.locator('section[aria-label="MCP 服务"]').waitFor({ timeout: 10000 });
     await page.locator('.mcp-server', { hasText: '销售数据' }).waitFor({ timeout: 10000 });
     await ctx.sleep(500);
     const configured = await ctx.shot('24-hub-connectors-mcp');
@@ -925,6 +1206,7 @@ try {
     const panel = page.locator('.tasks-panel');
     await panel.waitFor({ timeout: 15000 });
     await page.waitForFunction(() => /[1-9]\\d* 秒|\\d+ 分/.test(document.querySelector('.tasks-panel')?.textContent ?? ''), null, { timeout: 15000 });
+    await page.waitForFunction(() => [...document.querySelectorAll('.tasks-panel__item')].some((node) => node.textContent?.includes('任务')), null, { timeout: 15000 });
     await ctx.sleep(300);
     const shot = await ctx.shot('49-running-tasks');
     const rows = await panel.locator('.tasks-panel__item').allInnerTexts();

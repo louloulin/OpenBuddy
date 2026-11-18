@@ -20,7 +20,9 @@ import type {
  * file never holds a secret (e.g. an `httpProxy` with credentials).
  */
 export const PI_SETTINGS_FILE = "pi-settings.json";
-const PERSISTED_KEYS = ["compaction", "retry", "steeringMode", "followUpMode", "cacheWarming", "enabledModels", "deviceId"];
+// `packages` carries the configured extension-package sources/filters (S14/S16). Without it
+// `DefaultPackageManager.installAndPersist` silently forgets every package on the next launch.
+const PERSISTED_KEYS = ["compaction", "retry", "steeringMode", "followUpMode", "cacheWarming", "enabledModels", "deviceId", "packages"];
 
 type Json = Record<string, unknown>;
 interface PiSettingsFile {

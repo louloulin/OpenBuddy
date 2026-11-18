@@ -3,11 +3,11 @@ import { Paperclip, ChevronRight, Wand2 } from "lucide-react";
 import {
   AddIcon,
   ExpertTabIcon,
+  McpIcon,
   SkillTabIcon,
 } from "@openbuddy/ui/icon/icons/index";
-import { expertsLoad, skillsList } from "@openbuddy/client/agent-client";
+import { expertsLoad, skillsList, sessionMcpGet, sessionMcpSet } from "@openbuddy/client/agent-client";
 import { HOME_MODES, type HomeModeId } from "../../shared/content/scenes";
-import { CONNECTOR_LIST } from "../experts/data/connectors-catalog";
 import type { AgentEntry, SkillInfo } from "@openbuddy/protocol/dto";
 
 interface InputAddMenuProps {
@@ -16,6 +16,8 @@ interface InputAddMenuProps {
   onSelectExpert?: (agent: AgentEntry) => void;
   onSelectSkill?: (skillName: string) => void;
   onNavigateConnectors?: (tab?: "experts" | "connectors") => void;
+  /** 本任务连接器开关 (pii W2.4 P2); omitted on the home page (no task yet). */
+  sessionId?: string;
 }
 
 type MenuItemId = "add-files" | "mode" | "experts" | "skills" | "connectors";
@@ -34,6 +36,7 @@ const MENU_GROUPS: MenuItem[][] = [
     { id: "mode", label: "模式", icon: <Wand2 size={16} /> },
     { id: "experts", label: "专家", icon: <ExpertTabIcon size="md" /> },
     { id: "skills", label: "技能", icon: <SkillTabIcon size="md" /> },
+    { id: "connectors", label: "连接器", icon: <McpIcon size="md" /> },
   ],
 ];
 
@@ -43,6 +46,7 @@ export function InputAddMenu({
   onSelectExpert,
   onSelectSkill,
   onNavigateConnectors,
+  sessionId,
 }: InputAddMenuProps) {
   const [open, setOpen] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<MenuItemId | null>(null);
@@ -52,6 +56,8 @@ export function InputAddMenu({
 
   const [experts, setExperts] = useState<AgentEntry[]>([]);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
+  const [sessionMcp, setSessionMcp] = useState<Array<{ name: string; enabled: boolean }>>([]);
+  const [mcpBusy, setMcpBusy] = useState("");
   const [dataLoaded, setDataLoaded] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -73,6 +79,26 @@ export function InputAddMenu({
   useEffect(() => {
     if (open && !dataLoaded) loadData();
   }, [open, dataLoaded, loadData]);
+
+  // 本任务连接器开关 (W2.4 P2): read the session's enabled list when the menu opens.
+  useEffect(() => {
+    if (!open || !sessionId) return;
+    let disposed = false;
+    void sessionMcpGet(sessionId)
+      .then((state) => { if (!disposed) setSessionMcp(state.servers); })
+      .catch(() => { /* menu stays usable without connectors */ });
+    return () => { disposed = true; };
+  }, [open, sessionId]);
+
+  const toggleConnector = async (name: string, enabled: boolean) => {
+    if (!sessionId || mcpBusy) return;
+    setMcpBusy(name);
+    try {
+      const next = await sessionMcpSet(sessionId, name, enabled);
+      setSessionMcp(next.servers);
+    } catch { /* keep the previous state */ }
+    finally { setMcpBusy(""); }
+  };
 
   // Close on outside click
   useEffect(() => {
@@ -221,19 +247,28 @@ export function InputAddMenu({
     if (hoveredItem === "connectors") {
       items = (
         <>
-          {CONNECTOR_LIST.slice(0, 8).map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              className="iam-sub-item"
-              onClick={handleSelectConnector}
-            >
-              <span className="iam-sub-avatar" style={{ background: c.color || "var(--wb-text-tertiary)" }}>
-                {c.name[0]}
-              </span>
-              <span className="iam-sub-name">{c.name}</span>
-            </button>
-          ))}
+          <div className="iam-sub-heading">本任务连接器</div>
+          {!sessionId ? (
+            <div className="iam-sub-empty">打开任务后可切换本任务连接器</div>
+          ) : sessionMcp.length === 0 ? (
+            <div className="iam-sub-empty">还没有配置连接器</div>
+          ) : (
+            sessionMcp.map((server) => (
+              <button
+                key={server.name}
+                type="button"
+                className="iam-sub-item"
+                disabled={mcpBusy === server.name}
+                onClick={() => { void toggleConnector(server.name, !server.enabled); }}
+                aria-pressed={server.enabled}
+              >
+                <span className="iam-sub-text"><span className="iam-sub-name">{server.name}</span></span>
+                <span className={"iam-switch" + (server.enabled ? " iam-switch--on" : "")} aria-hidden="true">
+                  <span className="iam-switch__dot" />
+                </span>
+              </button>
+            ))
+          )}
           <div className="iam-sub-footer" onClick={handleSelectConnector}>
             管理连接器 →
           </div>
