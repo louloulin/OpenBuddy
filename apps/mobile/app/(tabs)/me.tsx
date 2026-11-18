@@ -154,7 +154,7 @@ export default function MeScreen() {
       </View>
 
       <Section theme={theme} label="连接">
-        <Row theme={theme} label="电脑" value={pairing?.gatewayUrl ?? '未连接'} />
+        <Row theme={theme} label="电脑" value={pairing ? pairing.gatewayUrl.replace(/^https?:\/\//, '') : '未连接'} />
         <Row theme={theme} label="设备" value={pairing?.deviceName ?? '这台手机'} />
         <Row theme={theme} label="状态" value={statusText} last />
       </Section>
