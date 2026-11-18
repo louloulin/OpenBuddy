@@ -19,6 +19,7 @@ import * as Notifications from 'expo-notifications'
 import { AppLockGate } from '../src/components/AppLockGate'
 import { useApp } from '../src/stores/app'
 import { registerForPush, routeForNotification } from '../src/native/notifications'
+import { decisionForResponse } from '../src/core/push-actions'
 import { themeFor } from '../src/theme'
 
 export default function RootLayout() {
@@ -63,7 +64,14 @@ export default function RootLayout() {
     if (!booted || !pairing) return
     void registerForPush()
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-      const route = routeForNotification(response.notification.request.content.data as Record<string, unknown>)
+      const data = response.notification.request.content.data as Record<string, unknown>
+      // E4: a button press answers the approval in place; a plain tap routes.
+      const decision = decisionForResponse(response.actionIdentifier, data)
+      if (decision) {
+        void useApp.getState().resolveApproval(decision.requestId, decision.approved)
+        return
+      }
+      const route = routeForNotification(data)
       if (route) router.push(route as never)
     })
     return () => subscription.remove()

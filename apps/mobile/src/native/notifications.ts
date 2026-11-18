@@ -11,7 +11,25 @@ import { Platform } from 'react-native'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 
+import { APPROVAL_CATEGORY, APPROVE_ACTION, DENY_ACTION } from '../core/push-actions'
+
 export type PushRegistration = { token: string; platform: 'ios' | 'android' }
+
+/**
+ * Buttons on an approval notification (E4). Registered before any push can
+ * arrive; the gateway tags actionable approvals with this category id.
+ */
+export async function registerApprovalCategory(): Promise<void> {
+  if (Platform.OS !== 'ios') return
+  try {
+    await Notifications.setNotificationCategoryAsync(APPROVAL_CATEGORY, [
+      { identifier: APPROVE_ACTION, buttonTitle: '允许', options: { opensAppToForeground: false } },
+      { identifier: DENY_ACTION, buttonTitle: '拒绝', options: { opensAppToForeground: false, isDestructive: true } },
+    ])
+  } catch {
+    // Older OS or a simulator: the tap still opens the approval screen.
+  }
+}
 
 /** Asks once; returns null when the user declined or this is a simulator. */
 export async function registerForPush(): Promise<PushRegistration | null> {
@@ -28,6 +46,7 @@ export async function registerForPush(): Promise<PushRegistration | null> {
       vibrationPattern: [0, 180, 120, 180],
     })
   }
+  await registerApprovalCategory()
 
   // Project id comes from EAS; without it Expo cannot mint a token, which is a
   // build configuration problem rather than a runtime one.

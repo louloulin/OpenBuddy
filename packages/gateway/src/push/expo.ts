@@ -57,6 +57,10 @@ export function createExpoProvider(options: ExpoProviderOptions = {}): PushProvi
         title: message.title,
         body: message.body,
         sound: 'default',
+        // A pending approval can be answered from the notification itself: the
+        // phone registers the `approval` category with Allow / Deny buttons
+        // (20261117-mobile E4). Everything else keeps the plain tap.
+        ...(message.kind === 'approval' && message.requestId ? { categoryId: 'approval' } : {}),
         data: {
           kind: message.kind,
           sessionId: message.sessionId,

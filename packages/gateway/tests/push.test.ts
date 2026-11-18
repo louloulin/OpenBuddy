@@ -1402,8 +1402,23 @@ describe('expo provider', () => {
       title: message.title,
       body: message.body,
       collapseId: 'session:s-1',
+      categoryId: 'approval',
       data: { kind: 'approval', sessionId: 's-1', requestId: 'req-1' },
     })
+  })
+
+  test('only a pending approval carries the action category', async () => {
+    const calls: { url: string; init: RequestInit }[] = []
+    const provider = createExpoProvider({
+      sendUrl: 'https://expo.test/send',
+      fetchImpl: (async (url: string, init: RequestInit) => {
+        calls.push({ url: String(url), init })
+        return new Response(JSON.stringify({ data: { status: 'ok', id: 't2' } }), { status: 200 })
+      }) as unknown as typeof fetch,
+    })
+    await provider.send({ ...message, kind: 'done', requestId: undefined })
+    const body = JSON.parse(String(calls[0]!.init.body))
+    expect(body.categoryId).toBeUndefined()
   })
 
   test('rejects a token that is not an Expo token without calling the network', async () => {

@@ -44,6 +44,7 @@ import { groupSessions } from '../apps/mobile/src/core/session-actions.js'
 import { toProjects } from '../apps/mobile/src/core/projects.js'
 import { canRevertTool, summarizeRevert } from '../apps/mobile/src/core/revert.js'
 import { extractSources, isSourceTool } from '../apps/mobile/src/core/sources.js'
+import { APPROVE_ACTION, DENY_ACTION, decisionForResponse } from '../apps/mobile/src/core/push-actions.js'
 import { cleanSessionTitle, sessionActions } from '../apps/mobile/src/core/session-actions.js'
 import { bumpUnread, shouldMarkUnread, totalUnread } from '../apps/mobile/src/core/unread.js'
 import { parseLockSetting, shouldRelock } from '../apps/mobile/src/core/app-lock.js'
@@ -687,6 +688,20 @@ check('web tool output yields deduped sources',
   && extractSources(webOutput)[0].title === 'MDN SSE')
 check('only web tools carry sources',
   isSourceTool('web_search') && !isSourceTool('write_text_file') && extractSources('没有链接').length === 0)
+
+// ── 8t. Approving from the notification (v3 E4) ────────────────────────────
+
+const pushed = decisionForResponse(APPROVE_ACTION, { kind: 'approval', sessionId: 'sess-1', requestId: 'perm-1' })
+check('an Allow button answers that approval', pushed?.requestId === 'perm-1' && pushed?.approved === true)
+check('a Deny button declines it', decisionForResponse(DENY_ACTION, { requestId: 'perm-1' })?.approved === false)
+check('a plain tap is not a decision',
+  decisionForResponse('expo.modules.notifications.actions.DEFAULT', { requestId: 'perm-1' }) === null)
+if (pushed) {
+  await transport.invoke('agent_resolve_permission', {
+    sessionId: 'sess-1', requestId: pushed.requestId, optionId: pushed.approved ? 'allow' : 'deny',
+  })
+  check('the decision reaches the desktop', resolved.some(item => item.requestId === 'perm-1'))
+}
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 
