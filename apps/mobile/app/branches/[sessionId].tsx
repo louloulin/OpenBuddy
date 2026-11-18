@@ -301,7 +301,7 @@ export default function BranchesScreen() {
           )}
 
           <Text style={{ color: theme.textWeak, fontSize: 11, lineHeight: 17, paddingHorizontal: 4 }}>
-            撤销工具改动需要每一轮的工具调用信息，只在桌面端提供；手机负责切换分支和恢复文件。
+            这里负责切换分支与恢复文件；撤销某一次工具调用的改动，在聊天页展开那张工具卡即可。
           </Text>
         </>
       )}
