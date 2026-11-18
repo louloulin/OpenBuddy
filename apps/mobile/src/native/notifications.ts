@@ -31,6 +31,26 @@ export async function registerApprovalCategory(): Promise<void> {
   }
 }
 
+export type PushAvailability = 'ready' | 'denied' | 'simulator' | 'unconfigured' | 'unsupported'
+
+/**
+ * Why push will or will not arrive here (E5). Shown in 我 so a missing push is
+ * explained instead of silent: a browser or simulator can never register, and a
+ * build without the EAS project id cannot mint a token.
+ */
+export async function pushAvailability(): Promise<PushAvailability> {
+  if (Platform.OS === 'web') return 'unsupported'
+  if (!Device.isDevice) return 'simulator'
+  try {
+    const permission = await Notifications.getPermissionsAsync()
+    if (permission.status === 'denied') return 'denied'
+  } catch {
+    return 'unsupported'
+  }
+  if (!process.env.EXPO_PUBLIC_EAS_PROJECT_ID) return 'unconfigured'
+  return 'ready'
+}
+
 /** Asks once; returns null when the user declined or this is a simulator. */
 export async function registerForPush(): Promise<PushRegistration | null> {
   if (!Device.isDevice) return null

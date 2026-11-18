@@ -7,7 +7,7 @@
  * saying so out loud is the point of this screen.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Alert, Pressable, ScrollView, Text, View, useColorScheme } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
@@ -16,8 +16,25 @@ import { ChevronRightIcon, SparkIcon } from '../../src/components/icons'
 import { canRun, unavailableReason } from '../../src/core/surface'
 import { useApp } from '../../src/stores/app'
 import { clearPairing } from '../../src/transport'
+import { pushAvailability, type PushAvailability } from '../../src/native/notifications'
 import { clearCache } from '../../src/db/cache'
 import { themeFor, type Theme } from '../../src/theme'
+
+const PUSH_LABEL: Record<PushAvailability, string> = {
+  ready: '已开启',
+  denied: '未授权',
+  simulator: '仅真机',
+  unconfigured: '未配置 EAS',
+  unsupported: '仅真机',
+}
+
+const PUSH_HINT: Record<PushAvailability, string> = {
+  ready: '离开应用后，审批与完成会推送到这台手机。',
+  denied: '系统里关闭了通知权限，可在设置中重新允许。',
+  simulator: '模拟器和浏览器收不到推送；真机安装后自动登记。',
+  unconfigured: '这个构建没有填 EAS 项目 id，无法生成推送 token。',
+  unsupported: '当前环境不支持推送；审批仍会出现在通知页。',
+}
 
 function Section({ theme, label, children }: { theme: Theme; label: string; children: React.ReactNode }) {
   return (
@@ -90,6 +107,13 @@ export default function MeScreen() {
   const activePairingId = useApp(state => state.activePairingId)
   const switchPairing = useApp(state => state.switchPairing)
   const [busyPairing, setBusyPairing] = useState(false)
+  const [push, setPush] = useState<PushAvailability>('unsupported')
+
+  useEffect(() => {
+    let alive = true
+    void pushAvailability().then(value => { if (alive) setPush(value) })
+    return () => { alive = false }
+  }, [])
 
   const switchTo = async (id: string) => {
     setBusyPairing(true)
@@ -229,6 +253,16 @@ export default function MeScreen() {
           label="回复自动播报"
           value={autoSpeak ? '已开启' : '关闭'}
           onPress={() => void setAutoSpeak(!autoSpeak)}
+          last
+        />
+      </Section>
+
+      <Section theme={theme} label="通知">
+        <Row
+          theme={theme}
+          label="推送通知"
+          value={PUSH_LABEL[push]}
+          onPress={() => Alert.alert('推送通知', PUSH_HINT[push])}
           last
         />
       </Section>
