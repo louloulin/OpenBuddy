@@ -7,7 +7,7 @@
  */
 
 import { useState } from 'react'
-import { ActivityIndicator, Pressable, Text, TextInput, View, useColorScheme } from 'react-native'
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native'
 import { useRouter } from 'expo-router'
 
 import { SearchIcon } from '../../src/components/icons'
@@ -95,40 +95,46 @@ export default function SearchScreen() {
         {busy ? <ActivityIndicator color={theme.textMedium} /> : null}
       </View>
 
-      {note ? <Text style={{ color: theme.textWeak, fontSize: 13, paddingHorizontal: 4 }}>{note}</Text> : null}
+      {note || hits.length ? (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1, gap: 10, paddingBottom: 16 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {note ? <Text style={{ color: theme.textWeak, fontSize: 13, paddingHorizontal: 4 }}>{note}</Text> : null}
 
-      {hits.length === 0 && !note ? (
+          {hits.map((hit, index) => (
+            <Pressable
+              key={`${hit.sessionId ?? hit.id ?? index}`}
+              onPress={() => hit.sessionId && router.push(`/chat/${encodeURIComponent(hit.sessionId)}`)}
+              style={({ pressed }) => ({
+                backgroundColor: pressed ? theme.hover : theme.card,
+                borderRadius: 12,
+                borderWidth: theme.hairline,
+                borderColor: theme.cardBorder,
+                padding: 13,
+                gap: 4,
+              })}
+            >
+              <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>
+                {hit.title ?? hit.sessionId ?? '会话'}
+              </Text>
+              {hit.snippet ?? hit.text ? (
+                <Text style={{ color: theme.textWeak, fontSize: 13, lineHeight: 19 }} numberOfLines={3}>
+                  {hit.snippet ?? hit.text}
+                </Text>
+              ) : null}
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingBottom: 80 }}>
           <SearchIcon size={28} color={theme.textWeak} />
           <Text style={{ color: theme.textWeak, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
             搜索所有会话的正文。{'\n'}索引在电脑上，手机只发查询。
           </Text>
         </View>
-      ) : null}
-
-      {hits.map((hit, index) => (
-        <Pressable
-          key={`${hit.sessionId ?? hit.id ?? index}`}
-          onPress={() => hit.sessionId && router.push(`/chat/${encodeURIComponent(hit.sessionId)}`)}
-          style={({ pressed }) => ({
-            backgroundColor: pressed ? theme.hover : theme.card,
-            borderRadius: 12,
-            borderWidth: theme.hairline,
-            borderColor: theme.cardBorder,
-            padding: 13,
-            gap: 4,
-          })}
-        >
-          <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>
-            {hit.title ?? hit.sessionId ?? '会话'}
-          </Text>
-          {hit.snippet ?? hit.text ? (
-            <Text style={{ color: theme.textWeak, fontSize: 13, lineHeight: 19 }} numberOfLines={3}>
-              {hit.snippet ?? hit.text}
-            </Text>
-          ) : null}
-        </Pressable>
-      ))}
+      )}
     </View>
   )
 }
