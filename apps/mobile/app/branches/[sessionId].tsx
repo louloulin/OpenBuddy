@@ -253,7 +253,9 @@ export default function BranchesScreen() {
                   <Text numberOfLines={1} style={{ flex: 1, color: theme.text, fontSize: 14, paddingVertical: 12 }}>
                     {point.preview || `第 ${point.index + 1} 条提问`}
                   </Text>
-                  {busy === point.entryId ? <ActivityIndicator color={theme.textMedium} /> : null}
+                  {busy === point.entryId
+                    ? <ActivityIndicator color={theme.textMedium} />
+                    : <ChevronRightIcon size={15} color={theme.textWeak} />}
                 </Pressable>
               ))}
             </Card>
