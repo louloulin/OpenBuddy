@@ -172,7 +172,7 @@ export default function MeScreen() {
         <View style={{ flex: 1 }}>
           <Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>OpenBuddy</Text>
           <Text style={{ color: theme.textWeak, fontSize: 12, marginTop: 2 }}>
-            {pairing ? `${pairing.gatewayUrl.replace(/^https?:\/\//, '')} · ${statusText}` : '未连接电脑'}
+            {pairing ? `${pairing.deviceName} · ${statusText}` : '未连接电脑'}
           </Text>
         </View>
       </View>

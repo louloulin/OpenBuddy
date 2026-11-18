@@ -112,10 +112,11 @@ export default function NotificationsScreen() {
               opacity: item.read ? 0.62 : 1,
             })}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
               <Text style={{ color: theme.textWeak, fontSize: 11, fontWeight: '600', letterSpacing: 0.3 }}>
                 {LABEL[item.kind] ?? item.kind}
               </Text>
+              {/* The dot marks the row, not the label — keep it on the card edge. */}
               {!item.read ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.ink }} /> : null}
             </View>
             <Text numberOfLines={1} style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>{item.title}</Text>
