@@ -6,7 +6,8 @@
  * medium contrast — the same de-emphasis the desktop uses for read items.
  */
 
-import { Pressable, Text, View, useColorScheme } from 'react-native'
+import { useEffect } from 'react'
+import { ActivityIndicator, Pressable, ScrollView, Text, View, useColorScheme } from 'react-native'
 import { useRouter } from 'expo-router'
 
 import { BellIcon } from '../../src/components/icons'
@@ -24,7 +25,21 @@ export default function NotificationsScreen() {
   const theme = themeFor(useColorScheme())
   const router = useRouter()
   const notifications = useApp(state => state.notifications)
+  const loaded = useApp(state => state.notificationsLoaded)
+  const refresh = useApp(state => state.refreshNotifications)
   const markRead = useApp(state => state.markNotificationsRead)
+
+  // The backlog lives on the computer; push only covers what arrived while the
+  // phone was away, so opening the tab has to ask.
+  useEffect(() => { void refresh() }, [refresh])
+
+  if (!loaded && notifications.length === 0) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface }}>
+        <ActivityIndicator color={theme.textWeak} />
+      </View>
+    )
+  }
 
   if (notifications.length === 0) {
     return (
@@ -62,8 +77,13 @@ export default function NotificationsScreen() {
         <Pressable
           key={item.id}
           onPress={() => {
-            if (item.kind === 'approval' || item.kind === 'question') router.push(`/approval/${encodeURIComponent(item.id)}`)
-            else if (item.sessionId) router.push(`/chat/${encodeURIComponent(item.sessionId)}`)
+            // A backlog row knows the session; only push rows carry the live
+            // request id, so without one we open the conversation itself.
+            if (item.requestId && (item.kind === 'approval' || item.kind === 'question')) {
+              router.push(`/approval/${encodeURIComponent(item.requestId)}`)
+            } else if (item.sessionId) {
+              router.push(`/chat/${encodeURIComponent(item.sessionId)}`)
+            }
           }}
           style={({ pressed }) => ({
             marginHorizontal: 12,

@@ -33,6 +33,11 @@ const SESSIONS: Array<{ id: string; title: string; updatedAt: number; pinned: bo
   { id: 'sess-notes', title: '周会纪要', updatedAt: now - 26 * 3_600_000, pinned: false, cwd: '/tmp/scratch' },
 ]
 
+const DEMO_NOTIFICATIONS = [
+  { id: 2, kind: 'approval', title: '需要你批准：写入 3 个文件', body: '会话「手机端接入设计」请求修改文档。', sessionId: 'sess-mobile', severity: 'info', read: false, at: new Date(now - 30_000).toISOString() },
+  { id: 1, kind: 'done', title: '会话已完成', body: '这一轮已经结束。', sessionId: 'sess-notes', severity: 'info', read: true, at: new Date(now - 3_600_000).toISOString() },
+]
+
 const AUTOMATIONS: Array<Record<string, unknown>> = [
   {
     id: 'auto-demo', name: '每日晨报', prompt: '整理今天的日程与待办，发一段摘要。',
@@ -195,7 +200,10 @@ const dispatcher: HostDispatcher = {
         demoQueue.followUp = []
         return { steering: [], followUp: [] }
       case 'notification_list':
-        return []
+        return DEMO_NOTIFICATIONS.map(item => ({ ...item }))
+      case 'notification_mark_all_read':
+        for (const item of DEMO_NOTIFICATIONS) item.read = true
+        return { ok: true }
       case 'agent_resolve_permission':
         for (const listener of listeners) listener('agent://permission-dismiss', { requestId: payload.requestId, sessionId: payload.sessionId })
         return { resolved: true }
@@ -263,6 +271,33 @@ const dispatcher: HostDispatcher = {
           { id: '/Users/louloulin/stock/OpenBuddy/docs', kind: 'folder', label: 'docs', path: '/Users/louloulin/stock/OpenBuddy/docs', addedAt: new Date(now).toISOString() },
           { id: '/tmp/scratch', kind: 'folder', label: 'scratch', path: '/tmp/scratch', addedAt: new Date(now).toISOString() },
         ]
+      case 'memory_list':
+        return [
+          { scope: 'global', path: 'MEMORY.md', content: '# 长期偏好\n\n- 回答用中文\n- 先给结论', size: 40 },
+          { scope: 'global', path: 'people/team.md', content: '- 小林负责安卓', size: 18 },
+          { scope: 'workspace', path: 'notes.md', content: '# 项目笔记', size: 12 },
+        ]
+      case 'memory_get':
+        return '# 长期偏好\n\n- 回答用中文\n- 先给结论再给理由'
+      case 'agent_tree':
+        return {
+          sessionId: 'sess-mobile',
+          leafId: 'leaf-2',
+          turns: [{
+            entryId: 'u-1', timestamp: now - 300_000, index: 1, total: 2,
+            siblings: [
+              { entryId: 'v1', leafId: 'leaf-1', timestamp: now - 320_000, preview: '手机端现在能直接用了？', files: [] },
+              { entryId: 'v2', leafId: 'leaf-2', timestamp: now - 300_000, preview: '手机端现在能直接用了？顺便看看重连。', files: [] },
+            ],
+          }],
+        }
+      case 'rewind_points':
+        return [{ entryId: 'u-1', index: 0, preview: '手机端现在能直接用了？' }]
+      case 'checkpoint_list':
+        return [{
+          id: 'ck-1', toolCallId: 'tc-write-1', path: 'docs/plan/20261115-mobile.md',
+          before: null, after: 'a'.repeat(64), at: now - 240_000, source: 'tool',
+        }]
       case 'automations_snapshot':
         return { automations: AUTOMATIONS.map(item => ({ ...item })), records: [] }
       case 'automations_save': {
@@ -334,8 +369,9 @@ const dispatcher: HostDispatcher = {
     'agent_set_session_pinned', 'agent_rename_session', 'agent_set_session_archived', 'agent_delete_session',
     'agent_export_jsonl', 'read_text_file', 'agent_session_info', 'list_dir', 'files_search', 'commands_list',
     'automations_snapshot', 'automations_save', 'automations_delete', 'automations_set_status', 'automations_run',
-    'library_list', 'projects_snapshot', 'turn_revert',
-    'session_search', 'notification_list',
+    'library_list', 'projects_snapshot', 'turn_revert', 'session_search',
+    'memory_list', 'memory_get', 'agent_tree', 'rewind_points', 'checkpoint_list', 'notification_list',
+    'notification_mark_all_read',
   ],
 }
 

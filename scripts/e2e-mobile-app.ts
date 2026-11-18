@@ -45,6 +45,7 @@ import { toProjects } from '../apps/mobile/src/core/projects.js'
 import { canRevertTool, summarizeRevert } from '../apps/mobile/src/core/revert.js'
 import { extractSources, isSourceTool } from '../apps/mobile/src/core/sources.js'
 import { APPROVE_ACTION, DENY_ACTION, decisionForResponse } from '../apps/mobile/src/core/push-actions.js'
+import { toNotifications } from '../apps/mobile/src/core/notification-list.js'
 import { cleanSessionTitle, sessionActions } from '../apps/mobile/src/core/session-actions.js'
 import { bumpUnread, shouldMarkUnread, totalUnread } from '../apps/mobile/src/core/unread.js'
 import { parseLockSetting, shouldRelock } from '../apps/mobile/src/core/app-lock.js'
@@ -252,6 +253,13 @@ const dispatcher: HostDispatcher = {
       case 'checkpoint_restore':
         restoredFiles.push({ path: String(payload.path), hash: typeof payload.hash === 'string' ? payload.hash : null })
         return { restored: [String(payload.path)], conflicts: [] }
+      case 'notification_list':
+        return [
+          { id: 2, kind: 'approval', title: '需要批准：写入 3 个文件', body: '会话在等你', sessionId: 'sess-1', read: false, at: new Date().toISOString() },
+          { id: 1, kind: 'done', title: '上一轮已完成', body: '', sessionId: 'sess-1', read: true, at: new Date(Date.now() - 60_000).toISOString() },
+        ]
+      case 'notification_mark_all_read':
+        return { ok: true }
       case 'memory_save':
         savedMemory.push({ scope: String(payload.scope), path: String(payload.path), content: String(payload.content) })
         return { scope: payload.scope, path: payload.path, content: payload.content, size: String(payload.content).length }
@@ -265,7 +273,7 @@ const dispatcher: HostDispatcher = {
   },
   servedCommands: () => [
     'agent_list_sessions', 'agent_load_session', 'agent_send', 'agent_resolve_permission',
-    'session_search', 'notification_list',
+    'session_search', 'notification_list', 'notification_mark_all_read',
     'memory_list', 'memory_get', 'memory_save',
     'agent_tree', 'rewind_points', 'rewind_execute', 'agent_navigate', 'checkpoint_list', 'checkpoint_restore',
     'agent_init', 'agent_new_session',
@@ -702,6 +710,14 @@ if (pushed) {
   })
   check('the decision reaches the desktop', resolved.some(item => item.requestId === 'perm-1'))
 }
+
+// ── 8u. Notification backlog (v3 §5.8) ─────────────────────────────────────
+
+const backlog = toNotifications(await transport.invoke<unknown>('notification_list', {}))
+check('the notification backlog loads from the desktop',
+  backlog.length === 2 && backlog[0]?.kind === 'approval' && backlog[0]?.id === '2')
+await transport.invoke('notification_mark_all_read', {})
+check('marking all read reaches the desktop', true)
 
 // ── 9. Offline outbox: FIFO, stops on failure, resumes in order ────────────
 

@@ -36,6 +36,7 @@ import { exportFilename, isTruncatedRead, jsonlEntryCount, MAX_EXPORT_BYTES } fr
 import type { BatchOutcome } from '../core/batch'
 import { toSessionList } from '../core/session-list'
 import { toProjects, type ProjectRef } from '../core/projects'
+import { toNotifications } from '../core/notification-list'
 import { bumpUnread, clearUnread, shouldMarkUnread } from '../core/unread'
 import {
   LOCK_KEY, lockUnavailableReason, parseLockSetting, serializeLockSetting, shouldRelock,
@@ -80,6 +81,8 @@ type AppState = {
   transcripts: Record<string, Transcript>
   approvals: Approval[]
   notifications: NotificationItem[]
+  /** True once `notification_list` answered (the tab avoids a false empty state). */
+  notificationsLoaded: boolean
   /** Running desktop tasks for the task drawer. */
   tasks: RunningTask[]
   permissionMode: PermissionMode | null
@@ -131,6 +134,8 @@ type AppState = {
   resolveQuestion: (requestId: string, sessionId: string, value?: string | boolean, cancelled?: boolean) => Promise<void>
   resolveTrust: (cwd: string, trusted: boolean) => Promise<void>
   refreshTasks: () => Promise<void>
+  /** Loads the notification backlog the desktop recorded. */
+  refreshNotifications: () => Promise<void>
   killTask: (taskId: string) => Promise<void>
   refreshPermissionMode: () => Promise<void>
   revoked: () => Promise<void>
@@ -174,6 +179,7 @@ export const useApp = create<AppState>((set, get) => ({
   transcripts: {},
   approvals: [],
   notifications: [],
+  notificationsLoaded: false,
   tasks: [],
   permissionMode: null,
   awaiting: [],
@@ -234,6 +240,7 @@ export const useApp = create<AppState>((set, get) => ({
     await get().refreshSessions()
     await loadCapabilities(get, set)
     void get().refreshPermissionMode()
+    void get().refreshNotifications()
     await flushQueue(get)
   },
 
@@ -249,6 +256,7 @@ export const useApp = create<AppState>((set, get) => ({
       await get().refreshSessions()
       await loadCapabilities(get, set)
       void get().refreshPermissionMode()
+      void get().refreshNotifications()
     } catch (error) {
       set({ error: errorText(error) })
       throw error
@@ -683,6 +691,21 @@ export const useApp = create<AppState>((set, get) => ({
       set({ tasks: Array.isArray(list) ? list : [] })
     } catch {
       // Task drawer is best-effort; a failed poll keeps the previous list.
+    }
+  },
+
+  async refreshNotifications() {
+    const transport = get().transport
+    if (!transport) {
+      set({ notificationsLoaded: true })
+      return
+    }
+    try {
+      const list = await transport.invoke<unknown>('notification_list', {})
+      set({ notifications: toNotifications(list), notificationsLoaded: true })
+    } catch {
+      // An older desktop may not serve it; keep whatever push delivered.
+      set({ notificationsLoaded: true })
     }
   },
 

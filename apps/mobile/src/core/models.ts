@@ -48,6 +48,8 @@ export type NotificationItem = {
   title: string
   body: string
   sessionId?: string
+  /** Set when the desktop attached the pending request to the row. */
+  requestId?: string
   read: boolean
   at: number
 }
