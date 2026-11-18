@@ -7,6 +7,7 @@
  * saying so out loud is the point of this screen.
  */
 
+import { useState } from 'react'
 import { Alert, Pressable, ScrollView, Text, View, useColorScheme } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
@@ -85,6 +86,19 @@ export default function MeScreen() {
   const autoSpeak = useApp(state => state.autoSpeak)
   const setAutoSpeak = useApp(state => state.setAutoSpeak)
   const unpair = useApp(state => state.unpair)
+  const pairings = useApp(state => state.pairings)
+  const activePairingId = useApp(state => state.activePairingId)
+  const switchPairing = useApp(state => state.switchPairing)
+  const [busyPairing, setBusyPairing] = useState(false)
+
+  const switchTo = async (id: string) => {
+    setBusyPairing(true)
+    try {
+      await switchPairing(id)
+    } finally {
+      setBusyPairing(false)
+    }
+  }
 
   const toggleLock = async () => {
     const result = await setAppLock(!appLock)
@@ -92,16 +106,19 @@ export default function MeScreen() {
   }
 
   const confirmUnpair = () => {
-    Alert.alert('断开这台电脑？', '设备凭证会从本机删除，需要重新扫码才能连接。', [
+    Alert.alert('断开这台电脑？', '设备凭证会从本机删除，需要重新扫码才能连接。其他已配对的电脑不受影响。', [
       { text: '取消', style: 'cancel' },
       {
         text: '断开',
         style: 'destructive',
         onPress: async () => {
           await unpair()
-          await clearPairing().catch(() => {})
           await clearCache().catch(() => {})
-          router.replace('/pair')
+          const stillPaired = useApp.getState().pairing
+          if (!stillPaired) {
+            await clearPairing().catch(() => {})
+            router.replace('/pair')
+          }
         },
       },
     ])

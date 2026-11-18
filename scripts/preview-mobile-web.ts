@@ -21,6 +21,8 @@ import { createAgentClient } from '../packages/gateway/src/agentCore.js'
 import { createBridgeServer, type HostDispatcher } from '../packages/pi-bridge/src/server.js'
 
 const webDir = resolve(process.argv[2] ?? '/tmp/expo-web')
+/** Optional prefix so two preview gateways are distinguishable in one phone. */
+const TAG = process.env.OPENBUDDY_PREVIEW_TAG ?? ''
 
 const listeners = new Set<(event: string, payload: unknown) => void>()
 const demoQueue = { steering: [] as string[], followUp: [] as string[] }
@@ -114,7 +116,9 @@ const dispatcher: HostDispatcher = {
     switch (command) {
       case 'agent_list_sessions': {
         const cwd = typeof payload.cwd === 'string' ? payload.cwd : null
-        return SESSIONS.filter(session => !cwd || session.cwd === cwd)
+        return SESSIONS
+          .filter(session => !cwd || session.cwd === cwd)
+          .map(session => ({ ...session, title: TAG ? `${TAG} ${session.title}` : session.title }))
       }
       case 'projects_snapshot':
         return {
@@ -408,7 +412,8 @@ const MIME: Record<string, string> = {
 }
 
 const web = serve({
-  port: 0,
+  // A fixed port lets two previews allow each other's origin (multi-desktop).
+  port: Number(process.env.OPENBUDDY_PREVIEW_WEB_PORT ?? 0),
   hostname: '127.0.0.1',
   async fetch(req) {
     const url = new URL(req.url)
@@ -452,7 +457,7 @@ const gateway = createGateway({
   pairTtlMs: 30 * 60_000,
   claimLimitPerMinute: 100,
   maxBodyBytes: 20 * 1024 * 1024,
-  allowedOrigins: [webOrigin],
+  allowedOrigins: [webOrigin, ...(process.env.OPENBUDDY_PREVIEW_EXTRA_ORIGINS ?? '').split(',').filter(Boolean)],
   h5Enabled: false,
   h5Dir: '.',
   pairAllowsSharedRoute: true,
