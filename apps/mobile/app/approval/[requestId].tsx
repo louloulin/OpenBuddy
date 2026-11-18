@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, ScrollView, Text, View, useColorScheme } from 'react-native'
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, View, useColorScheme } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
 import { RequestCard } from '../../src/components/RequestCard'
@@ -62,12 +62,17 @@ export default function ApprovalScreen() {
   }
 
   return (
-    <ScrollView
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1, backgroundColor: theme.surface }}
-      contentContainerStyle={{ padding: 16, flexGrow: 1 }}
-      keyboardShouldPersistTaps="handled"
     >
-      <RequestCard approval={approval} busy={busy} onAction={action => void settle(action)} />
-    </ScrollView>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 16, flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <RequestCard approval={approval} busy={busy} onAction={action => void settle(action)} />
+      </ScrollView>
+    </KeyboardAvoidingView>
   )
 }

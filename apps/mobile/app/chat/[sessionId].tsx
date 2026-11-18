@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { Modal, Pressable, ScrollView, Text, View, useColorScheme, useWindowDimensions } from 'react-native'
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View, useColorScheme, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FlashList } from '@shopify/flash-list'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -188,7 +188,10 @@ export default function ChatScreen() {
           onPick={id => router.replace(`/chat/${encodeURIComponent(id)}`)}
         />
       ) : null}
-      <View style={{ flex: 1, paddingTop: insets.top }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1, paddingTop: insets.top }}
+      >
       {/* In-flow header, like the desktop's `.main-topbar`: no shadow, one line. */}
       <View
         style={{
@@ -457,7 +460,7 @@ export default function ChatScreen() {
           </View>
         </View>
       </Modal>
-      </View>
+      </KeyboardAvoidingView>
     </View>
   )
 }
