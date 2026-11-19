@@ -8,10 +8,10 @@
  * at the visual bottom without moving the thumb.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View, useColorScheme, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { FlashList } from '@shopify/flash-list'
+import { FlashList, type FlashListRef } from '@shopify/flash-list'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
 import { Composer } from '../../src/components/Composer'
@@ -126,6 +126,14 @@ export default function ChatScreen() {
     }
     return items.reverse()
   }, [transcript.rows, approvals])
+  // The list is inverted, so offset 0 is the live edge. Once the reader scrolls
+  // away, Grok keeps a one-tap way back instead of making them fling.
+  const listRef = useRef<FlashListRef<ChatItem>>(null)
+  const [atBottom, setAtBottom] = useState(true)
+  const jumpToLatest = () => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: true })
+    setAtBottom(true)
+  }
   const streaming = isTurnPending(transcript)
   // `agent_regenerate` always redoes the newest answer, so the button belongs
   // on that row only — offering it on an older message would silently replace
@@ -278,30 +286,60 @@ export default function ChatScreen() {
           </View>
         </View>
       ) : (
-        <FlashList
-          data={data}
-          inverted
-          style={{ flex: 1 }}
-          renderItem={({ item }: { item: ChatItem }) => (item.kind === 'approval'
-            ? (
-              <RequestCard
-                approval={item.approval}
-                busy={busyRequest === item.approval.requestId}
-                onAction={action => void handleRequest(item.approval, action)}
-              />
-            )
-            : (
-              <MessageRow
-                row={item}
-                onRegenerate={!streaming && item.id === lastAssistantId ? () => void regenerate(sessionId) : undefined}
-                toolActions={toolActions}
-                onQuote={text => setQuoted(text)}
-                onEdit={text => { setQuoted(null); setEditText(text); setEditToken(token => token + 1) }}
-              />
-            ))}
-          keyExtractor={row => row.id}
-          contentContainerStyle={{ paddingVertical: 6 }}
-        />
+        <View style={{ flex: 1 }}>
+          <FlashList
+            ref={listRef}
+            data={data}
+            inverted
+            style={{ flex: 1 }}
+            onScroll={event => setAtBottom(event.nativeEvent.contentOffset.y <= 24)}
+            scrollEventThrottle={32}
+            renderItem={({ item }: { item: ChatItem }) => (item.kind === 'approval'
+              ? (
+                <RequestCard
+                  approval={item.approval}
+                  busy={busyRequest === item.approval.requestId}
+                  onAction={action => void handleRequest(item.approval, action)}
+                />
+              )
+              : (
+                <MessageRow
+                  row={item}
+                  onRegenerate={!streaming && item.id === lastAssistantId ? () => void regenerate(sessionId) : undefined}
+                  toolActions={toolActions}
+                  onQuote={text => setQuoted(text)}
+                  onEdit={text => { setQuoted(null); setEditText(text); setEditToken(token => token + 1) }}
+                />
+              ))}
+            keyExtractor={row => row.id}
+            contentContainerStyle={{ paddingVertical: 6 }}
+          />
+          {!atBottom ? (
+            <Pressable
+              onPress={jumpToLatest}
+              accessibilityLabel="回到底部"
+              style={({ pressed }) => ({
+                position: 'absolute',
+                bottom: 12,
+                right: 16,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                borderRadius: theme.radiusPill,
+                borderWidth: theme.hairline,
+                borderColor: theme.cardBorder,
+                backgroundColor: pressed ? theme.pressed : theme.card,
+              })}
+            >
+              <Text style={{ color: theme.textMedium, fontSize: 12 }}>回到底部</Text>
+              <View style={{ transform: [{ rotate: '90deg' }] }}>
+                <ChevronRightIcon size={12} color={theme.textWeak} />
+              </View>
+            </Pressable>
+          ) : null}
+        </View>
       )}
 
       {sessionTaskRows.length ? (
