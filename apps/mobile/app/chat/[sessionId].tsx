@@ -307,9 +307,11 @@ export default function ChatScreen() {
       {sessionTaskRows.length ? (
         <Pressable
           onPress={() => { setTasksOpen(true); void refreshTasks() }}
+          accessibilityLabel="查看运行中的任务"
           style={({ pressed }) => ({
             flexDirection: 'row',
             alignItems: 'center',
+            gap: 6,
             marginHorizontal: theme.gutter,
             paddingVertical: 7,
             opacity: pressed ? 0.6 : 1,
@@ -321,6 +323,7 @@ export default function ChatScreen() {
           <Text style={{ color: theme.textWeak, fontSize: 12 }}>
             {elapsedLabel(Math.min(...sessionTaskRows.map(task => task.startedAt ?? Date.now())))}
           </Text>
+          <ChevronRightIcon size={12} color={theme.textWeak} />
         </Pressable>
       ) : null}
 
