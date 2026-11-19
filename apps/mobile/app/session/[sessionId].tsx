@@ -117,6 +117,7 @@ export default function SessionPanelScreen() {
     if (isPreview()) {
       const demo = previewState().panel
       setExperts(toExpertOptions(demo?.experts ?? []))
+      setExpertId(demo?.experts?.[0]?.id)
       setThinking(demo?.thinkingLevel as ThinkingLevel | undefined)
       setArtifacts(toArtifacts(demo?.artifacts ?? []))
       setCwd(previewState().sessions.find(item => item.id === sessionId)?.cwd)
@@ -129,13 +130,16 @@ export default function SessionPanelScreen() {
     try {
       const [list, modelState, artifactList, sessionInfo] = await Promise.all([
         transport.invoke<unknown>('agents_list', {}).catch(() => []),
-        transport.invoke<{ thinkingLevel?: string }>('agent_get_model_state', { sessionId }).catch(() => ({}) as { thinkingLevel?: string }),
+        transport.invoke<{ thinkingLevel?: string; expert?: { id?: string; expertId?: string } | null }>('agent_get_model_state', { sessionId }).catch(() => ({}) as { thinkingLevel?: string; expert?: { id?: string; expertId?: string } | null }),
         transport.invoke<unknown>('artifacts_list', { sessionId }).catch(() => []),
         transport.invoke<{ usage?: { used?: number; total?: number }; cwd?: string }>('agent_session_info', { sessionId }).catch(() => ({}) as { usage?: { used?: number; total?: number }; cwd?: string }),
       ])
       setExperts(toExpertOptions(list))
       const level = modelState?.thinkingLevel
       setThinking(typeof level === 'string' && (THINKING_LEVELS as readonly string[]).includes(level) ? level as ThinkingLevel : undefined)
+      // The bound expert lives on the branch, so it must be read rather than
+      // remembered; otherwise every remount forgets the "当前" marker.
+      setExpertId(modelState?.expert?.id ?? modelState?.expert?.expertId)
       setArtifacts(toArtifacts(artifactList))
       setCwd(typeof sessionInfo?.cwd === 'string' ? sessionInfo.cwd : undefined)
       setUsage(formatUsage(sessionInfo?.usage))

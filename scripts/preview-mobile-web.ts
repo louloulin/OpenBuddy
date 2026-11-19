@@ -266,7 +266,12 @@ const dispatcher: HostDispatcher = {
         return { ok: true }
       }
       case 'agent_get_model_state':
-        return { thinkingLevel: DEMO_THINKING.level }
+        return { thinkingLevel: DEMO_THINKING.level, expert: { id: 'e-arch', name: '架构师' } }
+      case 'agents_list':
+        return [
+          { id: 'e-arch', name: '架构师', description: '擅长系统设计与接口拆解' },
+          { id: 'e-doc', name: '文档工程师', description: '把结论写成可执行的文档' },
+        ]
       case 'agent_set_thinking_level':
         DEMO_THINKING.level = String(payload.level ?? 'medium')
         return { ok: true }
@@ -400,7 +405,7 @@ const dispatcher: HostDispatcher = {
     'agent_init', 'agent_new_session', 'agent_list_workspaces', 'agent_fork_session', 'agent_handoff', 'agent_compact',
     'agent_set_session_pinned', 'agent_rename_session', 'agent_set_session_archived', 'agent_delete_session',
     'agent_export_jsonl', 'read_text_file', 'agent_session_info', 'artifacts_list', 'list_dir', 'files_search', 'commands_list',
-    'agent_get_model_state', 'agent_set_thinking_level',
+    'agent_get_model_state', 'agent_set_thinking_level', 'agents_list',
     'automations_snapshot', 'automations_save', 'automations_delete', 'automations_set_status', 'automations_run',
     'library_list', 'projects_snapshot', 'turn_revert', 'session_search',
     'memory_list', 'memory_get', 'agent_tree', 'rewind_points', 'checkpoint_list', 'notification_list',
