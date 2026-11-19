@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  formatUsage,
   isThinkingLevel,
   nextThinkingLevel,
   resolveArtifactPath,
@@ -42,6 +43,18 @@ describe('toArtifacts', () => {
 
   it('ignores entries without a path', () => {
     expect(toArtifacts([{ kind: 'image' }, 42])).toEqual([])
+  })
+})
+
+describe('formatUsage', () => {
+  it('groups digits and adds a percentage', () => {
+    expect(formatUsage({ used: 38_400, total: 200_000 })).toBe('38,400 / 200,000 · 19%')
+  })
+
+  it('handles zero total and missing numbers', () => {
+    expect(formatUsage({ used: 5, total: 0 })).toBe('5 / 0')
+    expect(formatUsage({ used: 5 })).toBeUndefined()
+    expect(formatUsage()).toBeUndefined()
   })
 })
 

@@ -92,6 +92,20 @@ export function toArtifacts(raw: unknown): ArtifactEntry[] {
   return entries
 }
 
+/**
+ * Context-window usage as the panel shows it: `38,400 / 200,000 · 19%`.
+ * Raw digits are hard to compare at a glance on a phone, and a percentage is
+ * how people actually judge "how full is this window".
+ */
+export function formatUsage(usage?: { used?: number; total?: number }): string | undefined {
+  const used = usage?.used
+  const total = usage?.total
+  if (typeof used !== 'number' || typeof total !== 'number') return undefined
+  const percent = total > 0 ? Math.round((used / total) * 100) : undefined
+  const base = `${used.toLocaleString('zh-CN')} / ${total.toLocaleString('zh-CN')}`
+  return percent === undefined ? base : `${base} · ${percent}%`
+}
+
 function isAbsolutePath(path: string): boolean {
   return path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path)
 }
@@ -107,7 +121,8 @@ export function resolveArtifactPath(path: string, cwd?: string): string {
   return `${cwd.replace(/[\\/]+$/, '')}/${trimmed.replace(/^[.][\\/]/, '')}`
 }
 
-/** `agent_set_thinking_level` only accepts these; anything else is refused. */export function thinkingLevelPayload(level: string): { level: ThinkingLevel } | null {
+/** `agent_set_thinking_level` only accepts these; anything else is refused. */
+export function thinkingLevelPayload(level: string): { level: ThinkingLevel } | null {
   return isThinkingLevel(level) ? { level } : null
 }
 

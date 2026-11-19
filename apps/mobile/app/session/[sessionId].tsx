@@ -15,6 +15,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { ChevronRightIcon } from '../../src/components/icons'
 import { permissionModeLabel } from '../../src/core/approvals'
 import {
+  formatUsage,
   resolveArtifactPath,
   thinkingLevelLabel,
   thinkingLevelPayload,
@@ -119,7 +120,7 @@ export default function SessionPanelScreen() {
       setThinking(demo?.thinkingLevel as ThinkingLevel | undefined)
       setArtifacts(toArtifacts(demo?.artifacts ?? []))
       setCwd(previewState().sessions.find(item => item.id === sessionId)?.cwd)
-      setUsage(demo?.usage ? `${demo.usage.used} / ${demo.usage.total}` : undefined)
+      setUsage(formatUsage(demo?.usage))
       return
     }
     if (!transport) return
@@ -137,9 +138,7 @@ export default function SessionPanelScreen() {
       setThinking(typeof level === 'string' && (THINKING_LEVELS as readonly string[]).includes(level) ? level as ThinkingLevel : undefined)
       setArtifacts(toArtifacts(artifactList))
       setCwd(typeof sessionInfo?.cwd === 'string' ? sessionInfo.cwd : undefined)
-      const used = sessionInfo?.usage?.used
-      const total = sessionInfo?.usage?.total
-      setUsage(typeof used === 'number' && typeof total === 'number' ? `${used} / ${total}` : undefined)
+      setUsage(formatUsage(sessionInfo?.usage))
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure))
     } finally {
