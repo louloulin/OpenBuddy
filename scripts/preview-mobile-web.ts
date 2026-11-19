@@ -276,6 +276,9 @@ const dispatcher: HostDispatcher = {
         return { restored: ['packages/gateway/src/relay/sse.ts'], conflicts: [] }
       case 'agent_session_info':
         return { cwd: '/tmp/scratch', usage: { used: 38_400, total: 200_000 } }
+      case 'artifacts_list':
+        // Relative on purpose: the panel resolves it against agent_session_info.cwd.
+        return [{ path: 'notes.md', kind: '文档', bytes: 120 }]
       case 'list_dir':
         return [
           { name: 'src', path: '/tmp/scratch/src', kind: 'directory', size: 0 },
@@ -396,7 +399,7 @@ const dispatcher: HostDispatcher = {
     'agent_resolve_ui', 'folder_trust_respond', 'tasks_list', 'task_kill', 'permission_mode_get',
     'agent_init', 'agent_new_session', 'agent_list_workspaces', 'agent_fork_session', 'agent_handoff', 'agent_compact',
     'agent_set_session_pinned', 'agent_rename_session', 'agent_set_session_archived', 'agent_delete_session',
-    'agent_export_jsonl', 'read_text_file', 'agent_session_info', 'list_dir', 'files_search', 'commands_list',
+    'agent_export_jsonl', 'read_text_file', 'agent_session_info', 'artifacts_list', 'list_dir', 'files_search', 'commands_list',
     'agent_get_model_state', 'agent_set_thinking_level',
     'automations_snapshot', 'automations_save', 'automations_delete', 'automations_set_status', 'automations_run',
     'library_list', 'projects_snapshot', 'turn_revert', 'session_search',

@@ -5,6 +5,7 @@ import { modeExtension } from "./mode.js";
 import { persona } from "./persona.js";
 import { memoryBuiltin } from "./memory.js";
 import { subagentBuiltin } from "./subagent.js";
+import { officeBuiltin } from "./office.js";
 import { trackBuiltinTools } from "./reserved-tools.js";
 
 /**
@@ -55,6 +56,8 @@ BUILTIN_EXTENSIONS.push(todoBuiltin);
 BUILTIN_EXTENSIONS.push(memoryBuiltin);
 // W3.4 sub-agents (`ob_subagent`): child sessions in the pool, parallel or chained.
 BUILTIN_EXTENSIONS.push(subagentBuiltin);
+// B2b office artifacts (`ob_docx` / `ob_xlsx` / `ob_pptx`): real OOXML through officegen.
+BUILTIN_EXTENSIONS.push(officeBuiltin);
 
 /**
  * Factories for one session, in registration order, skipping the ones switched off. Their tool

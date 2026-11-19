@@ -9,7 +9,8 @@ type Reason = "resolved" | "cancelled" | "timeout";
 type Decision = { allow: boolean; note?: string; kind?: "user" | "protected" };
 
 /** Tools that mutate a path; the protected-path guard only applies to these. */
-const MUTATING_TOOL = (toolName: string) => toolName === "write" || toolName === "edit" || /delete|remove/i.test(toolName);
+const MUTATING_TOOL = (toolName: string) =>
+  toolName === "write" || toolName === "edit" || /delete|remove/i.test(toolName) || /^ob_(docx|xlsx|pptx)$/.test(toolName);
 
 /**
  * 受保护路径 (pii W6.2): the first pattern matching a write/edit/delete target, or undefined.
