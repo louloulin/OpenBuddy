@@ -43,6 +43,7 @@ export default function AutomationsScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [note, setNote] = useState<string | null>(null)
   const [draft, setDraft] = useState<AutomationDraft | null>(null)
   const [draftError, setDraftError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -76,10 +77,18 @@ export default function AutomationsScreen() {
   }
 
   const runNow = async (automation: Automation) => {
+    // The review build has no desktop; acknowledge the tap so the flow reads.
+    if (isPreview()) {
+      setNote(`已开始运行「${automation.name}」`)
+      setTimeout(() => setNote(null), 2600)
+      return
+    }
     if (!transport) return
     setBusyId(automation.id)
     try {
       await transport.invoke('automations_run', { id: automation.id })
+      setNote(`已开始运行「${automation.name}」`)
+      setTimeout(() => setNote(null), 2600)
       await load()
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure))
@@ -172,6 +181,12 @@ export default function AutomationsScreen() {
         <View style={{ backgroundColor: theme.card, borderRadius: 12, borderWidth: theme.hairline, borderColor: theme.cardBorder, padding: 12 }}>
           <Text style={{ color: theme.danger, fontSize: 13 }}>{error}</Text>
         </View>
+      ) : null}
+
+      {note ? (
+        <Text accessibilityLiveRegion="polite" style={{ color: theme.ok, fontSize: 12, paddingHorizontal: 4 }}>
+          {note}
+        </Text>
       ) : null}
 
       {canSave ? (
