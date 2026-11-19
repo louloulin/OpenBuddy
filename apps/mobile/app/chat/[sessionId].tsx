@@ -50,6 +50,7 @@ export default function ChatScreen() {
   const send = useApp(state => state.send)
   const steer = useApp(state => state.steer)
   const removeQueued = useApp(state => state.removeQueued)
+  const clearQueue = useApp(state => state.clearQueue)
   const queue = useApp(state => state.queues[sessionId])
   const prefill = useApp(state => state.drafts[sessionId])
   const setDraft = useApp(state => state.setDraft)
@@ -126,12 +127,21 @@ export default function ChatScreen() {
     }
     return items.reverse()
   }, [transcript.rows, approvals])
-  // The list is inverted, so offset 0 is the live edge. Once the reader scrolls
-  // away, Grok keeps a one-tap way back instead of making them fling.
+  // The list is inverted, so offset 0 is the live edge. `offsetRef` is what the
+  // last scroll reported; the pin effect reads it before the browser can
+  // deliver the scroll event caused by the new content itself.
   const listRef = useRef<FlashListRef<ChatItem>>(null)
+  const offsetRef = useRef(0)
   const [atBottom, setAtBottom] = useState(true)
+  const tailLength = data[0] && data[0].kind === 'text' ? data[0].text.length : 0
+  useEffect(() => {
+    // Follow new tokens only while the reader is at the live edge; once they
+    // scroll up, appending must not yank them back.
+    if (offsetRef.current <= 24) listRef.current?.scrollToOffset({ offset: 0, animated: false })
+  }, [data.length, tailLength])
   const jumpToLatest = () => {
     listRef.current?.scrollToOffset({ offset: 0, animated: true })
+    offsetRef.current = 0
     setAtBottom(true)
   }
   const streaming = isTurnPending(transcript)
@@ -292,7 +302,10 @@ export default function ChatScreen() {
             data={data}
             inverted
             style={{ flex: 1 }}
-            onScroll={event => setAtBottom(event.nativeEvent.contentOffset.y <= 24)}
+            onScroll={event => {
+              offsetRef.current = event.nativeEvent.contentOffset.y
+              setAtBottom(offsetRef.current <= 24)
+            }}
             scrollEventThrottle={32}
             renderItem={({ item }: { item: ChatItem }) => (item.kind === 'approval'
               ? (
@@ -366,36 +379,58 @@ export default function ChatScreen() {
       ) : null}
 
       {queued.length ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ flexGrow: 0 }}
-          contentContainerStyle={{ gap: 8, paddingHorizontal: theme.gutter, paddingVertical: 6 }}
-        >
-          {queued.map(row => (
-            <View
-              key={`${row.kind}-${row.index}`}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ flexShrink: 1 }}
+            contentContainerStyle={{ gap: 8, paddingHorizontal: theme.gutter, paddingVertical: 6 }}
+          >
+            {queued.map(row => (
+              <View
+                key={`${row.kind}-${row.index}`}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  borderWidth: theme.hairline,
+                  borderColor: theme.cardBorder,
+                  borderRadius: theme.radiusPill,
+                  paddingLeft: 10,
+                  paddingRight: 6,
+                  paddingVertical: 6,
+                  backgroundColor: theme.card,
+                }}
+              >
+                <Text style={{ color: theme.textWeak, fontSize: 10 }}>{queueLabel(row.kind)}</Text>
+                <Text numberOfLines={1} style={{ maxWidth: 160, color: theme.textMedium, fontSize: 12 }}>{row.text}</Text>
+                <Pressable onPress={() => void removeQueued(sessionId, row)} hitSlop={8} accessibilityLabel="移除排队消息">
+                  <Text style={{ color: theme.textWeak, fontSize: 13 }}>×</Text>
+                </Pressable>
+              </View>
+            ))}
+          </ScrollView>
+          {/* Pinned outside the scroller: clearing is a queue-level action and
+              must stay reachable while the chips run off-screen. */}
+          {queued.length > 1 ? (
+            <Pressable
+              onPress={() => void clearQueue(sessionId)}
+              accessibilityLabel="清空排队消息"
+              style={({ pressed }) => ({
+                marginLeft: 6,
+                marginRight: theme.gutter,
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: theme.radiusPill,
                 borderWidth: theme.hairline,
                 borderColor: theme.cardBorder,
-                borderRadius: theme.radiusPill,
-                paddingLeft: 10,
-                paddingRight: 6,
-                paddingVertical: 6,
-                backgroundColor: theme.card,
-              }}
+                backgroundColor: pressed ? theme.pressed : 'transparent',
+              })}
             >
-              <Text style={{ color: theme.textWeak, fontSize: 10 }}>{queueLabel(row.kind)}</Text>
-              <Text numberOfLines={1} style={{ maxWidth: 160, color: theme.textMedium, fontSize: 12 }}>{row.text}</Text>
-              <Pressable onPress={() => void removeQueued(sessionId, row)} hitSlop={8} accessibilityLabel="移除排队消息">
-                <Text style={{ color: theme.textWeak, fontSize: 13 }}>×</Text>
-              </Pressable>
-            </View>
-          ))}
-        </ScrollView>
+              <Text style={{ color: theme.textWeak, fontSize: 12 }}>清空</Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
 
       {suggestions.length ? (

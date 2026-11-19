@@ -255,6 +255,8 @@ export const useApp = create<AppState>((set, get) => ({
         notifications: demo.notifications,
         approvals: demo.approvals,
         awaiting: demo.awaiting,
+        // A queued follow-up makes the chip row part of the review build.
+        queues: { 'sess-refactor': { steering: [], followUp: ['顺便补一条并发断言', '再跑一次基准'] } },
         appLock: appLock || previewLock,
         locked: appLock || previewLock,
         autoSpeak,
@@ -740,6 +742,11 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async clearQueue(sessionId) {
+    // The review build has no tunnel; clear the local copy so the rows react.
+    if (isPreview()) {
+      set(state => ({ queues: { ...state.queues, [sessionId]: { steering: [], followUp: [] } } }))
+      return
+    }
     const transport = get().transport
     if (!transport) return
     try {
