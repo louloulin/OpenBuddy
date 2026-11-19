@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, View, useColorScheme } from 'react-native'
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View, useColorScheme } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
 import { RequestCard } from '../../src/components/RequestCard'
@@ -29,6 +29,16 @@ export default function ApprovalScreen() {
   const booted = useApp(state => state.booted)
   const transport = useApp(state => state.transport)
   const [busy, setBusy] = useState(false)
+  // A push notification can outlive its request: the turn may have settled on
+  // the desktop before the phone opened the link. Give the tunnel a moment to
+  // hand it over, then say so instead of spinning forever.
+  const [waited, setWaited] = useState(false)
+
+  useEffect(() => {
+    if (approval) return
+    const timer = setTimeout(() => setWaited(true), 4000)
+    return () => clearTimeout(timer)
+  }, [approval])
 
   useEffect(() => {
     // The review build has no tunnel by design; it renders the demo request.
@@ -51,6 +61,29 @@ export default function ApprovalScreen() {
   }
 
   if (!approval) {
+    if (waited) {
+      return (
+        <View style={{ flex: 1, backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 }}>
+          <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600' }}>这次请求已经处理过了</Text>
+          <Text style={{ color: theme.textWeak, textAlign: 'center', lineHeight: 20 }}>
+            电脑上可能已经批准或取消了它。回到会话看看最新进展。
+          </Text>
+          <Pressable
+            onPress={() => router.back()}
+            accessibilityLabel="返回"
+            style={({ pressed }) => ({
+              marginTop: 4,
+              paddingHorizontal: 20,
+              paddingVertical: 10,
+              borderRadius: theme.radiusPill,
+              backgroundColor: pressed ? theme.pressed : theme.ink,
+            })}
+          >
+            <Text style={{ color: theme.inkFg, fontSize: 14, fontWeight: '600' }}>返回</Text>
+          </Pressable>
+        </View>
+      )
+    }
     return (
       <View style={{ flex: 1, backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 }}>
         <ActivityIndicator color={theme.textMedium} />
