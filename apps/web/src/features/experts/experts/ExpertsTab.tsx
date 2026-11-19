@@ -142,7 +142,15 @@ export function ExpertsTab({ pills, onGoHome, onToast, views = { center: true, m
       const team = result.team?.command
         ? `；已添加团队指令 /${result.team.command}`
         : result.team?.error ? `；团队指令未创建：${result.team.error}` : "";
-      onToast?.(result.imported.length ? `已从「${result.package}」导入 ${result.imported.length} 位专家${team}${failed}` : `没有导入任何专家${failed}`);
+      const capabilities = result.contributions?.length
+        ? `；技能/指令/MCP ${result.contributions.length} 项（MCP 默认关闭）`
+        : "";
+      const leftOut = result.skippedContributions?.length
+        ? `；${result.skippedContributions.length} 项未导入（${result.skippedContributions[0]?.reason ?? ""}）`
+        : "";
+      onToast?.(result.imported.length
+        ? `已从「${result.package}」导入 ${result.imported.length} 位专家${capabilities}${team}${failed}${leftOut}`
+        : `没有导入任何专家${failed}${leftOut}`);
       setView("my");
       reload();
     } catch (e) { onToast?.(`导入失败：${errorText(e)}`); }

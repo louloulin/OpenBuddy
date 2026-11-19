@@ -5,7 +5,7 @@ import { isExpertId, type ExpertCenterCatalog, type ExpertDraft, type ExpertEntr
 import { ProtocolError } from "@openbuddy/protocol/errors";
 import { JsonStore } from "../settings/settings.js";
 import { avatarImage, IMAGE_EXT, normalizeDraft, parseExpertMarkdown, serializeExpert, slugify } from "./expert-file.js";
-import { readWorkBuddyPackageFrom } from "./workbuddy.js";
+import { readWorkBuddyPackageFrom, type WorkBuddyPackage } from "./workbuddy.js";
 import { EXPERT_CATEGORIES, EXPERT_SCENES, SEED_EXPERTS } from "./seeds.js";
 
 /**
@@ -329,7 +329,7 @@ export class ExpertStore {
    * `experts_import_workbuddy`: import a WorkBuddy expert package (ZIP or an extracted folder) into
    * 我的专家 (S18). Each agent becomes a normal Markdown expert; avatars are copied next to it.
    */
-  importWorkBuddy(path: string): {
+  importWorkBuddy(path: string, observe?: (pkg: WorkBuddyPackage) => void): {
     package: string;
     imported: ExpertEntry[];
     skipped: Array<{ id: string; error: string }>;
@@ -339,6 +339,7 @@ export class ExpertStore {
     if (!resolved) throw new ProtocolError("path_not_authorized", "只能导入存在的 WorkBuddy 专家包");
     const isFile = statSync(resolved).isFile();
     const pkg = readWorkBuddyPackageFrom(resolved, isFile ? readFileSync(resolved) : undefined);
+    observe?.(pkg);
     const imported: ExpertEntry[] = [];
     const skipped: Array<{ id: string; error: string }> = [];
     /** Package agent id → the unique id actually written (S21 team wiring). */

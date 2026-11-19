@@ -2,9 +2,21 @@ import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
 import { readdirSync, readFileSync, statSync, type Dirent } from "node:fs";
 import { basename, extname, join } from "node:path";
 import { inflateRawSync } from "node:zlib";
-import { EXPERT_LIMITS, type ExpertDraft } from "@openbuddy/protocol/experts";
+import { EXPERT_LIMITS, type ExpertDraft, type WorkBuddySkippedContribution } from "@openbuddy/protocol/experts";
 import { ProtocolError } from "@openbuddy/protocol/errors";
 import { slugify } from "./expert-file.js";
+import {
+  collectMcp,
+  collectPrompts,
+  collectSkills,
+  declaredRequires,
+  type WorkBuddyMcpServer,
+  type WorkBuddyPromptFile,
+  type WorkBuddySkillFile,
+} from "./workbuddy-contributions.js";
+import { entryName, safeEntry, text } from "./workbuddy-shared.js";
+
+export type { WorkBuddyMcpServer, WorkBuddyPromptFile, WorkBuddySkillFile } from "./workbuddy-contributions.js";
 
 /**
  * WorkBuddy 专家包兼容 (S18). WorkBuddy exports a ZIP shaped like:
@@ -39,6 +51,16 @@ export interface WorkBuddyPackage {
   drafts: WorkBuddyDraft[];
   /** Present for `expertType: "team"` packages (S21). Agent ids are the draft ids. */
   team?: WorkBuddyTeam;
+  /** Capability contributions declared by the package (B1b). */
+  skills: WorkBuddySkillFile[];
+  prompts: WorkBuddyPromptFile[];
+  mcpServers: WorkBuddyMcpServer[];
+  /** Capability gates (`workbuddy.requiresProductFeature`). */
+  requires: string[];
+  /** `plugin.json` `defaultEnabled !== false`. */
+  enabledByDefault: boolean;
+  /** Declared items that were not imported, with a user-readable reason. */
+  skippedContributions: WorkBuddySkippedContribution[];
 }
 
 export interface WorkBuddyTeam {
@@ -57,6 +79,54 @@ export function workBuddyTeamPrompt(name: string, members: Array<{ name: string;
   return lines.join("\n");
 }
 
+export interface WorkBuddyTeamMember {
+  id: string;
+  name: string;
+  role?: "lead" | "member";
+  description?: string;
+}
+
+/**
+ * B2a: imported WorkBuddy teams run through Pi sub-agent sessions, not just a group persona.
+ * Each step names its own expert id; `ob_subagent` binds model / thinking / tools / persona on
+ * the child, and `chain` carries the previous answer forward.
+ */
+export function workBuddyTeamChainPrompt(name: string, members: WorkBuddyTeamMember[]): string {
+  const lead = members.find((member) => member.role === "lead") ?? members[0];
+  const others = members.filter((member) => member.id !== lead?.id);
+  const steps = [
+    ...(lead
+      ? [{
+          agent: lead.id,
+          role: "负责人",
+          task: `以「${lead.name}」的身份给出总体方案与分工，明确验收标准。用户任务：$ARGUMENTS`,
+        }]
+      : []),
+    ...others.map((member) => ({
+      agent: member.id,
+      role: member.name,
+      task: `从「${member.name}」的视角完成属于你的部分；如收到上一步结论，先指出问题再补充${member.description ? `（${member.description}）` : ""}。`,
+    })),
+    ...(lead
+      ? [{ agent: lead.id, role: "汇总", task: "汇总各成员结论，输出统一方案、风险与行动清单。" }]
+      : []),
+  ];
+  return [
+    `请以「${name}」的团队方式完成当前任务。`,
+    "",
+    "执行方式：调用一次 ob_subagent，参数 mode=chain。把下面的 steps 作为参数；用户任务在 $ARGUMENTS 中。",
+    "",
+    "```json",
+    JSON.stringify({ mode: "chain", team: name, steps }, null, 2),
+    "```",
+    "",
+    "要求：",
+    "- 每个成员只做自己的部分，不要跳过；",
+    "- 负责人先给方案，成员补充/审阅，负责人最后汇总；",
+    "- 任一步失败就停下来说明原因。",
+  ].join("\n");
+}
+
 interface Localized { en?: unknown; zh?: unknown }
 interface WorkBuddyPlugin {
   name?: unknown;
@@ -71,16 +141,19 @@ interface WorkBuddyPlugin {
   tags?: unknown;
   quickPrompts?: unknown;
   members?: unknown;
+  /** Capability declarations (B1b). */
+  skills?: unknown;
+  commands?: unknown;
+  hooks?: unknown;
+  extensions?: unknown;
+  mcpServers?: unknown;
+  defaultEnabled?: unknown;
+  requiresProductFeature?: unknown;
+  workbuddy?: { requiresProductFeature?: unknown };
 }
 
 const invalid = (reason: string): never => {
   throw new ProtocolError("expert_invalid", reason);
-};
-
-const text = (value: unknown, max: number): string | undefined => {
-  if (typeof value !== "string") return undefined;
-  const out = value.trim();
-  return out ? out.slice(0, max) : undefined;
 };
 
 const localized = (value: unknown, max = 300): string | undefined => {
@@ -120,12 +193,6 @@ const categoryOf = (value: unknown): string => {
 };
 
 const IMAGE = /\.(png|jpe?g|webp|gif)$/i;
-const safeEntry = (name: string): boolean =>
-  !!name && name.length <= 1024 && !name.includes("\0") && !name.startsWith("/") &&
-  !/^[A-Za-z]:/.test(name) && !name.split("/").some((part) => part === "..");
-
-/** Normalise an archive entry name to forward slashes; rejects traversal. */
-const entryName = (raw: string): string => raw.replace(/\\/g, "/").replace(/^\.\//, "");
 
 /** Read a ZIP into name → bytes. Central-directory driven; STORE and DEFLATE only. */
 export function readWorkBuddyZip(buffer: Buffer): Map<string, Uint8Array> {
@@ -262,6 +329,20 @@ export function readWorkBuddyPackage(files: Map<string, Uint8Array>): WorkBuddyP
     : readJson(files, `${prefix}plugin.json`);
   const packageName = text(plugin.name, 80) ?? root.split("/").pop() ?? "workbuddy-package";
 
+  // Capability contributions (B1b): parse first, install later (services/agents/capability-pack).
+  const skippedContributions: WorkBuddySkippedContribution[] = [];
+  const skills = collectSkills(files, prefix, plugin.skills, skippedContributions);
+  const prompts = collectPrompts(files, prefix, plugin.commands, skippedContributions);
+  const mcpServers = collectMcp(plugin.mcpServers, skippedContributions);
+  if (plugin.hooks) {
+    skippedContributions.push({ kind: "hook", name: "hooks", reason: "生命周期钩子需要宿主权限，暂不自动导入" });
+  }
+  if (plugin.extensions) {
+    skippedContributions.push({ kind: "extension", name: "extensions", reason: "扩展以宿主权限运行，需在扩展中心单独确认" });
+  }
+  const requires = declaredRequires(plugin);
+  const enabledByDefault = plugin.defaultEnabled !== false;
+
   const declared = Array.isArray(plugin.agents)
     ? plugin.agents.map((item) => text(item, 512)).filter((item): item is string => !!item)
     : [];
@@ -269,7 +350,11 @@ export function readWorkBuddyPackage(files: Map<string, Uint8Array>): WorkBuddyP
     ? declared.map((item) => entryName(item.replace(/^\.\//, ""))).filter(safeEntry).map((item) => `${prefix}${item}`)
     : [...files.keys()].filter((name) => name.startsWith(`${prefix}agents/`) && /\.md$/i.test(name));
   const paths = [...new Set(agentPaths)].filter((path) => files.has(path)).slice(0, MAX_AGENTS);
-  if (!paths.length) invalid("专家包中没有 agents/*.md");
+  // Capability-only packages (skills / commands / MCP, no agents) are valid: B1b imports their
+  // contributions without creating experts.
+  if (!paths.length && !skills.length && !prompts.length && !mcpServers.length) {
+    invalid("专家包中没有 agents/*.md 或可导入的能力");
+  }
 
   const members = Array.isArray(plugin.members)
     ? plugin.members.map((item) => (item && typeof item === "object" ? item as Record<string, unknown> : {}))
@@ -328,7 +413,9 @@ export function readWorkBuddyPackage(files: Map<string, Uint8Array>): WorkBuddyP
     agentIds.push(id);
     if (isLead) teamLead = id;
   }
-  if (!drafts.length) invalid("专家包中没有可导入的专家");
+  if (!drafts.length && !skills.length && !prompts.length && !mcpServers.length) {
+    invalid("专家包中没有可导入的专家或能力");
+  }
   const isTeam = plugin.expertType === "team" || !!plugin.teamInfo || !!agentMarker;
   const team: WorkBuddyTeam | undefined = isTeam
     ? {
@@ -337,7 +424,18 @@ export function readWorkBuddyPackage(files: Map<string, Uint8Array>): WorkBuddyP
         memberAgents: agentIds,
       }
     : undefined;
-  return { name: packageName, root, drafts, ...(team ? { team } : {}) };
+  return {
+    name: packageName,
+    root,
+    drafts,
+    skills,
+    prompts,
+    mcpServers,
+    requires,
+    enabledByDefault,
+    skippedContributions,
+    ...(team ? { team } : {}),
+  };
 }
 
 /** Entry point used by the expert store: directory or `.zip`. */

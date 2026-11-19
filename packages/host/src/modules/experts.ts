@@ -1,10 +1,11 @@
 import { text } from "@openbuddy/services/settings/settings";
 import { ExpertStore } from "@openbuddy/services/agents/store";
-import { workBuddyTeamPrompt } from "@openbuddy/services/agents/workbuddy";
+import { workBuddyTeamChainPrompt, type WorkBuddyPackage } from "@openbuddy/services/agents/workbuddy";
+import { CapabilityPackService } from "@openbuddy/services/agents/capability-pack";
 import { teamPrompt, teamSeed, teamTemplates } from "@openbuddy/services/agents/teams";
 import { clearSessionExpert, setSessionExpert } from "@openbuddy/engine/features/expert";
 import { ProtocolError } from "@openbuddy/protocol/errors";
-import type { ExpertDraft, ExpertEntry } from "@openbuddy/protocol/experts";
+import type { ExpertDraft, ExpertEntry, WorkBuddyContribution, WorkBuddySkippedContribution } from "@openbuddy/protocol/experts";
 import type { Handler, HostContext, HostModule } from "../module.js";
 
 /**
@@ -20,6 +21,24 @@ export function expertsModule(ctx: HostContext): HostModule {
   // Built on first use: module factories must not touch the context (modules.test.ts).
   let store: ExpertStore | undefined;
   const experts = () => (store ??= new ExpertStore({ dir: ctx.settings.dir, trusted: (cwd) => engine.trusted(cwd) }));
+  // 能力包 (B1b): skills → skillPaths, commands → prompts, mcpServers → disabled MCP entries.
+  let packs: CapabilityPackService | undefined;
+  const capabilityPacks = () =>
+    (packs ??= new CapabilityPackService(
+      ctx.settings.dir,
+      {
+        read: () => {
+          const config = ctx.settings.config.read();
+          return { skillPaths: [...config.skillPaths], disabledSkills: [...config.disabledSkills] };
+        },
+        write: (value) =>
+          ctx.update((config) => {
+            config.skillPaths = value.skillPaths;
+            config.disabledSkills = value.disabledSkills;
+          }),
+      },
+      (servers) => engine.mcp.registerFromPack(servers),
+    ));
   /** The cwd whose trusted `.pi/agents` joins the catalog: the payload's, else the focused session's. */
   const cwdOf = (p: Record<string, unknown>) => optional(p.cwd) ?? engine.currentCwd;
   const sessionCwd = (id: string) => {
@@ -64,26 +83,37 @@ export function expertsModule(ctx: HostContext): HostModule {
     // WorkBuddy 兼容 (S18/S21): import a WorkBuddy expert package; team packages also install a
     // `/team-wb-…` prompt so the lead/member roles are usable without a second step.
     experts_import_workbuddy: async (p) => {
-      const result = experts().importWorkBuddy(text(p.path));
-      if (!result.team) return result;
-      const slug = result.team.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "workbuddy";
+      let pkg: WorkBuddyPackage | undefined;
+      const result = experts().importWorkBuddy(text(p.path), (value) => {
+        pkg = value;
+      });
+      const installed = pkg
+        ? capabilityPacks().install(pkg)
+        : {
+            contributions: [] as WorkBuddyContribution[],
+            skippedContributions: [] as WorkBuddySkippedContribution[],
+            requires: [] as string[],
+          };
+      const merged = { ...result, ...installed };
+      if (!merged.team) return merged;
+      const slug = merged.team.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "workbuddy";
       const saved = new Set((await engine.prompts.list()).map((entry) => entry.name));
       let command = `team-wb-${slug}`;
       for (let n = 2; saved.has(command); n++) command = `team-wb-${slug}-${n}`;
-      const team = result.team;
+      const team = merged.team;
       const members = team.members.map((id) => {
-        const expert = result.imported.find((entry) => entry.id === id);
-        return { name: expert?.name ?? id, role: id === team.leadAgent ? "lead" as const : "member" as const, description: expert?.description };
+        const expert = merged.imported.find((entry) => entry.id === id);
+        return { id, name: expert?.name ?? id, role: id === team.leadAgent ? "lead" as const : "member" as const, description: expert?.description };
       });
       try {
         await engine.prompts.save("global", {
           name: command,
           description: `WorkBuddy 团队：${team.name}`,
-          content: workBuddyTeamPrompt(team.name, members),
+          content: workBuddyTeamChainPrompt(team.name, members),
         });
-        return { ...result, team: { ...team, command } };
+        return { ...merged, team: { ...team, command } };
       } catch (error) {
-        return { ...result, team: { ...team, error: error instanceof Error ? error.message : String(error) } };
+        return { ...merged, team: { ...team, error: error instanceof Error ? error.message : String(error) } };
       }
     },
     // 专家团 (W3.5): preset pipelines, installed as a 我的指令 prompt template.

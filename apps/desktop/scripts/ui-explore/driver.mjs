@@ -294,6 +294,16 @@ const fixtureServer = createServer(async (req, res) => {
     await streamText(chunk, '两个子代理都回来了：A 给出四个区域的季度汇总，B 发现西部库存周转偏低。下面是它们的结论。', fixture.delayMs / 3);
     finish(); return;
   }
+  // __TEAM__ (B2a): a team pipeline with per-step experts; children answer like any sub-agent.
+  if (lastUserText.includes('__TEAM__')) {
+    if (toolsSinceUser === 0) {
+      await streamText(chunk, '按投研流程分工：先调研，再审阅。', fixture.delayMs);
+      chunk({ tool_calls: [{ index: 0, id: 'call_team_1', type: 'function', function: { name: 'ob_subagent', arguments: JSON.stringify({ mode: 'chain', team: 'E2E 投研团队', steps: [{ task: '子任务 A：调研市场与竞争格局', agent: 'deep-researcher', role: '调研' }, { task: '子任务 B：审阅调研结论的风险', agent: 'code-reviewer', role: '审阅' }] }) } }] });
+      finish('tool_calls'); return;
+    }
+    await streamText(chunk, '团队已完成：调研给出市场结论，审阅指出两项风险。', fixture.delayMs / 3);
+    finish(); return;
+  }
   if (lastUserText.includes('__RM__')) {
     if (toolsSinceUser === 0) {
       await streamText(chunk, '清理旧的构建产物。', fixture.delayMs);

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   isThinkingLevel,
   nextThinkingLevel,
+  resolveArtifactPath,
   thinkingLevelLabel,
   thinkingLevelPayload,
   toArtifacts,
@@ -41,6 +42,24 @@ describe('toArtifacts', () => {
 
   it('ignores entries without a path', () => {
     expect(toArtifacts([{ kind: 'image' }, 42])).toEqual([])
+  })
+})
+
+describe('resolveArtifactPath', () => {
+  it('joins workspace-relative paths onto the cwd', () => {
+    expect(resolveArtifactPath('docs/plan/a.md', '/Users/me/work')).toBe('/Users/me/work/docs/plan/a.md')
+    expect(resolveArtifactPath('./docs/a.md', '/Users/me/work/')).toBe('/Users/me/work/docs/a.md')
+  })
+
+  it('leaves absolute paths alone', () => {
+    expect(resolveArtifactPath('/tmp/a.md', '/Users/me/work')).toBe('/tmp/a.md')
+    expect(resolveArtifactPath('C:\\work\\a.md', '/Users/me/work')).toBe('C:\\work\\a.md')
+  })
+
+  it('passes through when there is no usable cwd', () => {
+    expect(resolveArtifactPath('docs/a.md')).toBe('docs/a.md')
+    expect(resolveArtifactPath('docs/a.md', 'relative/dir')).toBe('docs/a.md')
+    expect(resolveArtifactPath('  ', '/Users/me')).toBe('')
   })
 })
 

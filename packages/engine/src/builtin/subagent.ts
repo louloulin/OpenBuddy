@@ -1,6 +1,7 @@
 import { SessionManager, type ExtensionFactory, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { EngineContext } from "../engine-context.js";
 import type { Slot } from "../types.js";
+import { setSessionExpert } from "../features/expert.js";
 
 /**
  * 子代理 built-in (20261116-pii W3.4).
@@ -27,16 +28,39 @@ const PARAMETERS = {
   type: "object",
   properties: {
     mode: { type: "string", enum: ["single", "parallel", "chain"], description: "single: one task; parallel: independent tasks at once; chain: each task sees the previous answer" },
-    agent: { type: "string", description: "Optional expert id or name whose persona and model the child uses (see 专家中心)." },
+    agent: { type: "string", description: "Optional expert id or name applied to every child (ignored when steps set their own agent)." },
     task: { type: "string", description: "The task for mode=single." },
     tasks: { type: "array", items: { type: "string" }, description: "The tasks for mode=parallel or chain (1–3 independent items, or ordered steps)." },
+    steps: {
+      type: "array",
+      description: "Per-step work. Each item may name its own expert and role — use this for team pipelines.",
+      items: {
+        type: "object",
+        properties: {
+          task: { type: "string", description: "The self-contained task for this step." },
+          agent: { type: "string", description: "Expert id or name for this step." },
+          role: { type: "string", description: "Short role label shown on the child card (e.g. 调研 / 审阅)." },
+        },
+        required: ["task"],
+        additionalProperties: false,
+      },
+    },
+    team: { type: "string", description: "Optional team name; carried on the child events so the UI can group them." },
   },
   additionalProperties: false,
 } as unknown as ToolDefinition["parameters"];
 
+interface SubagentStep {
+  task: string;
+  agent?: string;
+  role?: string;
+}
+
 interface SubagentChild {
   id: string;
   task: string;
+  agent?: string;
+  role?: string;
   status: "running" | "done" | "failed" | "cancelled";
   answer?: string;
   error?: string;
@@ -46,7 +70,8 @@ interface SubagentChild {
 interface SubagentDetails {
   mode: string;
   agent?: string;
-  children: Array<Pick<SubagentChild, "id" | "status" | "ms" | "error"> & { task: string }>;
+  team?: string;
+  children: Array<Pick<SubagentChild, "id" | "status" | "ms" | "error" | "agent" | "role"> & { task: string }>;
 }
 
 interface SubagentToolResult {
@@ -68,15 +93,20 @@ export interface SubagentContext {
 }
 
 /** Experts are read through the store the host module uses; created lazily so no engine cycle appears. */
-async function expertFor(engine: EngineContext, ref: string | undefined) {
+async function expertFor(engine: EngineContext, ref: string | undefined, cwd: string) {
   if (!ref) return undefined;
   const { ExpertStore } = await import("@openbuddy/services/agents/store");
-  const store = new ExpertStore({ dir: engine.settings.dir, trusted: (cwd) => engine.trusted(cwd) });
+  const store = new ExpertStore({ dir: engine.settings.dir, trusted: (value) => engine.trusted(value) });
   try {
-    const byId = store.list().find((entry) => entry.id === ref);
-    return byId ?? store.list().find((entry) => entry.name === ref);
+    // `get` resolves user → trusted project → library → builtin, so built-in team members
+    // (`deep-researcher`, `code-reviewer`, …) bind exactly like user experts.
+    return store.get(ref, cwd);
   } catch {
-    return undefined;
+    try {
+      return store.catalog(cwd).experts.find((entry) => entry.name === ref);
+    } catch {
+      return undefined;
+    }
   }
 }
 
@@ -102,26 +132,56 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function createSubagentExtension({ engine, sessionId, cwd }: SubagentContext): ExtensionFactory {
   /** Run one child to completion; never throws (a failed child is reported, not fatal to the tool). */
-  const runChild = async (task: string, expertName: string | undefined, persona: string | undefined, model?: string): Promise<SubagentChild> => {
+  const runChild = async (step: SubagentStep, team: string | undefined, index: number): Promise<SubagentChild> => {
+    const task = step.task;
     const started = Date.now();
-    const child: SubagentChild = { id: "", task, status: "running", ms: 0 };
+    const expert = await expertFor(engine, step.agent, cwd);
+    const agentLabel = expert?.name ?? step.agent;
+    const child: SubagentChild = { id: "", task, agent: agentLabel, role: step.role, status: "running", ms: 0 };
+    const model = expert?.model;
     const modelId = model && model.includes("/") ? model.split("/").slice(1).join("/") : model;
     const providerId = model && model.includes("/") ? model.split("/")[0] : undefined;
     let slot: Slot | undefined;
     try {
-      slot = await engine.open(SessionManager.inMemory(cwd), modelId, providerId, undefined, { parentId: sessionId, agentName: expertName });
+      slot = await engine.open(SessionManager.inMemory(cwd), modelId, providerId, undefined, { parentId: sessionId, agentName: agentLabel });
       child.id = slot.id;
       // A child inherits the parent's 做一做 / 想一想 / 问一问: 问一问 children must not write files.
       const parentMode = engine.modes.get(sessionId);
       if (parentMode && parentMode !== "craft") engine.setMode(slot.id, parentMode);
+      // Bind the expert on the child itself: model / thinking / tool allowlist + persona all apply
+      // through the same path a user-bound session uses. Falling back to a persona prefix keeps
+      // older experts (no tools/model) working if binding fails.
+      let bound = false;
+      if (expert) {
+        try {
+          await setSessionExpert(engine, slot.id, {
+            id: expert.id,
+            name: expert.name,
+            avatar: expert.image,
+            scope: expert.scope,
+            prompt: expert.prompt,
+            model: expert.model,
+            thinking: expert.thinking,
+            tools: expert.tools,
+            skills: expert.skills,
+            connectors: expert.connectors,
+          });
+          bound = true;
+        } catch {
+          /* fall back to the persona prefix below */
+        }
+      }
       engine.emit("agent://subagent", {
         parentId: sessionId,
         childId: slot.id,
         status: "started",
-        agent: expertName,
+        agent: agentLabel,
+        role: step.role,
+        team,
+        index,
         task: task.slice(0, 500),
       });
-      const prompt = persona ? `${persona}\n\n---\n\n${task}` : task;
+      const prompt = !bound && expert?.prompt ? `${expert.prompt}\n\n---\n\n${task}` : task;
       const turn = engine.send(slot.id, prompt);
       const deadline = started + CHILD_TIMEOUT_MS;
       while (slot.busy && Date.now() < deadline) await sleep(100);
@@ -153,7 +213,10 @@ export function createSubagentExtension({ engine, sessionId, cwd }: SubagentCont
           parentId: sessionId,
           childId: slot.id,
           status: child.status,
-          agent: expertName,
+          agent: agentLabel,
+          role: step.role,
+          team,
+          index,
           summary: child.answer?.slice(0, 500),
           error: child.error,
           ms: child.ms,
@@ -174,6 +237,7 @@ export function createSubagentExtension({ engine, sessionId, cwd }: SubagentCont
       promptSnippet: "Run one or more sub-agents (parallel or chained) and collect their answers",
       promptGuidelines: [
         "Use ob_subagent when the work splits into independent parts (parallel) or needs an ordered hand-off (chain).",
+        "For a team pipeline, pass steps: each step names its own agent (expert id) and role; chain mode carries the previous answer forward.",
         "Keep tasks self-contained: a child does not see this conversation.",
       ],
       parameters: PARAMETERS,
@@ -181,45 +245,74 @@ export function createSubagentExtension({ engine, sessionId, cwd }: SubagentCont
       async execute(_toolCallId: string, params: unknown): Promise<SubagentToolResult> {
         const value = (params ?? {}) as Record<string, unknown>;
         const mode = value.mode === "parallel" || value.mode === "chain" ? value.mode : "single";
-        const expert = await expertFor(engine, typeof value.agent === "string" ? value.agent : undefined);
-        const agentLabel = expert?.name ?? (typeof value.agent === "string" ? value.agent : undefined);
-        const tasks =
+        const team = typeof value.team === "string" && value.team.trim() ? value.team.trim().slice(0, 80) : undefined;
+        const fallbackAgent = typeof value.agent === "string" && value.agent.trim() ? value.agent.trim() : undefined;
+        const declared = Array.isArray(value.steps)
+          ? value.steps
+              .map((item) => {
+                const record = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+                const task = typeof record.task === "string" ? record.task.trim() : "";
+                const agent = typeof record.agent === "string" && record.agent.trim() ? record.agent.trim() : fallbackAgent;
+                const role = typeof record.role === "string" && record.role.trim() ? record.role.trim().slice(0, 40) : undefined;
+                return { task, ...(agent ? { agent } : {}), ...(role ? { role } : {}) };
+              })
+              .filter((step) => !!step.task)
+          : [];
+        const legacy =
           mode === "single"
             ? typeof value.task === "string" && value.task.trim() ? [value.task.trim()] : []
-            : Array.isArray(value.tasks) ? value.tasks.filter((t): t is string => typeof t === "string" && !!t.trim()).map((t) => t.trim()) : [];
-        if (!tasks.length)
+            : Array.isArray(value.tasks)
+              ? value.tasks.filter((task): task is string => typeof task === "string" && !!task.trim()).map((task) => task.trim())
+              : [];
+        const steps: SubagentStep[] = declared.length
+          ? declared
+          : legacy.map((task) => ({ task, ...(fallbackAgent ? { agent: fallbackAgent } : {}) }));
+        const agentLabel = fallbackAgent ?? (steps.length === 1 ? steps[0].agent : undefined);
+        if (!steps.length)
           return {
-            content: [{ type: "text", text: mode === "single" ? "缺少 task。" : "缺少 tasks（1–3 条）。" }],
+            content: [{ type: "text", text: mode === "single" ? "缺少 task 或 steps。" : "缺少 tasks 或 steps（1–3 条）。" }],
             isError: true,
-            details: { mode, agent: agentLabel, children: [] },
+            details: { mode, agent: agentLabel, team, children: [] },
           };
-        if (mode !== "chain" && tasks.length > SUBAGENT_LIMIT)
+        if (mode !== "chain" && steps.length > SUBAGENT_LIMIT)
           return {
             content: [{ type: "text", text: `一次最多 ${SUBAGENT_LIMIT} 个子代理，请拆成多轮。` }],
             isError: true,
-            details: { mode, agent: agentLabel, children: [] },
+            details: { mode, agent: agentLabel, team, children: [] },
+          };
+        if (mode === "chain" && steps.length > 8)
+          return {
+            content: [{ type: "text", text: "chain 最多 8 步，请合并步骤。" }],
+            isError: true,
+            details: { mode, agent: agentLabel, team, children: [] },
           };
 
         const children: SubagentChild[] = [];
         if (mode === "parallel") {
           // Batches of SUBAGENT_LIMIT; the engine's maxRunning is the real concurrency ceiling.
-          for (let i = 0; i < tasks.length; i += SUBAGENT_LIMIT)
-            children.push(...(await Promise.all(tasks.slice(i, i + SUBAGENT_LIMIT).map((task) => runChild(task, agentLabel, expert?.prompt, expert?.model)))));
+          for (let i = 0; i < steps.length; i += SUBAGENT_LIMIT)
+            children.push(...(await Promise.all(steps.slice(i, i + SUBAGENT_LIMIT).map((step, offset) => runChild(step, team, i + offset)))));
         } else if (mode === "chain") {
           let previous = "";
-          for (const task of tasks) {
-            const child = await runChild(previous ? `${task}\n\n上一步的结果：\n${previous}` : task, agentLabel, expert?.prompt, expert?.model);
+          for (let i = 0; i < steps.length; i += 1) {
+            const step = steps[i];
+            const child = await runChild(
+              previous ? { ...step, task: `${step.task}\n\n上一步的结果：\n${previous}` } : step,
+              team,
+              i,
+            );
             children.push(child);
             if (child.status !== "done") break;
             previous = child.answer ?? "";
           }
         } else {
-          children.push(await runChild(tasks[0], agentLabel, expert?.prompt, expert?.model));
+          children.push(await runChild(steps[0], team, 0));
         }
 
         const summary = children
           .map((child, index) => {
-            const head = `## 子代理 ${index + 1}${agentLabel ? `（${agentLabel}）` : ""} · ${child.status === "done" ? "完成" : child.status === "cancelled" ? "已取消" : "失败"} · ${Math.round(child.ms / 1000)}s`;
+            const who = [child.agent, child.role].filter(Boolean).join(" · ");
+            const head = `## 子代理 ${index + 1}${who ? `（${who}）` : ""} · ${child.status === "done" ? "完成" : child.status === "cancelled" ? "已取消" : "失败"} · ${Math.round(child.ms / 1000)}s`;
             return child.status === "done" ? `${head}\n${child.answer}` : `${head}\n${child.error ?? "没有结果"}`;
           })
           .join("\n\n");
@@ -229,8 +322,17 @@ export function createSubagentExtension({ engine, sessionId, cwd }: SubagentCont
           isError: failed === children.length,
           details: {
             mode,
-            agent: agentLabel,
-            children: children.map((child) => ({ id: child.id, status: child.status, ms: child.ms, error: child.error, task: child.task.slice(0, 200) })),
+            ...(agentLabel ? { agent: agentLabel } : {}),
+            ...(team ? { team } : {}),
+            children: children.map((child) => ({
+              id: child.id,
+              status: child.status,
+              ms: child.ms,
+              error: child.error,
+              task: child.task.slice(0, 200),
+              ...(child.agent ? { agent: child.agent } : {}),
+              ...(child.role ? { role: child.role } : {}),
+            })),
           },
         };
       },

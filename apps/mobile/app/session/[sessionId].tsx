@@ -15,6 +15,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { ChevronRightIcon } from '../../src/components/icons'
 import { permissionModeLabel } from '../../src/core/approvals'
 import {
+  resolveArtifactPath,
   thinkingLevelLabel,
   thinkingLevelPayload,
   toArtifacts,
@@ -25,6 +26,7 @@ import {
   type ThinkingLevel,
 } from '../../src/core/session-panel'
 import { isPreview, previewState } from '../../src/core/preview'
+import { canRun } from '../../src/core/surface'
 import { transcriptFilename, transcriptMarkdown } from '../../src/core/share'
 import { shareTextFile } from '../../src/native/share'
 import { useApp } from '../../src/stores/app'
@@ -101,6 +103,7 @@ export default function SessionPanelScreen() {
   const [expertId, setExpertId] = useState<string | undefined>()
   const [thinking, setThinking] = useState<ThinkingLevel | undefined>()
   const [artifacts, setArtifacts] = useState<ArtifactEntry[]>([])
+  const [cwd, setCwd] = useState<string | undefined>()
   const [usage, setUsage] = useState<string | undefined>()
   const [busy, setBusy] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -115,6 +118,7 @@ export default function SessionPanelScreen() {
       setExperts(toExpertOptions(demo?.experts ?? []))
       setThinking(demo?.thinkingLevel as ThinkingLevel | undefined)
       setArtifacts(toArtifacts(demo?.artifacts ?? []))
+      setCwd(previewState().sessions.find(item => item.id === sessionId)?.cwd)
       setUsage(demo?.usage ? `${demo.usage.used} / ${demo.usage.total}` : undefined)
       return
     }
@@ -132,6 +136,7 @@ export default function SessionPanelScreen() {
       const level = modelState?.thinkingLevel
       setThinking(typeof level === 'string' && (THINKING_LEVELS as readonly string[]).includes(level) ? level as ThinkingLevel : undefined)
       setArtifacts(toArtifacts(artifactList))
+      setCwd(typeof sessionInfo?.cwd === 'string' ? sessionInfo.cwd : undefined)
       const used = sessionInfo?.usage?.used
       const total = sessionInfo?.usage?.total
       setUsage(typeof used === 'number' && typeof total === 'number' ? `${used} / ${total}` : undefined)
@@ -329,15 +334,22 @@ export default function SessionPanelScreen() {
         {artifacts.length === 0 ? (
           <Row theme={theme} label="还没有产物" last />
         ) : (
-          artifacts.map((artifact, index) => (
-            <Row
-              key={artifact.path}
-              theme={theme}
-              label={artifact.path.split('/').pop() ?? artifact.path}
-              value={artifact.kind ?? undefined}
-              last={index === artifacts.length - 1}
-            />
-          ))
+          artifacts.map((artifact, index) => {
+            // Tap opens the read-only preview; the desktop still owns writes.
+            const full = resolveArtifactPath(artifact.path, cwd)
+            return (
+              <Row
+                key={artifact.path}
+                theme={theme}
+                label={artifact.path.split('/').pop() ?? artifact.path}
+                value={artifact.kind ?? undefined}
+                onPress={full && canRun(capabilities, 'read_text_file')
+                  ? () => router.push(`/files?sessionId=${encodeURIComponent(sessionId)}&file=${encodeURIComponent(full)}`)
+                  : undefined}
+                last={index === artifacts.length - 1}
+              />
+            )
+          })
         )}
       </Section>
 

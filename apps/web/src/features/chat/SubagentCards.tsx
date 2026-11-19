@@ -36,7 +36,7 @@ function SubagentCard({ run }: { run: SubagentRun }) {
   return <div className={"subagent-card subagent-card--" + run.status}>
     <button type="button" className="subagent-card__head" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
       <SparklesIcon size="sm" className={"subagent-card__icon" + (run.status === "running" ? " subagent-card__icon--spin" : "")} />
-      <span className="subagent-card__title">{run.agent ?? "子代理"}</span>
+      <span className="subagent-card__title">{run.agent ?? "子代理"}{run.role ? `（${run.role}）` : ""}</span>
       {run.task && <span className="subagent-card__task">{run.task.split("\n")[0].slice(0, 60)}</span>}
       <span className={"subagent-card__state subagent-card__state--" + run.status}>
         {STATUS_TEXT[run.status]}{run.ms !== undefined && run.status !== "running" ? ` · ${Math.max(1, Math.round(run.ms / 1000))}s` : ""}

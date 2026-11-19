@@ -5,6 +5,12 @@ import type { SubagentEvent } from "@openbuddy/protocol/subagent";
 export interface SubagentRun {
   childId: string;
   agent?: string;
+  /** Team pipeline this child belongs to (B2a). */
+  team?: string;
+  /** Short role label from the step (调研 / 审阅 …). */
+  role?: string;
+  /** Zero-based step index within the parent tool call. */
+  index?: number;
   task?: string;
   status: "running" | "done" | "failed" | "cancelled";
   summary?: string;
@@ -38,6 +44,9 @@ export const useSubagentStore = create<SubagentState>((set, get) => ({
     const next: SubagentRun = {
       childId: event.childId,
       agent: event.agent ?? (index >= 0 ? current[index].agent : undefined),
+      team: event.team ?? (index >= 0 ? current[index].team : undefined),
+      role: event.role ?? (index >= 0 ? current[index].role : undefined),
+      index: event.index ?? (index >= 0 ? current[index].index : undefined),
       task: event.task ?? (index >= 0 ? current[index].task : undefined),
       status: event.status === "started" ? "running" : event.status === "running" ? "running" : event.status,
       summary: event.summary ?? (index >= 0 ? current[index].summary : undefined),

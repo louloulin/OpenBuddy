@@ -15,9 +15,11 @@ describe("专家团 (pii W3.5)", () => {
     const text = teamPrompt(team);
     expect(text).toContain("ob_subagent");
     expect(text).toContain("mode=chain");
+    expect(text).toContain('"mode": "chain"');
     for (const stage of team.stages) {
       expect(text).toContain(stage.expertId);
       expect(text).toContain(stage.instruction);
+      expect(text).toContain(`"agent": "${stage.expertId}"`);
     }
     expect(text).toContain("$ARGUMENTS");
   });

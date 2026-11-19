@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-19",
+  "feature": "B2a 团队成员 → 真实 Pi 子会话",
+  "implementation": [
+    "engine/src/builtin/subagent.ts: steps[] + per-step expert binding + team/role metadata",
+    "engine/src/features/expert.ts: setSessionExpert applied on child",
+    "services/agents/{teams,workbuddy}.ts: explicit ob_subagent steps JSON",
+    "protocol/subagent.ts + web subagent card: team/role/index",
+    "host/modules/experts.ts: imported team prompt uses chain steps"
+  ],
+  "e2e": {
+    "ok": true,
+    "steps": 58,
+    "team_titles": [
+      "深度调研员（调研）",
+      "代码审查员（审阅）"
+    ]
+  },
+  "tests": {
+    "files": 235,
+    "tests": 1729
+  },
+  "gates": {
+    "typecheck": "pass",
+    "boundaries": "BOUNDARIES_OK",
+    "ipc_missing_handlers": []
+  },
+  "notes": [
+    "内置专家 id 通过 ExpertStore.get 解析（此前 list() 只含我的专家）",
+    "子代理工具集按专家 tools 收窄",
+    "maxTurns 仍未实现：Pi SDK 无该选项"
+  ]
+}

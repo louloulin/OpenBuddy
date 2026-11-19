@@ -92,8 +92,22 @@ export function toArtifacts(raw: unknown): ArtifactEntry[] {
   return entries
 }
 
-/** `agent_set_thinking_level` only accepts these; anything else is refused. */
-export function thinkingLevelPayload(level: string): { level: ThinkingLevel } | null {
+function isAbsolutePath(path: string): boolean {
+  return path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path)
+}
+
+/**
+ * `artifacts_list` sometimes returns workspace-relative paths. The file
+ * preview speaks absolute paths, so join against the session's cwd when one is
+ * known; anything already absolute (or without a cwd) is passed through.
+ */
+export function resolveArtifactPath(path: string, cwd?: string): string {
+  const trimmed = path.trim()
+  if (!trimmed || isAbsolutePath(trimmed) || !cwd || !isAbsolutePath(cwd)) return trimmed
+  return `${cwd.replace(/[\\/]+$/, '')}/${trimmed.replace(/^[.][\\/]/, '')}`
+}
+
+/** `agent_set_thinking_level` only accepts these; anything else is refused. */export function thinkingLevelPayload(level: string): { level: ThinkingLevel } | null {
   return isThinkingLevel(level) ? { level } : null
 }
 

@@ -1,10 +1,13 @@
 // @vitest-environment node
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { loadSkills } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it } from "vitest";
+import { CapabilityPackService } from "../src/agents/capability-pack";
 import { ExpertStore } from "../src/agents/store";
-import { workBuddyTeamPrompt } from "../src/agents/workbuddy";
+import { readWorkBuddyPackageFrom, workBuddyTeamChainPrompt, workBuddyTeamPrompt } from "../src/agents/workbuddy";
+import { PromptsService } from "../src/prompts/prompts";
 
 /** A real deflated WorkBuddy export (plugin.json + two agents + one avatar). */
 const ZIP_BASE64 = "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";
@@ -97,5 +100,137 @@ describe("WorkBuddy 专家包导入 (S18)", () => {
       { name: "负责人", role: "lead", description: "负责统筹" },
       { name: "成员", role: "member", description: "负责执行" },
     ])).toContain("- 负责人（负责人）：负责统筹");
+    const chain = workBuddyTeamChainPrompt("团队包", [
+      { id: "lead", name: "负责人", role: "lead", description: "负责统筹" },
+      { id: "member", name: "成员", role: "member", description: "负责执行" },
+    ]);
+    expect(chain).toContain('"mode": "chain"');
+    expect(chain).toContain('"agent": "lead"');
+    expect(chain).toContain('"agent": "member"');
+    expect(chain).toContain('"role": "汇总"');
+    expect(chain).toContain("$ARGUMENTS");
+  });
+});
+
+describe("能力包贡献安装 (B1b)", () => {
+  const richPackage = () => {
+    const pkg = join(tempDir(), "rich");
+    mkdirSync(join(pkg, ".codebuddy-plugin"), { recursive: true });
+    mkdirSync(join(pkg, "agents"), { recursive: true });
+    mkdirSync(join(pkg, "skills", "docx", "references"), { recursive: true });
+    mkdirSync(join(pkg, "commands"), { recursive: true });
+    writeFileSync(join(pkg, ".codebuddy-plugin", "plugin.json"), JSON.stringify({
+      name: "rich-pack",
+      displayName: { zh: "能力包" },
+      agents: ["./agents/lead.md"],
+      skills: ["./skills/docx"],
+      commands: ["./commands"],
+      mcpServers: {
+        calendar: { type: "http", url: "https://example.invalid/mcp", exposure: "deferred", headers: { "X-Test": "1" } },
+        broken: { auth: { type: "extension" } },
+      },
+      hooks: "./hooks/hooks.json",
+      extensions: { "ai.workbuddy": {} },
+      defaultEnabled: false,
+      workbuddy: { requiresProductFeature: "EnableDocs" },
+    }));
+    writeFileSync(join(pkg, "agents", "lead.md"), "---\nname: lead\ndescription: 负责人\n---\n你是负责人。\n");
+    writeFileSync(join(pkg, "skills", "docx", "SKILL.md"), "---\nname: docx\ndescription: Word 文档\n---\n生成 docx。\n");
+    writeFileSync(join(pkg, "skills", "docx", "references", "style.md"), "样式\n");
+    writeFileSync(join(pkg, "commands", "report.md"), "---\ndescription: 写报告\n---\n写一份报告。\n");
+    return pkg;
+  };
+
+  const install = (pkg: string) => {
+    const pi = join(tempDir(), "pi");
+    const config = { skillPaths: [] as string[], disabledSkills: [] as string[] };
+    let registered: Array<{ name: string; config: Record<string, unknown> }> = [];
+    const service = new CapabilityPackService(
+      pi,
+      {
+        read: () => ({ skillPaths: [...config.skillPaths], disabledSkills: [...config.disabledSkills] }),
+        write: (value) => {
+          config.skillPaths = [...value.skillPaths];
+          config.disabledSkills = [...value.disabledSkills];
+        },
+      },
+      (servers) => {
+        registered = servers;
+        return { installed: servers.map((server) => server.name), skipped: [] };
+      },
+    );
+    const result = service.install(readWorkBuddyPackageFrom(pkg));
+    return { pi, config, result, registered: () => registered, service };
+  };
+
+  it("installs skills, prompts and disabled MCP servers with visible skips", () => {
+    const pkg = richPackage();
+    const { pi, config, result, registered } = install(pkg);
+
+    expect(result.contributions).toEqual(expect.arrayContaining([
+      { kind: "skill", name: "docx", enabled: false },
+      { kind: "prompt", name: "report", enabled: true },
+      { kind: "mcp", name: "calendar", enabled: false },
+    ]));
+    expect(result.requires).toEqual(["EnableDocs"]);
+    expect(result.skippedContributions.map((item) => item.kind)).toEqual(expect.arrayContaining(["hook", "extension", "mcp"]));
+
+    const skillsRoot = join(pi, "capability-packs", "rich-pack", "skills");
+    expect(existsSync(join(skillsRoot, "docx", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(skillsRoot, "docx", "references", "style.md"))).toBe(true);
+    expect(config.skillPaths).toContain(skillsRoot);
+    expect(config.disabledSkills).toContain("docx");
+    expect(readFileSync(join(pi, "prompts", "report.md"), "utf8")).toContain("写一份报告");
+
+    expect(registered().map((server) => server.name)).toEqual(["calendar"]);
+    expect(registered()[0]!.config).toMatchObject({
+      enabled: false,
+      url: "https://example.invalid/mcp",
+      exposure: "deferred",
+      headers: { "X-Test": "1" },
+    });
+  });
+
+  it("keeps a user prompt and reports the collision instead of overwriting", () => {
+    const pkg = richPackage();
+    const { pi, result, service } = install(pkg);
+    writeFileSync(join(pi, "prompts", "report.md"), "用户自己的版本\n");
+
+    const second = service.install(readWorkBuddyPackageFrom(pkg));
+    expect(second.skippedContributions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "command", name: "report", reason: expect.stringContaining("已存在") }),
+    ]));
+    expect(result.contributions.some((item) => item.kind === "prompt")).toBe(true);
+    expect(readFileSync(join(pi, "prompts", "report.md"), "utf8")).toBe("用户自己的版本\n");
+  });
+
+  it("accepts a capability-only package with no agents", () => {
+    const pkg = join(tempDir(), "caps");
+    mkdirSync(join(pkg, ".codebuddy-plugin"), { recursive: true });
+    mkdirSync(join(pkg, "skills", "only"), { recursive: true });
+    writeFileSync(join(pkg, ".codebuddy-plugin", "plugin.json"), JSON.stringify({
+      name: "caps-only",
+      skills: ["./skills/only"],
+    }));
+    writeFileSync(join(pkg, "skills", "only", "SKILL.md"), "---\nname: only\ndescription: 只有一个技能\n---\n做一件事。\n");
+
+    const parsed = readWorkBuddyPackageFrom(pkg);
+    expect(parsed.drafts).toHaveLength(0);
+    expect(parsed.skills.map((skill) => skill.name)).toEqual(["only"]);
+  });
+
+  it("Pi's loader discovers the installed skill and prompt", async () => {
+    const { pi, config } = install(richPackage());
+
+    const discovered = loadSkills({
+      cwd: pi,
+      agentDir: pi,
+      skillPaths: config.skillPaths,
+      includeDefaults: false,
+    }).skills;
+    expect(discovered.map((skill) => skill.name)).toContain("docx");
+
+    const prompts = await new PromptsService({ dir: pi } as never, () => false).list();
+    expect(prompts.map((prompt) => prompt.name)).toContain("report");
   });
 });

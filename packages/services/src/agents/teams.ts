@@ -54,15 +54,24 @@ export const TEAM_SEEDS: TeamSeed[] = [
 
 /** The prompt-template body for one team: how the model should run the chain. */
 export function teamPrompt(team: Pick<TeamSeed, "name" | "stages">): string {
-  const steps = team.stages
-    .map((stage, index) => `${index + 1}. ${stage.role}（专家 ${stage.expertId}，name=${stage.expertName}）：${stage.instruction}`)
-    .join("\n");
+  // B2a: give the model an explicit `steps` payload; the tool binds each child to its own expert.
+  const steps = JSON.stringify({
+    mode: "chain",
+    team: team.name,
+    steps: team.stages.map((stage) => ({
+      agent: stage.expertId,
+      role: stage.role,
+      task: `${stage.instruction}（角色：${stage.expertName}；完成「${stage.role}」这一步，如收到上一步结论请在其基础上继续。）`,
+    })),
+  }, null, 2);
   return [
     `请按「${team.name}」这条流水线完成任务。`,
     "",
-    "执行方式：调用一次 ob_subagent，参数 mode=chain，按下面顺序给出 tasks；每一步指定对应的 agent，并让后一步带上一步的结论。",
+    "执行方式：调用一次 ob_subagent，参数 mode=chain。把下面的 steps 原样作为参数（task 可替换为针对用户任务的具体内容）：",
     "",
+    "```json",
     steps,
+    "```",
     "",
     "要求：",
     "- 每个子代理只做自己那一步，不要越界；",

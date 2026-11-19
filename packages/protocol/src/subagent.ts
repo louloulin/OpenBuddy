@@ -12,6 +12,12 @@ export interface SubagentEvent {
   status: "started" | "running" | "done" | "failed" | "cancelled";
   /** The expert / label the child was spawned as. */
   agent?: string;
+  /** Team name when the child belongs to a team pipeline (`ob_subagent` `team`). */
+  team?: string;
+  /** Short role label from the step (e.g. 调研 / 审阅). */
+  role?: string;
+  /** Zero-based step index within the parent tool call. */
+  index?: number;
   /** The task the child was given (truncated). */
   task?: string;
   /** The child's final answer (truncated). */

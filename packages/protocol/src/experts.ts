@@ -107,13 +107,34 @@ export interface ExpertRootInfo {
   error?: string;
 }
 
-/** `experts_import_workbuddy`: what a WorkBuddy package produced (S18/S21). */
+/** One capability the package declared and OpenBuddy installed (B1b). */
+export interface WorkBuddyContribution {
+  kind: "skill" | "prompt" | "mcp";
+  name: string;
+  /** Skills/prompts: true when active; MCP: always false until the user opts in. */
+  enabled: boolean;
+}
+
+/** A declared capability that was deliberately not installed, with the reason. */
+export interface WorkBuddySkippedContribution {
+  kind: "skill" | "command" | "hook" | "extension" | "mcp";
+  name: string;
+  reason: string;
+}
+
+/** `experts_import_workbuddy`: what a WorkBuddy package produced (S18/S21/B1b). */
 export interface WorkBuddyImportResult {
   package: string;
   imported: ExpertEntry[];
   skipped: Array<{ id: string; error: string }>;
   /** Team packages also install a 我的指令 prompt; `command` is its `/` invocation (S21). */
   team?: { name: string; command?: string; leadAgent?: string; members: string[]; error?: string };
+  /** Installed skills / prompts / MCP servers (B1b). */
+  contributions?: WorkBuddyContribution[];
+  /** Declared but not installed, so the UI can explain what was left out. */
+  skippedContributions?: WorkBuddySkippedContribution[];
+  /** Capability gates declared by the package (`requiresProductFeature`). */
+  requires?: string[];
 }
 
 /** `experts_load`: the merged catalog for one working directory. */

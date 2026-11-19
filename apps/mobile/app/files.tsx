@@ -33,9 +33,10 @@ import { themeFor } from '../src/theme'
 export default function FilesScreen() {
   const theme = themeFor(useColorScheme())
   const router = useRouter()
-  const params = useLocalSearchParams<{ sessionId?: string; path?: string }>()
+  const params = useLocalSearchParams<{ sessionId?: string; path?: string; file?: string }>()
   const sessionId = params.sessionId ? decodeURIComponent(params.sessionId) : ''
   const initialPath = params.path ? decodeURIComponent(params.path) : undefined
+  const initialFile = params.file ? decodeURIComponent(params.file) : undefined
 
   const transport = useApp(state => state.transport)
   const send = useApp(state => state.send)
@@ -148,8 +149,16 @@ export default function FilesScreen() {
     }
   }
 
-  const attach = async (file: { path: string }) => {
-    if (!sessionId) {
+  // Session artifacts link straight at a file; the browser itself is
+  // directory-first, so an explicit `file` param opens the preview once.
+  useEffect(() => {
+    if (!initialFile) return
+    void openFile({ path: initialFile, name: basename(initialFile), kind: 'file', size: 0 })
+    // The path is fixed for the life of the screen; openFile closes over transport.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFile])
+
+  const attach = async (file: { path: string }) => {    if (!sessionId) {
       setError('先打开一个会话，才能把文件交给它。')
       return
     }
@@ -191,7 +200,7 @@ export default function FilesScreen() {
           </View>
         </Pressable>
         <Text numberOfLines={1} style={{ flex: 1, color: theme.text, fontSize: 15, fontWeight: '600' }}>
-          {path ? basename(path) : '电脑上的文件'}
+          {preview ? basename(preview.path) : path ? basename(path) : '电脑上的文件'}
         </Text>
         {loading ? <ActivityIndicator size="small" color={theme.textWeak} /> : null}
       </View>

@@ -49,6 +49,29 @@ export class McpService {
     };
   }
 
+  /**
+   * 能力包 MCP (B1b): register declared servers as **disabled**; the user enables them in
+   * 连接器. Same-name entries are left untouched so a package never overwrites the user's config.
+   */
+  registerFromPack(servers: Array<{ name: string; config: Record<string, unknown> }>): {
+    installed: string[];
+    skipped: Array<{ name: string; reason: string }>;
+  } {
+    const config = this.store.read();
+    const installed: string[] = [];
+    const skipped: Array<{ name: string; reason: string }> = [];
+    for (const server of servers) {
+      if (config.mcpServers[server.name]) {
+        skipped.push({ name: server.name, reason: "同名 MCP 服务已存在" });
+        continue;
+      }
+      config.mcpServers[server.name] = { ...server.config, enabled: false };
+      installed.push(server.name);
+    }
+    if (installed.length) this.store.write(config);
+    return { installed, skipped };
+  }
+
   /** 延迟暴露 (W2.4 / S11): true when at least one server defers its tools behind `tool_search`. */
   usesDeferred(): boolean {
     return Object.values(this.store.read().mcpServers).some(

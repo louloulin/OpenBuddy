@@ -28,6 +28,8 @@ await mkdir(OUT, { recursive: true });
 const WB_FIXTURE = join(tmpdir(), `openbuddy-e2e-workbuddy-${process.pid}`);
 mkdirSync(join(WB_FIXTURE, '.codebuddy-plugin'), { recursive: true });
 mkdirSync(join(WB_FIXTURE, 'agents'), { recursive: true });
+mkdirSync(join(WB_FIXTURE, 'skills', 'e2e-skill'), { recursive: true });
+mkdirSync(join(WB_FIXTURE, 'commands'), { recursive: true });
 writeFileSync(join(WB_FIXTURE, '.codebuddy-plugin', 'plugin.json'), JSON.stringify({
   name: 'e2e-workbuddy',
   agents: ['./agents/quant-analyst.md', './agents/risk-officer.md'],
@@ -39,11 +41,17 @@ writeFileSync(join(WB_FIXTURE, '.codebuddy-plugin', 'plugin.json'), JSON.stringi
   categoryId: '08-FinanceInvestment',
   tags: [{ zh: '测试' }],
   quickPrompts: [{ zh: '回测一下这个策略' }],
+  skills: ['./skills/e2e-skill'],
+  commands: ['./commands'],
+  mcpServers: { e2e: { type: 'http', url: 'https://example.invalid/mcp' } },
+  hooks: './hooks/hooks.json',
   members: [
     { id: 'quant-analyst', displayName: { zh: '测试量化师' }, role: 'lead' },
     { id: 'risk-officer', displayName: { zh: '测试风控官' }, role: 'member' },
   ],
 }));
+writeFileSync(join(WB_FIXTURE, 'skills', 'e2e-skill', 'SKILL.md'), '---\nname: e2e-skill\ndescription: E2E 技能\n---\n\n按步骤执行。\n');
+writeFileSync(join(WB_FIXTURE, 'commands', 'e2e-report.md'), '---\ndescription: E2E 指令\n---\n\n生成一份测试报告。\n');
 writeFileSync(join(WB_FIXTURE, 'settings.json'), JSON.stringify({ agent: 'quant-analyst' }));
 writeFileSync(join(WB_FIXTURE, 'agents', 'quant-analyst.md'), '---\nname: quant-analyst\ndescription: 量化策略师\ndisplayName:\n  zh: 测试量化师\n---\n\n你是量化策略师。\n');
 writeFileSync(join(WB_FIXTURE, 'agents', 'risk-officer.md'), '---\nname: risk-officer\ndescription: 风控官\ndisplayName:\n  zh: 测试风控官\n---\n\n你是风控官。\n');
@@ -469,10 +477,25 @@ try {
     if (!command) throw new Error('team command missing: ' + JSON.stringify(result.team));
     const prompts = await ctx.call('prompts_list', {});
     if (!prompts.some((entry) => entry.name === command)) throw new Error('team prompt not installed: ' + command);
+    // B1b: skills / commands / mcpServers declared by the same package reach Pi's surfaces.
+    const contributions = result.contributions ?? [];
+    if (!contributions.some((entry) => entry.kind === 'skill' && entry.name === 'e2e-skill' && entry.enabled)) throw new Error('skill contribution missing: ' + JSON.stringify(contributions));
+    if (!contributions.some((entry) => entry.kind === 'prompt' && entry.name === 'e2e-report')) throw new Error('prompt contribution missing: ' + JSON.stringify(contributions));
+    const mcpContribution = contributions.find((entry) => entry.kind === 'mcp' && entry.name === 'e2e');
+    if (!mcpContribution || mcpContribution.enabled !== false) throw new Error('mcp contribution should be disabled: ' + JSON.stringify(mcpContribution));
+    if (!(result.skippedContributions ?? []).some((entry) => entry.kind === 'hook')) throw new Error('hook skip reason missing: ' + JSON.stringify(result.skippedContributions));
+    const installedSkills = await ctx.call('skills_list', {});
+    if (!installedSkills.some((entry) => entry.name === 'e2e-skill' && entry.enabled)) throw new Error('Pi skills_list missing e2e-skill: ' + JSON.stringify(installedSkills.map((s) => s.name)));
+    const installedPrompts = await ctx.call('prompts_list', {});
+    if (!installedPrompts.some((entry) => entry.name === 'e2e-report')) throw new Error('prompts_list missing e2e-report');
+    const servers = await ctx.call('mcp_list');
+    if (!servers.some((entry) => entry.name === 'e2e' && entry.enabled === false)) throw new Error('mcp_list missing disabled e2e: ' + JSON.stringify(servers));
     // Keep the later expert-count / prompt steps stable.
     for (const expert of result.imported) await ctx.call('agents_delete', { id: expert.id });
     await ctx.call('prompts_delete', { name: command, scope: 'global' });
-    return { package: result.package, names: result.imported.map((expert) => expert.name), team: command };`);
+    await ctx.call('prompts_delete', { name: 'e2e-report', scope: 'global' });
+    await ctx.call('mcp_delete', { name: 'e2e' });
+    return { package: result.package, names: result.imported.map((expert) => expert.name), team: command, contributions: contributions.map((entry) => entry.kind + ':' + entry.name), skipped: (result.skippedContributions ?? []).map((entry) => entry.kind + ':' + entry.name) };`);
   // W7.1 / W7.2: independent session window + global quick input.
   await step('独立窗口 + 全局快速输入', `
     const init = await ctx.call('agent_init', {});
@@ -972,6 +995,23 @@ try {
     await card.locator('.subagent-card__head').first().click();
     await ctx.sleep(500);
     return { collapsed, states, expanded: await ctx.shot('37-subagent-expanded') };`);
+  // B2a: team pipeline — each child is bound to its own expert, events carry team/role.
+  await step('团队子代理（B2a）', `
+    await page.locator('.sidebar__nav-item', { hasText: '新建任务' }).first().click();
+    await page.locator('.wb-composer__input').fill('__TEAM__ 按投研流程完成这份材料');
+    await page.getByRole('button', { name: '发送', exact: true }).click();
+    const allow = page.getByRole('button', { name: '允许本次', exact: true });
+    await allow.waitFor({ timeout: 30000 });
+    await allow.click();
+    await page.locator('.subagent-card').first().waitFor({ timeout: 30000 });
+    await page.waitForFunction(() => document.querySelectorAll('.subagent-card__state--done').length >= 2, null, { timeout: 60000 });
+    await ctx.sleep(800);
+    const titles = await page.locator('.subagent-card__title').allTextContents();
+    if (!titles.some((title) => title.includes('深度调研员'))) throw new Error('builtin expert name not resolved: ' + JSON.stringify(titles));
+    if (!titles.some((title) => title.includes('代码审查员'))) throw new Error('builtin expert name not resolved: ' + JSON.stringify(titles));
+    if (!titles.some((title) => title.includes('调研'))) throw new Error('team role 调研 missing: ' + JSON.stringify(titles));
+    if (!titles.some((title) => title.includes('审阅'))) throw new Error('team role 审阅 missing: ' + JSON.stringify(titles));
+    return { titles, shot: await ctx.shot('36b-team-subagent-cards') };`);
   await step('second task', `
     await page.getByRole('button', { name: '新建任务', exact: true }).first().click();
     const input = page.locator('.wb-composer__input');

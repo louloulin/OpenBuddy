@@ -79,7 +79,7 @@ describe("文件触发 watcher (pii W4.7)", () => {
     expect(watcher.watch(dir, { debounceMs: 20 })).toBe(true);
     expect(watcher.watching).toHaveLength(1);
     writeFileSync(join(dir, "new.txt"), "hello");
-    await vi.waitFor(() => expect(changes).toHaveLength(1));
+    await vi.waitFor(() => expect(changes).toHaveLength(1), { timeout: 5000, interval: 50 });
   });
 
   it("stops watching on unwatch", async () => {

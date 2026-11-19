@@ -1,0 +1,43 @@
+{
+  "date": "2026-11-19",
+  "feature": "B1b WorkBuddy 包贡献映射",
+  "real_pack": {
+    "path": "/Applications/WorkBuddy.app/Contents/Resources/app.asar.unpacked/resources/plugins/workbuddy-builtin/builtin-plugins/workbuddy-docx",
+    "experts": 3,
+    "skills": 8,
+    "prompts": 0,
+    "mcp": 0,
+    "skipped": [
+      "hook:hooks"
+    ]
+  },
+  "e2e": {
+    "ok": true,
+    "steps": 57,
+    "import_step": {
+      "package": "e2e-workbuddy",
+      "names": [
+        "测试量化师",
+        "测试风控官"
+      ],
+      "team": "team-wb-e2e",
+      "contributions": [
+        "skill:e2e-skill",
+        "prompt:e2e-report",
+        "mcp:e2e"
+      ],
+      "skipped": [
+        "hook:hooks"
+      ]
+    }
+  },
+  "tests": {
+    "files": 235,
+    "tests": 1727
+  },
+  "gates": {
+    "typecheck": "pass",
+    "boundaries": "BOUNDARIES_OK",
+    "ipc_missing_handlers": []
+  }
+}
