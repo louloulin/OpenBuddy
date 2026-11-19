@@ -28,15 +28,8 @@ import {
 import { unreadLabel } from '../../src/core/unread'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
+import { relativeTime } from '../../src/core/relative-time'
 import type { CachedSession } from '../../src/db/cache'
-
-function relative(ms: number): string {
-  const delta = Date.now() - ms
-  if (delta < 60_000) return '刚刚'
-  if (delta < 3_600_000) return `${Math.floor(delta / 60_000)} 分钟前`
-  if (delta < 86_400_000) return `${Math.floor(delta / 3_600_000)} 小时前`
-  return `${Math.floor(delta / 86_400_000)} 天前`
-}
 
 const SHEET_BACKDROP = { position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }
 
@@ -315,7 +308,7 @@ export default function SessionsScreen() {
             <Text style={{ color: theme.inkFg, fontSize: 10, fontWeight: '700' }}>{unreadLabel(session.unread)}</Text>
           </View>
         ) : null}
-        <Text style={{ color: theme.textWeak, fontSize: 11 }}>{relative(session.updatedAt)}</Text>
+        <Text style={{ color: theme.textWeak, fontSize: 11 }}>{relativeTime(session.updatedAt)}</Text>
       </View>
       {session.preview ? (
         <Text numberOfLines={1} style={{ color: theme.textWeak, fontSize: 13, marginTop: 3 }}>

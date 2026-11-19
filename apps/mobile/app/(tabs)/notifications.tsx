@@ -11,6 +11,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View, u
 import { useRouter } from 'expo-router'
 
 import { BellIcon } from '../../src/components/icons'
+import { relativeTime } from '../../src/core/relative-time'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
 
@@ -112,10 +113,12 @@ export default function NotificationsScreen() {
               opacity: item.read ? 0.62 : 1,
             })}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Text style={{ color: theme.textWeak, fontSize: 11, fontWeight: '600', letterSpacing: 0.3 }}>
                 {LABEL[item.kind] ?? item.kind}
               </Text>
+              <View style={{ flex: 1 }} />
+              <Text style={{ color: theme.textWeak, fontSize: 11 }}>{relativeTime(item.at)}</Text>
               {/* The dot marks the row, not the label — keep it on the card edge. */}
               {!item.read ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.ink }} /> : null}
             </View>
