@@ -31,60 +31,9 @@ import { canRun } from '../../src/core/surface'
 import { transcriptFilename, transcriptMarkdown } from '../../src/core/share'
 import { shareTextFile } from '../../src/native/share'
 import { useApp } from '../../src/stores/app'
-import { themeFor, type Theme } from '../../src/theme'
-
-function Section({ theme, label, children }: { theme: Theme; label: string; children: React.ReactNode }) {
-  return (
-    <View style={{ marginBottom: 22 }}>
-      <Text style={{ color: theme.textWeak, fontSize: 12, fontWeight: '600', marginBottom: 8, marginLeft: 4 }}>
-        {label}
-      </Text>
-      <View
-        style={{
-          backgroundColor: theme.card,
-          borderRadius: 14,
-          borderWidth: theme.hairline,
-          borderColor: theme.cardBorder,
-          overflow: 'hidden',
-        }}
-      >
-        {children}
-      </View>
-    </View>
-  )
-}
-
-function Row({
-  theme, label, value, onPress, last = false, danger = false,
-}: {
-  theme: Theme
-  label: string
-  value?: string
-  onPress?: () => void
-  last?: boolean
-  danger?: boolean
-}) {
-  const content = (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        paddingHorizontal: 14,
-        minHeight: 48,
-        borderBottomWidth: last ? 0 : theme.hairline,
-        borderBottomColor: theme.cardBorder,
-      }}
-    >
-      <Text style={{ flex: 1, color: danger ? theme.danger : theme.text, fontSize: 14 }}>{label}</Text>
-      {value ? (
-        <Text numberOfLines={1} style={{ maxWidth: '55%', color: theme.textWeak, fontSize: 13 }}>{value}</Text>
-      ) : null}
-      {onPress && !danger ? <ChevronRightIcon size={15} color={theme.textWeak} /> : null}
-    </View>
-  )
-  return onPress ? <Pressable onPress={onPress}>{content}</Pressable> : content
-}
+import { Row, Section } from '../../src/components/SettingsList'
+import { ArrowLeftIcon } from '../../src/components/icons'
+import { themeFor } from '../../src/theme'
 
 export default function SessionPanelScreen() {
   const theme = themeFor(useColorScheme())
@@ -276,15 +225,15 @@ export default function SessionPanelScreen() {
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 16, paddingTop: 12, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingHorizontal: theme.gutter, paddingBottom: 40 }}
       >
-      <Text style={{ color: theme.textWeak, fontSize: 12, marginBottom: 18 }}>
+      <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta, marginTop: 4, marginBottom: 18, lineHeight: 19 }}>
         会话设置改动会立刻作用在电脑上的这一轮对话。
       </Text>
 
       {error ? (
-        <View style={{ backgroundColor: theme.card, borderRadius: 12, borderWidth: theme.hairline, borderColor: theme.cardBorder, padding: 12, marginBottom: 16 }}>
-          <Text style={{ color: theme.danger, fontSize: 13 }}>{error}</Text>
+        <View style={{ backgroundColor: theme.card, borderRadius: theme.radiusTile, borderWidth: theme.hairline, borderColor: theme.cardBorder, padding: theme.pad, marginBottom: 16 }}>
+          <Text style={{ color: theme.danger, fontSize: theme.fontMeta }}>{error}</Text>
         </View>
       ) : null}
 

@@ -41,6 +41,16 @@ export type GatewayTransportOptions = {
    * that means the tunnel is gone even though the socket looked open.
    */
   heartbeatTimeoutMs?: number
+  /**
+   * The bridge's ring buffer no longer reaches back to our `since`, so the gap
+   * cannot be replayed. The app must reload the session snapshot; the
+   * transport reconnects on its own and continues from the new head.
+   *
+   * Before this existed, `resync` closed the stream and returned from the
+   * connect loop — the phone stayed dead with a stale transcript and no way to
+   * notice (20261117-mobile.md §2.5).
+   */
+  onResync?: () => void
 }
 
 export class GatewayTransport implements Transport {
@@ -61,6 +71,7 @@ export class GatewayTransport implements Transport {
   private stopped = false
   private attempt = 0
   private readonly onUnauthorized: (() => void) | undefined
+  private readonly onResync: (() => void) | undefined
   private readonly heartbeatTimeoutMs: number
   /** When the last frame of any kind arrived; the liveness measure. */
   private lastSeenAt = 0
@@ -84,7 +95,8 @@ export class GatewayTransport implements Transport {
     // plain global one.
     this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init))
     this.onUnauthorized = options.onUnauthorized
-    this.heartbeatTimeoutMs = options.heartbeatTimeoutMs ?? 70_000
+    this.onResync = options.onResync
+    this.heartbeatTimeoutMs = options.heartbeatTimeoutMs ?? 16_000
     void this.connect()
   }
 
@@ -241,10 +253,15 @@ export class GatewayTransport implements Transport {
                 continue
               }
               if (frame.event === 'resync') {
-                // The server cannot replay: the app must reload the session.
-                this.setStateInternal('closed')
+                // The server cannot replay the gap. Ask the app for a fresh
+                // snapshot, then start over from the new head instead of
+                // abandoning the stream: a dead phone that never reconnects is
+                // worse than a reload.
+                this.onResync?.()
+                this.lastSeq = 0
+                this.setStateInternal('connecting')
                 this.abort.abort()
-                return
+                break
               }
               const seq = frame.id ? Number(frame.id) : null
               if (seq !== null && Number.isFinite(seq)) this.lastSeq = Math.max(this.lastSeq, seq)

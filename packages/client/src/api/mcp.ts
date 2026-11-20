@@ -1,6 +1,6 @@
 // §5.3 `mcp` module: mcp_list / upsert / toggle / delete, mcp_config_read / save / path,
 // mcp_test (pii W2.4), mcp_auth_trigger / status.
-import type { ConnectorCatalog, McpAuthStatusEntry, McpAuthTriggerResult, McpConfigFile, McpServerEntry, McpTestResult, McpUpsertRequest, SessionMcpState } from "@openbuddy/protocol/dto";
+import type { ConnectorCatalog, McpAuthAttempt, McpAuthStatusEntry, McpAuthTriggerResult, McpConfigFile, McpServerEntry, McpTestResult, McpUpsertRequest, SessionMcpState } from "@openbuddy/protocol/dto";
 import { invoke } from "../ipc";
 
 /** 测试连接 (W2.4): connect once, list the tools, close; returns the duration or the error. */
@@ -56,6 +56,26 @@ export async function mcpAuthTrigger(
 
 export async function mcpAuthStatus(sessionId: string): Promise<McpAuthStatusEntry[]> {
   return invoke<McpAuthStatusEntry[]>("mcp_auth_status", { sessionId });
+}
+
+// ---------- 授权尝试 (B3a) ----------
+
+/** Start a sign-in now; the returned attempt carries an id, an expiry and a status. */
+export async function mcpAuthBegin(sessionId: string, serverName: string): Promise<McpAuthAttempt> {
+  return invoke<McpAuthAttempt>("mcp_auth_begin", { sessionId, serverName });
+}
+
+export async function mcpAuthAttempt(id: string): Promise<McpAuthAttempt | null> {
+  return invoke<McpAuthAttempt | null>("mcp_auth_attempt", { id });
+}
+
+export async function mcpAuthAttempts(sessionId?: string): Promise<McpAuthAttempt[]> {
+  return invoke<McpAuthAttempt[]>("mcp_auth_attempts", { sessionId: sessionId ?? null });
+}
+
+/** Close = cancel: aborts the SDK sign-in and its loopback listener. */
+export async function mcpAuthCancel(id: string): Promise<boolean> {
+  return invoke<boolean>("mcp_auth_cancel", { id });
 }
 
 // ---------- 延迟暴露 (W2.4 P2 / S11) ----------

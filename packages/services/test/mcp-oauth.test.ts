@@ -303,3 +303,30 @@ it("times out a waiting SDK callback and reports authorization denial without sa
     status: "needs_auth",
   });
 });
+
+// 授权尝试 (B3a): the host-held id/expiry/state machine around the same real PKCE flow.
+it("tracks an attempt through authorized, failed, cancelled and expired", async () => {
+  const ok = await setup();
+  const authorized = ok.auth.begin("session", "fixture", ok.url);
+  expect(authorized).toMatchObject({ sessionId: "session", serverName: "fixture", status: "pending" });
+  expect(authorized.expiresAt).toBeGreaterThan(authorized.startedAt);
+  await until(() => ok.auth.attempt(authorized.id)?.status === "authorized");
+  expect(ok.auth.attemptsFor("session")).toMatchObject([{ id: authorized.id, status: "authorized" }]);
+
+  const denied = await setup("error");
+  const failed = denied.auth.begin("session", "fixture", denied.url);
+  await until(() => denied.auth.attempt(failed.id)?.status !== "pending");
+  expect(denied.auth.attempt(failed.id)?.status).toBe("failed");
+
+  const waiting = await setup("wait");
+  const cancelled = waiting.auth.begin("session", "fixture", waiting.url);
+  await until(() => waiting.opens === 1);
+  expect(waiting.auth.cancelAttempt(cancelled.id)).toBe(true);
+  await until(() => waiting.auth.attempt(cancelled.id)?.status === "cancelled");
+  expect(waiting.auth.attempt(cancelled.id)?.status).toBe("cancelled");
+
+  const expiring = await setup("wait", 120);
+  const expired = expiring.auth.begin("session", "fixture", expiring.url);
+  await until(() => expiring.auth.attempt(expired.id)?.status !== "pending");
+  expect(expiring.auth.attempt(expired.id)?.status).toBe("expired");
+});

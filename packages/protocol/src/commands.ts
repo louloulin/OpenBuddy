@@ -15,6 +15,8 @@ export const COMMANDS = [
   'browse_directory', 'path_stat', 'open_path', 'open_url', 'reveal_in_folder',
   'mcp_list', 'mcp_upsert', 'mcp_toggle', 'mcp_delete', 'mcp_config_read', 'mcp_config_save',
   'mcp_config_path', 'mcp_test', 'mcp_auth_trigger', 'mcp_auth_status', 'mcp_deferred_get', 'mcp_deferred_set',
+  // 授权尝试 (B3a): begin returns an attempt id/expiry; attempt/attempts read it; cancel aborts.
+  'mcp_auth_begin', 'mcp_auth_attempt', 'mcp_auth_attempts', 'mcp_auth_cancel',
   // 连接器目录 (pii W2.4 P2): real MCP config templates; CLI auth commands stay unimplemented.
   'connectors_default_root', 'connectors_list_roots', 'connectors_load', 'connectors_read_mcp_config', 'connectors_icon',
   // 本任务连接器开关 (pii W2.4 P2): session-scoped enable list.
@@ -61,9 +63,13 @@ export const COMMANDS = [
   'agent_set_session_expert', 'agent_clear_session_expert',
   'experts_default_root', 'experts_list_roots', 'experts_set_roots', 'experts_load', 'experts_read_agent_prompt',
   'experts_thumbnail', 'experts_image_bytes', 'experts_link_agents', 'experts_import_workbuddy', 'teams_list', 'teams_install',
+  // 专家链接 (B3b): preview + idempotent import from an https URL or a local package path.
+  'experts_link_preview', 'experts_link_import',
+  // 能力包 (B1a): list / 整体启停 / 逐项开关 / 移除 WorkBuddy 包贡献的资源.
+  'capability_packs_list', 'capability_packs_set_enabled', 'capability_packs_set_contribution', 'capability_packs_remove',
   // 自动化 (20261116-pii W4.1–W4.3): the automation host module.
   'automations_snapshot', 'automations_save', 'automations_delete', 'automations_set_status', 'automations_run',
-  'automation_tick', 'automation_records_archive', 'automation_records_delete',
+  'automation_retry', 'automation_tick', 'automation_records_archive', 'automation_records_delete',
   // 记忆 (20261116-pii W5.1–W5.3): the memory host module.
   'memory_list', 'memory_get', 'memory_save', 'memory_delete', 'memory_rewrite',
   // 资料库知识源 (pii W5.5): the library host module.
@@ -72,6 +78,8 @@ export const COMMANDS = [
   'projects_snapshot', 'projects_save', 'projects_delete', 'projects_import',
   // 技能目录 + 我的指令 (20261116-pii W2.7): the skills host module.
   'skills_catalog_default_root', 'skills_catalog_list_roots', 'skills_catalog_load', 'skills_catalog_read_skill',
+  // 技能市场安装与导出 (B1c): copy into <pi>/skills, export a portable ZIP.
+  'skills_install_from_catalog', 'skills_export_zip',
   'prompts_list', 'prompts_get', 'prompts_save', 'prompts_delete',
 ] as const;
 export type CommandName = typeof COMMANDS[number];

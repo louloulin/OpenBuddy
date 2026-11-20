@@ -50,18 +50,23 @@ export function ToolCard({
   }
 
   return (
-    <View style={{ paddingHorizontal: theme.gutter, marginVertical: 3 }}>
+    <View style={{ paddingHorizontal: theme.gutter, marginVertical: 2 }}>
       <Pressable
         onPress={() => setOpen(value => !value)}
+        accessibilityRole="button"
+        accessibilityLabel={`${row.name}${running ? '，运行中' : row.status === 'error' ? '，失败' : '，完成'}`}
+        accessibilityState={{ expanded: open }}
+        accessibilityHint={open ? '收起结果' : '展开结果'}
         style={({ pressed }) => ({
           flexDirection: 'row',
           alignItems: 'center',
           gap: 8,
-          height: 32,
+          minHeight: 40,
           paddingHorizontal: 10,
-          borderRadius: 8,
+          paddingVertical: 6,
+          borderRadius: theme.radiusSmall,
           borderWidth: theme.hairline,
-          borderColor: running ? theme.focus : row.status === 'error' ? theme.danger : theme.cardBorder,
+          borderColor: running ? theme.textMedium : row.status === 'error' ? theme.danger : theme.cardBorder,
           backgroundColor: pressed ? theme.hover : theme.card,
         })}
       >
@@ -69,7 +74,7 @@ export function ToolCard({
           <Text
             style={{
               fontFamily: theme.mono,
-              fontSize: 11,
+              fontSize: theme.fontMicro,
               color: theme.textMedium,
               backgroundColor: theme.surface,
               borderWidth: theme.hairline,
@@ -83,11 +88,11 @@ export function ToolCard({
             {category}
           </Text>
         ) : null}
-        <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: theme.text, fontSize: 12 }}>
+        <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: theme.textMedium, fontSize: theme.fontMeta }}>
           {row.name}
         </Text>
         {running ? (
-          <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: theme.focus }} />
+          <ActivityIndicator size="small" color={theme.textMedium} />
         ) : row.status === 'error' ? (
           <CloseIcon size={14} color={tint} />
         ) : (
@@ -100,55 +105,58 @@ export function ToolCard({
           style={{
             marginTop: 4,
             padding: 10,
-            borderRadius: 8,
+            borderRadius: theme.radiusSmall,
             backgroundColor: theme.surface,
             borderWidth: theme.hairline,
             borderColor: theme.cardBorder,
           }}
         >
           {row.hint ? (
-            <Text selectable style={{ color: theme.textMedium, fontSize: 11, fontFamily: theme.mono, marginBottom: 6 }}>
+            <Text selectable style={{ color: theme.textMedium, fontSize: theme.fontMicro, fontFamily: theme.mono, marginBottom: 6 }}>
               {row.hint}
             </Text>
           ) : null}
           {row.output ? (
             <>
-              <Text selectable style={{ color: theme.textWeak, fontSize: 11, lineHeight: 17, fontFamily: theme.mono }}>
+              <Text selectable style={{ color: theme.textMedium, fontSize: theme.fontMicro, lineHeight: 17, fontFamily: theme.mono }}>
                 {clipped.text}
               </Text>
               {clipped.truncated ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
-                  <Text style={{ flex: 1, color: theme.textWeak, fontSize: 11 }}>
+                  <Text style={{ flex: 1, color: theme.textWeak, fontSize: theme.fontMicro }}>
                     已截断 · 共 {clipped.total.toLocaleString('zh-CN')} 字符
                   </Text>
                   <Pressable
                     onPress={() => void copyFull()}
                     hitSlop={8}
+                    accessibilityRole="button"
                     accessibilityLabel="复制完整输出"
                     style={({ pressed }) => ({
+                      justifyContent: 'center',
+                      minHeight: 32,
                       paddingHorizontal: 10,
-                      paddingVertical: 4,
                       borderRadius: theme.radiusPill,
                       borderWidth: theme.hairline,
                       borderColor: theme.cardBorder,
                       backgroundColor: pressed ? theme.pressed : 'transparent',
                     })}
                   >
-                    <Text style={{ color: theme.textMedium, fontSize: 11 }}>{copied ? '已复制' : '复制完整输出'}</Text>
+                    <Text style={{ color: theme.textMedium, fontSize: theme.fontMicro }}>{copied ? '已复制' : '复制完整输出'}</Text>
                   </Pressable>
                 </View>
               ) : null}
             </>
           ) : (
-            <Text style={{ color: theme.textWeak, fontSize: 11 }}>这个工具没有返回内容。</Text>
+            <Text style={{ color: theme.textWeak, fontSize: theme.fontMicro }}>这个工具没有返回内容。</Text>
           )}
           {sources.length ? (
             <View style={{ marginTop: 10, gap: 6 }}>
-              <Text style={{ color: theme.textWeak, fontSize: 11, fontWeight: '600' }}>来源</Text>
+              <Text style={{ color: theme.textWeak, fontSize: theme.fontMicro, fontWeight: '600' }}>来源</Text>
               {sources.map(source => (
                 <Pressable
                   key={source.url}
                   onPress={() => void Linking.openURL(source.url).catch(() => {})}
+                  accessibilityRole="link"
                   accessibilityLabel={`打开来源 ${source.title}`}
                   style={({ pressed }) => ({
                     flexDirection: 'row',
@@ -162,10 +170,10 @@ export function ToolCard({
                     borderColor: theme.cardBorder,
                   })}
                 >
-                  <Text numberOfLines={1} style={{ flex: 1, color: theme.textMedium, fontSize: 11 }}>
+                  <Text numberOfLines={1} style={{ flex: 1, color: theme.textMedium, fontSize: theme.fontMicro }}>
                     {source.title}
                   </Text>
-                  <Text numberOfLines={1} style={{ maxWidth: '45%', color: theme.textWeak, fontSize: 10 }}>
+                  <Text numberOfLines={1} style={{ maxWidth: '45%', color: theme.textWeak, fontSize: theme.fontMicro }}>
                     {source.url.replace(/^https?:\/\//, '')}
                   </Text>
                 </Pressable>
@@ -177,13 +185,15 @@ export function ToolCard({
               <Pressable
                 onPress={onRevert}
                 disabled={reverting}
+                accessibilityRole="button"
                 accessibilityLabel="撤销这一步的改动"
                 style={({ pressed }) => ({
                   flexDirection: 'row',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: 6,
+                  minHeight: 34,
                   paddingHorizontal: 12,
-                  paddingVertical: 6,
                   borderRadius: theme.radiusPill,
                   borderWidth: theme.hairline,
                   borderColor: theme.cardBorder,
@@ -192,10 +202,10 @@ export function ToolCard({
                 })}
               >
                 {reverting ? <ActivityIndicator size="small" color={theme.textWeak} /> : null}
-                <Text style={{ color: theme.textMedium, fontSize: 12 }}>撤销这一步</Text>
+                <Text style={{ color: theme.textMedium, fontSize: theme.fontMeta }}>撤销这一步</Text>
               </Pressable>
               {revertNote ? (
-                <Text style={{ flex: 1, color: theme.textWeak, fontSize: 11 }}>{revertNote}</Text>
+                <Text style={{ flex: 1, color: theme.textWeak, fontSize: theme.fontMicro }}>{revertNote}</Text>
               ) : null}
             </View>
           ) : null}

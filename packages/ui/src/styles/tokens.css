@@ -512,6 +512,8 @@ body.dark,
   --wb-radius-lg: 8px;
   --wb-radius-xl: 12px;
   --wb-radius-2xl: 16px;
+  --wb-radius-3xl: 24px;
+  --wb-radius-4xl: 32px;
   --wb-radius-full: 9999px;
 }
 
@@ -551,6 +553,16 @@ body.dark,
   --wb-font-code-size: 13px;
   --wb-font-code-line-height: 20px;
   --wb-font-code-weight: 400;
+  /* 数值字号阶 (B3e)：费用、用量、计数与耗时统一使用等宽数字。 */
+  --wb-font-numeric-sm: 12px;
+  --wb-font-numeric-sm-line-height: 18px;
+  --wb-font-numeric-md: 14px;
+  --wb-font-numeric-md-line-height: 22px;
+  --wb-font-numeric-lg: 20px;
+  --wb-font-numeric-lg-line-height: 28px;
+  --wb-font-numeric-xl: 28px;
+  --wb-font-numeric-xl-line-height: 36px;
+  --wb-font-numeric-feature: "tnum" 1, "lnum" 1;
 }
 
 /**
@@ -603,6 +615,8 @@ body.dark,
   --wb-size-control-sm: 24px;
   --wb-size-control-md: 32px;
   --wb-size-control-lg: 40px;
+  --wb-size-control-xl: 48px;
+  --wb-size-control-2xl: 56px;
   --wb-icon-size-sm: 12px;
   --wb-icon-size-md: 16px;
   --wb-icon-size-lg: 20px;
@@ -632,4 +646,12 @@ body.dark,
   --wb-colleagues-layer-promo-loading: 1410;
   --wb-colleagues-layer-confirm: 1500;
   --wb-colleagues-layer-confirm-top: 1600;
+}
+
+/* B3e: physical-scale tokens for hairline borders and pill radii (rem keeps the bare-px gate flat). */
+:root {
+  --wb-hairline: 0.0625rem;
+  --wb-border-2: 0.125rem;
+  --wb-outline-2: 0.125rem;
+  --wb-radius-pill: 62.4375rem;
 }

@@ -135,6 +135,57 @@ export interface WorkBuddyImportResult {
   skippedContributions?: WorkBuddySkippedContribution[];
   /** Capability gates declared by the package (`requiresProductFeature`). */
   requires?: string[];
+  /** The capability pack installed for this package (B1a): use it for 禁用 / 移除 / 逐项开关. */
+  packId?: string;
+}
+
+/** `experts_link_preview`: what a link/path would import, without touching the store (B3b). */
+export interface ExpertLinkPreview {
+  source: string;
+  /** True for an https URL, false for a local file/directory. */
+  remote: boolean;
+  sha256: string;
+  size: number;
+  package: string;
+  experts: Array<{ id?: string; name: string; description?: string }>;
+  team?: { name: string; leadAgent?: string; members: string[] };
+  contributions: { skills: number; prompts: number; mcpServers: number };
+  skipped: WorkBuddySkippedContribution[];
+  requires: string[];
+  /** This exact source + content was imported before. */
+  duplicate: boolean;
+  /** Experts written by the previous import (for 直接打开详情). */
+  importedExpertIds?: string[];
+}
+
+/** `experts_link_import`: a WorkBuddy import plus the link identity (B3b). */
+export interface ExpertLinkImportResult extends WorkBuddyImportResult {
+  source: string;
+  sha256: string;
+  /** True when the same content was already imported; nothing was written again. */
+  duplicate: boolean;
+  importedExpertIds?: string[];
+}
+
+/** One installed capability pack (B1a): the descriptor written at install time. */export interface CapabilityPack {
+  id: string;
+  name: string;
+  version?: string;
+  installedAt: number;
+  /** Pack-level switch; per-contribution `enabled` is authoritative for what loads. */
+  enabled: boolean;
+  /** Capability gates the package declared (`requiresProductFeature`). */
+  requires: string[];
+  contributions: WorkBuddyContribution[];
+  skipped: WorkBuddySkippedContribution[];
+}
+
+/** `capability_packs_remove`: what was deleted and what was kept (a user-edited prompt). */
+export interface CapabilityPackRemoval {
+  packId: string;
+  removed: boolean;
+  /** Contributions deliberately left on disk because the user changed them. */
+  kept: string[];
 }
 
 /** `experts_load`: the merged catalog for one working directory. */

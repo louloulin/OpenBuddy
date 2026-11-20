@@ -1,0 +1,246 @@
+{
+  "baseUrl": "http://127.0.0.1:55295",
+  "startedAt": "2026-11-19T23:39:39.977Z",
+  "runs": [
+    {
+      "scheme": "light",
+      "screen": "sessions",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "light",
+      "screen": "chat",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "light",
+      "screen": "pending",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "light",
+      "screen": "empty",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "light",
+      "screen": "me",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "light",
+      "screen": "notifications",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "light",
+      "screen": "search",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "light",
+      "screen": "files",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "light",
+      "screen": "library",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "light",
+      "screen": "memory",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "light",
+      "screen": "memory-note",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "light",
+      "screen": "branches",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "light",
+      "screen": "automations",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "light",
+      "screen": "panel",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "light",
+      "screen": "pair",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "light",
+      "screen": "approval",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "light",
+      "screen": "approval-stale",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "dark",
+      "screen": "sessions",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "dark",
+      "screen": "chat",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "dark",
+      "screen": "pending",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "dark",
+      "screen": "empty",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "dark",
+      "screen": "me",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "dark",
+      "screen": "notifications",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "dark",
+      "screen": "search",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "dark",
+      "screen": "files",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "dark",
+      "screen": "library",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "dark",
+      "screen": "memory",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "dark",
+      "screen": "memory-note",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "dark",
+      "screen": "branches",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "dark",
+      "screen": "automations",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "dark",
+      "screen": "panel",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "dark",
+      "screen": "pair",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "dark",
+      "screen": "approval",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    },
+    {
+      "scheme": "dark",
+      "screen": "approval-stale",
+      "ok": true,
+      "missing": [],
+      "errors": []
+    }
+  ],
+  "failures": [],
+  "finishedAt": "2026-11-19T23:40:35.408Z"
+}

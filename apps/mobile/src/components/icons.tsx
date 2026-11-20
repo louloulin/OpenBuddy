@@ -135,6 +135,20 @@ export function CloseIcon({ size = 18, color, strokeWidth = 2 }: IconProps) {
   )
 }
 
+/**
+ * The back affordance. Screens used to render `ChevronRightIcon` rotated 180°
+ * inside a wrapper, which is the same shape but reads as a chevron and cannot
+ * take a style prop; an arrow also matches the platform gesture's direction.
+ */
+export function ArrowLeftIcon({ size = 20, color, strokeWidth = 1.9 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Line x1={20} y1={12} x2={4.5} y2={12} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+      <Polyline points="10.5 5.5 4 12 10.5 18.5" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  )
+}
+
 export function ChevronRightIcon({ size = 18, color, strokeWidth = 1.9 }: IconProps) {
   return (
     <Svg {...base(size)}>

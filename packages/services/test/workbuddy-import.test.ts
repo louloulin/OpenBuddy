@@ -145,6 +145,8 @@ describe("能力包贡献安装 (B1b)", () => {
     const pi = join(tempDir(), "pi");
     const config = { skillPaths: [] as string[], disabledSkills: [] as string[] };
     let registered: Array<{ name: string; config: Record<string, unknown> }> = [];
+    const toggles: Array<[string, boolean]> = [];
+    const mcpState = new Map<string, boolean>();
     const service = new CapabilityPackService(
       pi,
       {
@@ -158,9 +160,14 @@ describe("能力包贡献安装 (B1b)", () => {
         registered = servers;
         return { installed: servers.map((server) => server.name), skipped: [] };
       },
+      (name, enabled) => {
+        toggles.push([name, enabled]);
+        mcpState.set(name, enabled);
+      },
+      (name) => mcpState.get(name) ?? false,
     );
     const result = service.install(readWorkBuddyPackageFrom(pkg));
-    return { pi, config, result, registered: () => registered, service };
+    return { pi, config, result, registered: () => registered, toggles, service };
   };
 
   it("installs skills, prompts and disabled MCP servers with visible skips", () => {
@@ -232,5 +239,70 @@ describe("能力包贡献安装 (B1b)", () => {
 
     const prompts = await new PromptsService({ dir: pi } as never, () => false).list();
     expect(prompts.map((prompt) => prompt.name)).toContain("report");
+  });
+
+  it("persists a descriptor and restores it after a restart (B1a)", () => {
+    const { pi, result, service } = install(richPackage());
+    expect(result.packId).toBe("rich-pack");
+    const descriptor = JSON.parse(readFileSync(join(pi, "capability-packs", "rich-pack", "pack.json"), "utf8"));
+    expect(descriptor).toMatchObject({ schemaVersion: 1, id: "rich-pack", enabled: false, requires: ["EnableDocs"] });
+    // A fresh service reads the same descriptor back.
+    const reloaded = new CapabilityPackService(pi, { read: () => ({ skillPaths: [], disabledSkills: [] }), write: () => {} });
+    expect(reloaded.list()).toEqual(service.list());
+    expect(reloaded.list()[0]).toMatchObject({ id: "rich-pack", name: "rich-pack", requires: ["EnableDocs"] });
+  });
+
+  it("disables and re-enables a whole pack without deleting its files (B1a)", () => {
+    const { pi, config, service, toggles } = install(richPackage());
+
+    service.setEnabled("rich-pack", true);
+    expect(config.disabledSkills).not.toContain("docx");
+    expect(existsSync(join(pi, "prompts", "report.md"))).toBe(true);
+    expect(service.list()[0]).toMatchObject({ enabled: true });
+    expect(service.list()[0]!.contributions).toEqual(expect.arrayContaining([
+      { kind: "skill", name: "docx", enabled: true },
+      { kind: "prompt", name: "report", enabled: true },
+      { kind: "mcp", name: "calendar", enabled: false },
+    ]));
+    // MCP stays opt-in even when the pack is enabled.
+    expect(toggles).toEqual([]);
+
+    service.setEnabled("rich-pack", false);
+    expect(config.disabledSkills).toContain("docx");
+    expect(existsSync(join(pi, "prompts", "report.md"))).toBe(false);
+    expect(existsSync(join(pi, "prompts", "report.md.disabled"))).toBe(true);
+    expect(toggles.at(-1)).toEqual(["calendar", false]);
+    expect(service.list()[0]!.enabled).toBe(false);
+  });
+
+  it("toggles one contribution at a time (B1a)", () => {
+    const { pi, config, service } = install(richPackage());
+    service.setContribution("rich-pack", "skill", "docx", true);
+    expect(config.disabledSkills).not.toContain("docx");
+    expect(service.list()[0]!.contributions.find((item) => item.name === "docx")).toMatchObject({ enabled: true });
+
+    service.setContribution("rich-pack", "prompt", "report", false);
+    expect(existsSync(join(pi, "prompts", "report.md.disabled"))).toBe(true);
+    expect(service.list()[0]!.contributions.find((item) => item.name === "report")).toMatchObject({ enabled: false });
+
+    expect(() => service.setContribution("rich-pack", "skill", "nope", true)).toThrow(/capability_contribution_not_found/);
+    expect(() => service.setEnabled("missing", true)).toThrow(/capability_pack_not_found/);
+  });
+
+  it("rolls back to the pre-install state and keeps a prompt the user rewrote (B1a)", () => {
+    const { pi, config, service } = install(richPackage());
+    const removal = service.remove("rich-pack");
+    expect(removal).toEqual({ packId: "rich-pack", removed: true, kept: [] });
+    expect(service.list()).toEqual([]);
+    expect(config.skillPaths).not.toContain(join(pi, "capability-packs", "rich-pack", "skills"));
+    expect(config.disabledSkills).not.toContain("docx");
+    expect(existsSync(join(pi, "prompts", "report.md"))).toBe(false);
+    expect(existsSync(join(pi, "capability-packs", "rich-pack"))).toBe(false);
+
+    const second = install(richPackage());
+    writeFileSync(join(second.pi, "prompts", "report.md"), "用户自己的版本\n");
+    const kept = second.service.remove("rich-pack");
+    expect(kept.kept).toEqual(["prompt:report"]);
+    expect(readFileSync(join(second.pi, "prompts", "report.md"), "utf8")).toBe("用户自己的版本\n");
   });
 });

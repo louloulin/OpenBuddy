@@ -30,6 +30,7 @@ import {
 import { canRun } from '../../src/core/surface'
 import { isPreview, previewState } from '../../src/core/preview'
 import { useApp } from '../../src/stores/app'
+import { PageHeader } from '../../src/components/PageHeader'
 import { themeFor } from '../../src/theme'
 
 export default function AutomationsScreen() {
@@ -174,9 +175,12 @@ export default function AutomationsScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: theme.surface }}
-      contentContainerStyle={{ padding: 12, paddingBottom: 24 + insets.bottom, gap: 8 }}
+      contentContainerStyle={{ paddingHorizontal: theme.gutter, paddingBottom: 24 + insets.bottom, gap: 8 }}
       refreshControl={<RefreshControl refreshing={refreshing} tintColor={theme.textMedium} onRefresh={() => void refresh()} />}
     >
+      <View style={{ marginHorizontal: -theme.gutter }}>
+        <PageHeader title="自动化" />
+      </View>
       {error ? (
         <View style={{ backgroundColor: theme.card, borderRadius: 12, borderWidth: theme.hairline, borderColor: theme.cardBorder, padding: 12 }}>
           <Text style={{ color: theme.danger, fontSize: 13 }}>{error}</Text>
@@ -214,12 +218,9 @@ export default function AutomationsScreen() {
       {items.length === 0 && !refreshing ? (
         <View style={{ padding: 32, alignItems: 'center', gap: 10 }}>
           <ClockIcon size={26} color={theme.textWeak} />
-          <Text style={{ color: theme.textWeak, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
+          <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta, textAlign: 'center', lineHeight: 20 }}>
             电脑上没有定时任务。{'\n'}在桌面端设置一个，它会出现在这里。
           </Text>
-          <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
-            <Text style={{ color: theme.text, fontSize: 13 }}>返回</Text>
-          </Pressable>
         </View>
       ) : null}
 
@@ -310,7 +311,7 @@ export default function AutomationsScreen() {
       <Modal visible={draft !== null} transparent animationType="fade" onRequestClose={() => setDraft(null)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: 'rgba(0,0,0,0.35)' }}
+          style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: theme.scrim }}
         >
           <View style={{
             backgroundColor: theme.card,

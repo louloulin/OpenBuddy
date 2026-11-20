@@ -12,13 +12,20 @@ import { Alert, Pressable, ScrollView, Text, View, useColorScheme } from 'react-
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 
-import { ChevronRightIcon, SparkIcon } from '../../src/components/icons'
+import { SparkIcon } from '../../src/components/icons'
+import { Row as SharedRow, Section as SharedSection } from '../../src/components/SettingsList'
+import { PageHeader } from '../../src/components/PageHeader'
 import { canRun, unavailableReason } from '../../src/core/surface'
 import { useApp } from '../../src/stores/app'
 import { clearPairing } from '../../src/transport'
 import { pushAvailability, type PushAvailability } from '../../src/native/notifications'
 import { clearCache } from '../../src/db/cache'
 import { themeFor, type Theme } from '../../src/theme'
+
+const Section = (props: { theme: Theme; label: string; children: React.ReactNode }) => (
+  <SharedSection label={props.label}>{props.children}</SharedSection>
+)
+const Row = SharedRow
 
 const PUSH_LABEL: Record<PushAvailability, string> = {
   ready: '已开启',
@@ -34,61 +41,6 @@ const PUSH_HINT: Record<PushAvailability, string> = {
   simulator: '模拟器和浏览器收不到推送；真机安装后自动登记。',
   unconfigured: '这个构建没有填 EAS 项目 id，无法生成推送 token。',
   unsupported: '当前环境不支持推送；审批仍会出现在通知页。',
-}
-
-function Section({ theme, label, children }: { theme: Theme; label: string; children: React.ReactNode }) {
-  return (
-    <View style={{ marginBottom: 22 }}>
-      <Text style={{ color: theme.textWeak, fontSize: 12, fontWeight: '600', marginBottom: 8, marginLeft: 4 }}>
-        {label}
-      </Text>
-      <View
-        style={{
-          backgroundColor: theme.card,
-          borderRadius: 14,
-          borderWidth: theme.hairline,
-          borderColor: theme.cardBorder,
-          overflow: 'hidden',
-        }}
-      >
-        {children}
-      </View>
-    </View>
-  )
-}
-
-function Row({
-  theme, label, value, onPress, last = false, danger = false,
-}: {
-  theme: Theme
-  label: string
-  value?: string
-  onPress?: () => void
-  last?: boolean
-  danger?: boolean
-}) {
-  const content = (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        paddingHorizontal: 14,
-        minHeight: 48,
-        borderBottomWidth: last ? 0 : theme.hairline,
-        borderBottomColor: theme.cardBorder,
-      }}
-    >
-      <Text style={{ flex: 1, color: danger ? theme.danger : theme.text, fontSize: 14, fontWeight: danger ? '600' : '400' }}>
-        {label}
-      </Text>
-      {value ? (
-        <Text numberOfLines={1} style={{ maxWidth: '55%', color: theme.textWeak, fontSize: 13 }}>{value}</Text>
-      ) : null}
-      {onPress && !danger ? <ChevronRightIcon size={15} color={theme.textWeak} /> : null}
-    </View>
-  )
-  return onPress ? <Pressable onPress={onPress}>{content}</Pressable> : content
 }
 
 export default function MeScreen() {
@@ -154,24 +106,25 @@ export default function MeScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: theme.surface }}
-      contentContainerStyle={{ padding: 16, paddingTop: 12, paddingBottom: 24 + insets.bottom }}
+      contentContainerStyle={{ paddingHorizontal: theme.gutter, paddingBottom: 24 + insets.bottom }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24, paddingHorizontal: 2 }}>
+      <PageHeader title="我" />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 22, paddingHorizontal: 2 }}>
         <View
           style={{
-            width: 46,
-            height: 46,
-            borderRadius: 23,
+            width: 44,
+            height: 44,
+            borderRadius: 22,
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: theme.ink,
           }}
         >
-          <SparkIcon size={22} color={theme.inkFg} />
+          <SparkIcon size={21} color={theme.inkFg} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>OpenBuddy</Text>
-          <Text style={{ color: theme.textWeak, fontSize: 12, marginTop: 2 }}>
+          <Text style={{ color: theme.text, fontSize: theme.fontHeading, fontWeight: '700' }}>OpenBuddy</Text>
+          <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta, marginTop: 2 }}>
             {pairing ? `${pairing.deviceName} · ${statusText}` : '未连接电脑'}
           </Text>
         </View>

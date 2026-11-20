@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   startMcpSignIn,
   completeMcpSignIn,
@@ -12,6 +12,7 @@ import {
 import type { McpExtensionOptions } from "@earendil-works/pi-coding-agent";
 import type { Settings } from "../settings/settings.js";
 import type { Emit } from "@openbuddy/kernel";
+import { AuthAttemptStore, type AuthAttemptInfo } from "./auth-attempts.js";
 
 /** Implements the SDK credential operations, with every state byte encrypted by safeStorage. */
 export class EncryptedMcpCredentials {
@@ -96,6 +97,8 @@ export class McpAuthService {
       done: Promise<{ status: string; error?: string }>;
     }
   >();
+  /** 授权尝试 (B3a): id + expiry + cancel, mirrored to the UI via `agent://mcp-auth`. */
+  readonly attempts: AuthAttemptStore;
   constructor(
     private settings: Settings,
     private openUrl: (url: string) => Promise<void>,
@@ -103,16 +106,18 @@ export class McpAuthService {
     private timeoutMs = 120000,
   ) {
     this.credentials = new EncryptedMcpCredentials(settings);
+    this.attempts = new AuthAttemptStore(Date.now, (info) => this.emit("agent://mcp-auth", info), timeoutMs);
   }
   status(name: string, url: string) {
     return this.credentials.status(name, url);
   }
-  trigger(
+  /** Start a sign-in without waiting; the attempt id is the UI's handle for countdown / cancel. */
+  begin(
     sessionId: string,
     name: string,
     url: string,
     oauth: McpOAuthSettings = {},
-  ): Promise<{ status: string; error?: string }> {
+  ): AuthAttemptInfo {
     const endpoint = new URL(url);
     if (
       endpoint.protocol !== "https:" &&
@@ -124,19 +129,44 @@ export class McpAuthService {
       throw Error("OAuth requires HTTPS except on loopback");
     if (this.pending.has(name)) throw Error("该 MCP 服务已有认证请求");
     const controller = new AbortController();
-    const pending = {
+    const attempt = this.attempts.start({
+      id: randomUUID(),
       sessionId,
+      serverName: name,
       controller,
-      done: Promise.resolve({ status: "pending" } as {
-        status: string;
-        error?: string;
-      }),
-    };
-    this.pending.set(name, pending);
-    pending.done = this.signIn(name, url, oauth, controller).finally(() =>
-      this.pending.delete(name),
-    );
-    return pending.done;
+      ttlMs: this.timeoutMs,
+    });
+    const done = this.signIn(name, url, oauth, controller)
+      .then((result) => {
+        if (this.attempts.get(attempt.id)?.status === "pending") {
+          if (result.status === "authenticated") this.attempts.settle(attempt.id, "authorized");
+          else if (result.status === "failed") this.attempts.settle(attempt.id, "failed", result.error);
+          // The store's timer aborts with "timeout"; anything else is a user/session cancel.
+          else this.attempts.settle(attempt.id, controller.signal.reason === "timeout" ? "expired" : "cancelled");
+        }
+        return result;
+      })
+      .finally(() => this.pending.delete(name));
+    this.pending.set(name, { sessionId, controller, done });
+    return attempt;
+  }
+  trigger(
+    sessionId: string,
+    name: string,
+    url: string,
+    oauth: McpOAuthSettings = {},
+  ): Promise<{ status: string; error?: string }> {
+    const attempt = this.begin(sessionId, name, url, oauth);
+    return this.pending.get(name)?.done ?? Promise.resolve({ status: "cancelled" });
+  }
+  attempt(id: string) {
+    return this.attempts.get(id);
+  }
+  attemptsFor(sessionId?: string) {
+    return this.attempts.list(sessionId);
+  }
+  cancelAttempt(id: string) {
+    return this.attempts.cancel(id);
   }
   private async signIn(
     name: string,
@@ -144,8 +174,6 @@ export class McpAuthService {
     oauth: McpOAuthSettings,
     controller: AbortController,
   ) {
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-    timer.unref?.();
     const signal = controller.signal,
       store = this.credentials.forServer(name, url);
     let callback:
@@ -198,7 +226,6 @@ export class McpAuthService {
         ),
       };
     } finally {
-      clearTimeout(timer);
       try {
         await callback?.close();
       } finally {
@@ -209,7 +236,7 @@ export class McpAuthService {
   cancel(sessionId?: string) {
     for (const pending of this.pending.values())
       if (!sessionId || pending.sessionId === sessionId)
-        pending.controller.abort();
+        pending.controller.abort("cancelled");
   }
   async settle() {
     await Promise.all([...this.pending.values()].map((p) => p.done));

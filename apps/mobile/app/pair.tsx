@@ -13,7 +13,8 @@ import { CameraView, useCameraPermissions } from 'expo-camera'
 import { useRouter } from 'expo-router'
 
 import { isPairCode, normalizeGatewayUrl, parsePairQr, type PairPayload } from '../src/core/pairing'
-import { GlobeIcon, SparkIcon } from '../src/components/icons'
+import { problemText } from '../src/core/problem'
+import { CloseIcon, GlobeIcon, SparkIcon } from '../src/components/icons'
 import { useApp } from '../src/stores/app'
 import { themeFor } from '../src/theme'
 
@@ -28,6 +29,12 @@ export default function PairScreen() {
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Why we are here: a revoked device is dumped back to this screen by the
+  // store, which records the reason in `state.error`. The screen's own error
+  // wins while the user is retrying.
+  const storeError = useApp(state => state.error)
+  const dismissError = useApp(state => state.dismissError)
+  const notice = error ?? storeError
 
   const finish = useCallback(async (payload: PairPayload) => {
     setBusy(true)
@@ -36,7 +43,10 @@ export default function PairScreen() {
       await pair(payload, '我的手机')
       router.replace('/')
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure))
+      // `pair()` reaches the network twice (claim, then the event stream). A
+      // dead gateway surfaces as the browser's 「Failed to fetch」; translate it
+      // here, at the boundary, instead of rendering English on a Chinese screen.
+      setError(problemText(failure))
     } finally {
       setBusy(false)
       setScanning(false)
@@ -81,10 +91,10 @@ export default function PairScreen() {
             borderRadius: 17,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: theme.scheme === 'dark' ? theme.card : '#333333',
+            backgroundColor: theme.ink,
           }}
         >
-          <SparkIcon size={18} color={theme.scheme === 'dark' ? theme.text : '#ffffff'} />
+          <SparkIcon size={18} color={theme.inkFg} />
         </View>
         <Text style={{ color: theme.text, fontSize: 21, fontWeight: '700' }}>连接你的电脑</Text>
       </View>
@@ -175,9 +185,37 @@ export default function PairScreen() {
         style={{ ...inputStyle, letterSpacing: 6, fontFamily: theme.mono, marginBottom: 16 }}
       />
 
-      {error ? (
-        <View style={{ backgroundColor: theme.card, borderRadius: 12, borderWidth: theme.hairline, borderColor: theme.cardBorder, padding: 12, marginBottom: 14 }}>
-          <Text style={{ color: theme.danger, fontSize: 13 }}>{error}</Text>
+      {notice ? (
+        // An error line, not a card: a bordered box between two inputs read like
+        // a third field. A tone-tinted strip with a danger edge says "this went
+        // wrong" without competing with the form.
+        <View
+          accessibilityLiveRegion="assertive"
+          accessibilityRole="alert"
+          style={{
+            flexDirection: 'row',
+            gap: 8,
+            alignItems: 'flex-start',
+            backgroundColor: 'rgba(229, 72, 77, 0.08)',
+            borderLeftWidth: 3,
+            borderLeftColor: theme.danger,
+            borderRadius: theme.radiusSmall,
+            paddingVertical: 9,
+            paddingHorizontal: 10,
+            marginBottom: 14,
+          }}
+        >
+          <Text style={{ flex: 1, color: theme.danger, fontSize: theme.fontMeta, lineHeight: 20 }}>{notice}</Text>
+          {!error && storeError ? (
+            <Pressable
+              onPress={dismissError}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="关闭提示"
+            >
+              <CloseIcon size={14} color={theme.textWeak} />
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 

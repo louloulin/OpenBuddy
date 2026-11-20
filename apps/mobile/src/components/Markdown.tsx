@@ -6,13 +6,13 @@
  * phone equivalent of the desktop's `<pre>` with a copy button.
  */
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Linking, Pressable, ScrollView, Text, View, useColorScheme } from 'react-native'
+import * as Clipboard from 'expo-clipboard'
 
 import { parseBlocks, type Block, type Inline } from '../core/markdown'
 import { themeFor, type Theme } from '../theme'
-import { CopyIcon } from './icons'
-import { CopyableText } from './CopyableText'
+import { CheckIcon, CopyIcon } from './icons'
 
 function InlineText({ inlines, theme, base }: { inlines: Inline[]; theme: Theme; base: object }) {
   return (
@@ -46,6 +46,7 @@ function InlineText({ inlines, theme, base }: { inlines: Inline[]; theme: Theme;
           return (
             <Text
               key={index}
+              accessibilityRole="link"
               style={[base, { color: theme.accent }]}
               onPress={() => { void Linking.openURL(inline.href).catch(() => {}) }}
             >
@@ -60,14 +61,27 @@ function InlineText({ inlines, theme, base }: { inlines: Inline[]; theme: Theme;
 }
 
 function CodeBlock({ block, theme }: { block: Extract<Block, { kind: 'code' }>; theme: Theme }) {
+  // The copy icon is the only affordance in the header, so it must respond to a
+  // tap. It used to sit inside `CopyableText`, which only listens for a long
+  // press — the button looked live and did nothing.
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    try {
+      await Clipboard.setStringAsync(block.text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1400)
+    } catch {
+      // No clipboard (rare on web): the code is still selectable.
+    }
+  }
   return (
     <View
       style={{
         marginVertical: 8,
-        backgroundColor: theme.card,
-        borderRadius: 12,
+        backgroundColor: theme.scheme === 'dark' ? '#1c1c1c' : theme.card,
+        borderRadius: theme.radiusSmall,
         borderWidth: theme.hairline,
-        borderColor: theme.cardBorder,
+        borderColor: theme.scheme === 'dark' ? 'rgba(255, 255, 255, 0.14)' : theme.cardBorder,
         overflow: 'hidden',
       }}
     >
@@ -81,17 +95,26 @@ function CodeBlock({ block, theme }: { block: Extract<Block, { kind: 'code' }>; 
           paddingTop: 6,
         }}
       >
-        <Text style={{ color: theme.textWeak, fontSize: 11 }}>{block.language ?? 'code'}</Text>
-        <CopyableText text={block.text}>
-          <Pressable hitSlop={8} style={({ pressed }) => ({ padding: 6, opacity: pressed ? 0.6 : 1 })}>
-            <CopyIcon size={13} color={theme.textWeak} />
-          </Pressable>
-        </CopyableText>
+        <Text style={{ color: theme.textWeak, fontSize: theme.fontMicro }}>{block.language ?? 'code'}</Text>
+        <Pressable
+          onPress={() => void copy()}
+          hitSlop={10}
+          accessibilityRole="button"
+          // The label stays constant: swapping it after a press changes the
+          // accessible name mid-interaction, which breaks hit-testing (and is
+          // announced twice). The state rides in `accessibilityState`.
+          accessibilityLabel="复制代码"
+          accessibilityState={{ selected: copied }}
+          style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, opacity: pressed ? 0.6 : 1 })}
+        >
+          {copied ? <CheckIcon size={13} color={theme.ok} /> : <CopyIcon size={13} color={theme.textMedium} />}
+          {copied ? <Text style={{ color: theme.textWeak, fontSize: theme.fontMicro }}>已复制</Text> : null}
+        </Pressable>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 12 }}>
         <Text
           selectable
-          style={{ fontFamily: theme.mono, fontSize: 12.5, lineHeight: 19, color: theme.text }}
+          style={{ fontFamily: theme.mono, fontSize: theme.fontMeta, lineHeight: 19, color: theme.text }}
         >
           {block.text}
         </Text>
@@ -110,7 +133,7 @@ export function Markdown({ source }: { source: string }) {
       {blocks.map((block, index) => {
         switch (block.kind) {
           case 'heading': {
-            const size = block.level === 1 ? 19 : block.level === 2 ? 17 : 16
+            const size = block.level === 1 ? theme.fontHeading + 2 : block.level === 2 ? theme.fontHeading : theme.fontBody + 1
             return (
               <Text
                 key={index}

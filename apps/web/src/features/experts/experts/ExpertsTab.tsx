@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { open as openDialog } from "@openbuddy/client/ipc";
 import { SearchIcon, MyExpertIcon, SparklesIcon, FolderOpenIcon, RefreshCwIcon } from "@openbuddy/ui/icon/icons/index";
 import { agentsDelete, agentsGet, agentsList, expertsImportWorkbuddy, expertsLinkAgents, expertsLoad, expertsSetRoots } from "@openbuddy/client/agent-client";
-import type { ExpertCenterCatalog, ExpertDraft, ExpertEntry, ExpertSceneInfo } from "@openbuddy/protocol/experts";
+import type { ExpertCenterCatalog, ExpertDraft, ExpertEntry, ExpertLinkImportResult, ExpertSceneInfo } from "@openbuddy/protocol/experts";
 import { appConfirm } from "../../../shared/ui/AppDialog";
 import { FEATURED_SCENES } from "../data/featured-scenes";
 import { Chip } from "../shared/ui";
@@ -14,6 +14,7 @@ import { ExpertSources } from "./ExpertSources";
 import { FeaturedScenes } from "./FeaturedScenes";
 import { TeamCards } from "./TeamCards";
 import { MyExperts } from "./MyExperts";
+import { LinkImportModal } from "./LinkImportModal";
 import { draftOf, emptyDraft, errorText, matches, toPending } from "./expert-model";
 import "./experts.css";
 
@@ -57,6 +58,7 @@ export function ExpertsTab({ pills, onGoHome, onToast, views = { center: true, m
   const [detail, setDetail] = useState<ExpertEntry | null>(null);
   const [editing, setEditing] = useState<ExpertDraft | null>(null);
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const setPending = usePendingExpertStore((s) => s.set);
 
@@ -129,7 +131,6 @@ export function ExpertsTab({ pills, onGoHome, onToast, views = { center: true, m
       return (Array.isArray(sel) ? sel[0] : sel) || undefined;
     } catch { return undefined; }
   };
-  /** WorkBuddy 兼容 (S18): pick its exported .zip and convert every agent into 我的专家. */
   const importWorkbuddy = useCallback(async () => {
     if (importing) return;
     try {
@@ -157,6 +158,16 @@ export function ExpertsTab({ pills, onGoHome, onToast, views = { center: true, m
     finally { setImporting(false); }
   }, [importing, onToast, reload]);
 
+  /** 专家链接 (B3b): a duplicate opens the expert imported the first time. */
+  const linkImported = useCallback(async (result: ExpertLinkImportResult) => {
+    setView("my");
+    reload();
+    const first = result.imported[0];
+    const id = first?.id ?? result.importedExpertIds?.[0];
+    if (!id) return;
+    setDetail(first ?? (await agentsGet(id).catch(() => null)));
+  }, [reload]);
+
   const overlays = (
     <>
       {detail && (
@@ -170,6 +181,7 @@ export function ExpertsTab({ pills, onGoHome, onToast, views = { center: true, m
       {sourcesOpen && catalog && (
         <ExpertSources catalog={catalog} onPickDir={pickDir} onChanged={reload} onClose={() => setSourcesOpen(false)} onToast={onToast} />
       )}
+      {linkOpen && <LinkImportModal onClose={() => setLinkOpen(false)} onImported={(result) => void linkImported(result)} onToast={onToast} />}
     </>
   );
 
@@ -178,6 +190,7 @@ export function ExpertsTab({ pills, onGoHome, onToast, views = { center: true, m
       <>
         <MyExperts experts={mine} categories={categories} loading={mineLoading} userDir={catalog?.userDir}
           importing={importing} onImportWorkbuddy={importWorkbuddy}
+          onImportLink={() => setLinkOpen(true)}
           onBack={() => setView("center")} onCreate={() => setEditing(emptyDraft())} onOpen={setDetail}
           onSummon={(e) => summon(e)} onEdit={edit} onDuplicate={duplicate} onDelete={remove} />
         {overlays}

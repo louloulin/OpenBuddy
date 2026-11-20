@@ -11,6 +11,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View, u
 import { useRouter } from 'expo-router'
 
 import { BellIcon } from '../../src/components/icons'
+import { PageHeader } from '../../src/components/PageHeader'
 import { relativeTime } from '../../src/core/relative-time'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
@@ -44,44 +45,58 @@ export default function NotificationsScreen() {
 
   if (!loaded && notifications.length === 0) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface }}>
-        <ActivityIndicator color={theme.textWeak} />
+      <View style={{ flex: 1, backgroundColor: theme.surface }}>
+        <PageHeader title="通知" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={theme.textWeak} />
+        </View>
       </View>
     )
   }
 
   if (notifications.length === 0) {
     return (
-      <View style={{ flex: 1, backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 }}>
-        <View
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 28,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: theme.card,
-            borderWidth: theme.hairline,
-            borderColor: theme.cardBorder,
-          }}
-        >
-          <BellIcon size={26} color={theme.textWeak} />
+      <View style={{ flex: 1, backgroundColor: theme.surface }}>
+        <PageHeader title="通知" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 }}>
+          <View
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: theme.card,
+              borderWidth: theme.hairline,
+              borderColor: theme.cardBorder,
+            }}
+          >
+            <BellIcon size={26} color={theme.textWeak} />
+          </View>
+          <Text style={{ color: theme.text, fontSize: theme.fontHeading, fontWeight: '600' }}>没有新通知</Text>
+          <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta, textAlign: 'center', lineHeight: 20 }}>
+            只有会话需要你时才会打扰你。{'\n'}审批、提问和完成会出现在这里。
+          </Text>
         </View>
-        <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600' }}>没有新通知</Text>
-        <Text style={{ color: theme.textWeak, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
-          只有会话需要你时才会打扰你。{'\n'}审批、提问和完成会出现在这里。
-        </Text>
       </View>
     )
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.surface }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: theme.gutter, paddingVertical: 10 }}>
-        <Pressable onPress={() => void markRead()} hitSlop={8} accessibilityLabel="全部标为已读">
-          <Text style={{ color: theme.textMedium, fontSize: 12 }}>全部标为已读</Text>
-        </Pressable>
-      </View>
+      <PageHeader
+        title="通知"
+        trailing={(
+          <Pressable
+            onPress={() => void markRead()}
+            accessibilityRole="button"
+            accessibilityLabel="全部标为已读"
+            style={({ pressed }) => ({ minHeight: 34, justifyContent: 'center', opacity: pressed ? 0.5 : 1 })}
+          >
+            <Text style={{ color: theme.textMedium, fontSize: theme.fontMeta, fontWeight: '600' }}>全部标为已读</Text>
+          </Pressable>
+        )}
+      />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 16 }}
@@ -102,29 +117,29 @@ export default function NotificationsScreen() {
               }
             }}
             style={({ pressed }) => ({
-              marginHorizontal: 12,
+              marginHorizontal: theme.gutter,
               marginBottom: 8,
               backgroundColor: pressed ? theme.hover : theme.card,
-              borderRadius: 14,
+              borderRadius: theme.radiusTile,
               borderWidth: theme.hairline,
               borderColor: theme.cardBorder,
-              padding: 14,
+              padding: theme.pad,
               gap: 5,
               opacity: item.read ? 0.62 : 1,
             })}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={{ color: theme.textWeak, fontSize: 11, fontWeight: '600', letterSpacing: 0.3 }}>
+              <Text style={{ color: theme.textWeak, fontSize: theme.fontMicro, fontWeight: '600', letterSpacing: 0.3 }}>
                 {LABEL[item.kind] ?? item.kind}
               </Text>
               <View style={{ flex: 1 }} />
-              <Text style={{ color: theme.textWeak, fontSize: 11 }}>{relativeTime(item.at)}</Text>
+              <Text style={{ color: theme.textWeak, fontSize: theme.fontMicro }}>{relativeTime(item.at)}</Text>
               {/* The dot marks the row, not the label — keep it on the card edge. */}
               {!item.read ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.ink }} /> : null}
             </View>
-            <Text numberOfLines={1} style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>{item.title}</Text>
+            <Text numberOfLines={1} style={{ color: theme.text, fontSize: theme.fontBody, fontWeight: '600' }}>{item.title}</Text>
             {item.body ? (
-              <Text numberOfLines={2} style={{ color: theme.textWeak, fontSize: 13, lineHeight: 19 }}>{item.body}</Text>
+              <Text numberOfLines={2} style={{ color: theme.textWeak, fontSize: theme.fontMeta, lineHeight: 19 }}>{item.body}</Text>
             ) : null}
           </Pressable>
         ))}

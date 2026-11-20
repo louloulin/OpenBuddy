@@ -141,9 +141,13 @@ export class AutomationService {
       scheduleType: "recurring",
       schedule: { freq: "DAILY", interval: 1, byday: [], bymonthday: [], bymonth: [], byhour: 9, byminute: 0, intervalHours: 1 },
       pushToWeChat: false,
+      revision: 0,
       createdAt: now.toISOString(),
     };
     const merged: Automation = { ...base, ...input, id: base.id, createdAt: base.createdAt };
+    // 修订语义 (B3c): every save is a new revision. A running executor keeps the object it
+    // started with, so an edit can never rewrite the prompt/cwd of an in-flight run.
+    merged.revision = (existing?.revision ?? 0) + 1;
     merged.name = text(merged.name, "name").slice(0, 120);
     merged.prompt = text(merged.prompt, "prompt");
     if (!merged.cwds.trim()) throw Error("invalid_payload: cwds");
@@ -193,19 +197,24 @@ export class AutomationService {
     task.nextRunAt = task.status === "ACTIVE" ? nextRunAt(task, at) : undefined;
     this.tasks.write(file);
   }
-  startRecord(automation: Automation, at = new Date()): AutomationRunRecord {
+  startRecord(automation: Automation, at = new Date(), extra: Partial<AutomationRunRecord> = {}): AutomationRunRecord {
     const record: AutomationRunRecord = {
       id: `run-${at.getTime().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
       automationId: automation.id,
       automationName: automation.name,
       status: "running",
       startedAt: at.toISOString(),
+      automationRevision: automation.revision ?? 1,
       archived: false,
+      ...extra,
     };
     const file = this.history.read();
     file.records.unshift(record);
     this.history.write(file);
     return record;
+  }
+  record(id: string): AutomationRunRecord | undefined {
+    return this.history.read().records.find((entry) => entry.id === id);
   }
   finishRecord(id: string, patch: Partial<AutomationRunRecord>) {
     const file = this.history.read();
@@ -238,9 +247,10 @@ export class AutomationService {
         this.finishRecord(record.id, {
           status: result.ok ? "success" : "failed",
           ...(result.sessionId ? { sessionId: result.sessionId } : {}),
+          ...(result.error ? { error: result.error } : {}),
         });
       } catch (error) {
-        this.finishRecord(record.id, { status: "failed", error: String(error) });
+        this.finishRecord(record.id, { status: "failed", error: error instanceof Error ? error.message : String(error) });
       }
     }
     return tasks.length;

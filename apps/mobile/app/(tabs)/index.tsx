@@ -31,7 +31,7 @@ import { themeFor } from '../../src/theme'
 import { relativeTime } from '../../src/core/relative-time'
 import type { CachedSession } from '../../src/db/cache'
 
-const SHEET_BACKDROP = { position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }
+const SHEET_BACKDROP = (scrim: string) => ({ position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: scrim })
 
 export default function SessionsScreen() {
   const theme = themeFor(useColorScheme())
@@ -282,17 +282,17 @@ export default function SessionsScreen() {
             {isSelected ? <CheckIcon size={12} color={theme.inkFg} strokeWidth={2.6} /> : null}
           </View>
         ) : null}
-        <Text numberOfLines={1} style={{ flex: 1, color: theme.text, fontSize: 15, fontWeight: '500' }}>
+        <Text numberOfLines={1} style={{ flex: 1, color: theme.text, fontSize: theme.fontBody, fontWeight: '500' }}>
           {session.title}
         </Text>
         {session.pinned ? (
           <View style={{ backgroundColor: theme.pressed, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 }}>
-            <Text style={{ color: theme.textMedium, fontSize: 10 }}>置顶</Text>
+            <Text style={{ color: theme.textMedium, fontSize: theme.fontMicro }}>置顶</Text>
           </View>
         ) : null}
         {session.archived ? (
           <View style={{ backgroundColor: theme.pressed, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 }}>
-            <Text style={{ color: theme.textWeak, fontSize: 10 }}>归档</Text>
+            <Text style={{ color: theme.textWeak, fontSize: theme.fontMicro }}>归档</Text>
           </View>
         ) : null}
         {session.unread > 0 ? (
@@ -305,13 +305,13 @@ export default function SessionsScreen() {
             justifyContent: 'center',
             backgroundColor: theme.ink,
           }}>
-            <Text style={{ color: theme.inkFg, fontSize: 10, fontWeight: '700' }}>{unreadLabel(session.unread)}</Text>
+            <Text style={{ color: theme.inkFg, fontSize: theme.fontMicro, fontWeight: '700' }}>{unreadLabel(session.unread)}</Text>
           </View>
         ) : null}
-        <Text style={{ color: theme.textWeak, fontSize: 11 }}>{relativeTime(session.updatedAt)}</Text>
+        <Text style={{ color: theme.textWeak, fontSize: theme.fontMicro }}>{relativeTime(session.updatedAt)}</Text>
       </View>
       {session.preview ? (
-        <Text numberOfLines={1} style={{ color: theme.textWeak, fontSize: 13, marginTop: 3 }}>
+        <Text numberOfLines={1} style={{ color: theme.textWeak, fontSize: theme.fontMeta, marginTop: 3 }}>
           {session.preview}
         </Text>
       ) : null}
@@ -322,16 +322,30 @@ export default function SessionsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.surface }}>
       <View style={{
-        paddingTop: insets.top + 10,
+        paddingTop: insets.top + 12,
         paddingHorizontal: theme.gutter,
-        paddingBottom: 2,
+        paddingBottom: 4,
         flexDirection: 'row',
-        alignItems: 'flex-end',
+        alignItems: 'center',
+        gap: 10,
       }}>
-        <Text style={{ color: theme.text, fontSize: 28, fontWeight: '700', letterSpacing: -0.5 }}>会话</Text>
-        <Text style={{ marginLeft: 'auto', marginBottom: 4, color: theme.textWeak, fontSize: 12 }}>
-          {connection === 'open' ? '电脑在线' : connection === 'connecting' ? '连接中' : '已断开'}
-        </Text>
+        <Text style={{ color: theme.text, fontSize: theme.fontTitle, fontWeight: '700', letterSpacing: -0.6 }}>会话</Text>
+        {/* Connection state is a dot + word: a bare 「电脑在线」 in the title row
+            competed with 「选择」 for the same corner. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <View
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: connection === 'open' ? theme.ok : connection === 'connecting' ? theme.warning : theme.danger,
+            }}
+          />
+          <Text style={{ color: theme.textWeak, fontSize: theme.fontMicro }}>
+            {connection === 'open' ? '在线' : connection === 'connecting' ? '连接中' : '已断开'}
+          </Text>
+        </View>
+        <View style={{ flex: 1 }} />
         {canArchiveBatch || canDeleteBatch ? (
           <Pressable
             onPress={() => {
@@ -339,10 +353,16 @@ export default function SessionsScreen() {
               setSelected([])
               setBatchNote(null)
             }}
-            hitSlop={10}
-            style={{ marginLeft: 12, marginBottom: 2 }}
+            accessibilityRole="button"
+            accessibilityLabel={selectMode ? '取消选择' : '选择会话'}
+            style={({ pressed }) => ({
+              minHeight: 34,
+              justifyContent: 'center',
+              paddingHorizontal: 4,
+              opacity: pressed ? 0.5 : 1,
+            })}
           >
-            <Text style={{ color: theme.textMedium, fontSize: 13, fontWeight: '600' }}>
+            <Text style={{ color: theme.textMedium, fontSize: theme.fontMeta, fontWeight: '600' }}>
               {selectMode ? '取消' : '选择'}
             </Text>
           </Pressable>
@@ -358,10 +378,10 @@ export default function SessionsScreen() {
             alignItems: 'center',
             gap: 8,
             marginHorizontal: theme.gutter,
-            marginTop: 10,
+            marginTop: 8,
             marginBottom: 4,
-            height: 44,
-            paddingHorizontal: 14,
+            height: 48,
+            paddingHorizontal: 16,
             borderRadius: theme.radiusPill,
             backgroundColor: pressed ? theme.pressed : theme.card,
             borderWidth: theme.hairline,
@@ -369,11 +389,11 @@ export default function SessionsScreen() {
             opacity: creating || connection !== 'open' ? 0.55 : 1,
           })}
         >
-          <PlusIcon size={17} color={theme.text} />
-          <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>
+          <PlusIcon size={18} color={theme.text} />
+          <Text style={{ color: theme.text, fontSize: theme.fontBody, fontWeight: '600' }}>
             {creating ? '正在新建…' : '新建任务'}
           </Text>
-          <Text style={{ flex: 1, color: theme.textWeak, fontSize: 12, textAlign: 'right' }}>在电脑上执行</Text>
+          <Text style={{ flex: 1, color: theme.textWeak, fontSize: theme.fontMicro, textAlign: 'right' }}>在电脑上执行</Text>
         </Pressable>
       ) : null}
       {batchNote ? (
@@ -492,16 +512,16 @@ export default function SessionsScreen() {
       {/* Long-press menu: the desktop sidebar's actions, in the same order. */}
       <Modal visible={menu !== null} transparent animationType="fade" onRequestClose={() => setMenu(null)}>
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable style={SHEET_BACKDROP} onPress={() => setMenu(null)} />
+          <Pressable style={SHEET_BACKDROP(theme.scrim)} onPress={() => setMenu(null)} />
           <View style={{
             backgroundColor: theme.surface,
-            borderTopLeftRadius: 18,
-            borderTopRightRadius: 18,
+            borderTopLeftRadius: theme.radiusSheet,
+            borderTopRightRadius: theme.radiusSheet,
             paddingHorizontal: theme.gutter,
             paddingTop: 16,
-            paddingBottom: 30,
+            paddingBottom: 12 + insets.bottom,
           }}>
-            <Text numberOfLines={1} style={{ color: theme.textWeak, fontSize: 12, marginBottom: 6 }}>
+            <Text numberOfLines={1} style={{ color: theme.textWeak, fontSize: theme.fontMeta, marginBottom: 6 }}>
               {menu?.title}
             </Text>
             {menu ? sessionActions(menu, can).map(action => (
@@ -565,7 +585,7 @@ export default function SessionsScreen() {
       <Modal visible={renaming !== null} transparent animationType="fade" onRequestClose={() => setRenaming(null)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: 'rgba(0,0,0,0.35)' }}
+          style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: theme.scrim }}
         >
           <View style={{
             backgroundColor: theme.card,
@@ -615,10 +635,17 @@ export default function SessionsScreen() {
       {/* New task: pick the folder the desktop should work in. */}
       <Modal visible={workspaceSheet} transparent animationType="fade" onRequestClose={() => setWorkspaceSheet(false)}>
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable style={SHEET_BACKDROP} onPress={() => setWorkspaceSheet(false)} />
-          <View style={{ backgroundColor: theme.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: theme.gutter, paddingTop: 14, paddingBottom: 30 }}>
-            <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700', marginBottom: 4 }}>在哪里开始？</Text>
-            <Text style={{ color: theme.textWeak, fontSize: 12, marginBottom: 8 }}>选择电脑上的一个工作目录。</Text>
+          <Pressable style={SHEET_BACKDROP(theme.scrim)} onPress={() => setWorkspaceSheet(false)} />
+          <View style={{
+            backgroundColor: theme.surface,
+            borderTopLeftRadius: theme.radiusSheet,
+            borderTopRightRadius: theme.radiusSheet,
+            paddingHorizontal: theme.gutter,
+            paddingTop: 14,
+            paddingBottom: 12 + insets.bottom,
+          }}>
+            <Text style={{ color: theme.text, fontSize: theme.fontHeading, fontWeight: '700', marginBottom: 4 }}>在哪里开始？</Text>
+            <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta, marginBottom: 8 }}>选择电脑上的一个工作目录。</Text>
             {workspaces.length === 0 ? (
               <Pressable onPress={() => void createIn()} style={({ pressed }) => ({ paddingVertical: 14, opacity: pressed ? 0.6 : 1 })}>
                 <Text style={{ color: theme.text, fontSize: 15 }}>使用桌面当前目录</Text>
@@ -649,7 +676,7 @@ export default function SessionsScreen() {
 
       {/* Handoff: what should the new task focus on? */}
       <Modal visible={handoffTarget !== null} transparent animationType="fade" onRequestClose={() => setHandoffTarget(null)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: 'rgba(0,0,0,0.35)' }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: theme.scrim }}>
           <View style={{ backgroundColor: theme.card, borderRadius: 14, padding: 18, gap: 12, borderWidth: theme.hairline, borderColor: theme.cardBorder }}>
             <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600' }}>交接到新任务</Text>
             <Text style={{ color: theme.textWeak, fontSize: 12, lineHeight: 18 }}>

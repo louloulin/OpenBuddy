@@ -59,15 +59,32 @@ export function questionApproval(request: QuestionRequest, receivedAt = Date.now
 
 export const trustRequestId = (cwd: string): string => `trust:${cwd}`
 
-export function trustApproval(cwd: string, receivedAt = Date.now()): Approval {
+/**
+ * `sessionId` is optional at the protocol level (`agent://folder-trust` only
+ * carries a cwd), but the card must be dismissible and must not follow the user
+ * into unrelated conversations — so the caller attaches the session when it
+ * knows one.
+ */
+export function trustApproval(cwd: string, receivedAt = Date.now(), sessionId?: string): Approval {
   return {
     requestId: trustRequestId(cwd),
     kind: 'trust',
     title: '信任这个文件夹？',
     detail: `${cwd}\n信任后，电脑会在这个目录里执行工具；可以随时在桌面撤回。`,
     cwd,
+    ...(sessionId ? { sessionId } : {}),
     receivedAt,
   }
+}
+
+/**
+ * Decisions that actually end a card. 「不信任」 answers the desktop but leaves
+ * the card up forever, and every later turn carries it — so a value the desktop
+ * has already recorded also dismisses it here.
+ */
+export function shouldDismissAfterAnswer(kind: Approval['kind'], action: { type: string; trusted?: boolean }): boolean {
+  if (kind === 'trust') return true
+  return action.type === 'permission' || action.type === 'question'
 }
 
 /** What the card shows under a permission title, from the tool's raw input. */

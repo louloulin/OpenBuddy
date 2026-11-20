@@ -33,6 +33,8 @@ export type TextRow = {
   /** True while tokens are still arriving; the view shows a caret. */
   streaming?: boolean
   isError?: boolean
+  /** A system row that reports a broken state rather than an aside. */
+  interrupted?: boolean
 }
 
 export type ThinkingRow = {
@@ -270,6 +272,32 @@ export function applyUpdates(updates: readonly SessionUpdate[], sessionId?: stri
 export function isTurnPending(transcript: Transcript): boolean {
   return transcript.rows.some(row =>
     (row.kind === 'text' && row.streaming) || (row.kind === 'thinking' && row.live) || (row.kind === 'tool' && row.status === 'running'))
+}
+
+/**
+ * Seals an interrupted turn (20261117-mobile.md §2.5).
+ *
+ * A stream can end without `agent_settled`: the desktop crashed, the tunnel
+ * died, the device was revoked. Anything still marked streaming keeps its caret
+ * blinking and reads as 「still working」, which is the one thing a supervising
+ * phone must never claim falsely. Closing the rows is safe to repeat and safe to
+ * run on a transcript that has already settled — it becomes a no-op.
+ */
+export function sealInterruptedTurn(transcript: Transcript, note?: string): Transcript {
+  let changed = false
+  const rows = transcript.rows.map(row => {
+    if (row.kind === 'text' && row.streaming) { changed = true; return { ...row, streaming: false } }
+    if (row.kind === 'thinking' && row.live) { changed = true; return { ...row, live: false } }
+    if (row.kind === 'tool' && row.status === 'running') { changed = true; return { ...row, status: 'error' as const } }
+    return row
+  })
+  if (!changed) return transcript
+  if (!note) return { ...transcript, rows }
+  // One system row explains why the answer stops mid-sentence.
+  const notice: TranscriptRow = {
+    kind: 'text', id: `interrupted:${rows.length}`, role: 'system', text: note, interrupted: true,
+  }
+  return { ...transcript, rows: [...rows, notice] }
 }
 
 /** One-line preview for the session list. */

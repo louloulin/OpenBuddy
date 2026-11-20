@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "files": {
+    "apps/web/src/styles/app.css": 4540,
+    "apps/web/src/styles/automation-wb.css": 479,
+    "apps/web/src/styles/chat.css": 342,
+    "apps/web/src/styles/composer-wb-align.css": 21,
+    "apps/web/src/styles/grok.css": 154,
+    "apps/web/src/styles/polish.css": 928,
+    "packages/ui/src/styles/global.css": 0,
+    "packages/ui/src/styles/tokens.css": 70
+  },
+  "total": 6534
+}

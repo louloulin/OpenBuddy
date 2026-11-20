@@ -1,10 +1,12 @@
 /**
  * The input card (20261115-mobile.md §4.3, §5.6).
  *
- * Mirrors the desktop composer: a 24px-radius card with a hairline border and a
- * soft shadow, the textarea above a footer row of small round icon buttons, and
- * an ink (not blue) send button. Focusing the field lifts the border to the
- * focus colour, exactly like `.wb-composer:focus-within`.
+ * A Grok-style input card: 24px radius, a hairline border, no shadow and no
+ * elevation (a drop shadow on a phone reads as a floating sheet, not a field),
+ * the textarea above a footer row of small round icon buttons, and an ink (not
+ * blue) send button. Focus lifts the border weight to the ink colour — the blue
+ * focus ring is reserved for keyboard focus on the web, and on a phone the
+ * caret already says where typing goes.
  *
  * Voice dictation fills the draft rather than sending: a misheard word must be
  * fixable before it becomes a turn.
@@ -18,6 +20,7 @@ import * as ImageManipulator from 'expo-image-manipulator'
 import * as Speech from 'expo-speech'
 
 import { appendAttachments, compressOptions, checkUpload, MAX_ATTACHMENTS } from '../core/attachments'
+import { problemText } from '../core/problem'
 import { quotePreview, withQuote } from '../core/quote'
 import { mergeTranscript, transcriptOutcome, unavailableMessage } from '../core/voice'
 import { haptic } from '../native/haptics'
@@ -172,7 +175,7 @@ export function Composer({
       if (images.length === 0) return
       stage(images)
     } catch (error) {
-      Alert.alert('拍照失败', error instanceof Error ? error.message : String(error))
+      Alert.alert('拍照失败', problemText(error))
     } finally {
       setBusy(false)
     }
@@ -204,7 +207,7 @@ export function Composer({
       if (images.length === 0) return
       stage(images)
     } catch (error) {
-      Alert.alert('选择图片失败', error instanceof Error ? error.message : String(error))
+      Alert.alert('选择图片失败', problemText(error))
     } finally {
       setBusy(false)
     }
@@ -277,7 +280,9 @@ export function Composer({
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled }}
       hitSlop={6}
       style={({ pressed }) => ({
         width: 34,
@@ -296,7 +301,7 @@ export function Composer({
   return (
     <View
       style={{
-        paddingHorizontal: 12,
+        paddingHorizontal: theme.gutter,
         paddingTop: 8,
         // The chat screen owns the bottom inset; a composer rendered on its own
         // still keeps clear of the home indicator.
@@ -309,17 +314,12 @@ export function Composer({
       <View
         style={{
           backgroundColor: theme.card,
-          borderWidth: theme.hairline,
-          borderColor: focused ? theme.focus : theme.cardBorder,
+          borderWidth: focused ? 1.5 : theme.hairline,
+          borderColor: focused ? theme.text : theme.cardBorder,
           borderRadius: theme.radiusCard,
           paddingHorizontal: 12,
           paddingTop: 10,
           paddingBottom: 8,
-          shadowColor: '#0f0d0a',
-          shadowOpacity: theme.scheme === 'dark' ? 0.45 : 0.06,
-          shadowRadius: 16,
-          shadowOffset: { width: 0, height: 6 },
-          elevation: 2,
         }}
       >
         {pending.length ? (
@@ -369,7 +369,7 @@ export function Composer({
               paddingLeft: 10,
               paddingRight: 6,
               paddingVertical: 6,
-              borderRadius: 8,
+              borderRadius: theme.radiusSmall,
               borderLeftWidth: 2,
               borderLeftColor: theme.textMedium,
               backgroundColor: theme.surface,
@@ -390,10 +390,12 @@ export function Composer({
               <Pressable
                 key={command.name}
                 onPress={() => setDraft(`/${command.name} `)}
+                accessibilityRole="button"
                 style={({ pressed }) => ({
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: 8,
+                  minHeight: theme.touch,
                   paddingVertical: 8,
                   paddingHorizontal: 2,
                   opacity: pressed ? 0.6 : 1,
@@ -420,6 +422,8 @@ export function Composer({
           placeholder={placeholder}
           placeholderTextColor={theme.textWeak}
           multiline
+          // Web focus ring suppressed: the card's own border is the focus state.
+          underlineColorAndroid="transparent"
           style={{
             minHeight: 40,
             maxHeight: 132,
@@ -437,21 +441,23 @@ export function Composer({
           {onCycleThinking ? (
             <Pressable
               onPress={onCycleThinking}
-              accessibilityLabel="思考深度"
+              accessibilityRole="button"
+              accessibilityLabel={`思考深度：${thinkingLabel ?? '跟随桌面'}`}
+              accessibilityHint="点按切换深度"
               style={({ pressed }) => ({
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: 4,
-                marginLeft: 4,
-                paddingHorizontal: 10,
-                paddingVertical: 5,
+                marginLeft: 6,
+                minHeight: 26,
+                paddingHorizontal: 9,
+                justifyContent: 'center',
                 borderRadius: theme.radiusPill,
                 borderWidth: theme.hairline,
                 borderColor: theme.cardBorder,
                 backgroundColor: pressed ? theme.pressed : 'transparent',
               })}
             >
-              <Text style={{ color: theme.textMedium, fontSize: 11, fontWeight: '600' }}>
+              <Text style={{ color: theme.textMedium, fontSize: theme.fontMicro, fontWeight: '600' }}>
                 {thinkingLabel ?? '跟随'}
               </Text>
             </Pressable>
@@ -460,17 +466,19 @@ export function Composer({
           {streaming && onStop ? (
             <Pressable
               onPress={onStop}
-              accessibilityLabel="停止"
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: 15,
+              accessibilityRole="button"
+              accessibilityLabel="停止生成"
+              style={({ pressed }) => ({
+                width: 34,
+                height: 34,
+                borderRadius: 17,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: theme.pressed,
-              }}
+                backgroundColor: theme.ink,
+                opacity: pressed ? 0.7 : 1,
+              })}
             >
-              <StopIcon size={12} color={theme.text} />
+              <StopIcon size={11} color={theme.inkFg} />
             </Pressable>
           ) : null}
           {hasText || pending.length ? (
@@ -478,7 +486,9 @@ export function Composer({
               onPress={submit}
               onLongPress={streaming && onSteer && hasText ? () => setSteerSheet(true) : undefined}
               delayLongPress={350}
-              accessibilityLabel={streaming ? '发送（排队）' : '发送'}
+              accessibilityRole="button"
+              accessibilityLabel={streaming ? '发送（可排队）' : '发送'}
+              accessibilityHint={streaming ? '长按选择立即插话或排队' : undefined}
               style={({ pressed }) => ({
                 width: 34,
                 height: 34,
@@ -507,46 +517,36 @@ export function Composer({
           )}
         </View>
       </View>
-      <Text style={{ color: theme.textWeak, fontSize: 11, textAlign: 'center', marginTop: 6 }}>
-        对话在你的电脑上进行，密钥从不离开桌面
-      </Text>
-
       {sheet ? (
         <Modal visible transparent animationType="fade" onRequestClose={() => setSheet(false)}>
-          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' }} onPress={() => setSheet(false)} />
-          <View
-            style={{
-              backgroundColor: theme.card,
-              borderTopLeftRadius: 18,
-              borderTopRightRadius: 18,
-              paddingVertical: 8,
-              paddingBottom: 30,
-            }}
-          >
+          <Pressable style={{ flex: 1, backgroundColor: theme.scrim }} onPress={() => setSheet(false)} />
+          <View style={sheetStyle(theme, insets.bottom)}>
             <Pressable
               onPress={() => void shoot()}
-              style={({ pressed }) => ({ paddingVertical: 15, paddingHorizontal: 20, backgroundColor: pressed ? theme.hover : 'transparent' })}
+              accessibilityRole="button"
+              style={({ pressed }) => ({ ...sheetRow, backgroundColor: pressed ? theme.hover : 'transparent' })}
             >
-              <Text style={{ color: theme.text, fontSize: 15 }}>拍一张</Text>
+              <Text style={{ color: theme.text, fontSize: theme.fontBody }}>拍一张</Text>
             </Pressable>
             <Pressable
               onPress={() => void pickFromLibrary()}
-              style={({ pressed }) => ({ paddingVertical: 15, paddingHorizontal: 20, backgroundColor: pressed ? theme.hover : 'transparent' })}
+              accessibilityRole="button"
+              style={({ pressed }) => ({ ...sheetRow, backgroundColor: pressed ? theme.hover : 'transparent' })}
             >
-              <Text style={{ color: theme.text, fontSize: 15 }}>从相册选择（最多 {MAX_ATTACHMENTS} 张）</Text>
+              <Text style={{ color: theme.text, fontSize: theme.fontBody }}>从相册选择（最多 {MAX_ATTACHMENTS} 张）</Text>
             </Pressable>
             <Pressable
               onPress={() => setSheet(false)}
+              accessibilityRole="button"
               style={({ pressed }) => ({
-                paddingVertical: 15,
-                paddingHorizontal: 20,
+                ...sheetRow,
                 backgroundColor: pressed ? theme.hover : 'transparent',
                 borderTopWidth: theme.hairline,
                 borderTopColor: theme.cardBorder,
                 marginTop: 6,
               })}
             >
-              <Text style={{ color: theme.textWeak, fontSize: 15 }}>取消</Text>
+              <Text style={{ color: theme.textMedium, fontSize: theme.fontBody }}>取消</Text>
             </Pressable>
           </View>
         </Modal>
@@ -555,16 +555,8 @@ export function Composer({
       {/* Running turn: normal send queues; this sheet offers the interrupt. */}
       {steerSheet ? (
         <Modal visible transparent animationType="fade" onRequestClose={() => setSteerSheet(false)}>
-          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' }} onPress={() => setSteerSheet(false)} />
-          <View
-            style={{
-              backgroundColor: theme.card,
-              borderTopLeftRadius: 18,
-              borderTopRightRadius: 18,
-              paddingVertical: 8,
-              paddingBottom: 30,
-            }}
-          >
+          <Pressable style={{ flex: 1, backgroundColor: theme.scrim }} onPress={() => setSteerSheet(false)} />
+          <View style={sheetStyle(theme, insets.bottom)}>
             <Pressable
               onPress={() => {
                 const text = draft.trim()
@@ -573,34 +565,55 @@ export function Composer({
                 setDraft('')
                 onSteer(text)
               }}
-              style={({ pressed }) => ({ paddingVertical: 15, paddingHorizontal: 20, backgroundColor: pressed ? theme.hover : 'transparent' })}
+              accessibilityRole="button"
+              style={({ pressed }) => ({ ...sheetRow, backgroundColor: pressed ? theme.hover : 'transparent' })}
             >
-              <Text style={{ color: theme.text, fontSize: 15 }}>立即插话</Text>
-              <Text style={{ color: theme.textWeak, fontSize: 12, marginTop: 2 }}>打断当前生成，按新指令继续</Text>
+              <Text style={{ color: theme.text, fontSize: theme.fontBody }}>立即插话</Text>
+              <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta, marginTop: 2 }}>打断当前生成，按新指令继续</Text>
             </Pressable>
             <Pressable
               onPress={() => { setSteerSheet(false); submit() }}
-              style={({ pressed }) => ({ paddingVertical: 15, paddingHorizontal: 20, backgroundColor: pressed ? theme.hover : 'transparent' })}
+              accessibilityRole="button"
+              style={({ pressed }) => ({ ...sheetRow, backgroundColor: pressed ? theme.hover : 'transparent' })}
             >
-              <Text style={{ color: theme.text, fontSize: 15 }}>排队等待</Text>
-              <Text style={{ color: theme.textWeak, fontSize: 12, marginTop: 2 }}>当前回合结束后再发送</Text>
+              <Text style={{ color: theme.text, fontSize: theme.fontBody }}>排队等待</Text>
+              <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta, marginTop: 2 }}>当前回合结束后再发送</Text>
             </Pressable>
             <Pressable
               onPress={() => setSteerSheet(false)}
+              accessibilityRole="button"
               style={({ pressed }) => ({
-                paddingVertical: 15,
-                paddingHorizontal: 20,
+                ...sheetRow,
                 backgroundColor: pressed ? theme.hover : 'transparent',
                 borderTopWidth: theme.hairline,
                 borderTopColor: theme.cardBorder,
                 marginTop: 6,
               })}
             >
-              <Text style={{ color: theme.textWeak, fontSize: 15 }}>取消</Text>
+              <Text style={{ color: theme.textMedium, fontSize: theme.fontBody }}>取消</Text>
             </Pressable>
           </View>
         </Modal>
       ) : null}
     </View>
   )
+}
+
+/** Bottom-sheet chrome shared by both sheets: token radius, real safe area. */
+function sheetStyle(theme: ReturnType<typeof themeFor>, bottomInset: number) {
+  return {
+    backgroundColor: theme.card,
+    borderTopLeftRadius: theme.radiusSheet,
+    borderTopRightRadius: theme.radiusSheet,
+    paddingTop: 8,
+    // The home indicator is 34pt on modern iPhones; a fixed 30 put 「取消」 under it.
+    paddingBottom: 8 + bottomInset,
+  }
+}
+
+const sheetRow = {
+  minHeight: 52,
+  justifyContent: 'center' as const,
+  paddingVertical: 12,
+  paddingHorizontal: 20,
 }

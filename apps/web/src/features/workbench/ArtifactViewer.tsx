@@ -6,6 +6,9 @@ import { copyText } from "@openbuddy/platform/clipboard";
 import { friendlyError } from "@openbuddy/chat-core/error-format";
 import { appConfirm } from "../../shared/ui/AppDialog";
 import { ArtifactPreview, useFileContent, type PreviewMode } from "./ArtifactPreview";
+import { ArtifactFallbackBody, useArtifactFallback } from "./ArtifactFallback";
+import { ArtifactReader } from "./ArtifactReader";
+import { ArtifactShare } from "./ArtifactShare";
 import { DiffBlock } from "./DiffBlock";
 import { benchKind, formatSize, isTextKind, KIND_LABEL } from "./bench-kind";
 
@@ -32,11 +35,15 @@ export function ArtifactViewer({ path, sessionId, info, version, onChanged, onAd
   const name = path.split(/[\\/]/).pop() ?? path;
   const [mode, setMode] = useState<PreviewMode>("rendered");
   const [view, setView] = useState<"preview" | "edit" | "versions">("preview");
+  const [readerOpen, setReaderOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [selected, setSelected] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
   // 外部修改检测 (U1.9): compare size + mtime from path_stat against the last loaded version.
   const [external, setExternal] = useState(false);
+  /** The file was removed outside the app (B3d): still readable from checkpoints. */
+  const [vanished, setVanished] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const baseline = useRef<{ size: number; mtimeMs: number } | null>(null);
 
@@ -49,6 +56,7 @@ export function ArtifactViewer({ path, sessionId, info, version, onChanged, onAd
     let alive = true;
     baseline.current = null;
     setExternal(false);
+    setVanished(false);
     statNow().then((value) => { if (alive) baseline.current = value; }, () => { /* binary / vanished: no banner */ });
     return () => { alive = false; };
   }, [path, version]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -60,6 +68,8 @@ export function ArtifactViewer({ path, sessionId, info, version, onChanged, onAd
       try {
         const current = await statNow();
         if (current && (current.size !== baseline.current.size || current.mtimeMs !== baseline.current.mtimeMs)) setExternal(true);
+        if (!current) setVanished(true);
+        else setVanished(false);
       } catch { /* stat failed: keep the preview as-is */ }
     };
     const onFocus = () => { void check(); };
@@ -72,6 +82,7 @@ export function ArtifactViewer({ path, sessionId, info, version, onChanged, onAd
     setReloadKey((key) => key + 1);
     setExternal(false);
     baseline.current = await statNow().catch(() => null);
+    setVanished(baseline.current === null);
   };
   const dismissExternal = async () => {
     setExternal(false);
@@ -105,8 +116,9 @@ export function ArtifactViewer({ path, sessionId, info, version, onChanged, onAd
     } catch (e) { onToast(`另存失败：${friendlyError(e)}`); }
   };
   const status = info ? (info.exists ? (info.status === "created" ? "新建" : "修改") : "已删除") : "";
-  /** Known to be gone (reverted / deleted): don't try to read it. */
-  const gone = info?.exists === false;
+  /** Known to be gone (reverted / deleted / removed outside): don't try to read it. */
+  const gone = info?.exists === false || vanished;
+  const fallback = useArtifactFallback(sessionId, path, gone, version);
   const stats = info && (info.added || info.removed) ? `+${info.added} −${info.removed}` : "";
 
   const menu: Array<{ label: string; run: () => void; hidden?: boolean }> = [
@@ -116,6 +128,8 @@ export function ArtifactViewer({ path, sessionId, info, version, onChanged, onAd
     { label: "加入对话", run: () => onAddToChat(path) },
     { label: kind === "markdown" ? "复制 Markdown" : "复制内容", run: () => void copyContent(), hidden: !isTextKind(kind) },
     { label: "另存为…", run: () => void saveAs(), hidden: !isTextKind(kind) },
+    { label: "独立阅读", run: () => setReaderOpen(true) },
+    { label: "分享…", run: () => setShareOpen(true) },
     { label: "版本历史", run: () => setView("versions") },
     { label: "查看变更", run: () => onShowChanges(path), hidden: !info },
   ];
@@ -169,15 +183,25 @@ export function ArtifactViewer({ path, sessionId, info, version, onChanged, onAd
         ) : view === "versions" ? (
           <VersionList path={path} sessionId={sessionId} onBack={() => setView("preview")} onRestored={onChanged} onToast={onToast} />
         ) : gone ? (
-          <div className="bench-empty">
-            <div className="bench-empty__title">文件已不在磁盘上</div>
-            <div className="bench-empty__hint">它可能被还原、移动或删除了。修改前后的内容都留在版本历史里，可以从那里找回。</div>
-            <div className="bench-empty__actions"><button type="button" className="bench-btn" onClick={() => setView("versions")}>打开版本历史</button></div>
+          <div className="bench-gone">
+            <div className="bench-reader__banner" role="status">
+              文件已不在磁盘上。下面是最后保存的版本，仍可复制、另存或独立阅读。
+            </div>
+            <ArtifactFallbackBody path={path} state={fallback} />
+            <div className="bench-gone__actions">
+              <button type="button" className="bench-btn" onClick={() => setView("versions")}>打开版本历史</button>
+              <button type="button" className="bench-btn" onClick={() => setReaderOpen(true)}>独立阅读</button>
+            </div>
           </div>
         ) : (
           <ArtifactPreview path={path} version={version + reloadKey} mode={mode} onModeChange={setMode} onSelectText={isTextKind(kind) ? setSelected : undefined} />
         )}
       </div>
+      {readerOpen && (
+        <ArtifactReader path={path} sessionId={sessionId} info={info} version={version + reloadKey}
+          onClose={() => setReaderOpen(false)} onToast={onToast} />
+      )}
+      {shareOpen && <ArtifactShare path={path} available={!gone} onClose={() => setShareOpen(false)} onToast={onToast} />}
     </div>
   );
 }

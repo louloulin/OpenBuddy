@@ -28,10 +28,13 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
+        // Every tab paints its own large title (`PageHeader`), so the native
+        // header is switched off: keeping it showed 「搜索」 twice, at 17pt and
+        // 28pt, on the same screen.
+        headerShown: false,
         headerStyle: { backgroundColor: theme.surface },
         headerShadowVisible: false,
         headerTintColor: theme.text,
-        headerTitleStyle: { fontSize: 17, fontWeight: '600' },
         tabBarStyle: {
           backgroundColor: theme.card,
           borderTopWidth: theme.hairline,
@@ -45,7 +48,7 @@ export default function TabsLayout() {
         },
         tabBarItemStyle: { paddingVertical: 0, justifyContent: 'flex-start' },
         tabBarIconStyle: { marginBottom: 4 },
-        tabBarLabelStyle: { fontSize: 11, lineHeight: 14, fontWeight: '500', flexShrink: 0 },
+        tabBarLabelStyle: { fontSize: theme.fontMicro, lineHeight: 14, fontWeight: '500', flexShrink: 0 },
         tabBarActiveTintColor: theme.text,
         tabBarInactiveTintColor: theme.textWeak,
         sceneStyle: { backgroundColor: theme.surface },
@@ -59,7 +62,7 @@ export default function TabsLayout() {
           headerShown: false,
           href: tabs.sessions === false ? null : undefined,
           tabBarBadge: unreadSessions > 0 ? unreadSessions : undefined,
-          tabBarBadgeStyle: { backgroundColor: theme.ink, color: theme.inkFg, fontSize: 10 },
+          tabBarBadgeStyle: { backgroundColor: theme.badge, color: theme.badgeText, fontSize: theme.fontMicro },
           tabBarIcon: ({ color }) => <ChatIcon size={22} color={color} />,
         }}
       />
@@ -77,7 +80,7 @@ export default function TabsLayout() {
           title: '通知',
           href: tabs.notifications === false ? null : undefined,
           tabBarBadge: unread > 0 ? unread : undefined,
-          tabBarBadgeStyle: { backgroundColor: theme.ink, color: theme.inkFg, fontSize: 10 },
+          tabBarBadgeStyle: { backgroundColor: theme.badge, color: theme.badgeText, fontSize: theme.fontMicro },
           tabBarIcon: ({ color }) => <BellIcon size={22} color={color} />,
         }}
       />

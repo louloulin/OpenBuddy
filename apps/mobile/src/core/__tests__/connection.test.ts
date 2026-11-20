@@ -47,3 +47,26 @@ describe('flushOutbox', () => {
     expect(result.error).toBe('offline again')
   })
 })
+
+describe('flushOutbox — the outbox must never lose or silently drop', () => {
+  // §2.5: 「离线发送丢失 0」. The old drain `break`ed on the first error with no
+  // message, so a queued message could simply never arrive.
+  const item = (id: string) => ({ id, sessionId: 's1', text: id, attachments: [], queuedAt: 0 })
+
+  it('keeps the unsent tail and reports the first failure', async () => {
+    const sent: string[] = []
+    const result = await flushOutbox([item('a'), item('b'), item('c')], async entry => {
+      if (entry.id === 'b') throw new Error('desktop offline')
+      sent.push(entry.id)
+    })
+    expect(sent).toEqual(['a'])
+    expect(result.sent).toBe(1)
+    expect(result.remaining.map(entry => entry.id)).toEqual(['b', 'c'])
+    expect(result.error).toContain('desktop offline')
+  })
+
+  it('drains everything when nothing fails', async () => {
+    const result = await flushOutbox([item('a'), item('b')], async () => {})
+    expect(result).toMatchObject({ sent: 2, remaining: [] })
+  })
+})

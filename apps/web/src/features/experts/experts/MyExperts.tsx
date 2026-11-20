@@ -12,6 +12,8 @@ interface Props {
   /** WorkBuddy package import (S18): ZIP picker + conversion progress. */
   importing?: boolean;
   onImportWorkbuddy?: () => void;
+  /** 从链接或本地包导入 (B3b). */
+  onImportLink?: () => void;
   onBack: () => void;
   onCreate: () => void;
   onOpen: (expert: ExpertEntry) => void;
@@ -22,7 +24,7 @@ interface Props {
 }
 
 /** 我的专家: the user's own experts (and the trusted project's, read-only) with 召唤 / 编辑 / 复制 / 删除. */
-export function MyExperts({ experts, categories, loading, userDir, importing, onImportWorkbuddy, onBack, onCreate, onOpen, onSummon, onEdit, onDuplicate, onDelete }: Props) {
+export function MyExperts({ experts, categories, loading, userDir, importing, onImportWorkbuddy, onImportLink, onBack, onCreate, onOpen, onSummon, onEdit, onDuplicate, onDelete }: Props) {
   return (
     <div className="um-page">
       <header className="um-topbar">
@@ -33,6 +35,11 @@ export function MyExperts({ experts, categories, loading, userDir, importing, on
           <span className="ex-page-title">我的专家</span>
         </div>
         <div className="um-topbar-right">
+          {onImportLink && (
+            <button type="button" className="um-btn um-btn--grey" onClick={onImportLink} title="从 https 链接或本地包导入专家">
+              从链接导入
+            </button>
+          )}
           {onImportWorkbuddy && (
             <button type="button" className="um-btn um-btn--grey" disabled={importing} onClick={onImportWorkbuddy} title="导入 WorkBuddy 导出的 .zip 专家包">
               {importing ? "导入中…" : "导入 WorkBuddy"}

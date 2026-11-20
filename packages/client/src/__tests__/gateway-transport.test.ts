@@ -259,3 +259,30 @@ describe("GatewayTransport default fetch", () => {
     }
   });
 });
+
+describe("GatewayTransport resync", () => {
+  // The bridge's ring buffer could not replay our `since`. Before this was
+  // handled, the transport closed the stream and returned from the connect
+  // loop: the phone stayed dead with a stale transcript and nothing to fix it.
+  it("tells the app to reload and keeps the stream alive", async () => {
+    const bridge = fakeBridge();
+    let resyncs = 0;
+    const transport = new GatewayTransport({
+      baseUrl: "http://bridge.test",
+      token: "t",
+      fetchImpl: bridge.fetchImpl,
+      onResync: () => { resyncs += 1; },
+    });
+    await sleep(60);
+    expect(transport.state()).toBe("open");
+
+    bridge.push("resync", 1, {});
+    await sleep(120);
+
+    expect(resyncs).toBe(1);
+    // It reconnected from the head rather than dying on the spot.
+    expect(bridge.eventsUrls.at(-1)).toContain("since=0");
+    expect(transport.state()).toMatch(/open|connecting/);
+    transport.close();
+  });
+});

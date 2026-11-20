@@ -24,8 +24,8 @@ import {
   readQueue,
   type CachedSession,
 } from '../db/cache'
-import { applyUpdate, emptyTranscript, transcriptPreview, type Transcript } from '../core/transcript'
-import { canSendNow } from '../core/connection'
+import { applyUpdate, emptyTranscript, sealInterruptedTurn, transcriptPreview, type Transcript } from '../core/transcript'
+import { canSendNow, flushOutbox } from '../core/connection'
 import { isPreview, previewState } from '../core/preview'
 import type { Capabilities } from '../core/surface'
 import {
@@ -39,6 +39,7 @@ import { toSessionList } from '../core/session-list'
 import { toProjects, type ProjectRef } from '../core/projects'
 import { toNotifications, numericNotificationId } from '../core/notification-list'
 import { bumpUnread, clearUnread, shouldMarkUnread } from '../core/unread'
+import { problemText } from '../core/problem'
 import {
   LOCK_KEY, lockUnavailableReason, parseLockSetting, serializeLockSetting, shouldRelock,
   type LockAvailability,
@@ -163,6 +164,12 @@ type AppState = {
   cycleThinkingLevel: (sessionId: string) => Promise<ThinkingLevel | null>
   revoked: () => Promise<void>
   resume: () => void
+  /**
+   * The gateway's replay buffer no longer reaches back to us (`resync`): every
+   * cached transcript may be missing a gap, so reload the snapshots and drain
+   * the outbox again (20261117-mobile.md §2.5).
+   */
+  resync: () => Promise<void>
   regenerate: (sessionId: string) => Promise<void>
   setSessionPinned: (sessionId: string, pinned: boolean) => Promise<void>
   renameSession: (sessionId: string, title: string) => Promise<void>
@@ -183,8 +190,14 @@ type AppState = {
 
 const ASSISTANT_EVENT = 'agent://event'
 
+/**
+ * Every failure the phone surfaces goes through this: transport and gateway
+ * errors are English protocol strings, and assigning them straight to
+ * `state.error` put 「desktop offline」 in the middle of a Chinese screen.
+ * See `core/problem.ts` for the mapping and its tests.
+ */
 function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return problemText(error)
 }
 
 export const useApp = create<AppState>((set, get) => ({
@@ -272,9 +285,10 @@ export const useApp = create<AppState>((set, get) => ({
 
     const transport = await openTransport(pairing, {
       onUnauthorized: () => { void get().revoked() },
+      onResync: () => { void get().resync() },
     })
     set({ transport, connection: transport.state() })
-    transport.onState(state => set({ connection: state }))
+    watchTransport(transport, set, get)
 
     // Subscribe before the first invoke so no turn is missed in the gap.
     await attachListeners(transport, set, get)
@@ -283,7 +297,7 @@ export const useApp = create<AppState>((set, get) => ({
     await loadCapabilities(get, set)
     void get().refreshPermissionMode()
     void get().refreshNotifications()
-    await flushQueue(get)
+    await flushQueue(get, set)
   },
 
   async pair(payload, deviceName) {
@@ -297,9 +311,12 @@ export const useApp = create<AppState>((set, get) => ({
         activePairingId: known.activeId ?? null,
         error: null,
       })
-      const transport = await openTransport(pairing)
+      const transport = await openTransport(pairing, {
+        onUnauthorized: () => { void get().revoked() },
+        onResync: () => { void get().resync() },
+      })
       set({ transport, connection: transport.state() })
-      transport.onState(state => set({ connection: state }))
+      watchTransport(transport, set, get)
       await attachListeners(transport, set, get)
       await get().refreshSessions()
       await loadCapabilities(get, set)
@@ -336,6 +353,31 @@ export const useApp = create<AppState>((set, get) => ({
   /** Called when the app comes back to the foreground: the tunnel is gone. */
   resume() {
     reconnectTransport()
+  },
+
+  async resync() {
+    const transport = get().transport
+    if (!transport) return
+    // The transport has already reopened from the new buffer head; the gap
+    // before it is unrecoverable from the event stream, so take a snapshot.
+    const open = Object.keys(get().transcripts)
+    const active = get().activeSessionId
+    const targets = active && !open.includes(active) ? [...open, active] : open
+    for (const sessionId of targets) {
+      try {
+        const history = await transport.invoke<{ updates?: SessionUpdate[] }>('agent_load_session', { sessionId })
+        const updates = history?.updates ?? []
+        let transcript = emptyTranscript()
+        for (const update of updates) transcript = applyUpdate(transcript, update, sessionId)
+        set(state => ({ transcripts: { ...state.transcripts, [sessionId]: transcript } }))
+        await cacheTranscript(sessionId, transcript.rows).catch(() => {})
+      } catch {
+        // One session failing must not stop the others from recovering.
+      }
+    }
+    void get().refreshQueue(active ?? '').catch(() => {})
+    await flushQueue(get, set)
+    void get().refreshTasks()
   },
 
   async unpair() {
@@ -385,9 +427,10 @@ export const useApp = create<AppState>((set, get) => ({
     try {
       const transport = await openTransport(pairing, {
         onUnauthorized: () => { void get().revoked() },
+        onResync: () => { void get().resync() },
       })
       set({ transport, connection: transport.state() })
-      transport.onState(state => set({ connection: state }))
+      watchTransport(transport, set, get)
       await attachListeners(transport, set, get)
       await get().refreshSessions()
       await loadCapabilities(get, set)
@@ -428,6 +471,12 @@ export const useApp = create<AppState>((set, get) => ({
   async openSession(sessionId) {
     // Reading a conversation clears its badge, even before history arrives.
     await get().markSessionRead(sessionId)
+    // Cards that were asked while the user was away in another conversation are
+    // stale news: they must not ambush the next session they open. The desktop
+    // re-asks (and the approval screen still answers) for anything still live.
+    set(state => ({
+      approvals: state.approvals.filter(item => !item.sessionId || item.sessionId === sessionId),
+    }))
     void get().refreshQueue(sessionId)
     // Cached transcript paints immediately.
     if (!get().transcripts[sessionId]) {
@@ -1222,7 +1271,10 @@ async function attachListeners(transport: Transport, set: SetState, get: () => A
 
   await transport.listen('agent://folder-trust', payload => {
     const cwd = (payload as { cwd?: unknown }).cwd
-    if (typeof cwd === 'string' && cwd) upsertApproval(set, trustApproval(cwd))
+    const sessionId = (payload as { sessionId?: unknown }).sessionId
+    if (typeof cwd === 'string' && cwd) {
+      upsertApproval(set, trustApproval(cwd, Date.now(), typeof sessionId === 'string' ? sessionId : undefined))
+    }
   })
 
   await transport.listen('agent://permission-mode', payload => {
@@ -1261,6 +1313,10 @@ function ingestUpdate(
     }
     // A settled turn drains one queued item; sync the chip row.
     void get().refreshQueue(key)
+    // …and frees its slot, so the 「运行中」 row must go with it. This was only
+    // refreshed on mount, so a finished turn kept claiming to be running until
+    // the user re-entered the conversation.
+    void get().refreshTasks()
   }
   const current = get().transcripts[key] ?? emptyTranscript()
   const next = applyUpdate(current, update, key)
@@ -1277,16 +1333,77 @@ function ingestUpdate(
 }
 
 /** Sends anything queued while the desktop was unreachable. */
-async function flushQueue(get: () => AppState): Promise<void> {
+/**
+ * Tracks a transport's state and runs the reconnect work.
+ *
+ * The outbox used to be drained only at startup, so a message queued while the
+ * tunnel was down stayed queued forever: the user saw it in the transcript and
+ * the desktop never got it (20261117-mobile.md §2.5 「重连后补齐」,
+ * §8 「离线发送丢失 0」).
+ */
+function watchTransport(transport: Transport, set: SetState, get: () => AppState): void {
+  let last = transport.state()
+  transport.onState(state => {
+    set({ connection: state })
+    if (state === 'open' && last !== 'open') {
+      // Reconnected: deliver what the outbox is holding, then refresh the list
+      // so the board is not frozen at the moment the link died.
+      void flushQueue(get, set)
+      void get().refreshSessions().catch(() => {})
+    }
+    if (state !== 'open' && last === 'open') {
+      // The link is gone. Anything still marked streaming keeps a caret
+      // blinking, which tells the user the desktop is working when it may not
+      // even exist any more (§2.5). Seal it and say why.
+      void sealOpenTurns(set, get)
+    }
+    last = state
+  })
+}
+
+/**
+ * Closes every transcript whose turn was left mid-stream.
+ *
+ * Only runs on an `open → closed/connecting` transition, so a healthy long turn
+ * is untouched. A short delay lets a reconnect that completes immediately
+ * (a flapping Wi-Fi handover) keep its stream instead of showing a scary notice.
+ */
+async function sealOpenTurns(set: SetState, get: () => AppState): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, 1500))
+  // Reconnected in the meantime: the turn is still real.
+  if (get().connection === 'open') return
+  const transcripts = get().transcripts
+  const note = '电脑的连接断开了，这一轮没有收尾。重新连接后可以让它继续。'
+  let changed = false
+  const next: Record<string, Transcript> = {}
+  for (const [sessionId, transcript] of Object.entries(transcripts)) {
+    const sealed = sealInterruptedTurn(transcript, note)
+    if (sealed !== transcript) { next[sessionId] = sealed; changed = true }
+  }
+  if (!changed) return
+  set(state => ({ transcripts: { ...state.transcripts, ...next }, awaiting: [] }))
+}
+
+/**
+ * Drains the offline outbox in FIFO order.
+ *
+ * Two rules from §2.5 matter here: nothing queued may be lost silently, and a
+ * failure must not look like success. The old version `break`ed on the first
+ * error with no message at all — the user saw a message they had sent simply
+ * never arrive.
+ */
+async function flushQueue(get: () => AppState, set: SetState): Promise<void> {
   const transport = get().transport
   if (!transport) return
   const queue = await readQueue().catch(() => [])
-  for (const item of queue) {
-    try {
-      await transport.invoke('agent_send', { sessionId: item.sessionId, text: item.text, attachments: item.attachments })
-      await dequeueMessage(item.id).catch(() => {})
-    } catch {
-      break
-    }
-  }
+  if (queue.length === 0) return
+  const { remaining, error } = await flushOutbox(queue, async item => {
+    await transport.invoke('agent_send', { sessionId: item.sessionId, text: item.text, attachments: item.attachments })
+    await dequeueMessage(item.id).catch(() => {})
+  })
+  if (remaining.length === 0) return
+  // Keep the unsent ones (they stay at the head of the queue, so ordering
+  // survives) and say so. The raw protocol error means nothing to a user; the
+  // sentence from `core/problem` does.
+  set({ error: problemText(error) })
 }

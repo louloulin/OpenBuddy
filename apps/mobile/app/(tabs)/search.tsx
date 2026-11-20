@@ -11,7 +11,9 @@ import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View, useCol
 import { useRouter } from 'expo-router'
 
 import { SearchIcon } from '../../src/components/icons'
+import { PageHeader } from '../../src/components/PageHeader'
 import { isPreview, previewState } from '../../src/core/preview'
+import { problemText } from '../../src/core/problem'
 import { canRun } from '../../src/core/surface'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
@@ -51,7 +53,7 @@ export default function SearchScreen() {
       setHits(list)
       if (list.length === 0) setNote('没有找到匹配的会话。')
     } catch (error) {
-      setNote(error instanceof Error ? error.message : String(error))
+      setNote(problemText(error))
     } finally {
       setBusy(false)
     }
@@ -59,27 +61,33 @@ export default function SearchScreen() {
 
   if (!canRun(capabilities, 'session_search')) {
     return (
-      <View style={{ flex: 1, backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-        <Text style={{ color: theme.textWeak, textAlign: 'center', lineHeight: 20 }}>
-          这台电脑没有开放会话搜索。
-        </Text>
+      <View style={{ flex: 1, backgroundColor: theme.surface }}>
+        <PageHeader title="搜索" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <Text style={{ color: theme.textWeak, textAlign: 'center', lineHeight: 20 }}>
+            这台电脑没有开放会话搜索。
+          </Text>
+        </View>
       </View>
     )
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.surface, padding: 12, gap: 12 }}>
+    <View style={{ flex: 1, backgroundColor: theme.surface }}>
+      <PageHeader title="搜索" subtitle="索引在电脑上，搜索不会离开这台设备。" />
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           gap: 8,
           height: 44,
+          marginHorizontal: theme.gutter,
+          marginBottom: 12,
           paddingHorizontal: 12,
           backgroundColor: theme.card,
           borderWidth: theme.hairline,
           borderColor: theme.cardBorder,
-          borderRadius: 12,
+          borderRadius: theme.radiusTile,
         }}
       >
         <SearchIcon size={17} color={theme.textWeak} />
@@ -116,11 +124,11 @@ export default function SearchScreen() {
                 gap: 4,
               })}
             >
-              <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>
+              <Text style={{ color: theme.text, fontSize: theme.fontBody, fontWeight: '600' }} numberOfLines={1}>
                 {hit.title ?? hit.sessionId ?? '会话'}
               </Text>
               {hit.snippet ?? hit.text ? (
-                <Text style={{ color: theme.textWeak, fontSize: 13, lineHeight: 19 }} numberOfLines={3}>
+                <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta, lineHeight: 19 }} numberOfLines={3}>
                   {hit.snippet ?? hit.text}
                 </Text>
               ) : null}

@@ -22,7 +22,7 @@ export interface ArtifactInfo {
 }
 
 type Entry = { type: string; timestamp?: string; message?: { role?: string; content?: unknown; toolCallId?: string; isError?: boolean; details?: unknown; timestamp?: number } };
-const TRACKED = new Set(["write", "edit"]);
+const TRACKED = new Set(["write", "edit", "ob_docx", "ob_xlsx", "ob_pptx"]);
 
 function countPatch(patch: string): { added: number; removed: number } {
   let added = 0;

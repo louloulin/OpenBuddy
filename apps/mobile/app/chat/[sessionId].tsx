@@ -18,14 +18,15 @@ import { Composer } from '../../src/components/Composer'
 import { RequestCard } from '../../src/components/RequestCard'
 import { LoadingRow } from '../../src/components/LoadingRow'
 import { MessageRow } from '../../src/components/MessageRow'
-import { ChevronRightIcon, SparkIcon } from '../../src/components/icons'
+import { ArrowLeftIcon, ChevronRightIcon, CloseIcon, SparkIcon } from '../../src/components/icons'
 import { emptyTranscript, isTurnPending, type TranscriptRow, type ToolRow } from '../../src/core/transcript'
 import { thinkingLevelLabel } from '../../src/core/session-panel'
 import { summarizeRevert } from '../../src/core/revert'
 import { canRun } from '../../src/core/surface'
 import { followUpsFor } from '../../src/core/follow-ups'
 import { queueLabel, queueRows } from '../../src/core/turn-input'
-import type { ApprovalAction } from '../../src/core/approvals'
+import { shouldDismissAfterAnswer, type ApprovalAction } from '../../src/core/approvals'
+import { problemText } from '../../src/core/problem'
 import type { Approval } from '../../src/core/models'
 import { elapsedLabel, sessionTasks } from '../../src/core/tasks'
 import { haptic } from '../../src/native/haptics'
@@ -92,7 +93,7 @@ export default function ChatScreen() {
     } catch (error) {
       setRevertNotes(notes => ({
         ...notes,
-        [row.id]: error instanceof Error ? error.message : String(error),
+        [row.id]: problemText(error),
       }))
     } finally {
       setRevertingId(null)
@@ -161,11 +162,18 @@ export default function ChatScreen() {
   const streamingText = transcript.rows.some(row => row.kind === 'text' && row.role === 'assistant' && row.streaming)
   // Kimi / Grok put next-question chips under the finished reply. They only
   // make sense once the turn is over and the answer is the latest one.
+  // Follow-ups assume a finished answer. After an interruption the turn has no
+  // conclusion to build on, so offering 「展开细节」 would ask the user to chase
+  // a reply that never arrived.
+  const interrupted = useMemo(
+    () => transcript.rows.some(row => row.kind === 'text' && row.role === 'system' && row.interrupted),
+    [transcript.rows],
+  )
   const suggestions = useMemo(
-    () => (!streaming && !awaiting && approvals.length === 0 && transcript.lastAssistantText
+    () => (!streaming && !awaiting && !interrupted && approvals.length === 0 && transcript.lastAssistantText
       ? followUpsFor(transcript.lastAssistantText)
       : []),
-    [streaming, awaiting, approvals.length, transcript.lastAssistantText],
+    [streaming, awaiting, interrupted, approvals.length, transcript.lastAssistantText],
   )
   const queued = useMemo(() => queueRows(queue), [queue])
   const sessionTaskRows = useMemo(() => sessionTasks(tasks, sessionId), [tasks, sessionId])
@@ -201,6 +209,11 @@ export default function ChatScreen() {
       } else if (action.type === 'trust' && approval.cwd) {
         await resolveTrust(approval.cwd, action.trusted)
       }
+      // Either answer settles the card: 「不信任」 that stays on screen blocks
+      // every following turn from being read as finished.
+      if (shouldDismissAfterAnswer(approval.kind, action)) {
+        useApp.setState(state => ({ approvals: state.approvals.filter(item => item.requestId !== approval.requestId) }))
+      }
     } finally {
       setBusyRequest(null)
     }
@@ -223,78 +236,85 @@ export default function ChatScreen() {
       {/* In-flow header, like the desktop's `.main-topbar`: no shadow, one line. */}
       <View
         style={{
-          height: 48,
+          height: 52,
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 8,
-          paddingHorizontal: 12,
+          paddingLeft: 4,
+          paddingRight: theme.gutter,
           borderBottomWidth: theme.hairline,
           borderBottomColor: theme.cardBorder,
         }}
       >
         <Pressable
           onPress={() => router.back()}
-          hitSlop={10}
+          accessibilityRole="button"
           accessibilityLabel="返回"
           style={({ pressed }) => ({
-            width: 32,
-            height: 32,
-            borderRadius: 16,
+            width: theme.touch,
+            height: theme.touch,
             alignItems: 'center',
             justifyContent: 'center',
+            borderRadius: theme.touch / 2,
             backgroundColor: pressed ? theme.pressed : 'transparent',
           })}
         >
-          <View style={{ transform: [{ rotate: '180deg' }] }}>
-            <ChevronRightIcon size={18} color={theme.text} />
-          </View>
+          <ArrowLeftIcon size={20} color={theme.text} />
         </Pressable>
+        {/* Title opens the session panel; the chevron is the only affordance
+            that says so, so it rides tight against the text. */}
         <Pressable
           onPress={() => router.push(`/session/${encodeURIComponent(sessionId)}`)}
+          accessibilityRole="button"
+          accessibilityLabel={`${session?.title ?? '会话'}，打开会话设置`}
           style={({ pressed }) => ({ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.6 : 1 })}
         >
-          <Text numberOfLines={1} style={{ color: theme.text, fontSize: 15, fontWeight: '600' }}>
+          <Text numberOfLines={1} style={{ flexShrink: 1, color: theme.text, fontSize: theme.fontHeading, fontWeight: '600' }}>
             {session?.title ?? '会话'}
           </Text>
-          <ChevronRightIcon size={14} color={theme.textWeak} />
+          <ChevronRightIcon size={15} color={theme.textWeak} />
         </Pressable>
       </View>
 
       {transcript.rows.length === 0 && approvals.length === 0 ? (
         // Grok-style empty state: the product name as the hero, then prompts
         // that can be sent with one tap instead of a centred "no messages".
-        <View style={{
-          flex: 1,
-          justifyContent: 'flex-end',
-          paddingHorizontal: theme.gutter + 8,
-          paddingBottom: 36,
-        }}>
-          <SparkIcon size={22} color={theme.textWeak} />
-          <Text style={{ color: theme.text, fontSize: 28, fontWeight: '700', letterSpacing: -0.4, marginTop: 10 }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            justifyContent: 'center',
+            paddingHorizontal: theme.gutter,
+            paddingBottom: 24,
+          }}
+        >
+          <SparkIcon size={24} color={theme.textWeak} />
+          <Text style={{ color: theme.text, fontSize: theme.fontTitle, fontWeight: '700', letterSpacing: -0.6, marginTop: 12 }}>
             OpenBuddy
           </Text>
-          <Text style={{ color: theme.textWeak, fontSize: 14, marginTop: 6, lineHeight: 20 }}>
+          <Text style={{ color: theme.textWeak, fontSize: theme.fontBody, marginTop: 6, lineHeight: 21 }}>
             把任务发过来，在电脑上执行。
           </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 18 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 20 }}>
             {['总结一下今天的改动', '把计划里的未完成项列出来', '这段代码为什么慢？'].map(text => (
               <Pressable
                 key={text}
                 onPress={() => void send(sessionId, text)}
+                accessibilityRole="button"
                 style={({ pressed }) => ({
+                  minHeight: 38,
+                  justifyContent: 'center',
                   borderWidth: theme.hairline,
                   borderColor: theme.cardBorder,
                   borderRadius: theme.radiusPill,
                   paddingHorizontal: 14,
-                  paddingVertical: 9,
                   backgroundColor: pressed ? theme.pressed : 'transparent',
                 })}
               >
-                <Text style={{ color: theme.textMedium, fontSize: 13 }}>{text}</Text>
+                <Text style={{ color: theme.textMedium, fontSize: theme.fontMeta }}>{text}</Text>
               </Pressable>
             ))}
           </View>
-        </View>
+        </ScrollView>
       ) : (
         <View style={{ flex: 1 }}>
           <FlashList
@@ -325,7 +345,10 @@ export default function ChatScreen() {
                 />
               ))}
             keyExtractor={row => row.id}
-            contentContainerStyle={{ paddingVertical: 6 }}
+            // The list is inverted; RN maps `paddingVertical` here to the
+            // physical top, so this is the gap under the header rule. Without
+            // it the first line sat flush against the border and read as cut off.
+            contentContainerStyle={{ paddingTop: 10, paddingBottom: 4 }}
           />
           {!atBottom ? (
             <Pressable
@@ -333,8 +356,10 @@ export default function ChatScreen() {
               accessibilityLabel="回到底部"
               style={({ pressed }) => ({
                 position: 'absolute',
-                bottom: 12,
-                right: 16,
+                // Clear of the newest message: the button used to sit on top of
+                // it, hiding the very text the user scrolled away from.
+                bottom: 8,
+                right: theme.gutter,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 4,
@@ -364,27 +389,27 @@ export default function ChatScreen() {
             alignItems: 'center',
             gap: 6,
             marginHorizontal: theme.gutter,
-            paddingVertical: 7,
+            minHeight: 34,
             opacity: pressed ? 0.6 : 1,
           })}
         >
-          <Text style={{ flex: 1, color: theme.textMedium, fontSize: 12 }}>
+          <Text style={{ flex: 1, color: theme.textMedium, fontSize: theme.fontMeta }}>
             运行中 {sessionTaskRows.length}
           </Text>
-          <Text style={{ color: theme.textWeak, fontSize: 12 }}>
+          <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta }}>
             {elapsedLabel(Math.min(...sessionTaskRows.map(task => task.startedAt ?? Date.now())))}
           </Text>
-          <ChevronRightIcon size={12} color={theme.textWeak} />
+          <ChevronRightIcon size={13} color={theme.textWeak} />
         </Pressable>
       ) : null}
 
       {queued.length ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: theme.gutter }}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={{ flexShrink: 1 }}
-            contentContainerStyle={{ gap: 8, paddingHorizontal: theme.gutter, paddingVertical: 6 }}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ gap: 8, paddingVertical: 6, paddingRight: 8 }}
           >
             {queued.map(row => (
               <View
@@ -402,10 +427,15 @@ export default function ChatScreen() {
                   backgroundColor: theme.card,
                 }}
               >
-                <Text style={{ color: theme.textWeak, fontSize: 10 }}>{queueLabel(row.kind)}</Text>
-                <Text numberOfLines={1} style={{ maxWidth: 160, color: theme.textMedium, fontSize: 12 }}>{row.text}</Text>
-                <Pressable onPress={() => void removeQueued(sessionId, row)} hitSlop={8} accessibilityLabel="移除排队消息">
-                  <Text style={{ color: theme.textWeak, fontSize: 13 }}>×</Text>
+                <Text style={{ color: theme.textWeak, fontSize: theme.fontMicro }}>{queueLabel(row.kind)}</Text>
+                <Text numberOfLines={1} style={{ maxWidth: 140, color: theme.textMedium, fontSize: theme.fontMeta }}>{row.text}</Text>
+                <Pressable
+                  onPress={() => void removeQueued(sessionId, row)}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel="移除排队消息"
+                >
+                  <CloseIcon size={12} color={theme.textWeak} />
                 </Pressable>
               </View>
             ))}
@@ -415,19 +445,17 @@ export default function ChatScreen() {
           {queued.length > 1 ? (
             <Pressable
               onPress={() => void clearQueue(sessionId)}
+              accessibilityRole="button"
               accessibilityLabel="清空排队消息"
               style={({ pressed }) => ({
-                marginLeft: 6,
-                marginRight: theme.gutter,
-                paddingHorizontal: 10,
-                paddingVertical: 6,
-                borderRadius: theme.radiusPill,
-                borderWidth: theme.hairline,
-                borderColor: theme.cardBorder,
-                backgroundColor: pressed ? theme.pressed : 'transparent',
+                minHeight: 34,
+                justifyContent: 'center',
+                paddingLeft: 10,
+                paddingRight: theme.gutter,
+                opacity: pressed ? 0.5 : 1,
               })}
             >
-              <Text style={{ color: theme.textWeak, fontSize: 12 }}>清空</Text>
+              <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta }}>清空</Text>
             </Pressable>
           ) : null}
         </View>
@@ -444,22 +472,28 @@ export default function ChatScreen() {
             <Pressable
               key={text}
               onPress={() => void send(sessionId, text)}
+              accessibilityRole="button"
               style={({ pressed }) => ({
                 borderWidth: theme.hairline,
                 borderColor: theme.cardBorder,
                 borderRadius: theme.radiusPill,
                 paddingHorizontal: 12,
-                paddingVertical: 7,
+                minHeight: 34,
+                justifyContent: 'center',
                 backgroundColor: pressed ? theme.pressed : 'transparent',
               })}
             >
-              <Text style={{ color: theme.textMedium, fontSize: 12 }}>{text}</Text>
+              <Text style={{ color: theme.textMedium, fontSize: theme.fontMeta }}>{text}</Text>
             </Pressable>
           ))}
         </ScrollView>
       ) : null}
 
-      {!streamingText && (awaiting || (streaming && transcript.rows.every(row => row.kind === 'thinking' || (row.kind === 'text' && row.role === 'user')))) ? (
+      {/* A pending approval *is* the reason nothing is streaming: the desktop is
+          blocked on the user. Showing 「等待模型响应」 under the card contradicts
+          the card and reads like a second, stuck queue. */}
+      {!streamingText && approvals.length === 0
+        && (awaiting || (streaming && transcript.rows.every(row => row.kind === 'thinking' || (row.kind === 'text' && row.role === 'user')))) ? (
         <LoadingRow />
       ) : null}
 
@@ -488,19 +522,19 @@ export default function ChatScreen() {
       <Modal visible={tasksOpen} transparent animationType="fade" onRequestClose={() => setTasksOpen(false)}>
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: theme.scrim }}
             onPress={() => setTasksOpen(false)}
           />
           <View style={{
             backgroundColor: theme.surface,
-            borderTopLeftRadius: 18,
-            borderTopRightRadius: 18,
+            borderTopLeftRadius: theme.radiusSheet,
+            borderTopRightRadius: theme.radiusSheet,
             paddingHorizontal: theme.gutter,
             paddingTop: 14,
-            paddingBottom: 30,
+            paddingBottom: 12 + insets.bottom,
             gap: 4,
           }}>
-            <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>运行中的任务</Text>
+            <Text style={{ color: theme.text, fontSize: theme.fontHeading, fontWeight: '700', marginBottom: 6 }}>运行中的任务</Text>
             {sessionTaskRows.length === 0 ? (
               <Text style={{ color: theme.textWeak, fontSize: 13, paddingVertical: 12 }}>没有运行中的任务。</Text>
             ) : (

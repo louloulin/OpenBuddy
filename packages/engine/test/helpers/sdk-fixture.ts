@@ -25,7 +25,19 @@ export async function sdkFixture(
   options: { trash?: (path: string) => Promise<void>; extensionFactories?: ExtensionFactory[] } = {},
 ) {
   const root = await mkdtemp(join(tmpdir(), "openbuddy-w1-"));
-  cleanups.push(() => rm(root, { recursive: true, force: true }));
+  // Some stores (checkpoints) finish writes after the turn resolves; a recursive rm can race a
+  // directory that is re-created mid-walk (ENOTEMPTY), so retry briefly before giving up.
+  cleanups.push(async () => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await rm(root, { recursive: true, force: true });
+        return;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOTEMPTY" || attempt >= 10) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    }
+  });
   const requests: FixtureRequest[] = [];
   const server = createServer(async (req, res) => {
     let body = "";

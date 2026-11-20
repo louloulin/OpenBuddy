@@ -16,6 +16,7 @@ import { createEngineHandlers } from '@openbuddy/host';
 import type { HostShell } from '@openbuddy/kernel';
 import { NATIVE_COMMANDS, DESKTOP_EVENTS } from '../native/index.js';
 import { PREVIEW_SCHEME, previewResponse } from '@openbuddy/services/preview/preview';
+import { StructuredLogger } from '@openbuddy/services/support/logger';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const developmentURL = 'http://127.0.0.1:1420/';
@@ -39,6 +40,25 @@ let mobileGateway: MobileGateway | undefined;
 let unregisterIpc: (() => void) | undefined;
 let registeredShortcut = '';
 const DEFAULT_QUICK_SHORTCUT = 'CommandOrControl+Shift+Space';
+
+/** 结构化日志 (O1): one rotating, redacted JSONL stream under <userData>/logs. */
+let fileLogger: StructuredLogger | undefined;
+const log = () => (fileLogger ??= new StructuredLogger(join(app.getPath('userData'), 'logs')));
+
+process.on('uncaughtException', (error) => {
+  log().error('main', 'uncaughtException', { message: error.message, stack: error.stack });
+  console.error('UNCAUGHT', error);
+});
+process.on('unhandledRejection', (reason) => {
+  log().error('main', 'unhandledRejection', {
+    message: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+  });
+  console.error('UNHANDLED_REJECTION', reason);
+});
+app.on('child-process-gone', (_event, details) => {
+  log().warn('main', 'child-process-gone', { type: details.type, reason: details.reason, exitCode: details.exitCode });
+});
 
 function disposeEngine(): Promise<void> {
   return cleanup ??= Promise.resolve().then(() => shutdown?.()).catch(error => { console.error('Engine shutdown failed', error); });
@@ -102,9 +122,18 @@ async function createWindow(route?: string): Promise<BrowserWindow | null> {
   const isMain = !mainWindow;
   if (isMain) mainWindow = win;
   windows.add(win);
-  win.webContents.on('console-message', event => { console.log('RENDERER_CONSOLE', event.level, event.message); });
-  win.webContents.on('render-process-gone', (_event, details) => { console.error('RENDERER_GONE', details.reason); });
-  win.webContents.on('did-fail-load', (_event, code, description) => { console.error('RENDERER_LOAD_FAILED', code, description); });
+  win.webContents.on('console-message', event => {
+    if (event.level === 'error' || event.level === 'warning') log().warn('renderer', event.message);
+    console.log('RENDERER_CONSOLE', event.level, event.message);
+  });
+  win.webContents.on('render-process-gone', (_event, details) => {
+    log().error('renderer', 'render-process-gone', { reason: details.reason, exitCode: details.exitCode });
+    console.error('RENDERER_GONE', details.reason);
+  });
+  win.webContents.on('did-fail-load', (_event, code, description) => {
+    log().warn('renderer', 'did-fail-load', { code, description });
+    console.error('RENDERER_LOAD_FAILED', code, description);
+  });
   if (isMain) {
     notifyMain = notifier(win, () => notificationsEnabled());
     // 任务栏角标 (W7.3): Windows overlay dot while a task waits for approval; cleared on focus.
@@ -148,6 +177,7 @@ app.setName('OpenBuddy');
 protocol.registerSchemesAsPrivileged([{ scheme: PREVIEW_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);
 if (process.env.OPENBUDDY_SMOKE_TEST === '1') app.setPath('userData', mkdtempSync(join(tmpdir(), 'openbuddy-smoke-')));
 app.whenReady().then(async () => {
+  log().info('main', 'ready', { version: app.getVersion(), packaged: app.isPackaged, platform: process.platform });
   // Only clipboard writes are granted; everything else (camera, notifications, …) stays denied.
   session.defaultSession.setPermissionRequestHandler((_contents, permission, callback) => callback(permission === 'clipboard-sanitized-write'));
   session.defaultSession.setPermissionCheckHandler((_contents, permission) => permission === 'clipboard-sanitized-write');
@@ -254,9 +284,9 @@ app.whenReady().then(async () => {
     if (!mainWindow) void createWindow();
     else { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.show(); mainWindow.focus(); }
   });
-}).catch(error => { console.error('OpenBuddy startup failed', error); app.exit(1); });
+}).catch(error => { log().error('main', 'startup-failed', { message: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined }); console.error('OpenBuddy startup failed', error); app.exit(1); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin' || process.env.OPENBUDDY_SMOKE_TEST === '1') app.quit(); });
-app.on('will-quit', () => { globalShortcut.unregisterAll(); unregisterIpc?.(); });
+app.on('will-quit', () => { log().info('main', 'will-quit'); globalShortcut.unregisterAll(); unregisterIpc?.(); });
 app.on('before-quit', event => {
   if (quitting) return;
   event.preventDefault();

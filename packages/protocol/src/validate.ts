@@ -225,13 +225,21 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   }
   // 测试连接 (W2.4): the server name in mcp.json.
   if (command === 'mcp_test') string('name', 256);
+  // 授权尝试 (B3a): bounded ids and server names.
+  if (command === 'mcp_auth_begin') { string('sessionId', 128, true); string('serverName', 256); }
+  if (command === 'mcp_auth_attempt' || command === 'mcp_auth_cancel') string('id', 128);
+  if (command === 'mcp_auth_attempts') string('sessionId', 128, true);
   // 专家团 (W3.5): install a preset by id.
   if (command === 'teams_install') string('id', 128);
+  // 专家链接 (B3b): an https URL or local package path; the service does the SSRF checks.
+  if (/^experts_link_(preview|import)$/.test(command)) string('source', 4096);
   // 资料库知识源 (W5.5): absolute folder paths.
   if (command === 'library_add') string('path');
   if (command === 'library_remove') string('id');
   // 自动化 (W4): ids are opaque strings; the payload itself is validated by AutomationService.save.
   if (/^(automations_delete|automations_set_status|automations_run|automation_records_archive|automation_records_delete)$/.test(command)) string('id', 128);
+  // 重试失败记录 (B3c): the record id, not the automation id.
+  if (command === 'automation_retry') string('recordId', 128);
   // 通知渠道 (W4.6): the service validates kind / endpoint; ids stay bounded here.
   if (/^(notify_channels_delete|notify_channels_test)$/.test(command)) string('id', 128);
   // 扩展中心 (W2.6): preview one path in an isolated loader; cwd scopes project extensions.
@@ -260,9 +268,19 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
     string('sessionId', 256);
     if (payload.direction !== undefined && payload.direction !== 'forward' && payload.direction !== 'backward') throw new Error('invalid_payload: direction');
   }
-  if (/^(agents_(list|get|save|delete|template)|experts_[a-z_]+|agent_(set|clear)_session_expert)$/.test(command)) expertPayload(command, payload);
+  if (/^(agents_(list|get|save|delete|template)|experts_[a-z_]+|capability_packs_[a-z_]+|agent_(set|clear)_session_expert)$/.test(command)) expertPayload(command, payload);
   if (command.startsWith('memory_')) memoryPayload(command, payload);
   if (command.startsWith('skills_catalog_')) skillsCatalogPayload(command, payload);
+  if (command === 'skills_install_from_catalog') {
+    const dirs = payload.dirs;
+    if (!Array.isArray(dirs) || !dirs.length || dirs.length > 20 || dirs.some((dir) => typeof dir !== 'string' || !dir.trim() || dir.length > 4096 || dir.includes('\0'))) throw new Error('invalid_payload: dirs');
+    string('cwd', 4096, true);
+  }
+  if (command === 'skills_export_zip') {
+    string('path', 4096);
+    string('target', 4096);
+    string('cwd', 4096, true);
+  }
   if (command.startsWith('prompts_')) promptsPayload(command, payload);
   return payload;
 }
@@ -417,6 +435,19 @@ function expertPayload(command: CommandName, payload: Payload) {
     case 'experts_link_agents':
       text(payload.root, 4096, 'root', false);
       if (payload.ids !== undefined && payload.ids !== null && (!Array.isArray(payload.ids) || payload.ids.length > 200 || !payload.ids.every(isExpertId))) fail('ids');
+      break;
+    case 'capability_packs_list':
+      break;
+    case 'capability_packs_set_enabled':
+    case 'capability_packs_remove':
+      if (typeof payload.id !== 'string' || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(payload.id)) fail('id');
+      if (command === 'capability_packs_set_enabled' && typeof payload.enabled !== 'boolean') fail('enabled');
+      break;
+    case 'capability_packs_set_contribution':
+      if (typeof payload.id !== 'string' || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(payload.id)) fail('id');
+      if (!['skill', 'prompt', 'mcp'].includes(String(payload.kind))) fail('kind');
+      text(payload.name, 128, 'name', false);
+      if (typeof payload.enabled !== 'boolean') fail('enabled');
       break;
   }
 }

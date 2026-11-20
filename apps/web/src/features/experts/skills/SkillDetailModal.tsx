@@ -6,10 +6,11 @@
  * Unlike WorkBuddy (which inlines the view), we use a full-screen overlay so
  * the back button returns to the skill grid without disturbing the grid state.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { SkillItem, SkillInfo } from "@openbuddy/protocol/dto";
-import { skillsCatalogReadSkill, skillsAdd } from "@openbuddy/client/agent-client";
+import { skillsCatalogReadSkill, skillsInstallFromCatalog } from "@openbuddy/client/agent-client";
 import { Markdown } from "@openbuddy/markdown/Markdown";
+import { useFocusTrap } from "@/shared/ui/use-focus-trap";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
 import { LetterAvatar } from "@openbuddy/ui/LetterAvatar";
 import {
@@ -30,6 +31,14 @@ export function SkillDetailModal({ skill, installed = [], onClose, onInstalled, 
   const [rawMd, setRawMd] = useState("");
   const [loading, setLoading] = useState(true);
   const [installing, setInstalling] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   useEffect(() => {
     let disposed = false;
@@ -55,8 +64,11 @@ export function SkillDetailModal({ skill, installed = [], onClose, onInstalled, 
     if (installing || installedEntry) return;
     setInstalling(true);
     try {
-      await skillsAdd(skill.sourceDir);
-      onToast?.(`已导入技能「${skill.name}」`);
+      // B1c: copy the marketplace directory into <pi>/skills, so removing the market root later
+      // does not take the skill with it; repeat installs are idempotent.
+      const result = await skillsInstallFromCatalog([skill.sourceDir]);
+      if (result.failed.length) throw new Error(result.failed[0]!.error);
+      onToast?.(result.installed[0]?.already ? `「${skill.name}」已安装` : `已安装技能「${skill.name}」`);
       onInstalled?.();
     } catch (e) {
       onToast?.(`导入失败：${String(e).replace(/^Error:\s*/, "")}`);
@@ -70,7 +82,7 @@ export function SkillDetailModal({ skill, installed = [], onClose, onInstalled, 
 
   return (
     <div className="sk-detail-overlay" onClick={onClose}>
-      <div className="sk-detail" onClick={(e) => e.stopPropagation()}>
+      <div className="sk-detail" ref={dialogRef} role="dialog" aria-modal="true" aria-label={`技能详情：${displayName}`} onClick={(e) => e.stopPropagation()}>
         {/* Header bar with back button */}
         <div className="sk-detail-bar">
           <button type="button" className="um-back" onClick={onClose}>

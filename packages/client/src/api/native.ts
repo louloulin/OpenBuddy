@@ -30,6 +30,13 @@ export async function exportTextFile(path: string, content: string): Promise<str
   return invoke<string>("export_text_file", { path, content });
 }
 
+/** Ask for a target and write text there (B3d local share); undefined when cancelled. */
+export async function saveTextAs(defaultPath: string, text: string): Promise<string | undefined> {
+  const target = await saveFileDialog({ title: "另存为", defaultPath });
+  if (!target) return undefined;
+  return exportTextFile(target, text);
+}
+
 /** Saves an image on the clipboard as a granted attachment; null when there is none. */
 export const clipboardSaveImage = () => invoke<{ path: string; name: string; size: number } | null>("clipboard_save_image", {});
 

@@ -45,21 +45,28 @@ export function ThinkingRow({ row }: { row: ThinkingRowData }) {
   const preview = lastLine(row.text)
 
   return (
-    <View style={{ paddingHorizontal: theme.gutter, marginBottom: 10 }}>
+    <View style={{ paddingHorizontal: theme.gutter, marginBottom: 4 }}>
       <Pressable
         onPress={() => setOpen(value => !value)}
+        accessibilityRole="button"
+        accessibilityLabel={row.live ? '思考中' : '思考过程'}
+        accessibilityState={{ expanded: open }}
+        accessibilityHint={open ? '收起' : '展开思考内容'}
         style={({ pressed }) => ({
           flexDirection: 'row',
           alignItems: 'center',
           gap: 4,
-          paddingVertical: 2,
+          minHeight: 34,
+          paddingVertical: 4,
           opacity: pressed ? 0.6 : 1,
         })}
       >
         <Triangle open={open} color={theme.textWeak} />
-        <Text style={{ color: theme.textWeak, fontSize: 13 }}>{row.live ? '思考中' : '思考过程'}</Text>
-        {!open && row.live && preview ? (
-          <Text numberOfLines={1} style={{ flex: 1, color: theme.textWeak, fontSize: 12, opacity: 0.8, marginLeft: 2 }}>
+        <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta }}>{row.live ? '思考中' : '思考过程'}</Text>
+        {/* The preview used to appear only while live, so a finished thought
+            collapsed into three bare characters with no hint of its content. */}
+        {!open && preview ? (
+          <Text numberOfLines={1} style={{ flex: 1, color: theme.textWeak, fontSize: theme.fontMicro, marginLeft: 2 }}>
             {preview}
           </Text>
         ) : null}
@@ -70,7 +77,7 @@ export function ThinkingRow({ row }: { row: ThinkingRowData }) {
           style={{ maxHeight: 240, marginTop: 6 }}
           contentContainerStyle={{ paddingLeft: 12, borderLeftWidth: 2, borderLeftColor: theme.cardBorder }}
         >
-          <Text selectable style={{ color: theme.textWeak, fontSize: 13, lineHeight: 22 }}>
+          <Text selectable style={{ color: theme.textMedium, fontSize: theme.fontMeta, lineHeight: 21 }}>
             {row.text}
           </Text>
         </ScrollView>

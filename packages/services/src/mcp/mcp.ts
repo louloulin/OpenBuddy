@@ -347,6 +347,29 @@ export class McpService {
       .map(([name, c]) => this.auth.status(name, String(c.url)));
   }
   async signIn(sessionId: string, name: string) {
+    const config = this.authConfig(name);
+    return this.auth.trigger(
+      sessionId,
+      name,
+      config.url,
+      config.oauth,
+    );
+  }
+  /** 授权尝试 (B3a): start without waiting; the UI polls/awaits `agent://mcp-auth`. */
+  authBegin(sessionId: string, name: string) {
+    const config = this.authConfig(name);
+    return this.auth.begin(sessionId, name, config.url, config.oauth);
+  }
+  authAttempt(id: string) {
+    return this.auth.attempt(id);
+  }
+  authAttempts(sessionId?: string) {
+    return this.auth.attemptsFor(sessionId);
+  }
+  authCancelAttempt(id: string) {
+    return this.auth.cancelAttempt(id);
+  }
+  private authConfig(name: string) {
     const config = this.store.read().mcpServers[name];
     if (!config || config.enabled === false)
       throw Error("MCP server不存在或未启用");
@@ -357,12 +380,7 @@ export class McpService {
       )
     )
       throw Error("该MCP使用静态Authorization，请先移除再使用OAuth");
-    return this.auth.trigger(
-      sessionId,
-      name,
-      config.url,
-      this.oauthSettings(name, config),
-    );
+    return { url: config.url, oauth: this.oauthSettings(name, config) };
   }
   /** `disabled`: 本任务连接器开关 (W2.4 P2) — names this session keeps off. */
   extension(disabled: string[] = []) {

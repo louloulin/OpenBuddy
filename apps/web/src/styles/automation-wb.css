@@ -336,7 +336,7 @@
   right: 0;
   width: 160px;
   background: var(--atm-popover-bg);
-  border: 1px solid var(--atm-border);
+  border: var(--wb-hairline) solid var(--atm-border);
   border-radius: 16px;
   box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.04), 0 3px 6px -8px rgba(0, 0, 0, 0.04);
   padding: 8px;
@@ -694,7 +694,7 @@
   right: 0;
   min-width: 128px;
   background: var(--atm-popover-bg);
-  border: 1px solid var(--atm-border);
+  border: var(--wb-hairline) solid var(--atm-border);
   border-radius: 8px;
   box-shadow: var(--atm-modal-shadow);
   padding: 4px;
@@ -894,7 +894,7 @@
 .atm-modal-input {
   width: 100%;
   height: 32px;
-  border: 1px solid var(--atm-border);
+  border: var(--wb-hairline) solid var(--atm-border);
   background: var(--atm-surface);
   color: var(--atm-text-primary);
   border-radius: 8px;
@@ -916,7 +916,7 @@
   right: 0;
   z-index: 100;
   background: var(--atm-popover-bg);
-  border: 1px solid var(--atm-border);
+  border: var(--wb-hairline) solid var(--atm-border);
   border-radius: 8px;
   box-shadow: var(--atm-modal-shadow);
   max-height: 240px;
@@ -955,7 +955,7 @@
 
 /* 提示词（边框大输入区 + 底部工具条） */
 .atm-modal-chat-input {
-  border: 1px solid var(--atm-border);
+  border: var(--wb-hairline) solid var(--atm-border);
   border-radius: 6px;
   background: var(--atm-surface);
   padding: 12px;
@@ -1016,7 +1016,7 @@
   max-height: 280px;
   overflow-y: auto;
   background: var(--atm-popover-bg);
-  border: 1px solid var(--atm-border);
+  border: var(--wb-hairline) solid var(--atm-border);
   border-radius: 8px;
   box-shadow: var(--atm-modal-shadow);
   padding: 4px;
@@ -1070,7 +1070,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid var(--atm-border);
+  border: var(--wb-hairline) solid var(--atm-border);
   border-radius: 8px;
   padding: 0 10px 0 12px;
   font-size: 13px;
@@ -1092,7 +1092,7 @@
 .atm-custom-select-dropdown {
   max-height: 220px;
   overflow-y: auto;
-  border: 1px solid var(--atm-border);
+  border: var(--wb-hairline) solid var(--atm-border);
   border-radius: 8px;
   background: var(--atm-popover-bg);
   box-shadow: var(--atm-modal-shadow);
@@ -1130,7 +1130,7 @@
   flex-wrap: nowrap;
   gap: 4px;
   padding: 4px 28px 4px 8px;
-  border: 1px solid var(--atm-border);
+  border: var(--wb-hairline) solid var(--atm-border);
   border-radius: 8px;
   background: var(--atm-surface);
   color: var(--atm-text-primary);
@@ -1200,7 +1200,7 @@
 .atm-monthday-picker-dropdown {
   max-height: 180px;
   overflow-y: auto;
-  border: 1px solid var(--atm-border);
+  border: var(--wb-hairline) solid var(--atm-border);
   border-radius: 8px;
   background: var(--atm-popover-bg);
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
@@ -1214,7 +1214,7 @@
   min-width: 40px;
   height: 30px;
   border-radius: 6px;
-  border: 1px solid var(--atm-border-soft);
+  border: var(--wb-hairline) solid var(--atm-border-soft);
   background: var(--atm-surface-soft);
   color: var(--atm-text-secondary);
   font-size: 12px;
@@ -1243,7 +1243,7 @@
   justify-content: space-between;
   gap: 10px;
   padding: 0 12px;
-  border: 1px solid var(--atm-border);
+  border: var(--wb-hairline) solid var(--atm-border);
   border-radius: 6px;
   background: var(--atm-surface);
   color: var(--atm-text-primary);
@@ -1258,7 +1258,7 @@
 .atm-time-picker-icon { color: var(--atm-text-tertiary); }
 .atm-time-picker-dropdown {
   border-radius: 10px;
-  border: 1px solid var(--atm-border);
+  border: var(--wb-hairline) solid var(--atm-border);
   background: var(--atm-popover-bg);
   box-shadow: var(--atm-modal-shadow);
   padding: 12px;
@@ -1297,7 +1297,7 @@
   height: 32px;
   padding: 5px 16px;
   border-radius: 0;
-  border: 1px solid var(--wb-color-border-primary, #E5E5E5);
+  border: var(--wb-hairline) solid var(--wb-color-border-primary, #E5E5E5);
   background: var(--atm-surface);
   color: var(--atm-text-secondary);
   font-size: 14px;
@@ -1346,7 +1346,7 @@
   gap: 12px;
   padding: 0 12px;
   border-radius: 6px;
-  border: 1px solid var(--atm-border);
+  border: var(--wb-hairline) solid var(--atm-border);
   background: var(--atm-surface);
   cursor: pointer;
   transition: border-color 0.15s ease;
@@ -1384,7 +1384,7 @@
 .atm-validity-clear:hover:not(:disabled) { background: var(--atm-surface-hover); color: var(--atm-text-primary); }
 .atm-validity-dropdown {
   border-radius: 10px;
-  border: 1px solid var(--atm-border);
+  border: var(--wb-hairline) solid var(--atm-border);
   background: var(--atm-popover-bg);
   box-shadow: var(--atm-modal-shadow);
   padding: 16px;
@@ -1450,7 +1450,7 @@
 .atm-validity-calendar-footer {
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid var(--atm-border-soft);
+  border-top: var(--wb-hairline) solid var(--atm-border-soft);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1494,7 +1494,7 @@
   width: 36px;
   height: 20px;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--wb-radius-pill);
   background: var(--atm-border);
   cursor: pointer;
   padding: 2px;
@@ -1529,7 +1529,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-left: 1px solid var(--atm-border-softest);
+  border-left: var(--wb-hairline) solid var(--atm-border-softest);
 }
 .atm-detail-run-history-header {
   display: flex;
@@ -1625,7 +1625,7 @@
   justify-content: space-between;
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid var(--atm-border);
+  border: var(--wb-hairline) solid var(--atm-border);
   border-radius: 6px;
   background: var(--atm-surface);
   cursor: pointer;
@@ -1665,7 +1665,7 @@
   z-index: 100;
   margin-top: 4px;
   background: var(--atm-popover-bg);
-  border: 1px solid var(--atm-border);
+  border: var(--wb-hairline) solid var(--atm-border);
   border-radius: 6px;
   box-shadow: var(--atm-modal-shadow);
   max-height: 280px;
@@ -1700,7 +1700,7 @@
   font-size: 12px;
   color: var(--atm-text-secondary);
   cursor: pointer;
-  border-top: 1px solid var(--atm-border-soft);
+  border-top: var(--wb-hairline) solid var(--atm-border-soft);
   transition: background-color 0.12s ease;
 }
 .connector-selector-field__manage:hover { background-color: var(--atm-surface-hover); color: var(--atm-text-primary); }
@@ -1739,7 +1739,7 @@
   width: 360px;
   max-width: calc(100vw - 48px);
   background: var(--atm-popover-bg);
-  border: 1px solid var(--atm-border);
+  border: var(--wb-hairline) solid var(--atm-border);
   border-radius: 8px;
   box-shadow: var(--atm-modal-shadow);
   padding: 4px;
@@ -1757,7 +1757,7 @@
   box-sizing: border-box;
 }
 .automation-permission-picker__item:hover { background: var(--atm-surface-hover); }
-.automation-permission-picker__item--divider { border-top: 1px solid var(--atm-border-soft); }
+.automation-permission-picker__item--divider { border-top: var(--wb-hairline) solid var(--atm-border-soft); }
 .automation-permission-picker__check-col {
   display: inline-flex;
   align-items: center;
@@ -1825,7 +1825,7 @@
 
 /* ---------- 通用按钮 / 确认弹窗 / 复选框 ---------- */
 .atm-btn {
-  border: 1px solid transparent;
+  border: var(--wb-hairline) solid transparent;
   border-radius: 6px;
   height: 36px;
   padding: 0 18px;
@@ -1841,9 +1841,9 @@
 .atm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .atm-btn--primary { background: var(--atm-primary-btn-bg); color: var(--atm-primary-btn-text); border-color: var(--atm-primary-btn-border); }
 .atm-btn--primary:hover:not(:disabled) { background: var(--atm-primary-btn-hover-bg); border-color: var(--atm-primary-btn-hover-border); }
-.atm-btn--secondary { background: var(--atm-secondary-btn-bg); color: var(--atm-secondary-btn-text); border: 1px solid var(--atm-secondary-btn-border); }
+.atm-btn--secondary { background: var(--atm-secondary-btn-bg); color: var(--atm-secondary-btn-text); border: var(--wb-hairline) solid var(--atm-secondary-btn-border); }
 .atm-btn--secondary:hover:not(:disabled) { background: var(--atm-secondary-btn-hover-bg); }
-.atm-btn--danger { background: var(--atm-result-failed-bg); color: var(--atm-result-failed-text); border: 1px solid var(--atm-result-failed-border); }
+.atm-btn--danger { background: var(--atm-result-failed-bg); color: var(--atm-result-failed-text); border: var(--wb-hairline) solid var(--atm-result-failed-border); }
 .atm-btn--danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--atm-result-failed-bg) 85%, var(--atm-result-failed-text) 15%);
   border-color: color-mix(in srgb, var(--atm-result-failed-border) 78%, var(--atm-result-failed-text) 22%);
@@ -1880,7 +1880,7 @@
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1px solid var(--wb-palette-black-20, rgba(0, 0, 0, 0.2));
+  border: var(--wb-hairline) solid var(--wb-palette-black-20, rgba(0, 0, 0, 0.2));
   border-radius: 4px;
   background: var(--atm-surface, #fff);
   color: var(--atm-primary-btn-text, #fff);
@@ -1891,3 +1891,16 @@
 [data-theme="dark"] .wb-checkbox-box { border-color: rgba(255, 255, 255, 0.3); }
 .wb-checkbox--checked .wb-checkbox-box { background: var(--atm-primary-btn-bg, #111); border-color: var(--atm-primary-btn-border, #111); }
 .wb-checkbox-label { font-size: 13px; line-height: 1.5; color: var(--atm-text-primary); }
+
+/* B3c: revision + retry affordances. rem/em only, so the bare-px gate stays flat. */
+.atm-row-revision,
+.atm-run-history-item-rev {
+  flex-shrink: 0;
+  padding: 0.1em 0.45em;
+  border-radius: 0.5em;
+  background: var(--wb-bg-secondary);
+  color: var(--wb-text-tertiary);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  font-feature-settings: var(--wb-font-numeric-feature);
+}

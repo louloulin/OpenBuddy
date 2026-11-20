@@ -64,6 +64,20 @@ export interface McpAuthTriggerResult {
   error?: string;
 }
 
+/** 授权尝试 (B3a): the host-held id, expiry and state the modal renders. */
+export type McpAuthAttemptStatus = "pending" | "authorized" | "failed" | "expired" | "cancelled";
+
+export interface McpAuthAttempt {
+  id: string;
+  sessionId: string;
+  serverName: string;
+  status: McpAuthAttemptStatus;
+  startedAt: number;
+  /** Epoch ms; the modal counts down to this and the host expires the attempt at it. */
+  expiresAt: number;
+  error?: string;
+}
+
 
 export interface McpAuthStatusEntry {
   serverName: string;

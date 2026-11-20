@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { open as openDialog } from "@openbuddy/client/ipc";
 import {
   SearchIcon, InstalledSkillIcon, AddCircleIcon, RefreshCwIcon,
-  PuzzlePieceIcon, DeleteIcon, FolderOpenIcon, ChevronLeftIcon, SparklesIcon,
+  PuzzlePieceIcon, DeleteIcon, FolderOpenIcon, ChevronLeftIcon, SparklesIcon, DownloadIcon,
 } from "@openbuddy/ui/icon/icons/index";
 import {
-  skillsList, skillsRemove, skillsToggle,
+  saveFileDialog, skillsExportZip, skillsList, skillsRemove, skillsToggle,
   skillsCatalogDefaultRoot, skillsCatalogLoad,
 } from "@openbuddy/client/agent-client";
 import type { SkillCatalog, SkillItem, SkillInfo } from "@openbuddy/protocol/dto";
@@ -151,6 +151,33 @@ export function SkillsTab({ pills, onToast }: Props) {
     catch (e) { onToast?.(`移除失败：${String(e).replace(/^Error:\s*/, "")}`); }
   }, [onToast, reloadLocals]);
 
+  // B1c: one switch per skill stays, plus batch enable/disable for marketplace installs.
+  const batchToggle = useCallback(async (enabled: boolean) => {
+    const targets = locals.filter((s) => s.market && s.enabled !== enabled);
+    if (!targets.length) { onToast?.(enabled ? "已全部启用" : "已全部停用"); return; }
+    for (const s of targets) {
+      try { await skillsToggle(s.name, enabled); } catch { /* one failure must not stop the rest */ }
+    }
+    onToast?.(`${enabled ? "启用" : "停用"} ${targets.length} 个技能`);
+    await reloadLocals();
+  }, [locals, onToast, reloadLocals]);
+
+  const handleExport = useCallback(async (s: SkillInfo) => {
+    if (!s.path) return;
+    try {
+      const target = await saveFileDialog({
+        title: "导出技能",
+        defaultPath: `${s.name.replace(/[^A-Za-z0-9._-]+/g, "-")}.zip`,
+        filters: [{ name: "ZIP", extensions: ["zip"] }],
+      });
+      if (!target) return;
+      const result = await skillsExportZip(s.path, target);
+      onToast?.(`已导出 ${result.files.length} 个文件（${Math.max(1, Math.round(result.bytes / 1024))} KB）`);
+    } catch (e) {
+      onToast?.(`导出失败：${String(e).replace(/^Error:\s*/, "")}`);
+    }
+  }, [onToast]);
+
   // ---- no data dir yet ----
   if (needPick && !catalog && view === "center") {
     return (
@@ -181,6 +208,12 @@ export function SkillsTab({ pills, onToast }: Props) {
             </button>
           </div>
           <div className="um-topbar-right">
+            <button type="button" className="um-btn um-btn--grey" onClick={() => { void batchToggle(true); }}>
+              <span>全部启用</span>
+            </button>
+            <button type="button" className="um-btn um-btn--grey" onClick={() => { void batchToggle(false); }}>
+              <span>全部停用</span>
+            </button>
             <button type="button" className="um-btn um-btn--grey" onClick={() => setImportOpen(true)}>
               <AddCircleIcon size="sm" /><span>添加技能</span>
             </button>
@@ -202,7 +235,10 @@ export function SkillsTab({ pills, onToast }: Props) {
                   <div className="sk-card-head" style={{ flex: 1 }}>
                     <PuzzlePieceIcon size="md" className="sk-inst-icon" />
                     <div className="sk-inst-info">
-                      <div className="sk-card-name">{s.displayName || s.name}</div>
+                      <div className="sk-card-name">
+                        {s.displayName || s.name}
+                        {s.version && <span className="sk-inst-ver">v{s.version}</span>}
+                      </div>
                       <p className="sk-card-desc">{s.description || "（无描述）"}</p>
                     </div>
                   </div>
@@ -211,6 +247,10 @@ export function SkillsTab({ pills, onToast }: Props) {
                       onChange={() => handleToggle(s, !s.enabled)} />
                     <span className="sk-toggle-track"><span className="sk-toggle-thumb" /></span>
                   </label>
+                  {s.path && (
+                    <button type="button" className="sk-inst-del" title="导出 ZIP"
+                      onClick={() => { void handleExport(s); }}><DownloadIcon size="sm" /></button>
+                  )}
                   {s.path && (
                     <button type="button" className="sk-inst-del" title="移除"
                       onClick={() => handleRemove(s)}><DeleteIcon size="sm" /></button>

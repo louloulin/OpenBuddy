@@ -1,0 +1,787 @@
+{
+  "at": "2026-11-19T07:07:45.422Z",
+  "ok": true,
+  "steps": [
+    {
+      "name": "home",
+      "result": "/tmp/ob-e2e-b1c/01-home.png"
+    },
+    {
+      "name": "configure fixture provider",
+      "result": {
+        "models": [
+          {
+            "modelId": "fixture-model",
+            "providerId": "fixture",
+            "name": "Fixture 模型",
+            "contextWindow": 128000,
+            "reasoning": true,
+            "input": [
+              "text",
+              "image"
+            ],
+            "maxTokens": 4096,
+            "availableThinkingLevels": [
+              "off",
+              "minimal",
+              "low",
+              "medium",
+              "high"
+            ],
+            "modelKey": "model:fixture/fixture-model",
+            "pricingKnown": false
+          }
+        ],
+        "providers": [
+          {
+            "id": "fixture",
+            "providerKind": "custom",
+            "baseUrl": "http://127.0.0.1:47224/v1",
+            "apiBackend": "chat_completions",
+            "authScheme": "bearer",
+            "label": "Fixture",
+            "apiKey": "••••"
+          }
+        ]
+      }
+    },
+    {
+      "name": "chat markdown answer",
+      "result": "/tmp/ob-e2e-b1c/02-chat-markdown.png"
+    },
+    {
+      "name": "code block copy",
+      "result": {
+        "clipboardWrites": 1
+      }
+    },
+    {
+      "name": "tool approval",
+      "result": [
+        "/tmp/ob-e2e-b1c/03-approval.png",
+        "/tmp/ob-e2e-b1c/62-approval-rules.png",
+        "/tmp/ob-e2e-b1c/04-tool-done.png"
+      ]
+    },
+    {
+      "name": "agent writes files → workbench",
+      "result": [
+        "/tmp/ob-e2e-b1c/05-workbench.png",
+        "/tmp/ob-e2e-b1c/67-external-modified.png"
+      ]
+    },
+    {
+      "name": "branch switcher",
+      "result": [
+        "/tmp/ob-e2e-b1c/08-branch-2of2.png",
+        "/tmp/ob-e2e-b1c/08-branch-1of2.png"
+      ]
+    },
+    {
+      "name": "bang command",
+      "result": [
+        "/tmp/ob-e2e-b1c/09-bash-mode.png",
+        "/tmp/ob-e2e-b1c/09-bash-output.png",
+        "hello"
+      ]
+    },
+    {
+      "name": "@ file mention",
+      "result": {
+        "all": "/tmp/ob-e2e-b1c/10-file-mention-all.png",
+        "groups": [
+          "本任务产物"
+        ],
+        "shot": "/tmp/ob-e2e-b1c/10-file-mention.png",
+        "items": [
+          "report.md\ndocs"
+        ],
+        "value": "看看 @docs/report.md "
+      }
+    },
+    {
+      "name": "plan: 想一想 records steps with ob_todo",
+      "result": "/tmp/ob-e2e-b1c/11-plan-ready.png"
+    },
+    {
+      "name": "plan: 按此计划执行 updates the steps",
+      "result": "/tmp/ob-e2e-b1c/12-plan-progress.png"
+    },
+    {
+      "name": "plan: ob_todo rows in the transcript",
+      "result": [
+        "/tmp/ob-e2e-b1c/13-plan-transcript.png",
+        [
+          "更新计划 开始 #1 读取 data/sales.csv 并核对字段 0/4",
+          "更新计划 完成 #1 读取 data/sales.csv 并核对字段 1/4",
+          "更新计划 开始 #2 按区域汇总季度销售额 1/4",
+          "更新计划 完成 #2 按区域汇总季度销售额 2/4",
+          "更新计划 开始 #3 撰写分析报告 docs/report.md 2/4"
+        ]
+      ]
+    },
+    {
+      "name": "plan: task overview popover",
+      "result": [
+        "/tmp/ob-e2e-b1c/14-task-overview.png",
+        "步骤 2/4 · 产物 4"
+      ]
+    },
+    {
+      "name": "turn menu: 逐条回答",
+      "result": [
+        "/tmp/ob-e2e-b1c/68-qna-menu.png",
+        ""
+      ]
+    },
+    {
+      "name": "批注托盘 + 窄窗口标签下拉",
+      "result": [
+        "/tmp/ob-e2e-b1c/69-annotation-tray.png",
+        "/tmp/ob-e2e-b1c/70-tabs-dropdown.png"
+      ]
+    },
+    {
+      "name": "交接到新任务",
+      "result": [
+        "/tmp/ob-e2e-b1c/71-handoff.png",
+        "## 背景接手（来自「__LONG__ 帮我整理一个重构方案」）\n工作空间：`/private/var/folders/nj/vtk9xv2j4wq41_94ry3zr8hh0000gn/T/openbuddy-e2e-30005/run/"
+      ]
+    },
+    {
+      "name": "连接器目录 + 本任务连接器开关",
+      "result": [
+        "/tmp/ob-e2e-b1c/72-connectors-catalog.png",
+        "/tmp/ob-e2e-b1c/73-connectors-installed.png",
+        "/tmp/ob-e2e-b1c/74-session-connectors.png"
+      ]
+    },
+    {
+      "name": "扩展中心 · npm / git 安装入口与包市场",
+      "result": "/tmp/ob-e2e-b1c/78-extension-packages.png"
+    },
+    {
+      "name": "扩展包市场 · npm 实时搜索",
+      "result": {
+        "total": 14037,
+        "packages": 25,
+        "first": "pi-web-access@0.48.0"
+      }
+    },
+    {
+      "name": "专家 · WorkBuddy 包导入",
+      "result": {
+        "package": "e2e-workbuddy",
+        "packId": "e2e-workbuddy",
+        "names": [
+          "测试量化师",
+          "测试风控官"
+        ],
+        "team": "team-wb-e2e",
+        "contributions": [
+          "skill:e2e-skill",
+          "prompt:e2e-report",
+          "mcp:e2e"
+        ],
+        "skipped": [
+          "hook:hooks"
+        ],
+        "lifecycle": "disable → enable → per-item off → remove"
+      }
+    },
+    {
+      "name": "独立窗口 + 全局快速输入",
+      "result": {
+        "sessionWindow": "file:///Users/louloulin/stock/OpenBuddy/dist/index.html#/session/01a1f29e-2353-767f-87d2-5546ef1f0449",
+        "quickWindow": "file:///Users/louloulin/stock/OpenBuddy/dist/index.html#/quick",
+        "windows": 2
+      }
+    },
+    {
+      "name": "settings",
+      "result": "/tmp/ob-e2e-b1c/06-settings.png"
+    },
+    {
+      "name": "settings sections",
+      "result": [
+        "/tmp/ob-e2e-b1c/07-settings-general.png",
+        "/tmp/ob-e2e-b1c/07-settings-model.png",
+        "/tmp/ob-e2e-b1c/07-settings-assistant.png",
+        "/tmp/ob-e2e-b1c/07-settings-agent-settings.png",
+        "/tmp/ob-e2e-b1c/07-settings-security.png",
+        "/tmp/ob-e2e-b1c/07-settings-personalize.png",
+        "/tmp/ob-e2e-b1c/07-settings-memory.png",
+        "/tmp/ob-e2e-b1c/07-settings-shortcuts.png",
+        "/tmp/ob-e2e-b1c/07-settings-agent-mail.png",
+        "/tmp/ob-e2e-b1c/07-settings-data.png",
+        "/tmp/ob-e2e-b1c/07-settings-help.png",
+        "/tmp/ob-e2e-b1c/07-settings-about.png"
+      ]
+    },
+    {
+      "name": "本地模型（W8）",
+      "result": "/tmp/ob-e2e-b1c/77-local-model.png"
+    },
+    {
+      "name": "通用偏好（主题 / 字号 / 密度 / 发送键）",
+      "result": {
+        "light": "/tmp/ob-e2e-b1c/59-general.png",
+        "dark": "/tmp/ob-e2e-b1c/60-general-dark-large.png",
+        "about": "/tmp/ob-e2e-b1c/61-about.png",
+        "tray": "/tmp/ob-e2e-b1c/63-tray-enabled.png",
+        "attrs": {
+          "theme": "dark",
+          "fontSize": "large",
+          "density": "compact",
+          "sendKey": "mod+enter"
+        }
+      }
+    },
+    {
+      "name": "安全中心（受保护路径 + 规则）",
+      "result": {
+        "before": "/tmp/ob-e2e-b1c/56-security-center.png",
+        "after": "/tmp/ob-e2e-b1c/57-security-configured.png",
+        "paths": [
+          ".env",
+          ".git",
+          ".ssh",
+          "*.pem",
+          "*.key",
+          "*.p12",
+          "id_rsa",
+          "id_ed25519",
+          "credentials.json",
+          "config/secrets.json"
+        ],
+        "ruleSaved": true
+      }
+    },
+    {
+      "name": "诊断报告（本地预览）",
+      "result": {
+        "shot": "/tmp/ob-e2e-b1c/58-diagnostics.png",
+        "lines": 25
+      }
+    },
+    {
+      "name": "agent settings persisted (pii W0.4)",
+      "result": {
+        "before": "/tmp/ob-e2e-b1c/15-settings-agent.png",
+        "after": "/tmp/ob-e2e-b1c/16-settings-agent-persisted.png",
+        "autoCompaction": {
+          "enabled": false,
+          "reserveTokens": 16384,
+          "keepRecentTokens": 20000
+        },
+        "followUpMode": "all",
+        "builtins": [
+          "mode:true",
+          "persona:true",
+          "todo:true",
+          "memory:true",
+          "subagent:true",
+          "office:true"
+        ]
+      }
+    },
+    {
+      "name": "model favourites (pii W1.6)",
+      "result": {
+        "menu": "/tmp/ob-e2e-b1c/17-model-menu-favorites.png",
+        "cycled": "/tmp/ob-e2e-b1c/18-ctrl-p-cycled.png",
+        "favoriteModels": [
+          "model:fixture/fixture-model",
+          "model:fixture/fixture-priced"
+        ]
+      }
+    },
+    {
+      "name": "context popover (pii W1.5)",
+      "result": {
+        "popover": "/tmp/ob-e2e-b1c/19-context-popover.png",
+        "compacted": "/tmp/ob-e2e-b1c/20-context-compact.png",
+        "cost": "$0.0063",
+        "message": "暂时没有可压缩的内容，对话再长一些后再试",
+        "autoCompaction": true
+      }
+    },
+    {
+      "name": "mode restored after switching sessions (pii W0.5)",
+      "result": {
+        "title": "交接任务",
+        "shot": "/tmp/ob-e2e-b1c/21-mode-restored.png",
+        "checked": "true"
+      }
+    },
+    {
+      "name": "close settings",
+      "result": true
+    },
+    {
+      "name": "sidebar after cleanup",
+      "result": {
+        "nav": [
+          "experts-hub:专家·技能·连接器",
+          "automation:自动化",
+          "library:资料库",
+          "projects:项目"
+        ],
+        "moreItems": [
+          "我的文件",
+          "知识库",
+          "用量统计",
+          "通知渠道",
+          "灵感",
+          "策略设置"
+        ],
+        "shot": "/tmp/ob-e2e-b1c/22-sidebar-registry.png"
+      }
+    },
+    {
+      "name": "click every entry",
+      "result": {
+        "visited": [
+          "experts-hub",
+          "automation",
+          "library",
+          "projects",
+          "my-files",
+          "knowledge-base",
+          "usage",
+          "notify-channels",
+          "inspiration",
+          "policy"
+        ],
+        "commands": [
+          "agent_list_workspaces",
+          "agents_list",
+          "automations_snapshot",
+          "experts_load",
+          "library_list",
+          "list_dir",
+          "mcp_list",
+          "memory_list",
+          "notify_channels_list",
+          "providers_list",
+          "skills_list",
+          "tasks_list",
+          "teams_list",
+          "usage_snapshot"
+        ],
+        "rejected": [],
+        "notImplemented": []
+      }
+    },
+    {
+      "name": "资料库三标签",
+      "result": {
+        "memory": "/tmp/ob-e2e-b1c/38-library-memory.png",
+        "files": "/tmp/ob-e2e-b1c/39-library-files.png",
+        "knowledge": "/tmp/ob-e2e-b1c/40-library-knowledge.png"
+      }
+    },
+    {
+      "name": "灵感静态场景",
+      "result": {
+        "cards": 33,
+        "grid": "/tmp/ob-e2e-b1c/41-inspiration.png",
+        "scene": "scene-working-1-1"
+      }
+    },
+    {
+      "name": "用量统计",
+      "result": {
+        "values": [
+          "20.7k",
+          "2",
+          "$0.0063"
+        ],
+        "totals": {
+          "tokens": 20700,
+          "prompt": 18000,
+          "completion": 2700,
+          "cost": 0.0063,
+          "sessions": 2
+        },
+        "shot": "/tmp/ob-e2e-b1c/42-usage.png"
+      }
+    },
+    {
+      "name": "自动化：创建 → 测试运行 → 运行记录 → 打开会话",
+      "result": {
+        "empty": "/tmp/ob-e2e-b1c/43-automation-empty.png",
+        "form": "/tmp/ob-e2e-b1c/44-automation-form.png",
+        "saved": "/tmp/ob-e2e-b1c/45-automation-saved.png",
+        "records": "/tmp/ob-e2e-b1c/46-automation-records.png",
+        "session": "/tmp/ob-e2e-b1c/47-automation-session.png",
+        "automations": [
+          "每日销售摘要"
+        ],
+        "recordsCount": 1,
+        "recordText": "每日销售摘要 成功 15:04"
+      }
+    },
+    {
+      "name": "保存为自动化（会话 ⋯ 菜单）",
+      "result": {
+        "name": "用一句话总结今天的销售情况",
+        "prompt": "用一句话总结今天的销售情况",
+        "cwd": "/private/var/folders/nj/vtk9xv2j4wq41_94ry3zr8hh0000gn/T/openbuddy-e2e-30005/run/profile/pi/inbox",
+        "shot": "/tmp/ob-e2e-b1c/48-save-as-automation.png"
+      }
+    },
+    {
+      "name": "experts hub with skills and MCP",
+      "result": {
+        "tabs": [
+          "专家",
+          "技能",
+          "连接器",
+          "我的指令",
+          "扩展"
+        ],
+        "shots": [
+          "/tmp/ob-e2e-b1c/23-hub-skills.png",
+          "/tmp/ob-e2e-b1c/24-hub-connectors-mcp.png",
+          "/tmp/ob-e2e-b1c/24b-hub-connectors-tested.png",
+          "/tmp/ob-e2e-b1c/65-mcp-tool-rules.png",
+          "/tmp/ob-e2e-b1c/66-mcp-deferred.png",
+          "/tmp/ob-e2e-b1c/25-hub-extensions.png",
+          "/tmp/ob-e2e-b1c/25b-hub-prompts.png",
+          "/tmp/ob-e2e-b1c/25c-prompt-editor.png",
+          "/tmp/ob-e2e-b1c/25d-prompt-saved.png"
+        ],
+        "tools": [
+          "query_sales",
+          "inventory_check"
+        ],
+        "templates": [
+          "global/scene-working-1-1",
+          "global/weekly-report"
+        ]
+      }
+    },
+    {
+      "name": "能力包管理（B1a）",
+      "result": {
+        "packId": "ui-pack",
+        "shot": "/tmp/ob-e2e-b1c/25e-capability-pack.png",
+        "off": "/tmp/ob-e2e-b1c/25f-capability-pack-off.png",
+        "lifecycle": "UI 逐项关闭 → 回退"
+      }
+    },
+    {
+      "name": "技能市场安装 / 导出（B1c）",
+      "result": {
+        "version": "3.1.0",
+        "files": 2,
+        "market": true,
+        "shots": [
+          "/tmp/ob-e2e-b1c/25g-skill-market-installed.png",
+          "/tmp/ob-e2e-b1c/25h-skill-batch-off.png"
+        ]
+      }
+    },
+    {
+      "name": "subagent cards",
+      "result": {
+        "collapsed": "/tmp/ob-e2e-b1c/36-subagent-cards.png",
+        "states": [
+          "已完成 · 9s",
+          "运行中"
+        ],
+        "expanded": "/tmp/ob-e2e-b1c/37-subagent-expanded.png"
+      }
+    },
+    {
+      "name": "团队子代理（B2a）",
+      "result": {
+        "titles": [
+          "深度调研员（调研）",
+          "代码审查员（审阅）"
+        ],
+        "shot": "/tmp/ob-e2e-b1c/36b-team-subagent-cards.png"
+      }
+    },
+    {
+      "name": "办公产物（B2b）",
+      "result": {
+        "paths": [
+          "/private/var/folders/nj/vtk9xv2j4wq41_94ry3zr8hh0000gn/T/openbuddy-e2e-30005/run/profile/pi/inbox/reports/q3.xlsx"
+        ],
+        "path": "/private/var/folders/nj/vtk9xv2j4wq41_94ry3zr8hh0000gn/T/openbuddy-e2e-30005/run/profile/pi/inbox/reports/q3.xlsx",
+        "shot": "/tmp/ob-e2e-b1c/36c-office-xlsx.png"
+      }
+    },
+    {
+      "name": "second task",
+      "result": true
+    },
+    {
+      "name": "palette content search",
+      "result": {
+        "marks": [
+          "统一卡片的圆角"
+        ],
+        "findValue": "统一卡片的圆角",
+        "count": "1/1",
+        "highlights": 1,
+        "shots": [
+          "/tmp/ob-e2e-b1c/26-palette-content-search.png",
+          "/tmp/ob-e2e-b1c/27-palette-hit-opened.png"
+        ]
+      }
+    },
+    {
+      "name": "host capabilities",
+      "result": {
+        "protocolVersion": 1,
+        "platform": "desktop",
+        "commands": 209,
+        "events": 32,
+        "includesSelf": true,
+        "includesNative": true,
+        "features": []
+      }
+    },
+    {
+      "name": "experts center",
+      "result": {
+        "cards": 12,
+        "shots": [
+          "/tmp/ob-e2e-b1c/28-experts-center.png",
+          "/tmp/ob-e2e-b1c/28b-expert-teams.png",
+          "/tmp/ob-e2e-b1c/28c-expert-team-installed.png"
+        ],
+        "teamCommand": "/team-research-write-review"
+      }
+    },
+    {
+      "name": "experts detail",
+      "result": "/tmp/ob-e2e-b1c/29-expert-detail.png"
+    },
+    {
+      "name": "my experts (empty)",
+      "result": "/tmp/ob-e2e-b1c/30-my-experts-empty.png"
+    },
+    {
+      "name": "expert editor: create",
+      "result": [
+        "/tmp/ob-e2e-b1c/31-expert-editor.png",
+        "/tmp/ob-e2e-b1c/32-my-experts.png"
+      ]
+    },
+    {
+      "name": "summon → composer prefilled (not sent)",
+      "result": {
+        "prefilled": "帮我规划一个三天两晚的杭州周末行程，预算 2000 元",
+        "shot": "/tmp/ob-e2e-b1c/33-summon-prefilled.png"
+      }
+    },
+    {
+      "name": "send → persona reaches the model",
+      "result": {
+        "persona": "旅行规划师",
+        "shot": "/tmp/ob-e2e-b1c/34-persona-answer.png"
+      }
+    },
+    {
+      "name": "unbind expert",
+      "result": "/tmp/ob-e2e-b1c/35-expert-unbound.png"
+    },
+    {
+      "name": "通知渠道（主进程发送）",
+      "result": {
+        "empty": "/tmp/ob-e2e-b1c/50-notify-channels-empty.png",
+        "configured": "/tmp/ob-e2e-b1c/51-notify-channels-configured.png",
+        "tested": "/tmp/ob-e2e-b1c/52-notify-channels-tested.png",
+        "payload": {
+          "title": "OpenBuddy 测试通知",
+          "body": "这条消息来自 设置 · 通知渠道 的测试按钮。",
+          "level": "info",
+          "ts": 1795072032899
+        },
+        "channels": [
+          "销售群机器人:generic-webhook:true"
+        ]
+      }
+    },
+    {
+      "name": "文件触发自动化",
+      "result": {
+        "form": "/tmp/ob-e2e-b1c/53-automation-file-trigger.png",
+        "saved": "/tmp/ob-e2e-b1c/54-automation-file-trigger-saved.png",
+        "records": "/tmp/ob-e2e-b1c/55-automation-file-trigger-record.png",
+        "text": "收件箱文件触发 成功 15:07",
+        "trigger": {
+          "path": "/var/folders/nj/vtk9xv2j4wq41_94ry3zr8hh0000gn/T/openbuddy-e2e-30005/run/watched-inbox.csv"
+        },
+        "recordStatus": "success",
+        "sessionId": "01a1f2a1-9b59-767f-87d2-555f1238027f",
+        "recordCount": 2
+      }
+    },
+    {
+      "name": "会话导出 / 导入（JSONL）",
+      "result": {
+        "source": "01a1f2a1-9b59-767f-87d2-555f1238027f",
+        "imported": "01a1f2a1-c6a1-767f-87d2-55612421ddca",
+        "exported": "/var/folders/nj/vtk9xv2j4wq41_94ry3zr8hh0000gn/T/openbuddy-e2e-30005/run/session-export.jsonl"
+      }
+    },
+    {
+      "name": "运行中面板（任务 / 用时 / 停止）",
+      "result": {
+        "shot": "/tmp/ob-e2e-b1c/49-running-tasks.png",
+        "rows": [
+          "新任务\n任务\n· 3 秒"
+        ],
+        "kills": 1
+      }
+    },
+    {
+      "name": "项目后端与项目说明 (pii W5.4)",
+      "result": {
+        "shot": "/tmp/ob-e2e-b1c/64-projects-host.png",
+        "id": "proj_1795072058392_b6r4y0",
+        "reloaded": true,
+        "projectPrompt": "E2E 项目"
+      }
+    },
+    {
+      "name": "audit",
+      "result": {
+        "invoked": 717,
+        "distinctCommands": 112,
+        "byCommand": {
+          "agent_auth_status": 6,
+          "agent_bash": 1,
+          "agent_clear_session_expert": 1,
+          "agent_compact": 1,
+          "agent_cycle_model": 1,
+          "agent_diagnose": 1,
+          "agent_export_jsonl": 1,
+          "agent_extensions_list": 3,
+          "agent_extensions_packages": 4,
+          "agent_extensions_resources": 4,
+          "agent_extensions_search_registry": 3,
+          "agent_extensions_set_package_resources": 1,
+          "agent_get_model_state": 9,
+          "agent_handoff": 1,
+          "agent_import_jsonl": 1,
+          "agent_init": 4,
+          "agent_list_sessions": 5,
+          "agent_list_workspaces": 9,
+          "agent_load_session": 7,
+          "agent_navigate": 2,
+          "agent_new_session": 9,
+          "agent_regenerate": 1,
+          "agent_resolve_permission": 4,
+          "agent_send": 15,
+          "agent_session_info": 64,
+          "agent_session_usage": 48,
+          "agent_set_mode": 3,
+          "agent_set_session_expert": 1,
+          "agent_tree": 22,
+          "agents_defaults_get": 25,
+          "agents_defaults_save": 1,
+          "agents_delete": 2,
+          "agents_list": 10,
+          "agents_save": 1,
+          "artifacts_list": 28,
+          "automations_run": 1,
+          "automations_save": 2,
+          "automations_snapshot": 33,
+          "capability_packs_list": 5,
+          "capability_packs_remove": 2,
+          "capability_packs_set_contribution": 2,
+          "capability_packs_set_enabled": 2,
+          "clipboard_write_text": 1,
+          "commands_list": 4,
+          "connectors_default_root": 1,
+          "connectors_load": 2,
+          "connectors_read_mcp_config": 1,
+          "experts_import_workbuddy": 2,
+          "experts_load": 9,
+          "files_search": 2,
+          "host_capabilities": 4,
+          "library_list": 2,
+          "list_dir": 2,
+          "mcp_auth_status": 2,
+          "mcp_config_read": 5,
+          "mcp_config_save": 1,
+          "mcp_deferred_get": 3,
+          "mcp_deferred_set": 2,
+          "mcp_delete": 1,
+          "mcp_list": 15,
+          "mcp_test": 1,
+          "mcp_upsert": 1,
+          "memory_list": 4,
+          "notification_append": 3,
+          "notification_list": 1,
+          "notification_prefs_get": 1,
+          "notify_channels_list": 4,
+          "notify_channels_save": 1,
+          "notify_channels_test": 1,
+          "path_stat": 21,
+          "permission_list": 9,
+          "permission_mode_get": 25,
+          "permission_mode_set": 2,
+          "permission_protected_get": 6,
+          "permission_protected_set": 2,
+          "permission_save": 5,
+          "projects_save": 1,
+          "projects_snapshot": 5,
+          "prompts_delete": 1,
+          "prompts_list": 13,
+          "prompts_save": 2,
+          "providers_list": 23,
+          "providers_local_get": 5,
+          "providers_local_probe": 1,
+          "providers_local_set": 1,
+          "providers_save_model": 2,
+          "providers_save_provider": 1,
+          "quick_shortcut_get": 4,
+          "quick_shortcut_set": 1,
+          "read_file_base64": 2,
+          "read_text_file": 4,
+          "session_mcp_get": 1,
+          "session_mcp_set": 1,
+          "session_search": 1,
+          "settings_agent_get": 12,
+          "settings_agent_set": 5,
+          "skills_catalog_load": 1,
+          "skills_catalog_read_skill": 1,
+          "skills_export_zip": 1,
+          "skills_install_from_catalog": 2,
+          "skills_list": 31,
+          "skills_remove": 2,
+          "skills_toggle": 4,
+          "task_kill": 1,
+          "tasks_list": 77,
+          "teams_install": 1,
+          "teams_list": 6,
+          "tray_get": 5,
+          "tray_set": 2,
+          "usage_snapshot": 3,
+          "window_open_quick": 1,
+          "window_open_session": 1
+        },
+        "rejected": [
+          {
+            "command": "agent_extensions_set_package_resources",
+            "error": "not_found: package"
+          },
+          {
+            "command": "agent_compact",
+            "error": "Nothing to compact (session too small)"
+          }
+        ],
+        "notImplemented": [],
+        "pageErrors": [],
+        "fixtureRequests": 32
+      }
+    }
+  ]
+}

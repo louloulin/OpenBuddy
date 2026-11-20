@@ -1,10 +1,12 @@
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { ErrorBoundary } from "./ErrorBoundary";
 import "../../../../packages/ui/src/styles/global.css";
 import "../styles/app.css";
 import "../styles/automation-wb.css";
 import "../styles/chat.css";
 import "../styles/polish.css";
+import "../styles/grok.css";
 import { MarkdownHostProvider } from "@openbuddy/markdown/host";
 import { webMarkdownHost } from "../shared/markdown-host";
 import { PairingGate } from "./h5/PairingGate";
@@ -28,7 +30,9 @@ function renderApp() {
   const root = ReactDOM.createRoot(container);
   root.render(
     <MarkdownHostProvider host={webMarkdownHost}>
-      {isQuickWindow ? <QuickInput /> : <App />}
+      <ErrorBoundary scope={isQuickWindow ? "quick-input" : "app"}>
+        {isQuickWindow ? <QuickInput /> : <App />}
+      </ErrorBoundary>
     </MarkdownHostProvider>
   );
   return root;

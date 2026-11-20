@@ -89,3 +89,23 @@ export function parsePairQr(text: string): PairPayload | null {
   const gatewayUrl = gatewayFromPayload(gateway)
   return gatewayUrl ? { gatewayUrl, code: code.trim() } : null
 }
+
+/**
+ * The gateway speaks HTTP, not Chinese. Its `/pair/claim` errors are stable
+ * English strings (`invalid or expired code`, `too many attempts`, …) and the
+ * phone used to render them verbatim in the middle of an otherwise Chinese pair
+ * screen. Map the ones a user can actually cause; anything unknown becomes a
+ * neutral message with the status code, never an English sentence.
+ */
+export function pairErrorMessage(raw: unknown, status?: number): string {
+  const text = typeof raw === 'string' ? raw.trim().toLowerCase() : ''
+  if (!text) return `配对失败（HTTP ${status ?? '?'}）`
+  if (text.includes('invalid or expired code')) return '配对码不对或已过期，请在电脑上重新生成。'
+  if (text.includes('too many attempts')) return '尝试次数过多，等一分钟再试。'
+  if (text.includes('invalid pairing request')) return '配对信息不完整，请重新扫码。'
+  if (text.includes('device limit')) return '这台电脑的配对设备已达上限，请先在桌面撤销一台。'
+  if (text.includes('request body too large')) return '配对请求过大，请重新扫码。'
+  if (/^[\x00-\x7f]*$/.test(text)) return `配对失败（HTTP ${status ?? '?'}）`
+  // Already localized by someone upstream: keep it.
+  return typeof raw === 'string' ? raw : `配对失败（HTTP ${status ?? '?'}）`
+}

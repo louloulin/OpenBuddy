@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, extname, isAbsolute, resolve } from "node:path";
 import type { ExtensionFactory, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { buildDocx, buildPptx, buildXlsx } from "@openbuddy/services/office/index";
-import type { BuiltinContext } from "./index.js";
+import type { EngineContext } from "../engine-context.js";
 
 /**
  * 办公产物 (B2b): real .docx / .xlsx / .pptx through `officegen` (OOXML).
@@ -101,7 +101,13 @@ const targetPath = (cwd: string, raw: unknown, extension: string): string => {
   return isAbsolute(value) ? value : resolve(cwd, value);
 };
 
-export function createOfficeExtension({ engine, sessionId, cwd }: BuiltinContext): ExtensionFactory {
+export interface OfficeBuiltinContext {
+  engine: EngineContext;
+  sessionId: string;
+  cwd: string;
+}
+
+export function createOfficeExtension({ engine, sessionId, cwd }: OfficeBuiltinContext): ExtensionFactory {
   const write = async (
     toolCallId: string,
     path: string,
@@ -114,8 +120,15 @@ export function createOfficeExtension({ engine, sessionId, cwd }: BuiltinContext
     } catch {
       /* a failed snapshot must never block the write */
     }
-    mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-    writeFileSync(path, bytes, { mode: 0o600 });
+    try {
+      mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+      writeFileSync(path, bytes, { mode: 0o600 });
+      // Commit the checkpoint so the file is listed as created and can be restored/rewound.
+      await engine.checkpoints.finish(toolCallId);
+    } catch (error) {
+      engine.checkpoints.discard(toolCallId);
+      throw error;
+    }
     engine.emit("agent://artifacts", { sessionId });
     return {
       content: [{ type: "text" as const, text: `已生成 ${format.toUpperCase()}：${path}（${Math.max(1, Math.round(bytes.length / 1024))} KB）` }],
@@ -194,5 +207,5 @@ export const officeBuiltin = {
   label: "办公文档",
   description: "让模型直接生成 Word / Excel / PowerPoint 文件（ob_docx / ob_xlsx / ob_pptx），产物进入工作台",
   tools: [DOCX_TOOL, XLSX_TOOL, PPTX_TOOL] as readonly string[],
-  create: (ctx: BuiltinContext) => createOfficeExtension(ctx),
+  create: (ctx: OfficeBuiltinContext) => createOfficeExtension(ctx),
 };

@@ -47,15 +47,38 @@ export type Theme = {
   radiusBubble: number
   radiusCard: number
   radiusPill: number
-  /** Typography. */
+  /** Cards inside a list (SettingsList, result rows). */
+  radiusTile: number
+  /** Bottom sheets. */
+  radiusSheet: number
+  /** Code blocks, thumbnails, chips inside a card. */
+  radiusSmall: number
+  /**
+   * Typography ramp. Four sizes, no ad-hoc numbers: a screen title, a section
+   * heading, body, and metadata. `fontMicro` is allowed only for uppercase
+   * labels ≤ 4 characters (thinking chip, counters), never for sentences.
+   */
+  fontTitle: number
+  fontHeading: number
   fontBody: number
   lineBody: number
   fontMeta: number
+  fontMicro: number
   mono: string
   /** Layout. */
   gutter: number
-  hairline: number
+  /** Padding inside a card. */
+  pad: number
+  /** Vertical rhythm between transcript rows. */
+  rowGap: number
+  /** Minimum tap target (Apple HIG / Material). */
   touch: number
+  hairline: number
+  /** Modal backdrop. Stronger on dark: a 35% veil over pure black is invisible. */
+  scrim: string
+  /** Filled badge (unread counts) — ink, so it matches the primary button. */
+  badge: string
+  badgeText: string
 }
 
 const light: Theme = {
@@ -66,7 +89,8 @@ const light: Theme = {
   cardBorder: '#e6e6e6',
   text: '#0a0a0a',
   textMedium: '#525252',
-  textWeak: '#8b8b8b',
+  // #8b8b8b on white is ≈3.4:1; metadata that must stay legible uses #6f6f6f (4.7:1).
+  textWeak: '#6f6f6f',
   hover: 'rgba(0, 0, 0, 0.045)',
   pressed: 'rgba(0, 0, 0, 0.08)',
   ink: '#0a0a0a',
@@ -82,13 +106,24 @@ const light: Theme = {
   radiusBubble: 16,
   radiusCard: 24,
   radiusPill: 999,
+  radiusTile: 14,
+  radiusSheet: 18,
+  radiusSmall: 8,
+  fontTitle: 28,
+  fontHeading: 17,
   fontBody: 15,
   lineBody: 24,
   fontMeta: 13,
+  fontMicro: 11,
   mono: 'Menlo',
   gutter: 16,
-  hairline: 1,
+  pad: 14,
+  rowGap: 8,
   touch: 44,
+  hairline: 1,
+  scrim: 'rgba(0, 0, 0, 0.32)',
+  badge: '#0a0a0a',
+  badgeText: '#ffffff',
 }
 
 const dark: Theme = {
@@ -98,8 +133,9 @@ const dark: Theme = {
   card: '#171717',
   cardBorder: 'rgba(255, 255, 255, 0.08)',
   text: '#f5f5f5',
-  textMedium: 'rgba(245, 245, 245, 0.66)',
-  textWeak: 'rgba(245, 245, 245, 0.42)',
+  textMedium: 'rgba(245, 245, 245, 0.70)',
+  // 0.58 on #171717 ≈ 4.7:1 — metadata still recedes but clears AA.
+  textWeak: 'rgba(245, 245, 245, 0.58)',
   hover: 'rgba(255, 255, 255, 0.06)',
   pressed: 'rgba(255, 255, 255, 0.1)',
   ink: '#f5f5f5',
@@ -115,13 +151,25 @@ const dark: Theme = {
   radiusBubble: 16,
   radiusCard: 24,
   radiusPill: 999,
+  radiusTile: 14,
+  radiusSheet: 18,
+  radiusSmall: 8,
+  fontTitle: 28,
+  fontHeading: 17,
   fontBody: 15,
   lineBody: 24,
   fontMeta: 13,
+  fontMicro: 11,
   mono: 'Menlo',
   gutter: 16,
-  hairline: 1,
+  pad: 14,
+  rowGap: 8,
   touch: 44,
+  hairline: 1,
+  // A 35% veil over #000 is invisible; dark needs a heavier backdrop.
+  scrim: 'rgba(0, 0, 0, 0.62)',
+  badge: '#f5f5f5',
+  badgeText: '#0b0b0b',
 }
 
 export function themeFor(scheme: Scheme | null | undefined): Theme {

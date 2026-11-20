@@ -95,6 +95,24 @@ try {
     await ctx.setSize(1440, 900);
     await ctx.sleep(800);
     return await ctx.shot('01-home');`);
+  // B3e: the Grok Bot layout holds at 1280 / 1440 / 1920 without horizontal overflow.
+  await step('首页三视口（B3e）', `
+    const shots = [];
+    for (const [width, height] of [[1280, 800], [1440, 900], [1920, 1080]]) {
+      await ctx.setSize(width, height);
+      await ctx.sleep(600);
+      const guard = await page.evaluate(() => {
+        const el = document.querySelector('.wb-composer');
+        const box = el ? el.getBoundingClientRect() : null;
+        return { width: innerWidth, scrollWidth: document.documentElement.scrollWidth, composer: box ? { x: Math.round(box.x), right: Math.round(box.right) } : null };
+      });
+      if (guard.scrollWidth > guard.width + 1) throw new Error('horizontal overflow at ' + width + ': ' + JSON.stringify(guard));
+      if (!guard.composer || guard.composer.x < 0 || guard.composer.right > guard.width + 1) throw new Error('composer outside viewport at ' + width + ': ' + JSON.stringify(guard));
+      shots.push(await ctx.shot('01a-home-' + width));
+    }
+    await ctx.setSize(1440, 900);
+    await ctx.sleep(400);
+    return { sizes: [1280, 1440, 1920], shots };`);
   await step('configure fixture provider', `
     await ctx.call('providers_save_provider', { provider: { id: 'fixture', providerKind: 'custom', label: 'Fixture', baseUrl: 'http://127.0.0.1:${FIXTURE_PORT}/v1', apiBackend: 'chat_completions', authScheme: 'bearer', apiKey: 'local-fixture-only' } });
     await ctx.call('providers_save_model', { model: { providerId: 'fixture', modelId: 'fixture-model', name: 'Fixture 模型', reasoning: true, input: ['text', 'image'], contextWindow: 128000, maxTokens: 4096 } });
@@ -166,6 +184,65 @@ try {
     await page.locator('.bench-external').waitFor({ state: 'detached', timeout: 5000 });
     await page.getByText('EXTERNAL_EDIT_MARKER', { exact: false }).first().waitFor({ timeout: 10000 });
     return [shot, external];`);
+  // B3d: 独立阅读、同版本双处刷新、分享前态、删除后仍可读。
+  await step('产物独立阅读与删除态（B3d）', `
+    const viewer = page.locator('.bench-viewer');
+    await viewer.waitFor({ timeout: 10000 });
+    const path = await viewer.locator('.bench-viewer__title').getAttribute('title');
+    if (!path) throw new Error('open artifact path missing');
+    const workspaces = await ctx.call('agent_list_workspaces');
+    const cwd = workspaces[0]?.cwd;
+    if (!cwd) throw new Error('no workspace for artifact reader');
+    const sessions = await ctx.call('agent_list_sessions', { cwd });
+    let sessionId = null;
+    for (const session of sessions) {
+      const list = await ctx.call('artifacts_list', { sessionId: session.sessionId });
+      if (Array.isArray(list) && list.some((item) => item.path === path)) { sessionId = session.sessionId; break; }
+    }
+    if (!sessionId) throw new Error('no session owns artifact ' + path);
+    const original = await ctx.call('read_text_file', { path, maxBytes: 1048576 });
+    await viewer.getByRole('button', { name: '更多操作' }).click();
+    await page.getByRole('menuitem', { name: '独立阅读' }).click();
+    const reader = page.locator('.bench-reader');
+    await reader.waitFor({ timeout: 10000 });
+    const first = await ctx.shot('05b-artifact-reader');
+
+    // Same version in two places: artifact_save emits agent://artifacts; both reload.
+    const marker = 'B3D_SYNC_MARKER';
+    await ctx.call('artifact_save', { sessionId, path, content: String(original) + '\\n\\n' + marker + '\\n' });
+    await reader.getByText(marker, { exact: false }).waitFor({ timeout: 15000 });
+    await page.locator('.bench-viewer__body').getByText(marker, { exact: false }).waitFor({ timeout: 15000 });
+    const synced = await ctx.shot('05c-artifact-reader-synced');
+
+    // Share pre-state: local export works, cloud is explicitly unavailable (C2).
+    await reader.getByRole('button', { name: '分享', exact: true }).click();
+    const share = page.locator('.bench-share');
+    await share.waitFor({ timeout: 10000 });
+    // B4: focus starts inside the dialog, Tab cycles inside, Escape restores the trigger.
+    if (!(await page.evaluate(() => !!document.activeElement?.closest('.bench-share')))) throw new Error('share dialog did not take focus');
+    for (let i = 0; i < 6; i++) {
+      await page.keyboard.press('Tab');
+      if (!(await page.evaluate(() => !!document.activeElement?.closest('.bench-share')))) throw new Error('Tab escaped the share dialog');
+    }
+    const cloud = share.getByRole('button', { name: /云端链接/ });
+    if (!(await cloud.isDisabled())) throw new Error('cloud share should be disabled before C2');
+    const shared = await ctx.shot('05d-artifact-share');
+    await page.keyboard.press('Escape');
+    await share.waitFor({ state: 'detached', timeout: 5000 });
+    const restored = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? "");
+    if (restored !== '分享') throw new Error('focus not restored to 分享: ' + restored);
+
+    // Deleting the file: the reader switches to the last checkpoint body instead of a dead end.
+    await ctx.rm(path);
+    await reader.getByText('文件已不在磁盘上', { exact: false }).waitFor({ timeout: 15000 });
+    await reader.getByText(marker, { exact: false }).waitFor({ timeout: 15000 });
+    const deleted = await ctx.shot('05e-artifact-deleted-readable');
+    await page.locator('.bench-gone').waitFor({ timeout: 15000 });
+    await page.keyboard.press('Escape');
+    await reader.waitFor({ state: 'detached', timeout: 5000 });
+    // 恢复文件，后面的 @ 文件提及仍能引用本任务产物。
+    await ctx.call('artifact_save', { sessionId, path, content: String(original) + '\\n\\n' + marker + '\\n' });
+    return { path, sessionId, first, synced, shared, deleted };`);
   // 20261116-pii W1.1: regenerate → ‹ 2/2 ›, then switch back and forth; the transcript must change.
   await step('branch switcher', `
     const panel = page.getByRole('button', { name: '收起右侧栏', exact: true });
@@ -490,12 +567,37 @@ try {
     if (!installedPrompts.some((entry) => entry.name === 'e2e-report')) throw new Error('prompts_list missing e2e-report');
     const servers = await ctx.call('mcp_list');
     if (!servers.some((entry) => entry.name === 'e2e' && entry.enabled === false)) throw new Error('mcp_list missing disabled e2e: ' + JSON.stringify(servers));
+    // B1a: the descriptor is persisted; pack-level and per-contribution switches are real.
+    const packId = result.packId;
+    if (!packId) throw new Error('capability pack id missing: ' + JSON.stringify(result.contributions));
+    const packs = await ctx.call('capability_packs_list');
+    const pack = packs.find((entry) => entry.id === packId);
+    if (!pack || pack.contributions.length < 3) throw new Error('capability_packs_list missing pack: ' + JSON.stringify(packs));
+    const disabledPacks = await ctx.call('capability_packs_set_enabled', { id: packId, enabled: false });
+    if (disabledPacks.find((entry) => entry.id === packId)?.enabled !== false) throw new Error('pack disable not persisted: ' + JSON.stringify(disabledPacks));
+    const offSkills = await ctx.call('skills_list');
+    if (!offSkills.some((entry) => entry.name === 'e2e-skill' && entry.enabled === false)) throw new Error('pack disable did not switch the skill off: ' + JSON.stringify(offSkills.map((s) => s.name + ':' + s.enabled)));
+    const offPrompts = await ctx.call('prompts_list');
+    if (offPrompts.some((entry) => entry.name === 'e2e-report')) throw new Error('pack disable did not hide the prompt');
+    const offMcp = await ctx.call('mcp_list');
+    if (!offMcp.some((entry) => entry.name === 'e2e' && entry.enabled === false)) throw new Error('pack disable did not switch MCP off');
+    await ctx.call('capability_packs_set_enabled', { id: packId, enabled: true });
+    const onSkills = await ctx.call('skills_list');
+    if (!onSkills.some((entry) => entry.name === 'e2e-skill' && entry.enabled === true)) throw new Error('pack enable did not restore the skill');
+    const onPrompts = await ctx.call('prompts_list');
+    if (!onPrompts.some((entry) => entry.name === 'e2e-report')) throw new Error('pack enable did not restore the prompt');
+    const single = await ctx.call('capability_packs_set_contribution', { id: packId, kind: 'prompt', name: 'e2e-report', enabled: false });
+    if (!single.find((entry) => entry.id === packId)?.contributions.some((item) => item.kind === 'prompt' && item.name === 'e2e-report' && item.enabled === false)) throw new Error('per-contribution toggle not persisted');
+    const removal = await ctx.call('capability_packs_remove', { id: packId });
+    if (!removal.removed) throw new Error('capability pack not removed: ' + JSON.stringify(removal));
+    if ((await ctx.call('capability_packs_list')).some((entry) => entry.id === packId)) throw new Error('pack still listed after removal');
+    if ((await ctx.call('skills_list')).some((entry) => entry.name === 'e2e-skill')) throw new Error('skill still loaded after rollback');
+    if ((await ctx.call('prompts_list')).some((entry) => entry.name === 'e2e-report')) throw new Error('prompt still listed after rollback');
     // Keep the later expert-count / prompt steps stable.
     for (const expert of result.imported) await ctx.call('agents_delete', { id: expert.id });
     await ctx.call('prompts_delete', { name: command, scope: 'global' });
-    await ctx.call('prompts_delete', { name: 'e2e-report', scope: 'global' });
     await ctx.call('mcp_delete', { name: 'e2e' });
-    return { package: result.package, names: result.imported.map((expert) => expert.name), team: command, contributions: contributions.map((entry) => entry.kind + ':' + entry.name), skipped: (result.skippedContributions ?? []).map((entry) => entry.kind + ':' + entry.name) };`);
+    return { package: result.package, packId, names: result.imported.map((expert) => expert.name), team: command, contributions: contributions.map((entry) => entry.kind + ':' + entry.name), skipped: (result.skippedContributions ?? []).map((entry) => entry.kind + ':' + entry.name), lifecycle: 'disable → enable → per-item off → remove' };`);
   // W7.1 / W7.2: independent session window + global quick input.
   await step('独立窗口 + 全局快速输入', `
     const init = await ctx.call('agent_init', {});
@@ -890,6 +992,50 @@ try {
     const session = await ctx.shot('47-automation-session');
     const snapshot = await ctx.call('automations_snapshot');
     return { empty, form, saved, records, session, automations: snapshot.automations.map(a => a.name), recordsCount: snapshot.records.length, recordText: recordText.replace(/\\s+/g, ' ') };`);
+  // B3c: 修订语义 + 交付目标不可用 + 失败记录重试（真实命令 + 运行记录 UI）。
+  await step('自动化修订：编辑不改运行、目标不可用留记录、失败可重试', `
+    const draft = {
+      id: '', name: '目标不可用演练', prompt: '写一句话', cwds: '/nonexistent/openbuddy-b3c-target',
+      status: 'ACTIVE', skills: [], connectorIds: [], permissionMode: 'default',
+      scheduleType: 'recurring',
+      schedule: { freq: 'DAILY', interval: 1, byday: [], bymonthday: [], bymonth: [], byhour: 9, byminute: 0, intervalHours: 1 },
+      pushToWeChat: false,
+    };
+    const v1 = await ctx.call('automations_save', { automation: draft });
+    if (v1.revision !== 1) throw new Error('first save revision: ' + v1.revision);
+    const v2 = await ctx.call('automations_save', { automation: { ...v1, name: '目标不可用演练（二版）' } });
+    if (v2.revision !== 2) throw new Error('second save revision: ' + v2.revision);
+    const run = await ctx.call('automations_run', { id: v2.id });
+    if (run.ok !== false || !String(run.error || '').includes('交付目标不可用')) throw new Error('run should fail with delivery reason: ' + JSON.stringify(run));
+    let snap = await ctx.call('automations_snapshot');
+    const failed = snap.records.find((r) => r.id === run.recordId);
+    if (!failed || failed.status !== 'failed' || failed.automationRevision !== 2) throw new Error('failed record: ' + JSON.stringify(failed));
+    // Editing again must not rewrite the finished record's revision.
+    await ctx.call('automations_save', { automation: { ...v2, prompt: '改过的提示词' } });
+    snap = await ctx.call('automations_snapshot');
+    const frozen = snap.records.find((r) => r.id === run.recordId);
+    if (frozen.automationRevision !== 2) throw new Error('record revision changed: ' + JSON.stringify(frozen));
+    const retry = await ctx.call('automation_retry', { recordId: run.recordId });
+    snap = await ctx.call('automations_snapshot');
+    const retried = snap.records.find((r) => r.id === retry.recordId);
+    if (!retried || retried.retryOf !== run.recordId) throw new Error('retry link: ' + JSON.stringify(retried));
+
+    await page.locator('.sidebar__nav > [data-feature="automation"]').click();
+    await page.getByRole('tab', { name: '运行记录' }).click();
+    const row = page.locator('.atm-inbox-row', { hasText: '目标不可用演练' }).first();
+    await row.waitFor({ timeout: 10000 });
+    const text = (await row.innerText()).replace(/\\s+/g, ' ');
+    if (!text.includes('失败') || !text.includes('修订 ' + retried.automationRevision)) throw new Error('record row: ' + text);
+    await row.hover();
+    const retryBtn = row.locator('button[title="重试这次运行"]');
+    if (await retryBtn.count() !== 1) throw new Error('retry button missing');
+    await ctx.sleep(500);
+    const shot = await ctx.shot('46b-automation-revision-retry');
+    await ctx.call('automations_delete', { id: v2.id });
+    // 返回上一段留下的会话，后续步骤继续在对话页操作。
+    await page.locator('.atm-inbox-row', { hasText: '每日销售摘要' }).first().click();
+    await page.locator('.chatview__inner').waitFor({ timeout: 15000 });
+    return { v1: v1.revision, v2: v2.revision, error: run.error, retryOf: retried.retryOf, row: text, shot };`);
   // W4.3: 会话 ⋯ 菜单 → 保存为自动化，预填名称 / 最后一条用户消息 / 工作空间。
   await step('保存为自动化（会话 ⋯ 菜单）', `
     await page.getByRole('button', { name: '更多操作' }).first().click();
@@ -975,6 +1121,158 @@ try {
     const saved = await ctx.shot('25d-prompt-saved');
     const templates = await ctx.call('prompts_list');
     return { tabs, shots: [skills, configured, mcp, toolRules, deferred, extensions, prompts, editor, saved], tools, templates: templates.map(t => t.scope + '/' + t.name) };`);
+  // B1a: the capability-pack descriptor is visible and switchable in 扩展; removal rolls back.
+  await step('能力包管理（B1a）', `
+    const root = ctx.tmpPath('b1a-pack');
+    await ctx.mkdir(root + '/.codebuddy-plugin');
+    await ctx.mkdir(root + '/skills/ui');
+    await ctx.mkdir(root + '/commands');
+    await ctx.writeFile(root + '/.codebuddy-plugin/plugin.json', JSON.stringify({ name: 'ui-pack', displayName: { zh: '界面能力包' }, skills: ['./skills/ui'], commands: ['./commands'] }));
+    await ctx.writeFile(root + '/skills/ui/SKILL.md', '---\\nname: ui-skill\\ndescription: UI 演示技能\\n---\\n演示。\\n');
+    await ctx.writeFile(root + '/commands/ui-report.md', '---\\ndescription: 界面指令\\n---\\n写报告。\\n');
+    const imported = await ctx.call('experts_import_workbuddy', { path: root });
+    const packId = imported.packId;
+    if (!packId) throw new Error('ui pack id missing: ' + JSON.stringify(imported));
+    await page.getByRole('tab', { name: '扩展' }).click();
+    const section = page.locator('section[aria-label="能力包"]');
+    await section.waitFor({ timeout: 10000 });
+    await section.getByText('ui-pack · 2/2 项启用').waitFor({ timeout: 10000 });
+    await ctx.sleep(500);
+    const shot = await ctx.shot('25e-capability-pack');
+    await section.getByRole('button', { name: /^ui-pack/ }).click();
+    const toggle = page.getByRole('checkbox', { name: '指令 · ui-report' });
+    await toggle.waitFor({ timeout: 5000 });
+    await toggle.click();
+    // Persisting a switch rebuilds live sessions first, and the list re-renders; poll the text,
+    // not an element handle, so re-rendering cannot detach the thing we are waiting for.
+    await page.waitForFunction(() => {
+      const current = document.querySelector('section[aria-label="能力包"]');
+      return !!current && current.textContent.includes('ui-pack · 1/2 项启用');
+    }, null, { timeout: 20000 });
+    if (await page.getByRole('checkbox', { name: '指令 · ui-report' }).isChecked()) {
+      const errorText = await section.locator('[role="alert"]').first().textContent().catch(() => null);
+      const failed = await ctx.shot('25e-capability-pack-failed');
+      throw new Error('UI toggle did not apply: ' + (errorText ?? 'no alert') + ' shot=' + failed);
+    }
+    await ctx.sleep(400);
+    const off = await ctx.shot('25f-capability-pack-off');
+    if ((await ctx.call('prompts_list')).some((entry) => entry.name === 'ui-report')) throw new Error('UI prompt toggle did not hide ui-report');
+    const removal = await ctx.call('capability_packs_remove', { id: packId });
+    if (!removal.removed) throw new Error('capability pack rollback failed: ' + JSON.stringify(removal));
+    if ((await ctx.call('prompts_list')).some((entry) => entry.name === 'ui-report')) throw new Error('ui-report survived rollback');
+    return { packId, shot, off, lifecycle: 'UI 逐项关闭 → 回退' };`);
+  // B3a: attempt IPC surface is wired; the real four-state flow runs in mcp-oauth.test.ts.
+  await step('授权尝试命令面（B3a）', `
+    const attempts = await ctx.call('mcp_auth_attempts', { sessionId: null });
+    if (!Array.isArray(attempts)) throw new Error('mcp_auth_attempts shape: ' + JSON.stringify(attempts));
+    const missing = await ctx.call('mcp_auth_attempt', { id: '11111111-2222-3333' });
+    if (missing !== null) throw new Error('unknown attempt should be null: ' + JSON.stringify(missing));
+    const cancelled = await ctx.call('mcp_auth_cancel', { id: '11111111-2222-3333' });
+    if (cancelled !== false) throw new Error('cancelling an unknown attempt should be false: ' + JSON.stringify(cancelled));
+    return { attempts: attempts.length, missing, cancelled };`);
+  // B3b: 专家链接 — preview, one import per content digest, duplicate opens the existing expert.
+  await step('专家链接导入（B3b）', `
+    const root = ctx.tmpPath('b3b-link');
+    await ctx.mkdir(root + '/.codebuddy-plugin');
+    await ctx.mkdir(root + '/agents');
+    await ctx.writeFile(root + '/.codebuddy-plugin/plugin.json', JSON.stringify({ name: 'link-pkg', displayName: { zh: '链接包' }, agents: ['./agents/linker.md'] }));
+    await ctx.writeFile(root + '/agents/linker.md', '---\\nname: linker\\ndescription: 链接专家\\ndisplayName:\\n  zh: 链接员\\n---\\n\\n你是链接员。\\n');
+    const before = (await ctx.call('agents_list', {})).length;
+    const preview = await ctx.call('experts_link_preview', { source: root });
+    if (preview.package !== 'link-pkg' || preview.experts.length !== 1 || preview.duplicate) throw new Error('preview: ' + JSON.stringify(preview));
+    const first = await ctx.call('experts_link_import', { source: root });
+    if (first.duplicate || first.imported.length !== 1) throw new Error('first import: ' + JSON.stringify(first).slice(0, 400));
+    const afterFirst = (await ctx.call('agents_list', {})).length;
+    if (afterFirst !== before + 1) throw new Error('expert count after first import: ' + before + ' → ' + afterFirst);
+    const second = await ctx.call('experts_link_import', { source: root });
+    if (!second.duplicate || second.imported.length !== 0) throw new Error('duplicate import: ' + JSON.stringify(second).slice(0, 400));
+    if ((await ctx.call('agents_list', {})).length !== afterFirst) throw new Error('duplicate import wrote another expert');
+    const previewAgain = await ctx.call('experts_link_preview', { source: root });
+    if (!previewAgain.duplicate || !previewAgain.importedExpertIds?.length) throw new Error('preview duplicate: ' + JSON.stringify(previewAgain));
+
+    await page.locator('.sidebar__nav > [data-feature="experts-hub"]').click();
+    await page.getByRole('tab', { name: '专家' }).click();
+    await page.getByRole('button', { name: '我的专家' }).click();
+    await page.getByRole('button', { name: '从链接导入' }).click();
+    await page.locator('#expert-link-source').fill(root);
+    await page.getByRole('button', { name: '预览', exact: true }).click();
+    await page.getByText('link-pkg', { exact: false }).first().waitFor({ timeout: 10000 });
+    await page.getByText('这个链接的内容已经导入过', { exact: false }).waitFor({ timeout: 10000 });
+    await ctx.sleep(400);
+    const shot = await ctx.shot('25i-link-import');
+    await page.getByRole('button', { name: '导入', exact: true }).click();
+    await page.getByText('链接员', { exact: false }).first().waitFor({ timeout: 10000 });
+    await ctx.sleep(400);
+    const detail = await ctx.shot('25j-link-detail');
+    await page.keyboard.press('Escape');
+    // 回到专家中心，后续步骤继续从「专家」页签开始。
+    await page.locator('.um-back').first().click();
+    await page.getByRole('tab', { name: '专家' }).waitFor({ timeout: 10000 });
+    // 清理本次导入，后面的「我的专家（空态）」步骤仍从干净状态开始。
+    await ctx.call('agents_delete', { id: first.imported[0].id });
+    return { preview: preview.package, experts: preview.experts.map((e) => e.name), duplicate: second.duplicate, importedIds: second.importedExpertIds, shots: [shot, detail] };`);
+  // B1c: marketplace install copies into <pi>/skills, shows the version, batch-switches and exports.
+  await step('技能市场安装 / 导出（B1c）', `
+    const root = ctx.tmpPath('b1c-market');
+    await ctx.mkdir(root + '/.codebuddy-connector');
+    await ctx.mkdir(root + '/connectors/demo/skills/references');
+    await ctx.mkdir(root + '/connectors/beta/skills');
+    await ctx.writeFile(root + '/.codebuddy-connector/connectors.json', JSON.stringify({ connectors: [{ id: 'demo' }, { id: 'beta' }] }));
+    await ctx.writeFile(root + '/connectors/demo/skills/SKILL.md', '---\\nname: market-alpha\\ndescription: 市场技能甲\\nversion: 3.1.0\\n---\\n\\n执行甲。\\n');
+    await ctx.writeFile(root + '/connectors/demo/skills/references/a.md', '参考甲');
+    await ctx.writeFile(root + '/connectors/beta/skills/SKILL.md', '---\\nname: market-beta\\ndescription: 市场技能乙\\nversion: 0.9.0\\n---\\n\\n执行乙。\\n');
+    await page.evaluate((value) => localStorage.setItem('skillsCatalogRoot', value), root);
+    // Remount the catalog so it reads the new root.
+    await page.getByRole('tab', { name: '专家' }).click();
+    await page.getByRole('tab', { name: '技能' }).click();
+    const card = page.locator('.sk-card', { hasText: 'market-alpha' });
+    await card.waitFor({ timeout: 15000 });
+    await card.click();
+    await page.locator('.sk-detail').waitFor({ timeout: 10000 });
+    await page.getByRole('button', { name: '导入技能' }).click();
+    await page.locator('.sk-detail-installed').waitFor({ timeout: 20000 });
+    const installedShot = await ctx.shot('25g-skill-market-installed');
+    await page.locator('.sk-detail-bar .um-back').click();
+    // A second skill through the same IPC path, for the batch switch.
+    const second = await ctx.call('skills_install_from_catalog', { dirs: [root + '/connectors/beta/skills'] });
+    if (second.failed.length) throw new Error('second install failed: ' + JSON.stringify(second.failed));
+    await page.getByRole('button', { name: /我安装的/ }).click();
+    const alphaRow = page.locator('.sk-inst-row', { hasText: 'market-alpha' });
+    await alphaRow.waitFor({ timeout: 10000 });
+    if (!(await alphaRow.textContent()).includes('v3.1.0')) throw new Error('version badge missing: ' + (await alphaRow.textContent()).slice(0, 120));
+    await page.getByRole('button', { name: '全部停用' }).click();
+    let alphaOff;
+    for (let i = 0; i < 40; i++) {
+      alphaOff = (await ctx.call('skills_list')).find((entry) => entry.name === 'market-alpha');
+      if (alphaOff && !alphaOff.enabled) break;
+      await ctx.sleep(250);
+    }
+    if (!alphaOff || alphaOff.enabled || !alphaOff.market) throw new Error('batch disable failed: ' + JSON.stringify(alphaOff));
+    // The panel state updates after the IPC round-trips; wait for the row before the next batch.
+    await page.waitForFunction(() => {
+      const row = [...document.querySelectorAll('.sk-inst-row')].find((node) => node.textContent.includes('market-alpha'));
+      return !!row && row.querySelector('input[type=checkbox]')?.checked === false;
+    }, null, { timeout: 20000 });
+    const batchShot = await ctx.shot('25h-skill-batch-off');
+    await page.getByRole('button', { name: '全部启用' }).click();
+    let alpha;
+    for (let i = 0; i < 40; i++) {
+      alpha = (await ctx.call('skills_list')).find((entry) => entry.name === 'market-alpha');
+      if (alpha?.enabled) break;
+      await ctx.sleep(250);
+    }
+    if (!alpha?.enabled) throw new Error('batch enable failed: ' + JSON.stringify(alpha));
+    const on = await ctx.call('skills_list');
+    const target = ctx.tmpPath('market-alpha.zip');
+    const exported = await ctx.call('skills_export_zip', { path: alpha.path, target });
+    if (!exported.files.includes('SKILL.md')) throw new Error('zip missing SKILL.md: ' + JSON.stringify(exported.files));
+    const b64 = await ctx.call('read_file_base64', { path: target, maxBytes: 1048576 });
+    if (!String(b64).startsWith('UEsDB')) throw new Error('exported file is not a ZIP');
+    const beta = on.find((entry) => entry.name === 'market-beta');
+    if (beta?.path) await ctx.call('skills_remove', { path: beta.path });
+    await ctx.call('skills_remove', { path: alpha.path });
+    if ((await ctx.call('skills_list')).some((entry) => entry.name === 'market-alpha')) throw new Error('market-alpha survived removal');
+    return { version: '3.1.0', files: exported.files.length, market: alpha.market === true, shots: [installedShot, batchShot] };`);
   // 20261116-pii W3.4: ob_subagent runs two child sessions; the transcript shows their cards.
   await step('subagent cards', `
     await page.locator('.sidebar__nav-item', { hasText: '新建任务' }).first().click();
@@ -1012,6 +1310,26 @@ try {
     if (!titles.some((title) => title.includes('调研'))) throw new Error('team role 调研 missing: ' + JSON.stringify(titles));
     if (!titles.some((title) => title.includes('审阅'))) throw new Error('team role 审阅 missing: ' + JSON.stringify(titles));
     return { titles, shot: await ctx.shot('36b-team-subagent-cards') };`);
+  // B2b: ob_docx / ob_xlsx / ob_pptx are ordinary Pi tools — approval gate, checkpoint, artifacts refresh.
+  await step('办公产物（B2b）', `
+    await page.locator('.sidebar__nav-item', { hasText: '新建任务' }).first().click();
+    await page.locator('.wb-composer__input').waitFor({ state: 'visible', timeout: 10000 });
+    await page.locator('.wb-composer__input').fill('__OFFICE__ 生成季度销售表格');
+    await page.getByRole('button', { name: '发送', exact: true }).click();
+    const allow = page.getByRole('button', { name: '允许本次', exact: true });
+    await allow.waitFor({ timeout: 30000 });
+    await allow.click();
+    await page.getByText('表格已生成', { exact: false }).first().waitFor({ timeout: 60000 });
+    const toggle = page.getByRole('button', { name: '展开右侧栏', exact: true });
+    if (await toggle.isVisible()) await toggle.click();
+    await page.locator('.bench-item__main').first().waitFor({ timeout: 15000 });
+    const paths = await page.locator('.bench-item__main').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('title')));
+    const path = paths.find((p) => p && p.endsWith('.xlsx'));
+    if (!path) throw new Error('xlsx artifact missing: ' + JSON.stringify(paths));
+    const b64 = await ctx.call('read_file_base64', { path, maxBytes: 1048576 });
+    if (!String(b64).startsWith('UEsDB')) throw new Error('not an OOXML (ZIP) file: ' + String(b64).slice(0, 12));
+    await ctx.sleep(800);
+    return { paths, path, shot: await ctx.shot('36c-office-xlsx') };`);
   await step('second task', `
     await page.getByRole('button', { name: '新建任务', exact: true }).first().click();
     const input = page.locator('.wb-composer__input');
@@ -1296,6 +1614,90 @@ try {
     const last = ctx.fixture.requests.at(-1);
     if (last.project !== 'E2E 项目') throw new Error('project prompt missing: ' + JSON.stringify(last).slice(0, 300));
     return { shot, id: project.id, reloaded: true, projectPrompt: last.project };`);
+  // B4: keyboard + accessible names on the main surfaces, narrow viewport included.
+  const a11y = await step('无障碍与键盘（B4）', `
+    const scan = () => page.evaluate(() => {
+      const issues = [];
+      const visible = (el) => el.offsetParent !== null || getComputedStyle(el).position === 'fixed';
+      const named = (el) => (el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || '').trim();
+      for (const el of document.querySelectorAll('button, [role="button"]')) {
+        if (visible(el) && !named(el)) issues.push('button:' + (el.className || el.tagName));
+      }
+      for (const el of document.querySelectorAll('input, textarea, select')) {
+        if (!visible(el)) continue;
+        const id = el.id;
+        const labelled = (id && document.querySelector('label[for="' + CSS.escape(id) + '"]')) || el.closest('label')
+          || el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || el.getAttribute('placeholder') || el.getAttribute('title');
+        if (!labelled) issues.push('control:' + el.tagName + '.' + el.className);
+      }
+      for (const el of document.querySelectorAll('img')) {
+        if (visible(el) && !el.hasAttribute('alt')) issues.push('img:' + String(el.getAttribute('src')).slice(0, 40));
+      }
+      for (const el of document.querySelectorAll('[role="dialog"]')) {
+        if (!visible(el)) continue;
+        if (el.getAttribute('aria-modal') !== 'true') issues.push('dialog-modal:' + el.className);
+        if (!(el.getAttribute('aria-label') || el.getAttribute('aria-labelledby'))) issues.push('dialog-name:' + el.className);
+      }
+      return issues;
+    });
+    const results = {};
+    results.chat = await scan();
+
+    await page.locator('.sidebar__nav-item', { hasText: '新建任务' }).first().click();
+    await page.locator('.wb-composer__input').waitFor({ timeout: 15000 });
+    await ctx.sleep(500);
+    results.home = await scan();
+
+    await page.locator('.sidebar__nav > [data-feature="experts-hub"]').click();
+    await page.getByRole('tab', { name: '专家' }).waitFor({ timeout: 10000 });
+    await ctx.sleep(500);
+    results.experts = await scan();
+
+    await page.locator('.sidebar__nav > [data-feature="automation"]').click();
+    await ctx.sleep(600);
+    results.automation = await scan();
+
+    // Keyboard: focus 设置, Enter opens, Escape closes (no mouse involved).
+    const settingsBtn = page.getByRole('button', { name: '设置', exact: true }).first();
+    await settingsBtn.focus();
+    await page.keyboard.press('Enter');
+    await page.getByRole('dialog', { name: '设置' }).waitFor({ timeout: 10000 });
+    await ctx.sleep(500);
+    results.settings = await scan();
+    await page.keyboard.press('Escape');
+    await page.locator('.settings-modal').waitFor({ state: 'detached', timeout: 5000 });
+
+    // Narrow viewport: the same scan at 900×800.
+    await ctx.setSize(900, 800);
+    await ctx.sleep(500);
+    results.narrow = await scan();
+    await ctx.setSize(1440, 900);
+    await ctx.sleep(300);
+
+    const issues = Object.entries(results).flatMap(([screen, list]) => list.map((item) => screen + ':' + item));
+    if (issues.length) throw new Error('a11y issues: ' + issues.slice(0, 12).join(' | '));
+    return { screens: Object.keys(results), counts: Object.fromEntries(Object.entries(results).map(([k, v]) => [k, v.length])) };`);
+
+  // O1: a renderer error reaches the main process' JSONL log, and the log is redacted on disk.
+  const o1 = await step('可观测与恢复（O1）', `
+    await page.locator('.sidebar__nav-item', { hasText: '新建任务' }).first().click();
+    await page.locator('.wb-composer__input').waitFor({ state: 'visible', timeout: 20000 });
+    const secret = 'sk-e2e-observe-1234567890';
+    const absPath = '/Users/e2e/secret-project/app.ts';
+    await page.evaluate(([secret, absPath]) => console.error('O1LOGPROBE ' + secret + ' ' + absPath), [secret, absPath]);
+    let logs = await ctx.readLogs();
+    for (let i = 0; i < 25 && !logs.some(f => f.content.includes('O1LOGPROBE')); i += 1) {
+      await ctx.sleep(200);
+      logs = await ctx.readLogs();
+    }
+    const all = logs.map(f => f.content).join('');
+    if (!all.includes('O1LOGPROBE')) throw new Error('renderer console error never reached <userData>/logs');
+    if (all.includes(secret) || all.includes('/Users/e2e')) throw new Error('log leaked a credential or absolute path');
+    if (!all.includes('[redacted]') || !all.includes('[path]')) throw new Error('log redaction markers missing');
+    if (!/"scope":"renderer"/.test(all)) throw new Error('renderer record missing from structured JSONL');
+    if (!/"scope":"main"/.test(all)) throw new Error('main-process startup record missing');
+    return { files: logs.map(f => f.name), records: all.trim().split('\\n').length, redacted: true };`);
+
   const audit = await step('audit', `
     const a = await ctx.audit();
     const rejected = a.main.filter(r => r.status === 'rejected');

@@ -3,7 +3,7 @@ import { AutomationService, type AutomationExecutor } from "@openbuddy/services/
 import { FileTriggerWatcher, readTriggerContent } from "@openbuddy/services/automation/triggers";
 import { ExpertStore } from "@openbuddy/services/agents/store";
 import { setSessionExpert, type ExpertProfile } from "@openbuddy/engine/features/expert";
-import type { Automation, AutomationStatus } from "@openbuddy/protocol/dto";
+import type { Automation, AutomationRunRecord, AutomationStatus } from "@openbuddy/protocol/dto";
 import type { Handler, HostContext, HostModule } from "../module.js";
 
 /**
@@ -58,7 +58,17 @@ export function automationModule(ctx: HostContext): HostModule {
 
   /** Open a background session, send the prompt, and wait for the turn to settle. */
   const executor: AutomationExecutor = async (task, extraPrompt?: string) => {
-    const cwd = await engine.validCwd(task.cwds.split(",")[0].trim());
+    // 交付目标校验 (B3c): a missing workspace fails the record with a readable reason instead of
+    // leaving it stuck in `running` (automations_run used to throw before finishRecord).
+    const target = task.cwds.split(",")[0].trim();
+    let cwd: string;
+    try {
+      cwd = await engine.validCwd(target);
+    } catch (error) {
+      const reason = `交付目标不可用（${target || "未设置"}）：${error instanceof Error ? error.message : String(error)}`;
+      engine.emit("agent://automation", { id: task.id, name: task.name, status: "failed" });
+      return { ok: false, error: reason };
+    }
     const sessionId = await engine.newSession(cwd, task.modelId, undefined, undefined, true);
     // 后台任务视图 (W4.5): the 运行中 panel labels this session with its automation name.
     const slot = engine.slots.get(sessionId);
@@ -99,8 +109,7 @@ export function automationModule(ctx: HostContext): HostModule {
     }
   };
 
-  let timer: ReturnType<typeof setInterval> | undefined;
-  const tickMs = ctx.options.automationTickMs ?? 30_000;
+  let timer: ReturnType<typeof setInterval> | undefined;  const tickMs = ctx.options.automationTickMs ?? 30_000;
   if (tickMs > 0) {
     timer = setInterval(() => {
       syncWatchers();
@@ -145,6 +154,34 @@ export function automationModule(ctx: HostContext): HostModule {
       watcher.watch(path, { meta: task.id, ...(task.fileTrigger?.debounceMs ? { debounceMs: task.fileTrigger.debounceMs } : {}) });
   };
 
+  /**
+   * 运行一次并记录 (B3c). The task is cloned first: the executor sees the revision that was
+   * current when the run started, even if the user saves an edit while it is in flight.
+   */
+  const runTask = async (
+    task: Automation,
+    extraPrompt?: string,
+    meta: Partial<AutomationRunRecord> = {},
+  ) => {
+    const snapshot = structuredClone(task);
+    automations().markRun(snapshot.id);
+    const record = automations().startRecord(snapshot, new Date(), meta);
+    try {
+      const result = await executor(snapshot, extraPrompt);
+      automations().finishRecord(record.id, {
+        status: result.ok ? "success" : "failed",
+        ...(result.sessionId ? { sessionId: result.sessionId } : {}),
+        ...(result.error ? { error: result.error } : {}),
+      });
+      return { recordId: record.id, ...result };
+    } catch (error) {
+      // Keep the record even when the executor itself throws (delivery target, session failure).
+      const message = error instanceof Error ? error.message : String(error);
+      automations().finishRecord(record.id, { status: "failed", error: message });
+      return { recordId: record.id, ok: false, error: message };
+    }
+  };
+
   const commands: Record<string, Handler> = {
     automations_snapshot: () => automations().snapshot(),
     automations_save: (p) => {
@@ -163,15 +200,16 @@ export function automationModule(ctx: HostContext): HostModule {
     automations_run: async (p) => {
       const task = automations().get(text(p.id));
       if (!task) throw Error("automation_not_found: 找不到这个自动化");
-      automations().markRun(task.id);
-      const record = automations().startRecord(task);
-      const result = await executor(task);
-      automations().finishRecord(record.id, {
-        status: result.ok ? "success" : "failed",
-        ...(result.sessionId ? { sessionId: result.sessionId } : {}),
-        ...(result.error ? { error: result.error } : {}),
-      });
-      return { recordId: record.id, ...result };
+      return runTask(task);
+    },
+    /** 重试一条失败记录 (B3c): a new record links back via `retryOf`; history is never rewritten. */
+    automation_retry: async (p) => {
+      const record = automations().record(text(p.recordId));
+      if (!record) throw Error("record_not_found: 找不到这条运行记录");
+      if (record.status !== "failed") throw Error("invalid_state: 只能重试失败的运行记录");
+      const task = automations().get(record.automationId);
+      if (!task) throw Error("automation_not_found: 自动化任务已被删除，无法重试");
+      return runTask(task, undefined, { retryOf: record.id });
     },
     /** One scheduler pass now (tests; also the 运行记录 refresh path). */
     automation_tick: async () => ({ fired: await automations().tick(executor) }),

@@ -20,18 +20,21 @@ export function Banner() {
     return (
       <Pressable
         onPress={dismiss}
+        accessibilityRole="button"
+        accessibilityLabel={`错误：${error}，点按关闭`}
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           gap: 8,
+          minHeight: theme.touch,
           backgroundColor: theme.card,
           borderBottomWidth: theme.hairline,
           borderBottomColor: theme.cardBorder,
-          paddingHorizontal: 14,
-          paddingVertical: 10,
+          paddingHorizontal: theme.gutter,
+          paddingVertical: 8,
         }}
       >
-        <Text style={{ flex: 1, color: theme.danger, fontSize: 13 }}>{error}</Text>
+        <Text style={{ flex: 1, color: theme.danger, fontSize: theme.fontMeta, lineHeight: 19 }}>{error}</Text>
         <CloseIcon size={14} color={theme.textWeak} />
       </Pressable>
     )
@@ -47,11 +50,11 @@ export function Banner() {
         backgroundColor: theme.card,
         borderBottomWidth: theme.hairline,
         borderBottomColor: theme.cardBorder,
-        paddingHorizontal: 14,
+        paddingHorizontal: theme.gutter,
         paddingVertical: 9,
       }}
     >
-      <Text style={{ color: banner.tone === 'warn' ? theme.warning : theme.textMedium, fontSize: 12, textAlign: 'center' }}>
+      <Text style={{ color: banner.tone === 'warn' ? theme.warning : theme.textMedium, fontSize: theme.fontMicro, textAlign: 'center' }}>
         {banner.text}
       </Text>
     </Pressable>

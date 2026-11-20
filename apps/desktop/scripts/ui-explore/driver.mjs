@@ -3,7 +3,7 @@
 // - runs a local OpenAI-compatible SSE fixture (no real keys)
 // - exposes an HTTP control endpoint: POST /eval with JS body executed as async fn(ctx)
 import { createServer } from 'node:http';
-import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -304,6 +304,16 @@ const fixtureServer = createServer(async (req, res) => {
     await streamText(chunk, '团队已完成：调研给出市场结论，审阅指出两项风险。', fixture.delayMs / 3);
     finish(); return;
   }
+  // __OFFICE__ (B2b): ob_xlsx writes a real OOXML workbook; the tool goes through the approval gate.
+  if (lastUserText.includes('__OFFICE__')) {
+    if (toolsSinceUser === 0) {
+      await streamText(chunk, '好的，我生成一张季度销售表。', fixture.delayMs);
+      chunk({ tool_calls: [{ index: 0, id: 'call_office_1', type: 'function', function: { name: 'ob_xlsx', arguments: JSON.stringify({ path: 'reports/q3.xlsx', sheets: [{ name: '销售', columns: ['月份', '销量'], rows: [['1月', 10], ['2月', 20], ['3月', 35]] }] }) } }] });
+      finish('tool_calls'); return;
+    }
+    await streamText(chunk, '表格已生成：`reports/q3.xlsx`，已放进右侧工作台。', fixture.delayMs / 3);
+    finish(); return;
+  }
   if (lastUserText.includes('__RM__')) {
     if (toolsSinceUser === 0) {
       await streamText(chunk, '清理旧的构建产物。', fixture.delayMs);
@@ -393,7 +403,16 @@ const ctx = {
   /** Save a base64 PNG returned by a secondary window's capturePage (pii W7). */
   savePng: async (name, base64) => { const path = join(OUT, `${name}.png`); await writeFile(path, Buffer.from(base64, 'base64')); return path; },
   mkdir: (path) => mkdir(path, { recursive: true }),
+  rm: (path) => rm(path, { force: true }),
   tmpPath: (name) => join(RUN, name),
+  /** O1: the structured logs the main process wrote under <userData>/logs (already redacted). */
+  readLogs: async () => {
+    const dir = join(profile, 'logs');
+    const names = await readdir(dir).catch(() => []);
+    const files = [];
+    for (const name of names.filter((n) => n.endsWith('.log'))) files.push({ name, content: await readFile(join(dir, name), 'utf8').catch(() => '') });
+    return files;
+  },
   call: (command, payload = {}) => page.evaluate(({ command, payload }) => window.openbuddy.invoke(command, payload), { command, payload }),
   audit: () => app.evaluate(() => ({ main: globalThis.__ipcAudit, renderer: globalThis.__rendererRejects })),
 };

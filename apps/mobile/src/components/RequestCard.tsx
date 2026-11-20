@@ -29,9 +29,12 @@ function Pill({
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
       style={({ pressed }) => ({
         flex: 1,
-        minHeight: 38,
+        minHeight: theme.touch,
         paddingHorizontal: 10,
         borderRadius: theme.radiusPill,
         flexDirection: 'row',
@@ -47,7 +50,7 @@ function Pill({
       {danger ? <CloseIcon size={14} color={theme.danger} /> : primary ? <CheckIcon size={14} color={theme.inkFg} /> : null}
       <Text style={{
         color: danger ? theme.danger : primary ? theme.inkFg : theme.text,
-        fontSize: 13,
+        fontSize: theme.fontMeta,
         fontWeight: '600',
       }}>
         {label}
@@ -72,19 +75,19 @@ export function RequestCard({
       <View
         style={{
           backgroundColor: theme.card,
-          borderRadius: 16,
+          borderRadius: theme.radiusBubble,
           borderWidth: theme.hairline,
           borderColor: theme.cardBorder,
-          padding: 14,
+          padding: theme.pad,
           gap: 10,
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <SparkIcon size={16} color={theme.warning} />
-          <Text style={{ flex: 1, color: theme.text, fontSize: 14, fontWeight: '600' }}>{approval.title}</Text>
+          <Text style={{ flex: 1, color: theme.text, fontSize: theme.fontBody, fontWeight: '600' }}>{approval.title}</Text>
         </View>
         {approval.detail ? (
-          <Text selectable style={{ color: theme.textMedium, fontSize: 13, lineHeight: 20 }}>
+          <Text selectable style={{ color: theme.textMedium, fontSize: theme.fontMeta, lineHeight: 20 }}>
             {approval.detail}
           </Text>
         ) : null}
@@ -130,8 +133,14 @@ export function RequestCard({
                 onPress={() => onAction({ type: 'question', value: option })}
               />
             ))}
-            <Pressable onPress={() => onAction({ type: 'question', cancelled: true })} disabled={busy}>
-              <Text style={{ color: theme.textWeak, fontSize: 12, textAlign: 'center', paddingVertical: 4 }}>取消</Text>
+            <Pressable
+              onPress={() => onAction({ type: 'question', cancelled: true })}
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel="取消这次问询"
+              style={({ pressed }) => ({ minHeight: theme.touch, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}
+            >
+              <Text style={{ color: theme.textMedium, fontSize: theme.fontMeta }}>取消</Text>
             </Pressable>
           </View>
         ) : null}
@@ -154,12 +163,12 @@ export function RequestCard({
               placeholder={approval.placeholder}
               placeholderTextColor={theme.textWeak}
               style={{
-                minHeight: 38,
+                minHeight: 40,
                 maxHeight: 120,
                 color: theme.text,
-                fontSize: 14,
+                fontSize: theme.fontBody,
                 backgroundColor: theme.surface,
-                borderRadius: 8,
+                borderRadius: theme.radiusSmall,
                 borderWidth: theme.hairline,
                 borderColor: theme.cardBorder,
                 paddingHorizontal: 10,

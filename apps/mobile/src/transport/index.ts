@@ -11,7 +11,7 @@ import { Platform } from 'react-native'
 import { GatewayTransport } from '@openbuddy/client/gateway-transport'
 import type { Transport } from '@openbuddy/client/transport'
 
-import type { PairPayload } from '../core/pairing'
+import { pairErrorMessage, type PairPayload } from '../core/pairing'
 import {
   makePairingRecord, resolveActiveId, upsertPairing, type PairingRecord,
 } from '../core/pairings'
@@ -157,7 +157,9 @@ export async function claimPair(payload: PairPayload, deviceName: string): Promi
     error?: string
   }
   if (!response.ok || !body.deviceToken) {
-    throw new Error(body.error ?? `配对失败（HTTP ${response.status}）`)
+    // The gateway answers in English; translate at the boundary so the pair
+    // screen never shows 「invalid or expired code」 to a Chinese user.
+    throw new Error(pairErrorMessage(body.error, response.status))
   }
   return {
     gatewayUrl: payload.gatewayUrl,
@@ -172,7 +174,7 @@ let active: { transport: GatewayTransport; gatewayUrl: string; token: string } |
 /** Builds the app-wide transport; safe to call twice (the old one is closed). */
 export async function openTransport(
   pairing: Pairing,
-  options: { onUnauthorized?: () => void } = {},
+  options: { onUnauthorized?: () => void; onResync?: () => void } = {},
 ): Promise<Transport> {
   active?.transport.close()
   const transport = new GatewayTransport({
@@ -180,6 +182,7 @@ export async function openTransport(
     token: pairing.deviceToken,
     fetchImpl: await streamFetch(),
     ...(options.onUnauthorized ? { onUnauthorized: options.onUnauthorized } : {}),
+    ...(options.onResync ? { onResync: options.onResync } : {}),
   })
   active = { transport, gatewayUrl: pairing.gatewayUrl, token: pairing.deviceToken }
   return transport

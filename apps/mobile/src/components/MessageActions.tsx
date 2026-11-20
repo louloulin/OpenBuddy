@@ -9,6 +9,7 @@
 
 import { useState } from 'react'
 import { Modal, Pressable, Text, View, useColorScheme } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Clipboard from 'expo-clipboard'
 
 import { themeFor } from '../theme'
@@ -29,25 +30,29 @@ export type MessageActionsProps = {
   onQuote?: () => void
   /** Edit-resend: put a user message back in the composer. */
   onEdit?: () => void
+  /**
+   * Copy feedback is reported upward instead of rendered here: the sheet wraps
+   * the bubble content, so a note in this tree would grow the bubble itself.
+   */
+  onNote?: (note: string | null) => void
   children: React.ReactNode
 }
 
 export function MessageActions({
-  text, markdown, canRegenerate, onRegenerate, onSpeak, onQuote, onEdit, children,
+  text, markdown, canRegenerate, onRegenerate, onSpeak, onQuote, onEdit, onNote, children,
 }: MessageActionsProps) {
   const theme = themeFor(useColorScheme())
+  const insets = useSafeAreaInsets()
   const [open, setOpen] = useState(false)
-  const [note, setNote] = useState<string | null>(null)
 
   const copy = async (value: string, label: string) => {
     try {
       await Clipboard.setStringAsync(value)
-      setNote(label)
-      setTimeout(() => setNote(null), 1400)
+      onNote?.(label)
     } catch {
-      setNote('复制失败')
-      setTimeout(() => setNote(null), 1400)
+      onNote?.('复制失败')
     }
+    setTimeout(() => onNote?.(null), 1400)
     setOpen(false)
   }
 
@@ -75,37 +80,48 @@ export function MessageActions({
       <Pressable onLongPress={() => setOpen(true)} delayLongPress={350}>
         {children}
       </Pressable>
-      {note ? (
-        <View style={{ alignItems: 'flex-end', paddingTop: 4, paddingHorizontal: theme.gutter }}>
-          <Text style={{ color: theme.textWeak, fontSize: 11 }}>{note}</Text>
-        </View>
-      ) : null}
-
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' }} onPress={() => setOpen(false)} />
+        <Pressable style={{ flex: 1, backgroundColor: theme.scrim }} onPress={() => setOpen(false)} />
         <View
           style={{
             backgroundColor: theme.card,
-            borderTopLeftRadius: 18,
-            borderTopRightRadius: 18,
+            borderTopLeftRadius: theme.radiusSheet,
+            borderTopRightRadius: theme.radiusSheet,
             paddingVertical: 8,
-            paddingBottom: 30,
+            paddingBottom: 16 + insets.bottom,
           }}
         >
           {items.map(item => (
             <Pressable
               key={item.key}
               onPress={item.run}
-              style={({ pressed }) => ({ paddingVertical: 15, paddingHorizontal: 20, backgroundColor: pressed ? theme.hover : 'transparent' })}
+              accessibilityRole="button"
+              style={({ pressed }) => ({
+                minHeight: theme.touch,
+                justifyContent: 'center',
+                paddingVertical: 12,
+                paddingHorizontal: 20,
+                backgroundColor: pressed ? theme.hover : 'transparent',
+              })}
             >
-              <Text style={{ color: theme.text, fontSize: 15 }}>{item.label}</Text>
+              <Text style={{ color: theme.text, fontSize: theme.fontBody }}>{item.label}</Text>
             </Pressable>
           ))}
           <Pressable
             onPress={() => setOpen(false)}
-            style={({ pressed }) => ({ paddingVertical: 15, paddingHorizontal: 20, backgroundColor: pressed ? theme.hover : 'transparent', borderTopWidth: theme.hairline, borderTopColor: theme.cardBorder, marginTop: 6 })}
+            accessibilityRole="button"
+            style={({ pressed }) => ({
+              minHeight: theme.touch,
+              justifyContent: 'center',
+              paddingVertical: 12,
+              paddingHorizontal: 20,
+              backgroundColor: pressed ? theme.hover : 'transparent',
+              borderTopWidth: theme.hairline,
+              borderTopColor: theme.cardBorder,
+              marginTop: 6,
+            })}
           >
-            <Text style={{ color: theme.textWeak, fontSize: 15 }}>取消</Text>
+            <Text style={{ color: theme.textMedium, fontSize: theme.fontBody }}>取消</Text>
           </Pressable>
         </View>
       </Modal>

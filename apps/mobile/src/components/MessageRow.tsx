@@ -30,6 +30,7 @@ import { ToolCard } from './ToolCard'
 
 function UserBubble({ row, onQuote, onEdit }: { row: TextRow; onQuote?: () => void; onEdit?: () => void }) {
   const theme = themeFor(useColorScheme())
+  const [note, setNote] = useState<string | null>(null)
   return (
     <View style={{ alignItems: 'flex-end', paddingHorizontal: theme.gutter, paddingVertical: 8 }}>
       <View
@@ -45,7 +46,7 @@ function UserBubble({ row, onQuote, onEdit }: { row: TextRow; onQuote?: () => vo
           paddingVertical: 8,
         }}
       >
-        <MessageActions text={row.text} onQuote={onQuote} onEdit={onEdit}>
+        <MessageActions text={row.text} onQuote={onQuote} onEdit={onEdit} onNote={setNote}>
           <Text
             selectable
             style={{
@@ -58,6 +59,14 @@ function UserBubble({ row, onQuote, onEdit }: { row: TextRow; onQuote?: () => vo
           </Text>
         </MessageActions>
       </View>
+      {note ? (
+        <Text
+          accessibilityLiveRegion="polite"
+          style={{ color: theme.textWeak, fontSize: theme.fontMicro, marginTop: 4 }}
+        >
+          {note}
+        </Text>
+      ) : null}
     </View>
   )
 }
@@ -91,28 +100,39 @@ function InlineActions({ row, onRegenerate, onQuote }: { row: TextRow; onRegener
     setTimeout(() => setNote(null), 1600)
   }
 
+  // Each affordance is a 44pt tap target centred on a 15pt glyph. The bare
+  // icons before were 15pt tall with a 10pt slop — 35pt of real estate, under
+  // every platform minimum, and VoiceOver had no role to announce.
+  const action = (label: string, glyph: React.ReactNode, onPress: () => void) => (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => ({
+        width: theme.touch,
+        height: theme.touch,
+        marginLeft: -10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: pressed ? 0.5 : 1,
+      })}
+    >
+      {glyph}
+    </Pressable>
+  )
+
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 8 }}>
-      <Pressable hitSlop={10} onPress={() => void copy()} accessibilityLabel="复制">
-        <CopyIcon size={15} color={theme.textWeak} />
-      </Pressable>
-      <Pressable hitSlop={10} onPress={() => void share()} accessibilityLabel="分享">
-        <ShareIcon size={15} color={theme.textWeak} />
-      </Pressable>
-      <Pressable hitSlop={10} onPress={() => speak(row.text)} accessibilityLabel="朗读">
-        <VolumeIcon size={15} color={theme.textWeak} />
-      </Pressable>
-      {onQuote ? (
-        <Pressable hitSlop={10} onPress={onQuote} accessibilityLabel="引用回复">
-          <QuoteIcon size={15} color={theme.textWeak} />
-        </Pressable>
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+      {action('复制', <CopyIcon size={15} color={theme.textMedium} />, () => void copy())}
+      {action('分享', <ShareIcon size={15} color={theme.textMedium} />, () => void share())}
+      {action('朗读', <VolumeIcon size={15} color={theme.textMedium} />, () => speak(row.text))}
+      {onQuote ? action('引用回复', <QuoteIcon size={15} color={theme.textMedium} />, onQuote) : null}
+      {onRegenerate ? action('重新生成', <RefreshIcon size={15} color={theme.textMedium} />, onRegenerate) : null}
+      {note ? (
+        <Text accessibilityLiveRegion="polite" style={{ color: theme.textWeak, fontSize: theme.fontMicro, marginLeft: 8 }}>
+          {note}
+        </Text>
       ) : null}
-      {onRegenerate ? (
-        <Pressable hitSlop={10} onPress={onRegenerate} accessibilityLabel="重新生成">
-          <RefreshIcon size={15} color={theme.textWeak} />
-        </Pressable>
-      ) : null}
-      {note ? <Text style={{ color: theme.textWeak, fontSize: 11 }}>{note}</Text> : null}
     </View>
   )
 }
@@ -120,10 +140,12 @@ function InlineActions({ row, onRegenerate, onQuote }: { row: TextRow; onRegener
 function AssistantRow({ row, onRegenerate, onQuote }: { row: TextRow; onRegenerate?: () => void; onQuote?: () => void }) {
   const theme = themeFor(useColorScheme())
   return (
-    <View style={{ paddingHorizontal: theme.gutter, paddingVertical: 10 }}>
+    <View style={{ paddingHorizontal: theme.gutter, paddingTop: theme.rowGap, paddingBottom: 2 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
         <SparkIcon size={14} color={theme.textWeak} />
-        <Text style={{ color: theme.textWeak, fontSize: 12, fontWeight: '600', letterSpacing: 0.2 }}>OpenBuddy</Text>
+        <Text style={{ color: theme.textMedium, fontSize: theme.fontMeta, fontWeight: '600', letterSpacing: 0.2 }}>
+          OpenBuddy
+        </Text>
       </View>
       <MessageActions
         text={row.text}
@@ -151,11 +173,43 @@ function AssistantRow({ row, onRegenerate, onQuote }: { row: TextRow; onRegenera
   )
 }
 
+/**
+ * A system line inside the transcript.
+ *
+ * Most are quiet asides (compaction, context notices) and stay centred and grey.
+ * An interruption is different: the answer the user was reading simply stops, so
+ * the line has to read as a state, not as a footnote — it gets a warning tint, a
+ * left rule and a label, and is announced to screen readers.
+ */
 function SystemRow({ row }: { row: TextRow }) {
   const theme = themeFor(useColorScheme())
+  const interrupted = row.interrupted === true
+  if (!interrupted) {
+    return (
+      <View style={{ paddingHorizontal: theme.gutter, paddingVertical: 6, alignItems: 'center' }}>
+        <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta, lineHeight: 19, textAlign: 'center' }}>{row.text}</Text>
+      </View>
+    )
+  }
   return (
-    <View style={{ paddingHorizontal: theme.gutter, paddingVertical: 6, alignItems: 'center' }}>
-      <Text style={{ color: theme.textWeak, fontSize: 12, lineHeight: 18, textAlign: 'center' }}>{row.text}</Text>
+    <View style={{ paddingHorizontal: theme.gutter, paddingVertical: 8 }}>
+      <View
+        accessibilityRole="alert"
+        accessibilityLiveRegion="polite"
+        style={{
+          flexDirection: 'row',
+          gap: 8,
+          alignItems: 'flex-start',
+          borderLeftWidth: 3,
+          borderLeftColor: theme.warning,
+          backgroundColor: 'rgba(178, 106, 0, 0.08)',
+          borderRadius: theme.radiusSmall,
+          paddingVertical: 9,
+          paddingHorizontal: 10,
+        }}
+      >
+        <Text style={{ flex: 1, color: theme.textMedium, fontSize: theme.fontMeta, lineHeight: 20 }}>{row.text}</Text>
+      </View>
     </View>
   )
 }

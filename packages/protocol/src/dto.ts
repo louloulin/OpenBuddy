@@ -310,24 +310,17 @@ export interface SessionSummaryEvent {
   title: string;
 }
 
-// ---------- skills (x.ai/skills
-export interface SkillInfo {
-  name: string;
-  displayName?: string;
-  description?: string;
-  /** Where the skill was discovered: "local" | "repo" | "user" | "server" | "bundled" | "plugin". */
-  scope?: string;
-  enabled: boolean;
-  userInvocable?: boolean;
-  /** Filesystem path to the skill directory (when available). */
-  path?: string;
-}
+// ---------- skills (x.ai/skills) ----------
+// The DTOs live in ./skills.ts (B1c) and are re-exported here for existing importers.
+export type { SkillExportResult, SkillInfo, SkillInstallation, SkillInstallResult } from './skills.js';
 
 // ---------- connectors / MCP (x.ai/mcp/*) ----------
 // The MCP wire types (server entries, upsert request, auth results, 测试连接 W2.4, 即时连接卡 W2.5)
 // live in ./mcp.ts so this file stays under its size ceiling; they are re-exported here.
 export type {
   ConnectorNeededEvent,
+  McpAuthAttempt,
+  McpAuthAttemptStatus,
   McpAuthStatusEntry,
   McpAuthTriggerResult,
   McpServerEntry,
@@ -679,6 +672,10 @@ export interface Automation {
    * 参照 Pi SDK 的 `file-trigger` 示例扩展：监听路径 → 防抖 → 把内容注入这一轮。
    */
   fileTrigger?: AutomationFileTrigger;
+  /**
+   * 修订号 (B3c)：每次保存 +1；运行记录锁定当时的修订，编辑中的任务不会改变已在跑的运行。
+   */
+  revision?: number;
   lastRunAt?: string;
   nextRunAt?: string;
   createdAt: string;
@@ -703,6 +700,10 @@ export interface AutomationRunRecord {
   sessionId?: string;
   /** Failure / timeout reason (`automation_timeout`, executor error text). */
   error?: string;
+  /** 运行时锁定的任务修订 (B3c)；之后编辑任务不会改写这条记录。 */
+  automationRevision?: number;
+  /** 重试来源记录 id (B3c)。 */
+  retryOf?: string;
   archived: boolean;
 }
 

@@ -19,6 +19,15 @@ export function skillsModule(ctx: HostContext): HostModule {
       engine.skills.toggle(text(p.name), bool(p.enabled));
       await engine.reload();
     },
+    // 技能市场安装 (B1c): copy into <pi>/skills (idempotent), then reload so Pi discovers it.
+    skills_install_from_catalog: async (p) => {
+      const dirs = Array.isArray(p.dirs) ? p.dirs.filter((dir): dir is string => typeof dir === "string") : [];
+      const result = await engine.skills.installFromCatalog(dirs, cwdOf(p));
+      await engine.reload();
+      return result;
+    },
+    // 导出 ZIP (B1c): only a discovered skill directory; the renderer chooses the target.
+    skills_export_zip: (p) => engine.skills.exportZip(text(p.path), text(p.target), cwdOf(p)),
     commands_list: () => engine.commands(),
     // 技能目录 (pii W2.7): scan a marketplace root, read a SKILL.md before import.
     skills_catalog_default_root: () => engine.skillCatalog.defaultRoot(),

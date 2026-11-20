@@ -151,6 +151,19 @@ describe("payload validation for new commands", () => {
     bad("experts_import_workbuddy", {});
     bad("experts_import_workbuddy", { path: "" });
     bad("experts_import_workbuddy", { path: "x".repeat(4097) });
+    ok("capability_packs_list", {});
+    ok("capability_packs_set_enabled", { id: "rich-pack", enabled: false });
+    bad("capability_packs_set_enabled", { id: "../escape", enabled: false });
+    bad("capability_packs_set_enabled", { id: "rich-pack" });
+    ok("capability_packs_set_contribution", { id: "rich-pack", kind: "prompt", name: "report", enabled: false });
+    bad("capability_packs_set_contribution", { id: "rich-pack", kind: "hook", name: "report", enabled: true });
+    ok("capability_packs_remove", { id: "rich-pack" });
+    bad("capability_packs_remove", {});
+    ok("skills_install_from_catalog", { dirs: ["/market/skills/a"], cwd: "/work" });
+    bad("skills_install_from_catalog", { dirs: [] });
+    bad("skills_install_from_catalog", { dirs: Array.from({ length: 21 }, (_, i) => `/m/${i}`) });
+    ok("skills_export_zip", { path: "/pi/skills/a", target: "/tmp/a.zip", cwd: "/work" });
+    bad("skills_export_zip", { path: "", target: "/tmp/a.zip" });
     bad("experts_load", { cwd: 42 });
     ok("experts_load", { cwd: "/work" });
     // agents_defaults_* are not expert commands and keep their own rules.

@@ -7,6 +7,8 @@ import {
   applyUpdates,
   contentText,
   emptyTranscript,
+  isTurnPending,
+  sealInterruptedTurn,
   toolCategory,
   transcriptPreview,
   type Transcript,
@@ -169,5 +171,60 @@ describe('toolCategory', () => {
   it('never returns an empty tag', () => {
     expect(toolCategory('')).toBe('tool')
     expect(toolCategory('agent_')).toBe('agent')
+  })
+})
+
+describe('sealInterruptedTurn', () => {
+  // A stream can end without `agent_settled` (desktop crash, tunnel loss). A
+  // caret left blinking tells the user work is happening when it is not.
+  const streaming = (): Transcript => ({
+    rows: [
+      { kind: 'text', id: 'u1', role: 'user', text: '问题' },
+      { kind: 'text', id: 'a1', role: 'assistant', text: '正在处理', streaming: true },
+      { kind: 'thinking', id: 't1', text: '想一想', live: true },
+      { kind: 'tool', id: 'k1', name: 'bash', status: 'running' },
+    ],
+    lastAssistantText: '正在处理',
+  })
+
+  it('closes every row that still claims to be running', () => {
+    const sealed = sealInterruptedTurn(streaming(), '断开了')
+    expect(sealed.rows.filter(row => row.kind === 'text' && row.role === 'assistant')[0]).toMatchObject({ streaming: false })
+    expect(sealed.rows.find(row => row.kind === 'thinking')).toMatchObject({ live: false })
+    expect(sealed.rows.find(row => row.kind === 'tool')).toMatchObject({ status: 'error' })
+    expect(isTurnPending(sealed)).toBe(false)
+  })
+
+  it('appends one system row explaining why the answer stops', () => {
+    const sealed = sealInterruptedTurn(streaming(), '断开了')
+    const notice = sealed.rows.at(-1)
+    expect(notice).toMatchObject({ kind: 'text', role: 'system', text: '断开了' })
+  })
+
+  it('is a no-op on a settled transcript, and without a note', () => {
+    const settled: Transcript = { rows: [{ kind: 'text', id: 'a1', role: 'assistant', text: '完成' }], lastAssistantText: '完成' }
+    expect(sealInterruptedTurn(settled, 'x')).toBe(settled)
+    const silent = sealInterruptedTurn(streaming())
+    expect(silent.rows).toHaveLength(4)
+    expect(isTurnPending(silent)).toBe(false)
+  })
+})
+
+describe('interrupted system row', () => {
+  // The chat screen uses this flag to hide follow-up chips: they assume a
+  // finished answer, and an interrupted turn has none.
+  it('is marked so the UI can style it and suppress follow-ups', () => {
+    const sealed = sealInterruptedTurn({
+      rows: [{ kind: 'text', id: 'a1', role: 'assistant', text: '半句', streaming: true }],
+      lastAssistantText: '半句',
+    }, '断开了')
+    const notice = sealed.rows.at(-1)
+    expect(notice).toMatchObject({ role: 'system', interrupted: true })
+  })
+
+  it('leaves ordinary system asides untouched', () => {
+    const plain: Transcript = { rows: [{ kind: 'text', id: 's', role: 'system', text: '已压缩上下文' }], lastAssistantText: '' }
+    expect(sealInterruptedTurn(plain, 'x')).toBe(plain)
+    expect(plain.rows[0]).not.toHaveProperty('interrupted')
   })
 })

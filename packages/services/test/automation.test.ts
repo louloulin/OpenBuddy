@@ -95,6 +95,24 @@ describe("自动化服务 (pii W4.1 / W4.2)", () => {
     expect(() => service.delete("a1")).toThrow("automation_not_found");
   });
 
+  it("bumps the revision on every save and freezes it in the run record (B3c)", () => {
+    const service = new AutomationService(settingsFor());
+    const created = service.save(base({ id: "" }));
+    expect(created.revision).toBe(1);
+    const edited = service.save({ ...created, name: "第二版" });
+    expect(edited.revision).toBe(2);
+    expect(service.snapshot().automations[0]).toMatchObject({ name: "第二版", revision: 2 });
+
+    const record = service.startRecord(edited);
+    expect(record).toMatchObject({ automationRevision: 2, automationName: "第二版" });
+    // Editing while the run is "in flight" never rewrites the record it started with.
+    service.save({ ...edited, name: "第三版", prompt: "新提示词" });
+    expect(service.record(record.id)).toMatchObject({ automationRevision: 2, automationName: "第二版" });
+
+    const retry = service.startRecord(edited, new Date(), { retryOf: record.id });
+    expect(retry).toMatchObject({ retryOf: record.id, automationRevision: 2 });
+  });
+
   it("tick runs due tasks once, records the result and advances the schedule", async () => {
     const service = new AutomationService(settingsFor());
     service.save(base({ schedule: schedule({ byhour: 9, byminute: 0 }) }));
@@ -105,14 +123,14 @@ describe("自动化服务 (pii W4.1 / W4.2)", () => {
     expect(await service.tick(run, at)).toBe(1);
     expect(run).toHaveBeenCalledTimes(1);
     const snapshot = service.snapshot(at);
-    expect(snapshot.records[0]).toMatchObject({ automationId: "a1", status: "success", sessionId: "s1" });
+    expect(snapshot.records[0]).toMatchObject({ automationId: "a1", status: "success", sessionId: "s1", automationRevision: 1 });
     expect(new Date(snapshot.automations[0].lastRunAt!).getTime()).toBe(at.getTime());
     expect(new Date(snapshot.automations[0].nextRunAt!).getTime()).toBeGreaterThan(at.getTime());
     // Not due again.
     expect(await service.tick(run, at)).toBe(0);
-    // A failing executor is recorded as failed.
+    // A failing executor is recorded as failed, with its reason kept for retry/diagnostics.
     run.mockRejectedValueOnce(new Error("boom"));
     expect(await service.tick(run, new Date(at.getTime() + 86_400_000))).toBe(1);
-    expect(service.snapshot().records[0].status).toBe("failed");
+    expect(service.snapshot().records[0]).toMatchObject({ status: "failed", error: "boom" });
   });
 });

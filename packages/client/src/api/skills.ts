@@ -1,5 +1,5 @@
 // §5.3 `skills` module: skills_list / add / remove / toggle, commands_list.
-import type { SkillInfo, SlashCommand } from "@openbuddy/protocol/dto";
+import type { SkillExportResult, SkillInfo, SkillInstallResult, SlashCommand } from "@openbuddy/protocol/dto";
 import { invoke } from "../ipc";
 
 // ---------- skills (x.ai/skills
@@ -20,6 +20,16 @@ export async function skillsRemove(path: string, cwd?: string): Promise<void> {
 /** Enable or disable a skill by name (writes `[skills] disabled`). */
 export async function skillsToggle(name: string, enabled: boolean): Promise<void> {
   await invoke<void>("skills_toggle", { name, enabled });
+}
+
+/** Install marketplace skill directories into `<pi>/skills` (B1c); already-installed names are idempotent. */
+export async function skillsInstallFromCatalog(dirs: string[], cwd?: string): Promise<SkillInstallResult> {
+  return invoke<SkillInstallResult>("skills_install_from_catalog", { dirs, cwd: cwd ?? null });
+}
+
+/** Export one installed skill as a portable ZIP to `target` (B1c). */
+export async function skillsExportZip(path: string, target: string, cwd?: string): Promise<SkillExportResult> {
+  return invoke<SkillExportResult>("skills_export_zip", { path, target, cwd: cwd ?? null });
 }
 
 // ---------- slash commands + prompt history ----------

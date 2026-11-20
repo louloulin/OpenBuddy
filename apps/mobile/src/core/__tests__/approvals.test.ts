@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   parsePermissionMode, permissionDetail, permissionModeLabel, permissionOptionId, questionApproval,
-  trustApproval, trustRequestId,
+  shouldDismissAfterAnswer, trustApproval, trustRequestId,
 } from '../approvals'
 
 describe('permissionOptionId', () => {
@@ -48,6 +48,27 @@ describe('trustApproval', () => {
     expect(trustRequestId('/w')).toBe('trust:/w')
     expect(trustApproval('/w', 7)).toMatchObject({ requestId: 'trust:/w', kind: 'trust', cwd: '/w', receivedAt: 7 })
     expect(trustApproval('/w').detail).toContain('/w')
+  })
+
+  // The event carries only a cwd; without a session the card followed the user
+  // into every other conversation (and blocked their finished-turn state).
+  it('attaches the session when the event knows one', () => {
+    expect(trustApproval('/w', 7, 's1')).toMatchObject({ sessionId: 's1' })
+    expect(trustApproval('/w', 7)).not.toHaveProperty('sessionId')
+  })
+})
+
+describe('shouldDismissAfterAnswer', () => {
+  // Both answers end a trust card: recorded-but-still-visible cards were the
+  // reason follow-up chips never appeared again.
+  it('always dismisses a trust card', () => {
+    expect(shouldDismissAfterAnswer('trust', { type: 'trust', trusted: true })).toBe(true)
+    expect(shouldDismissAfterAnswer('trust', { type: 'trust', trusted: false })).toBe(true)
+  })
+
+  it('dismisses permission and question cards once answered', () => {
+    expect(shouldDismissAfterAnswer('permission', { type: 'permission' })).toBe(true)
+    expect(shouldDismissAfterAnswer('question', { type: 'question' })).toBe(true)
   })
 })
 

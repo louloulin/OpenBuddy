@@ -321,10 +321,12 @@ function RunHistory({
   records,
   onArchive,
   onDelete,
+  onRetry,
 }: {
   records: AutomationRunRecord[];
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
+  onRetry?: (id: string) => void;
 }) {
   const [filter, setFilter] = useState<HistoryFilter>("all");
   const [filterOpen, setFilterOpen] = useState(false);
@@ -396,8 +398,12 @@ function RunHistory({
               className={`atm-run-history-item${canArchive ? " atm-run-history-item--archivable" : ""}${item.archived ? " atm-run-history-item--archived" : ""}`}
             >
               <span className="atm-run-history-item-name">{item.automationName}</span>
+              {item.automationRevision ? (
+                <span className="atm-run-history-item-rev" title="运行时锁定的任务修订">修订 {item.automationRevision}</span>
+              ) : null}
+              {item.retryOf ? <span className="atm-run-history-item-rev">重试</span> : null}
               <div className="atm-run-history-item-right">
-                <span className="atm-run-history-item-time">
+                <span className="atm-run-history-item-time" title={item.error || undefined}>
                   {new Date(item.finishedAt || item.startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </span>
                 <span className={`atm-run-history-item-status ${item.status}`}>
@@ -407,6 +413,19 @@ function RunHistory({
                     <RunStatusIcon status={item.status} />
                   )}
                 </span>
+                {item.status === "failed" && onRetry && (
+                  <button
+                    type="button"
+                    className="atm-run-history-item-archive"
+                    title="重试这次运行"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRetry(item.id);
+                    }}
+                  >
+                    <PlayIcon width={16} height={16} />
+                  </button>
+                )}
                 {canArchive && (
                   <button
                     type="button"
@@ -473,6 +492,7 @@ export function AutomationEditPage({
   onOpenConnectorSettings,
   onArchiveRecord,
   onDeleteRecord,
+  onRetryRecord,
 }: {
   mode: "create" | "edit";
   draft: AutomationDraft;
@@ -492,6 +512,7 @@ export function AutomationEditPage({
   onOpenConnectorSettings?: () => void;
   onArchiveRecord: (id: string) => void;
   onDeleteRecord: (id: string) => void;
+  onRetryRecord?: (id: string) => void;
 }) {
   const isEditMode = mode === "edit";
   const set = (patch: Partial<AutomationDraft>) => setDraft({ ...draft, ...patch });
@@ -933,7 +954,7 @@ export function AutomationEditPage({
 
         {/* 运行历史（编辑态） */}
         {isEditMode && (
-          <RunHistory records={records} onArchive={onArchiveRecord} onDelete={onDeleteRecord} />
+          <RunHistory records={records} onArchive={onArchiveRecord} onDelete={onDeleteRecord} onRetry={onRetryRecord} />
         )}
       </div>
     </div>

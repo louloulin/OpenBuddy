@@ -4,10 +4,14 @@
 // The names the renderer used before (agentsList, expertsThumbnail …) keep their call shapes;
 // `api/deferred/{experts,assistants}.ts` re-export them from here.
 import type {
+  CapabilityPack,
+  CapabilityPackRemoval,
   ExpertCenterCatalog,
   ExpertDraft,
   ExpertEntry,
   ExpertRootInfo,
+  ExpertLinkImportResult,
+  ExpertLinkPreview,
   SessionExpertInfo,
   WorkBuddyImportResult,
 } from "@openbuddy/protocol/experts";
@@ -111,9 +115,46 @@ export async function expertsImportWorkbuddy(path: string): Promise<WorkBuddyImp
   return invoke<WorkBuddyImportResult>("experts_import_workbuddy", { path });
 }
 
+/** Preview an https URL or local package without writing anything (B3b). */
+export async function expertsLinkPreview(source: string): Promise<ExpertLinkPreview> {
+  return invoke<ExpertLinkPreview>("experts_link_preview", { source });
+}
+
+/** Import a link/path once per content digest; a repeat returns `duplicate: true` (B3b). */
+export async function expertsLinkImport(source: string): Promise<ExpertLinkImportResult> {
+  return invoke<ExpertLinkImportResult>("experts_link_import", { source });
+}
+
 /** Open an experts directory in the system file manager (the `files` module's `open_path`). */
 export async function expertsOpenDir(path: string): Promise<void> {
   await invoke<void>("open_path", { path });
+}
+
+// ---------- 能力包 (B1a) ----------
+
+/** Installed capability packs and their per-contribution switches. */
+export async function capabilityPacksList(): Promise<CapabilityPack[]> {
+  return invoke<CapabilityPack[]>("capability_packs_list");
+}
+
+/** Enable or disable every contribution of one pack (MCP stays opt-in). */
+export async function capabilityPackSetEnabled(id: string, enabled: boolean): Promise<CapabilityPack[]> {
+  return invoke<CapabilityPack[]>("capability_packs_set_enabled", { id, enabled });
+}
+
+/** Toggle one skill / prompt / MCP contribution. */
+export async function capabilityPackSetContribution(
+  id: string,
+  kind: "skill" | "prompt" | "mcp",
+  name: string,
+  enabled: boolean,
+): Promise<CapabilityPack[]> {
+  return invoke<CapabilityPack[]>("capability_packs_set_contribution", { id, kind, name, enabled });
+}
+
+/** Roll a pack back to the pre-install state (user-rewritten prompts are kept). */
+export async function capabilityPackRemove(id: string): Promise<CapabilityPackRemoval> {
+  return invoke<CapabilityPackRemoval>("capability_packs_remove", { id });
 }
 
 // ---------- 专家团 (pii W3.5) ----------

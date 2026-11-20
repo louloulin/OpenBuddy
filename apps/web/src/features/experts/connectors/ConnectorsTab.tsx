@@ -7,7 +7,7 @@ import {
   connectorsDefaultRoot, connectorsLoad, connectorsReadMcpConfig,
   connectorsCliAuth, connectorsCliAuthCancel, connectorsCliSkillsDir,
   connectorsCliStatus, connectorsCliUnauth,
-  mcpAuthStatus, mcpAuthTrigger, mcpConfigRead, mcpConfigSave,
+  mcpAuthStatus, mcpConfigRead, mcpConfigSave,
   onConnectorCliAuthUrl, onConnectorCliAuthLog, openUrl, skillsAdd,
 } from "@openbuddy/client/agent-client";
 import { ensureSession } from "@/features/sessions/ensure-session";
@@ -22,6 +22,7 @@ import { ConnectorQrModal } from "./ConnectorQrModal";
 import { McpModal } from "./McpModal";
 import { McpServersPanel } from "./McpServersPanel";
 import type { ConnectorAuthState } from "./shared";
+import { useMcpOauthFlow, type ConnectorAuthPhase } from "./use-mcp-oauth";
 
 const LS_ROOT = "connectorsRoot";
 const DEFAULT_PICK = "C:/Users/chenr/.workbuddy/connectors-marketplace";
@@ -32,9 +33,7 @@ interface Props {
 }
 
 /** The auth flow currently running (drives the waiting / QR modal). */
-type AuthPhase =
-  | { kind: "oauth"; connector: ConnectorItem; error?: string }
-  | { kind: "cli"; connector: ConnectorItem; url?: string; qrModal: boolean; logs: string[] };
+type AuthPhase = ConnectorAuthPhase;
 
 
 const OAUTH_MODES = new Set(["server-side", "oneid-token", "gateway", "mcp"]);
@@ -92,9 +91,6 @@ export function ConnectorsTab({ pills, onToast }: Props) {
   const [tokenPrefill, setTokenPrefill] = useState<Record<string, string>>({});
   /** Guard against double-clicking connect while a flow runs. */
   const connectingRef = useRef(false);
-  /** Set when the user dismisses the OAuth modal mid-flow (suppresses the
-   *  success toast when the dangling promise eventually resolves). */
-  const oauthDismissedRef = useRef(false);
 
   const persist = (r: string) => { try { localStorage.setItem(LS_ROOT, r); } catch { /* ignore */ } };
 
@@ -151,6 +147,13 @@ export function ConnectorsTab({ pills, onToast }: Props) {
   }, []);
 
   useEffect(() => { refreshState(); }, [refreshState]);
+
+  // 授权尝试 (B3a): the queue lives in the hook; the component only renders its phase.
+  const { start: startOauthFlow, close: closeOauth } = useMcpOauthFlow({
+    setPhase: setAuthPhase,
+    onToast,
+    onSettled: refreshState,
+  });
 
   // Probe CLI connectors in the background once the catalog is loaded, so
   // cards can show 已授权 badges. Sequential to avoid spawning 13 CLIs at once.
@@ -263,35 +266,6 @@ export function ConnectorsTab({ pills, onToast }: Props) {
     setMcpVersion((value) => value + 1);
     return Object.keys(incomingServers);
   }, [root]);
-
-  
-  const startOauthFlow = useCallback(async (
-    c: ConnectorItem,
-    sessionId: string,
-    serverNames: string[],
-  ) => {
-    oauthDismissedRef.current = false;
-    setAuthPhase({ kind: "oauth", connector: c });
-    try {
-      for (const name of serverNames) {
-        const res = await mcpAuthTrigger(sessionId, name);
-        if (res.status === "authenticated") continue;
-        const detail = res.error
-          || (res.status === "setup_required" ? "该服务需要额外的配置" : "授权失败");
-        setAuthPhase((p) => (p?.kind === "oauth" ? { ...p, error: detail } : p));
-        return;
-      }
-      if (!oauthDismissedRef.current) {
-        setAuthPhase(null);
-        onToast?.(`「${c.name}」授权成功`);
-      }
-    } catch (e) {
-      const msg = String(e).replace(/^Error:\s*/, "");
-      setAuthPhase((p) => (p?.kind === "oauth" ? { ...p, error: msg } : p));
-    } finally {
-      refreshState();
-    }
-  }, [onToast, refreshState]);
 
   /** CLI-connector authorization flow (install CLI → auth → install skills). */
   const startCliAuth = useCallback(async (c: ConnectorItem) => {
@@ -568,7 +542,8 @@ export function ConnectorsTab({ pills, onToast }: Props) {
         <ConnectorAuthModal
           connector={authPhase.connector}
           error={authPhase.error}
-          onClose={() => { oauthDismissedRef.current = true; setAuthPhase(null); }}
+          attempt={authPhase.attempt}
+          onClose={closeOauth}
         />
       )}
 

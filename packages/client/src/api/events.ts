@@ -1,5 +1,5 @@
 // Event subscription: agent://… and app://… events from the host, fanned out to typed handlers.
-import type { ConnectorNeededEvent, PermissionRequest, PromptComplete, SessionSummaryEvent, SessionUpdate, TurnErrorEvent } from "@openbuddy/protocol/dto";
+import type { ConnectorNeededEvent, McpAuthAttempt, PermissionRequest, PromptComplete, SessionSummaryEvent, SessionUpdate, TurnErrorEvent } from "@openbuddy/protocol/dto";
 import type { SessionModelState } from "@openbuddy/protocol/agent-settings";
 import type { SubagentEvent } from "@openbuddy/protocol/subagent";
 import { listen, type UnlistenFn } from "../ipc";
@@ -17,6 +17,8 @@ export async function subscribeAgentEvents(handlers: {
   onComplete?: (complete: PromptComplete) => void;
   onSummary?: (summary: SessionSummaryEvent) => void;
   onMcpStatus?: (payload: unknown) => void;
+  /** 授权尝试 (B3a): pending / authorized / failed / expired / cancelled. */
+  onMcpAuth?: (attempt: McpAuthAttempt) => void;
   onFolderTrust?: (payload: unknown) => void;
   onPermissionMode?: (payload: unknown) => void;
   onModelsUpdate?: (payload: unknown) => void;
@@ -52,6 +54,7 @@ export async function subscribeAgentEvents(handlers: {
     await wire("agent://ui-notification", handlers.onUiNotification);
     await wire("agent://summary", handlers.onSummary);
     await wire("agent://mcp-status", handlers.onMcpStatus);
+    await wire<McpAuthAttempt>("agent://mcp-auth", handlers.onMcpAuth);
     await wire("agent://folder-trust", handlers.onFolderTrust);
     await wire("agent://permission-mode", handlers.onPermissionMode);
     await wire("agent://models-update", handlers.onModelsUpdate);
@@ -79,4 +82,9 @@ export async function subscribeAgentEvents(handlers: {
  */
 export async function onSessionModelState(callback: (state: SessionModelState) => void): Promise<UnlistenFn> {
   return listen<SessionModelState>("agent://model-state", (event) => callback(event.payload));
+}
+
+/** 授权尝试 (B3a) lifecycle: one event per state change, payload is the attempt. */
+export async function onMcpAuthAttempt(callback: (attempt: McpAuthAttempt) => void): Promise<UnlistenFn> {
+  return listen<McpAuthAttempt>("agent://mcp-auth", (event) => callback(event.payload));
 }

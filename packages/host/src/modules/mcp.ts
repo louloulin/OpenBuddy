@@ -48,6 +48,17 @@ export function mcpModule(ctx: HostContext): HostModule {
       if (id && !engine.has(id)) throw Error("会话未加载");
       return engine.mcp.authStatus();
     },
+    // 授权尝试 (B3a): begin returns immediately; closing the modal cancels through `mcp_auth_cancel`.
+    mcp_auth_begin: (p) => {
+      const id = typeof p.sessionId === "string" ? p.sessionId : "";
+      return engine.mcp.authBegin(id, text(p.serverName));
+    },
+    mcp_auth_attempt: (p) => engine.mcp.authAttempt(text(p.id)) ?? null,
+    mcp_auth_attempts: (p) => {
+      const id = typeof p.sessionId === "string" ? p.sessionId : undefined;
+      return engine.mcp.authAttempts(id);
+    },
+    mcp_auth_cancel: (p) => engine.mcp.authCancelAttempt(text(p.id)),
     // 连接器目录 (W2.4 P2): built-in catalog with real MCP config templates.
     connectors_default_root: () => catalog.root,
     connectors_list_roots: () => [catalog.root],

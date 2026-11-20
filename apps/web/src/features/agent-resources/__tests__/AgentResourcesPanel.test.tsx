@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AgentResourcesPanel } from "../AgentResourcesPanel";
-import { agentExtensionsPreviewPackage, agentExtensionsSearchRegistry, agentExtensionsSetEnabled, mcpAuthTrigger, mcpList, mcpTest } from "@openbuddy/client/agent-client";
+import { agentExtensionsPreviewPackage, agentExtensionsSearchRegistry, agentExtensionsSetEnabled, capabilityPackSetEnabled, capabilityPacksList, mcpAuthTrigger, mcpList, mcpTest } from "@openbuddy/client/agent-client";
 
 vi.mock("@openbuddy/client/agent-client", () => ({
   skillsList: vi.fn(async () => []), skillsAdd: vi.fn(), skillsRemove: vi.fn(), skillsToggle: vi.fn(),
@@ -24,6 +24,10 @@ vi.mock("@openbuddy/client/agent-client", () => ({
   agentExtensionsSetPackageResources: vi.fn(async () => []),
   agentExtensionsSearchRegistry: vi.fn(async () => ({ query: "", source: "npm", total: 1, fetchedAt: 0, packages: [{ name: "pi-web-access", version: "1.2.0", description: "Web search", publisher: "pi", weeklyDownloads: 1234, keywords: ["pi-package"] }] })),
   onExtensionProgress: vi.fn(async () => () => {}),
+  capabilityPacksList: vi.fn(async () => []),
+  capabilityPackSetEnabled: vi.fn(async () => []),
+  capabilityPackSetContribution: vi.fn(async () => []),
+  capabilityPackRemove: vi.fn(async () => ({ packId: "wb", removed: true, kept: [] })),
 }));
 vi.mock("../../experts/connectors/McpConfigEditor", () => ({ McpConfigEditor: () => <div>MCP editor</div> }));
 beforeEach(() => vi.clearAllMocks());
@@ -82,5 +86,28 @@ describe("MCP explicit OAuth", () => {
     expect(screen.getByText("1234 次/周")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "检查并安装" }));
     await waitFor(() => expect(agentExtensionsPreviewPackage).toHaveBeenCalledWith("npm:pi-web-access"));
+  });
+
+  it("manages an installed capability pack (B1a)", async () => {
+    vi.mocked(capabilityPacksList).mockResolvedValue([{
+      id: "rich-pack", name: "能力包", installedAt: 1, enabled: true, requires: ["EnableDocs"],
+      contributions: [{ kind: "skill", name: "docx", enabled: true }, { kind: "prompt", name: "report", enabled: true }, { kind: "mcp", name: "calendar", enabled: false }],
+      skipped: [{ kind: "hook", name: "hooks", reason: "需要宿主权限" }],
+    }]);
+    vi.mocked(capabilityPackSetEnabled).mockResolvedValue([{
+      id: "rich-pack", name: "能力包", installedAt: 1, enabled: false, requires: ["EnableDocs"],
+      contributions: [{ kind: "skill", name: "docx", enabled: false }, { kind: "prompt", name: "report", enabled: false }, { kind: "mcp", name: "calendar", enabled: false }],
+      skipped: [],
+    }]);
+    render(<AgentResourcesPanel sessionId="A" />);
+    fireEvent.click(screen.getByRole("button", { name: "可信扩展" }));
+    const row = await screen.findByText("rich-pack · 2/3 项启用 · 需要 EnableDocs");
+    // Expanding lists each contribution for the per-item switches.
+    fireEvent.click(row);
+    expect(await screen.findByText("技能 · docx")).toBeInTheDocument();
+    expect(screen.getByText(/跳过：hook:hooks/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "禁用" }));
+    await waitFor(() => expect(capabilityPackSetEnabled).toHaveBeenCalledWith("rich-pack", false));
+    expect(await screen.findByText("rich-pack · 0/3 项启用 · 需要 EnableDocs")).toBeInTheDocument();
   });
 });

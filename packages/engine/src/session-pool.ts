@@ -58,7 +58,9 @@ export async function open(
   const cwd = manager.getCwd();
   const trusted = engine.trusted(cwd);
   if (!trusted && config.folderTrustDecisions?.[cwd] === undefined)
-    engine.emit("agent://folder-trust", { cwd });
+    // The session id rides along so a client (the phone) can show the card in
+    // the conversation that triggered it instead of in every conversation.
+    engine.emit("agent://folder-trust", { cwd, sessionId: manager.getSessionId() });
   // Persisted Pi settings (pi-settings.json, 20261116-pii W0.4); project settings still need trust.
   const sdkSettings = engine.settings.pi.manager(trusted);
   const sessionId = manager.getSessionId();

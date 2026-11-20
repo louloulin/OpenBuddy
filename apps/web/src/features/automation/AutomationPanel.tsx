@@ -34,6 +34,7 @@ import {
   agentsList,
   automationRecordsArchive,
   automationRecordsDelete,
+  automationRetry,
   automationsDelete,
   automationsRun,
   automationsSave,
@@ -95,9 +96,12 @@ const RECORD_FILTERS: { key: RecordFilter; label: string }[] = [
 ];
 
 function recordStatusLabel(item: AutomationRunRecord): string {
-  if (item.status === "running") return "运行中";
-  if (item.status === "success") return "成功";
-  if (item.status === "failed") return "失败";
+  if (item.status === "running") return item.automationRevision ? `运行中 · 修订 ${item.automationRevision}` : "运行中";
+  if (item.status === "success") return item.automationRevision ? `成功 · 修订 ${item.automationRevision}` : "成功";
+  if (item.status === "failed") {
+    const base = item.automationRevision ? `失败 · 修订 ${item.automationRevision}` : "失败";
+    return item.error ? `${base} · ${item.error}` : base;
+  }
   return item.status;
 }
 
@@ -370,8 +374,9 @@ export function AutomationPanel({ onToast, onNavigate, onOpenSession }: Automati
   const handleRunTest = useCallback(
     async (automationId: string) => {
       try {
-        await automationsRun(automationId);
-        onToast?.("已触发测试运行。测试运行不会影响正式调度时间。");
+        const result = await automationsRun(automationId);
+        if (result.ok) onToast?.("已触发测试运行。测试运行不会影响正式调度时间。");
+        else onToast?.(`运行失败：${result.error ?? "未知原因"}`);
         await refresh(true);
       } catch (e) {
         onToast?.(`触发测试运行失败：${String(e).replace(/^Error:\s*/, "")}`);
@@ -429,6 +434,20 @@ export function AutomationPanel({ onToast, onNavigate, onOpenSession }: Automati
           }
         },
       });
+    },
+    [onToast, refresh],
+  );
+
+  /** 重试失败记录 (B3c): runs the current revision, linked back via retryOf. */
+  const handleRetryRecord = useCallback(
+    async (itemId: string) => {
+      try {
+        const result = await automationRetry(itemId);
+        onToast?.(result.ok ? "已重试并成功" : `已重试，但仍失败${result.error ? `：${result.error}` : ""}`);
+        await refresh(true);
+      } catch (e) {
+        onToast?.(`重试失败：${String(e).replace(/^Error:\s*/, "")}`);
+      }
     },
     [onToast, refresh],
   );
@@ -579,6 +598,7 @@ export function AutomationPanel({ onToast, onNavigate, onOpenSession }: Automati
           onOpenConnectorSettings={() => onNavigate?.("专家·技能·连接器")}
           onArchiveRecord={handleArchiveRecord}
           onDeleteRecord={handleDeleteRecord}
+          onRetryRecord={handleRetryRecord}
         />
         <AutomationPermissionConfirmDialog
           open={showPermissionConfirm}
@@ -860,6 +880,7 @@ export function AutomationPanel({ onToast, onNavigate, onOpenSession }: Automati
                       onOpen={onOpenSession}
                       onArchive={handleArchiveRecord}
                       onDelete={handleDeleteRecord}
+                      onRetry={handleRetryRecord}
                     />
                   ))}
               </div>
@@ -877,7 +898,7 @@ export function AutomationPanel({ onToast, onNavigate, onOpenSession }: Automati
               </div>
               {archivedGroupOpen &&
                 archivedRecords.map((item) => (
-                  <InboxRow key={item.id} item={item} archived onOpen={onOpenSession} onArchive={handleArchiveRecord} onDelete={handleDeleteRecord} />
+                  <InboxRow key={item.id} item={item} archived onOpen={onOpenSession} onArchive={handleArchiveRecord} onDelete={handleDeleteRecord} onRetry={handleRetryRecord} />
                 ))}
             </div>
           )}
@@ -1057,6 +1078,7 @@ function InboxRow({
   onOpen,
   onArchive,
   onDelete,
+  onRetry,
 }: {
   item: AutomationRunRecord;
   archived?: boolean;
@@ -1064,6 +1086,8 @@ function InboxRow({
   onOpen?: (sessionId: string) => void;
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
+  /** 重试失败记录 (B3c). */
+  onRetry?: (id: string) => void;
 }) {
   const isRunning = item.status === "running";
   const date = new Date(item.finishedAt || item.startedAt);
@@ -1081,8 +1105,11 @@ function InboxRow({
         <div className="atm-row-content">
           <div className="atm-row-main atm-row-main-inbox">
             <span className="atm-row-name">{item.automationName}</span>
+            {item.automationRevision ? (
+              <span className="atm-row-revision" title="运行时锁定的任务修订">修订 {item.automationRevision}</span>
+            ) : null}
           </div>
-          <span className="atm-row-result-label" title={recordStatusLabel(item)}>
+          <span className="atm-row-result-label" title={item.error || recordStatusLabel(item)}>
             {recordStatusLabel(item)}
           </span>
         </div>
@@ -1098,6 +1125,19 @@ function InboxRow({
         </span>
         {!isRunning && (
           <div className="atm-row-hover-actions">
+            {item.status === "failed" && onRetry && (
+              <button
+                type="button"
+                className="atm-row-archive-btn"
+                title="重试这次运行"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRetry(item.id);
+                }}
+              >
+                <PlayIcon width={14} height={14} />
+              </button>
+            )}
             {!archived && (
               <button
                 type="button"

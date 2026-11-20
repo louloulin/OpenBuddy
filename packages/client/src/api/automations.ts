@@ -21,8 +21,13 @@ export async function automationsSetStatus(id: string, status: AutomationStatus)
 }
 
 /** Run now, opening a background session (the call resolves when the turn settles). */
-export async function automationsRun(id: string): Promise<{ recordId: string; sessionId?: string; ok: boolean }> {
-  return invoke<{ recordId: string; sessionId?: string; ok: boolean }>("automations_run", { id });
+export async function automationsRun(id: string): Promise<{ recordId: string; sessionId?: string; ok: boolean; error?: string }> {
+  return invoke<{ recordId: string; sessionId?: string; ok: boolean; error?: string }>("automations_run", { id });
+}
+
+/** Retry a failed run (B3c): a new record links back to it via `retryOf`. */
+export async function automationRetry(recordId: string): Promise<{ recordId: string; sessionId?: string; ok: boolean; error?: string }> {
+  return invoke<{ recordId: string; sessionId?: string; ok: boolean; error?: string }>("automation_retry", { recordId });
 }
 
 export async function automationRecordsArchive(id: string, archived: boolean): Promise<void> {

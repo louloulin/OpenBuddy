@@ -1,4 +1,3 @@
-// @vitest-environment node
 // B2b: the office builders produce real OOXML packages (officegen) that unzip and parse.
 import { describe, expect, it } from "vitest";
 import { readWorkBuddyZip } from "../src/agents/workbuddy";

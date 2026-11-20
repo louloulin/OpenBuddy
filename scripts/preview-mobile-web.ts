@@ -52,6 +52,17 @@ const AUTOMATIONS: Array<Record<string, unknown>> = [
 
 const HISTORY: Record<string, unknown[]> = {
   'sess-mobile': [
+    // A turn that ends in a fenced code block: this is the shape users get from
+    // the model constantly, and it is the only place the code-block copy button
+    // appears. Kept first so it is mounted without deep scrolling.
+    { type: 'message_end', sessionId: 'sess-mobile', message: { role: 'user', content: '网关那边会把 SSE 缓冲住吗？' } },
+    {
+      type: 'message_end', sessionId: 'sess-mobile',
+      message: {
+        role: 'assistant',
+        content: '不会。代理层只做一件事：\n\n```ts\nheaders[\'accept-encoding\'] = \'identity\'\n```\n\n上游写一帧就转发一帧，中间不做任何聚合。',
+      },
+    },
     { type: 'message_end', sessionId: 'sess-mobile', message: { role: 'user', content: '手机端现在能直接用了？' } },
     {
       type: 'message_end', sessionId: 'sess-mobile',
@@ -140,8 +151,18 @@ const dispatcher: HostDispatcher = {
             { id: 'proj-scratch', name: '临时试验', cwd: '/tmp/scratch' },
           ],
         }
-      case 'agent_load_session':
-        return { updates: HISTORY[String(payload.sessionId)] ?? [] }
+      case 'agent_load_session': {
+        // `session-pool.ts` emits the folder-trust request when a session opens
+        // on an untrusted directory, so the harness does the same — scoped to
+        // the session that opened.
+        const loadedId = String(payload.sessionId ?? '')
+        if (loadedId && process.env.OPENBUDDY_PREVIEW_TRUST !== '0') {
+          for (const listener of listeners) {
+            listener('agent://folder-trust', { cwd: '/demo/workspace', sessionId: loadedId })
+          }
+        }
+        return { updates: HISTORY[loadedId] ?? [] }
+      }
       case 'agent_send': {
         const sessionId = String(payload.sessionId ?? 'sess-mobile')
         const text = String(payload.text ?? '')
@@ -188,9 +209,10 @@ const dispatcher: HostDispatcher = {
                       requestId: 'q-demo', sessionId, kind: 'select', title: '选哪种压测？',
                       options: ['100 并发', '500 并发'], message: '桌面在等你回答。',
                     })
-                    listener('agent://folder-trust', { cwd: '/demo/workspace' })
                   }
                 }
+                // A settled turn leaves no busy slot: `tasks_list` must empty.
+                demoTaskAlive = false
                 emit({ type: 'agent_settled' })
               }
             }, 320 * (index + 1))
@@ -383,6 +405,10 @@ const dispatcher: HostDispatcher = {
       case 'agent_compact':
         return { tokensBefore: 1000, tokensAfter: 400 }
       case 'tasks_list':
+        // The real host only lists slots that are busy *right now*
+        // (`session-pool.ts::running()` filters on `slot.busy`), so a task
+        // cannot outlive its turn. The old harness kept one forever, which hid
+        // a class of bug: the row says 「运行中」 while the answer is finished.
         return demoTaskAlive ? [{
           id: 'sess-mobile', kind: 'bash', title: '演示：跑测试', status: 'running',
           startedAt: Date.now() - 12_000, pending: 1, sessionId: 'sess-mobile',

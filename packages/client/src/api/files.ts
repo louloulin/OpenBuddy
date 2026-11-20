@@ -53,3 +53,19 @@ export function previewUrl(absPath: string): string {
   const segments = absPath.split(/[\\/]/).filter(Boolean).map(encodeURIComponent);
   return `ob-preview://local/${segments.join("/")}`;
 }
+
+// ---------- plain file reads (B3d) ----------
+
+export interface PathStat {
+  exists?: boolean;
+  size?: number;
+  mtimeMs?: number;
+  isDirectory?: boolean;
+}
+
+/** Stat one path without reading it (artifact reader's live deletion probe). */
+export const pathStat = (path: string) => invoke<PathStat>("path_stat", { path });
+
+/** Read a text file with a byte cap; the host enforces the cap and the workspace grant. */
+export const readTextFile = (path: string, maxBytes?: number) =>
+  invoke<string>("read_text_file", { path, ...(maxBytes ? { maxBytes } : {}) });
