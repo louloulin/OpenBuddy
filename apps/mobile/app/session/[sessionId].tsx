@@ -14,6 +14,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 
 import { ChevronRightIcon } from '../../src/components/icons'
 import { permissionModeLabel } from '../../src/core/approvals'
+import { permissionRuleLabel, permissionRuleSummary, permissionRules, type PermissionRule } from '../../src/core/permissions'
 import {
   formatUsage,
   resolveArtifactPath,
@@ -32,6 +33,7 @@ import { transcriptFilename, transcriptMarkdown } from '../../src/core/share'
 import { shareTextFile } from '../../src/native/share'
 import { useApp } from '../../src/stores/app'
 import { Row, Section } from '../../src/components/SettingsList'
+import { problemText } from '../../src/core/problem'
 import { ArrowLeftIcon } from '../../src/components/icons'
 import { themeFor } from '../../src/theme'
 
@@ -48,11 +50,16 @@ export default function SessionPanelScreen() {
   const transcript = useApp(state => state.transcripts[sessionId])
   const capabilities = useApp(state => state.capabilities)
   const permissionMode = useApp(state => state.permissionMode)
+  const currentCwd = useApp(state => state.currentCwd)
+  // Experts and skills are workspace-scoped; the panel must ask about the
+  // session's workspace, not whatever session the desktop happens to focus.
+  const sessionCwd = session?.cwd ?? currentCwd ?? undefined
 
   const [experts, setExperts] = useState<ExpertOption[]>([])
   const [expertId, setExpertId] = useState<string | undefined>()
   const [thinking, setThinking] = useState<ThinkingLevel | undefined>()
   const [artifacts, setArtifacts] = useState<ArtifactEntry[]>([])
+  const [rules, setRules] = useState<PermissionRule[]>([])
   const [cwd, setCwd] = useState<string | undefined>()
   const [usage, setUsage] = useState<string | undefined>()
   const [busy, setBusy] = useState(false)
@@ -69,6 +76,7 @@ export default function SessionPanelScreen() {
       setExpertId(demo?.experts?.[0]?.id)
       setThinking(demo?.thinkingLevel as ThinkingLevel | undefined)
       setArtifacts(toArtifacts(demo?.artifacts ?? []))
+      setRules(permissionRules(demo?.rules ?? []))
       setCwd(previewState().sessions.find(item => item.id === sessionId)?.cwd)
       setUsage(formatUsage(demo?.usage))
       return
@@ -77,11 +85,15 @@ export default function SessionPanelScreen() {
     setBusy(true)
     setError(null)
     try {
-      const [list, modelState, artifactList, sessionInfo] = await Promise.all([
-        transport.invoke<unknown>('agents_list', {}).catch(() => []),
+      const [list, modelState, artifactList, sessionInfo, ruleList] = await Promise.all([
+        transport.invoke<unknown>('agents_list', sessionCwd ? { cwd: sessionCwd } : {}).catch(() => []),
         transport.invoke<{ thinkingLevel?: string; expert?: { id?: string; expertId?: string } | null }>('agent_get_model_state', { sessionId }).catch(() => ({}) as { thinkingLevel?: string; expert?: { id?: string; expertId?: string } | null }),
         transport.invoke<unknown>('artifacts_list', { sessionId }).catch(() => []),
         transport.invoke<{ usage?: { used?: number; total?: number }; cwd?: string }>('agent_session_info', { sessionId }).catch(() => ({}) as { usage?: { used?: number; total?: number }; cwd?: string }),
+        // Read-only: the desktop owns rule editing (设置·安全中心).
+        canRun(capabilities, 'permission_list')
+          ? transport.invoke<unknown>('permission_list', {}).catch(() => [])
+          : Promise.resolve([]),
       ])
       setExperts(toExpertOptions(list))
       const level = modelState?.thinkingLevel
@@ -90,14 +102,17 @@ export default function SessionPanelScreen() {
       // remembered; otherwise every remount forgets the "当前" marker.
       setExpertId(modelState?.expert?.id ?? modelState?.expert?.expertId)
       setArtifacts(toArtifacts(artifactList))
+      setRules(permissionRules(ruleList))
       setCwd(typeof sessionInfo?.cwd === 'string' ? sessionInfo.cwd : undefined)
       setUsage(formatUsage(sessionInfo?.usage))
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure))
+      // The desktop answers in its own idiom (`EACCES: permission denied`);
+      // `problemText` turns that into something a user can act on.
+      setError(problemText(failure))
     } finally {
       setBusy(false)
     }
-  }, [transport, sessionId])
+  }, [transport, sessionId, capabilities, sessionCwd])
 
   useEffect(() => { void load() }, [load])
 
@@ -114,7 +129,9 @@ export default function SessionPanelScreen() {
       await transport.invoke('agent_set_session_expert', { sessionId, expertId: id })
       setExpertId(id)
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure))
+      // The desktop answers in its own idiom (`EACCES: permission denied`);
+      // `problemText` turns that into something a user can act on.
+      setError(problemText(failure))
     } finally {
       setBusy(false)
     }
@@ -128,7 +145,9 @@ export default function SessionPanelScreen() {
       await transport.invoke('agent_set_thinking_level', { sessionId, ...payload })
       setThinking(payload.level)
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure))
+      // The desktop answers in its own idiom (`EACCES: permission denied`);
+      // `problemText` turns that into something a user can act on.
+      setError(problemText(failure))
     } finally {
       setBusy(false)
     }
@@ -155,7 +174,9 @@ export default function SessionPanelScreen() {
             : '这台设备不支持文件分享',
       )
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure))
+      // The desktop answers in its own idiom (`EACCES: permission denied`);
+      // `problemText` turns that into something a user can act on.
+      setError(problemText(failure))
     } finally {
       setExporting(false)
     }
@@ -178,7 +199,9 @@ export default function SessionPanelScreen() {
       )
       setExportNote(result === 'downloaded' ? '已下载整段会话' : result === 'shared' ? '已打开分享面板' : '这台设备不支持文件分享')
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure))
+      // The desktop answers in its own idiom (`EACCES: permission denied`);
+      // `problemText` turns that into something a user can act on.
+      setError(problemText(failure))
     }
   }
 
@@ -255,7 +278,12 @@ export default function SessionPanelScreen() {
       </Section>
 
       <Section theme={theme} label="思考深度">
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 12 }}>
+        {/* One swipeable row: wrapping left "最高" stranded on a second line. */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ flexDirection: 'row', gap: 6, padding: 10 }}
+        >
           {THINKING_LEVELS.map(level => {
             const active = thinking === level
             return (
@@ -264,7 +292,7 @@ export default function SessionPanelScreen() {
                 onPress={() => void setLevel(level)}
                 disabled={!canSetThinking || busy}
                 style={({ pressed }) => ({
-                  paddingHorizontal: 12,
+                  paddingHorizontal: 9,
                   paddingVertical: 7,
                   borderRadius: 999,
                   borderWidth: theme.hairline,
@@ -279,7 +307,7 @@ export default function SessionPanelScreen() {
               </Pressable>
             )
           })}
-        </View>
+        </ScrollView>
       </Section>
 
       <Section theme={theme} label="本轮产物">
@@ -309,8 +337,21 @@ export default function SessionPanelScreen() {
         <Row theme={theme} label="上下文" value={usage ?? '桌面未提供'} last />
       </Section>
 
-      <Section theme={theme} label="权限">
-        <Row theme={theme} label="审批模式" value={permissionModeLabel(permissionMode)} last />
+      <Section theme={theme} label="权限" footer={canRun(capabilities, 'permission_list') ? permissionRuleSummary(rules) : undefined}>
+        <Row theme={theme} label="审批模式" value={permissionModeLabel(permissionMode)} last={!canRun(capabilities, 'permission_list') || rules.length === 0} />
+        {canRun(capabilities, 'permission_list') && rules.length > 0
+          ? rules.slice(0, 8).map((rule, index) => (
+            <Row
+              key={`${rule.action}:${rule.tool}:${rule.pattern ?? ''}:${index}`}
+              theme={theme}
+              label={permissionRuleLabel(rule)}
+              last={index === Math.min(rules.length, 8) - 1}
+            />
+          ))
+          : null}
+        {canRun(capabilities, 'permission_list') && rules.length > 8
+          ? <Row theme={theme} label="还有更多规则" value={`${rules.length - 8} 条`} last />
+          : null}
       </Section>
 
       <Section theme={theme} label="资料">
