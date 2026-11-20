@@ -15,6 +15,7 @@ import type { DirEntry } from './files'
 import type { Automation } from './automations'
 import type { MemoryEntry } from './memory'
 import type { LibrarySource } from './library'
+import type { PromptEntry, SkillEntry } from './skills'
 import type { ProjectRef } from './projects'
 import type { BranchTree } from '@openbuddy/protocol/branches'
 import type { RewindPoint } from '@openbuddy/protocol/dto'
@@ -41,6 +42,10 @@ export type PreviewState = {
   memories: MemoryEntry[]
   /** Knowledge-source folders the fake desktop registered. */
   library: LibrarySource[]
+  /** Read-only skills the fake desktop discovered. */
+  skills: SkillEntry[]
+  /** Read-only prompt templates. */
+  prompts: PromptEntry[]
   /** Projects that name the session list's workspace sections. */
   projects: ProjectRef[]
   /** The session tree with sibling versions. */
@@ -57,6 +62,8 @@ export type PreviewState = {
     thinkingLevel?: string
     artifacts: { path: string; kind?: string }[]
     usage?: { used: number; total: number }
+    /** Read-only permission rules the desktop applies (permission_list). */
+    rules?: { action: 'allow' | 'deny' | 'ask'; tool: string; pattern?: string }[]
   }
 }
 
@@ -201,6 +208,11 @@ export function previewState(): PreviewState {
       { path: 'packages/pi-bridge/src/server.ts', kind: '代码' },
     ],
     usage: { used: 38_400, total: 200_000 },
+    rules: [
+      { action: 'allow' as const, tool: 'bash', pattern: 'git ' },
+      { action: 'allow' as const, tool: 'read' },
+      { action: 'deny' as const, tool: 'any', pattern: 'rm -rf' },
+    ],
   }
 
   const capabilities: Capabilities = {
@@ -210,13 +222,15 @@ export function previewState(): PreviewState {
       'agent_resolve_permission', 'agent_get_model_state', 'agent_set_thinking_level',
       'agent_set_session_expert', 'agent_regenerate', 'agent_cancel',
       'agents_list', 'artifacts_list', 'agent_session_info', 'session_search',
+      'permission_list', 'permission_pending', 'question_pending', 'trust_pending',
       'automations_snapshot', 'automations_run', 'automations_set_status', 'automations_save', 'automations_delete',
-      'notification_list', 'notification_mark_all_read', 'memory_list', 'memory_get',
+      'notification_list', 'notification_mark_all_read', 'notification_prefs_get', 'memory_list', 'memory_get',
       'memory_save', 'memory_delete', 'list_dir', 'read_text_file', 'browse_directory',
       'experts_load', 'experts_list_roots', 'agent_session_usage',
       'agent_init', 'agent_set_session_pinned', 'agent_rename_session',
       'agent_set_session_archived', 'agent_delete_session', 'agent_tree',
       'agent_export_jsonl', 'files_search', 'commands_list', 'library_list', 'projects_snapshot', 'turn_revert',
+      'skills_list', 'prompts_list',
       'rewind_points', 'rewind_execute', 'agent_navigate', 'checkpoint_list', 'checkpoint_restore',
     ],
     events: ['agent://event', 'agent://permission', 'agent://update'],
@@ -394,8 +408,18 @@ export function previewState(): PreviewState {
     { id: 'proj-scratch', name: '临时试验', cwd: '/tmp/scratch' },
   ]
 
+  const skills: SkillEntry[] = [
+    { name: 'pdf', displayName: 'PDF 助手', description: '读、填、合并 PDF', scope: 'user', enabled: true, version: '1.4', market: true },
+    { name: 'repo-review', description: '按仓库规范检查改动', scope: 'repo', enabled: true, market: false },
+    { name: 'legacy-export', description: '旧的导出脚本', scope: 'user', enabled: false, market: false },
+  ]
+  const prompts: PromptEntry[] = [
+    { name: 'summary', description: '总结这一段对话', scope: 'global', argumentHint: '<范围>' },
+    { name: 'review', description: '按清单审阅改动', scope: 'workspace' },
+  ]
+
   return {
     sessions, transcripts, notifications, approvals, awaiting: ['sess-pending'],
-    capabilities, panel, files, automations, memories, branchTree, rewindPoints, checkpoints, library, projects,
+    capabilities, panel, files, automations, memories, branchTree, rewindPoints, checkpoints, library, projects, skills, prompts,
   }
 }

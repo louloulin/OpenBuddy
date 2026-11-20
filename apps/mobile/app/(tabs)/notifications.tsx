@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router'
 import { BellIcon } from '../../src/components/icons'
 import { PageHeader } from '../../src/components/PageHeader'
 import { relativeTime } from '../../src/core/relative-time'
+import { canRun } from '../../src/core/surface'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
 
@@ -31,11 +32,28 @@ export default function NotificationsScreen() {
   const refresh = useApp(state => state.refreshNotifications)
   const markRead = useApp(state => state.markNotificationsRead)
   const markOne = useApp(state => state.markNotificationRead)
+  const systemNotifications = useApp(state => state.systemNotifications)
+  const refreshPrefs = useApp(state => state.refreshNotificationPrefs)
+  const capabilities = useApp(state => state.capabilities)
+  const transport = useApp(state => state.transport)
   const [refreshing, setRefreshing] = useState(false)
 
   // The backlog lives on the computer; push only covers what arrived while the
   // phone was away, so opening the tab has to ask.
   useEffect(() => { void refresh() }, [refresh])
+
+  // Read-only preferences (§5 Tab 3 后续). Re-run when the tunnel arrives so a
+  // notification deep link as the first screen still shows them.
+  const canPrefs = canRun(capabilities, 'notification_prefs_get')
+  useEffect(() => {
+    if (canPrefs) void refreshPrefs()
+  }, [canPrefs, transport, refreshPrefs])
+
+  const prefsNote = canPrefs && systemNotifications !== null ? (
+    <Text style={{ color: theme.textWeak, fontSize: theme.fontMicro, textAlign: 'center', paddingHorizontal: 24, paddingTop: 8, paddingBottom: 12, lineHeight: 17 }}>
+      系统通知：{systemNotifications ? '开' : '关'} · 在电脑上调整
+    </Text>
+  ) : null
 
   const pull = async () => {
     setRefreshing(true)
@@ -58,26 +76,29 @@ export default function NotificationsScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: theme.surface }}>
         <PageHeader title="通知" />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 }}>
-          <View
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 28,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: theme.card,
-              borderWidth: theme.hairline,
-              borderColor: theme.cardBorder,
-            }}
-          >
-            <BellIcon size={26} color={theme.textWeak} />
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 }}>
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: theme.card,
+                borderWidth: theme.hairline,
+                borderColor: theme.cardBorder,
+              }}
+            >
+              <BellIcon size={26} color={theme.textWeak} />
+            </View>
+            <Text style={{ color: theme.text, fontSize: theme.fontHeading, fontWeight: '600' }}>没有新通知</Text>
+            <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta, textAlign: 'center', lineHeight: 20 }}>
+              只有会话需要你时才会打扰你。{'\n'}审批、提问和完成会出现在这里。
+            </Text>
           </View>
-          <Text style={{ color: theme.text, fontSize: theme.fontHeading, fontWeight: '600' }}>没有新通知</Text>
-          <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta, textAlign: 'center', lineHeight: 20 }}>
-            只有会话需要你时才会打扰你。{'\n'}审批、提问和完成会出现在这里。
-          </Text>
-        </View>
+          {prefsNote}
+        </ScrollView>
       </View>
     )
   }
@@ -143,6 +164,7 @@ export default function NotificationsScreen() {
             ) : null}
           </Pressable>
         ))}
+        {prefsNote}
       </ScrollView>
     </View>
   )

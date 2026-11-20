@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  nextSpeechRate, parseSpeechRate, rateForKey, serializeSpeechRate, speechRateLabel,
   parseSpeakSetting, serializeSpeakSetting, shouldSpeak, speakableText, SPEAK_MAX_CHARS,
 } from '../speech'
 
@@ -11,6 +12,35 @@ describe('speak setting', () => {
     expect(parseSpeakSetting(null)).toBe(false)
     expect(serializeSpeakSetting(true)).toBe('1')
     expect(serializeSpeakSetting(false)).toBe('0')
+  })
+})
+
+describe('speech rate', () => {
+  it('falls back to normal for unknown or missing values', () => {
+    expect(parseSpeechRate('slow')).toBe('slow')
+    expect(parseSpeechRate('fast')).toBe('fast')
+    expect(parseSpeechRate('normal')).toBe('normal')
+    expect(parseSpeechRate('warp')).toBe('normal')
+    expect(parseSpeechRate(null)).toBe('normal')
+    expect(serializeSpeechRate('fast')).toBe('fast')
+  })
+
+  it('maps each preset to a monotonic TTS rate', () => {
+    expect(rateForKey('slow')).toBeLessThan(1)
+    expect(rateForKey('normal')).toBe(1)
+    expect(rateForKey('fast')).toBeGreaterThan(1)
+  })
+
+  it('cycles through the presets', () => {
+    expect(nextSpeechRate('slow')).toBe('normal')
+    expect(nextSpeechRate('normal')).toBe('fast')
+    expect(nextSpeechRate('fast')).toBe('slow')
+  })
+
+  it('labels the current rate', () => {
+    expect(speechRateLabel('slow')).toBe('慢')
+    expect(speechRateLabel('normal')).toBe('标准')
+    expect(speechRateLabel('fast')).toBe('快')
   })
 })
 

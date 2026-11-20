@@ -22,6 +22,7 @@ import * as Speech from 'expo-speech'
 import { appendAttachments, compressOptions, checkUpload, MAX_ATTACHMENTS } from '../core/attachments'
 import { problemText } from '../core/problem'
 import { quotePreview, withQuote } from '../core/quote'
+import { currentSpeechRate } from '../native/speech'
 import { mergeTranscript, transcriptOutcome, unavailableMessage } from '../core/voice'
 import { haptic } from '../native/haptics'
 import { matchCommands, slashQuery, toSlashCommands, type SlashCommand } from '../core/slash'
@@ -49,12 +50,19 @@ export type ComposerProps = {
   /** Thinking-level chip: current label, tap cycles (agent_set_thinking_level). */
   thinkingLabel?: string
   onCycleThinking?: () => void
+  /**
+   * Whether the tunnel is up (§2.3). Steer and follow-up both need a live
+   * desktop; offline they must be disabled with an explanation rather than
+   * offered and then failed. Plain sends still work — they go to the outbox.
+   */
+  online?: boolean
 }
 
 export function Composer({
   onSend, onImage, onImages, onStop, onSteer,
   streaming = false, placeholder = '给 OpenBuddy 发消息…', initialDraft = '',
   quoted = null, onClearQuote, prefill, thinkingLabel, onCycleThinking,
+  online = true,
 }: ComposerProps) {
   const theme = themeFor(useColorScheme())
   const insets = useSafeAreaInsets()
@@ -273,7 +281,7 @@ export function Composer({
       await dictate()
       return
     }
-    Speech.speak(draft, { language: 'zh-CN' })
+    Speech.speak(draft, { language: 'zh-CN', rate: currentSpeechRate() })
   }
 
   const roundButton = (onPress: () => void, disabled: boolean, child: React.ReactNode, label?: string) => (
@@ -559,17 +567,27 @@ export function Composer({
           <View style={sheetStyle(theme, insets.bottom)}>
             <Pressable
               onPress={() => {
+                if (!online) return
                 const text = draft.trim()
                 setSteerSheet(false)
                 if (!text || !onSteer) return
                 setDraft('')
                 onSteer(text)
               }}
+              disabled={!online}
               accessibilityRole="button"
-              style={({ pressed }) => ({ ...sheetRow, backgroundColor: pressed ? theme.hover : 'transparent' })}
+              accessibilityLabel="立即插话"
+              accessibilityState={{ disabled: !online }}
+              style={({ pressed }) => ({
+                ...sheetRow,
+                backgroundColor: pressed && online ? theme.hover : 'transparent',
+                opacity: online ? 1 : 0.45,
+              })}
             >
-              <Text style={{ color: theme.text, fontSize: theme.fontBody }}>立即插话</Text>
-              <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta, marginTop: 2 }}>打断当前生成，按新指令继续</Text>
+              <Text style={{ color: online ? theme.text : theme.textWeak, fontSize: theme.fontBody }}>立即插话</Text>
+              <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta, marginTop: 2 }}>
+                {online ? '打断当前生成，按新指令继续' : '电脑不在线，插话需要连上电脑。'}
+              </Text>
             </Pressable>
             <Pressable
               onPress={() => { setSteerSheet(false); submit() }}

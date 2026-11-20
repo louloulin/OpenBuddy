@@ -38,20 +38,21 @@ const channel = process.env.PLAYWRIGHT_CHANNEL ?? 'chrome'
 
 /** expected: every string must be present; alternatives: any one of them. */
 const screens = [
-  { name: 'sessions', path: '/', expected: ['会话', '新建任务', '重构网关隧道', '置顶会话', 'OpenBuddy', '临时试验'] },
+  { name: 'sessions', path: '/', expected: ['会话', '新建任务', '重构网关隧道', '置顶会话', 'OpenBuddy', '临时试验', '待审批'] },
   { name: 'chat', path: '/chat/sess-refactor', expected: ['重构网关隧道', '没有缓冲', 'OpenBuddy', '允许修改这 3 个文件', 'grep'] },
   { name: 'pending', path: '/chat/sess-pending', alternatives: [['准备中', '等待模型响应']], expected: ['跑一遍 100 并发的 SSE 压测'] },
   { name: 'empty', path: '/chat/sess-empty', expected: ['OpenBuddy', '把任务发过来', '总结一下今天的改动'] },
-  { name: 'me', path: '/me', expected: ['OpenBuddy', '专家 · 人格', '回复自动播报', '应用锁', '断开这台电脑'] },
-  { name: 'notifications', path: '/notifications', expected: ['通知', '需要你批准', '在等你回答一个问题', '全部标为已读'] },
+  { name: 'me', path: '/me', expected: ['OpenBuddy', '专家 · 人格', '回复自动播报', '语速', '应用锁', '断开这台电脑'] },
+  { name: 'notifications', path: '/notifications', expected: ['通知', '需要你批准', '在等你回答一个问题', '全部标为已读', '系统通知'] },
   { name: 'search', path: '/search', expected: ['搜索', '索引在电脑上'] },
   { name: 'files', path: '/files', expected: ['OpenBuddy', 'apps', 'docs', 'packages', 'README.md'] },
   { name: 'library', path: '/library', expected: ['资料库', '只读浏览', 'docs', 'packages', 'notes'] },
+  { name: 'skills', path: '/skills', expected: ['技能与指令', '技能 · 3', '我的指令 · 2', 'PDF 助手', 'repo-review', '/summary'] },
   { name: 'memory', path: '/memory', expected: ['记忆', '全局记忆', 'MEMORY', 'team', 'openbuddy', '项目记忆'] },
   { name: 'memory-note', path: '/memory/MEMORY.md', expected: ['MEMORY', '内容（Markdown）', '保存', '删除'] },
   { name: 'branches', path: '/branches/sess-refactor', expected: ['分支与检查点', '2/3', '回到某条提问', '文件检查点', 'proxy.ts'] },
   { name: 'automations', path: '/automations', expected: ['每日晨报', '每周代码巡检'] },
-  { name: 'panel', path: '/session/sess-refactor', expected: ['会话设置', '人格', '思考深度', '本轮产物', '用量'] },
+  { name: 'panel', path: '/session/sess-refactor', expected: ['会话设置', '人格', '思考深度', '本轮产物', '用量', '权限', '允许 bash', '拒绝 any'] },
   { name: 'pair', path: '/pair', expected: ['连接你的电脑', '扫描二维码', '8 位配对码'] },
   { name: 'approval', path: '/approval/req-preview', expected: ['允许修改这 3 个文件', '拒绝', '允许', 'proxy.ts', 'sse.test.ts'] },
   // A push that outlives its request: shows the "already handled" state.
@@ -146,6 +147,17 @@ try {
       await page.screenshot({ path: join(outDir, scheme, 'interaction-search.png') })
       if (!searchOk) failures.push({ scheme, screen: 'interaction:search', missing: ['手机端配对流程'] })
       console.log(`[${searchOk ? 'PASS' : 'FAIL'}] ${scheme} interaction:search`)
+
+      // Speech rate is a one-tap cycle on the Me screen (§5 Tab 5).
+      await page.goto(baseUrl + '/me', { waitUntil: 'load' })
+      await page.waitForFunction(() => document.body.innerText.includes('语速'), null, { timeout: 30_000 })
+      await page.getByText('语速', { exact: true }).click()
+      await page.waitForTimeout(350)
+      const meBody = await page.evaluate(() => document.body.innerText)
+      const rateOk = meBody.includes('语速') && meBody.includes('快')
+      await page.screenshot({ path: join(outDir, scheme, 'interaction-speech-rate.png') })
+      if (!rateOk) failures.push({ scheme, screen: 'interaction:speech-rate', missing: ['快'] })
+      console.log(`[${rateOk ? 'PASS' : 'FAIL'}] ${scheme} interaction:speech-rate`)
     } finally {
       await page.close()
     }

@@ -24,10 +24,11 @@ import {
   readQueue,
   type CachedSession,
 } from '../db/cache'
-import { applyUpdate, emptyTranscript, sealInterruptedTurn, transcriptPreview, type Transcript } from '../core/transcript'
+import { applyUpdate, emptyTranscript, sealInterruptedTurn, transcriptPreview, type Transcript, type TranscriptRow } from '../core/transcript'
 import { canSendNow, flushOutbox } from '../core/connection'
 import { isPreview, previewState } from '../core/preview'
 import type { Capabilities } from '../core/surface'
+import { canRun } from '../core/surface'
 import {
   checkNewSession, workspaceChoices, type InitAnswer, type WorkspaceChoice, type WorkspaceInfo,
 } from '../core/new-session'
@@ -46,16 +47,17 @@ import {
 } from '../core/app-lock'
 import { getItem, setItem } from '../transport/storage'
 import {
-  parseSpeakSetting, serializeSpeakSetting, shouldSpeak, SPEAK_KEY,
+  parseSpeakSetting, parseSpeechRate, rateForKey, serializeSpeakSetting, serializeSpeechRate,
+  shouldSpeak, SPEAK_KEY, SPEECH_RATE_KEY, type SpeechRateKey,
 } from '../core/speech'
-import { speak } from '../native/speech'
+import { setSpeechRate, speak } from '../native/speech'
 import {
   dispositionFor, withoutQueueItem, type QueueRow, type TurnQueue,
 } from '../core/turn-input'
 import type { Approval, NotificationItem, RunningTask } from '../core/models'
 import {
-  parsePermissionMode, permissionDetail, permissionOptionId, questionApproval, trustApproval,
-  type PermissionMode, type QuestionRequest,
+  parsePermissionMode, permissionApproval, permissionOptionId, questionApproval, reconcileApprovals, trustApproval,
+  type PermissionMode, type PermissionRequest, type QuestionRequest,
 } from '../core/approvals'
 import type { PairPayload } from '../core/pairing'
 import {
@@ -95,6 +97,8 @@ type AppState = {
   notifications: NotificationItem[]
   /** True once `notification_list` answered (the tab avoids a false empty state). */
   notificationsLoaded: boolean
+  /** Read-only desktop preference: are system notifications on? `null` = unknown. */
+  systemNotifications: boolean | null
   /** Running desktop tasks for the task drawer. */
   tasks: RunningTask[]
   permissionMode: PermissionMode | null
@@ -111,6 +115,8 @@ type AppState = {
   backgroundedAt: number | null
   /** Read assistant replies of the open conversation out loud. */
   autoSpeak: boolean
+  /** Read-aloud speed (§5 Tab 5「音色语速」). */
+  speechRate: SpeechRateKey
 
   bootstrap: () => Promise<void>
   pair: (payload: PairPayload, deviceName: string) => Promise<void>
@@ -154,10 +160,18 @@ type AppState = {
   refreshTasks: () => Promise<void>
   /** Loads the notification backlog the desktop recorded. */
   refreshNotifications: () => Promise<void>
+  /** Read-only: the desktop's system-notification switch (§5 Tab 3 后续). */
+  refreshNotificationPrefs: () => Promise<void>
   /** Marks one backlog notification read (desktop keeps the numeric id). */
   markNotificationRead: (id: string) => Promise<void>
   killTask: (taskId: string) => Promise<void>
   refreshPermissionMode: () => Promise<void>
+  /**
+   * Pulls the permission cards the desktop is still waiting on (§2.4 path 3).
+   * A request emitted while the phone was backgrounded never reached the event
+   * listener; this recovers it on resume/reconnect.
+   */
+  refreshApprovals: () => Promise<void>
   /** Reads the session's thinking level for the composer chip. */
   refreshThinkingLevel: (sessionId: string) => Promise<void>
   /** Cycles the level and tells the desktop; returns the new level. */
@@ -186,6 +200,7 @@ type AppState = {
   noteBackground: () => void
   relockIfNeeded: () => void
   setAutoSpeak: (enabled: boolean) => Promise<void>
+  setSpeechRateKey: (key: SpeechRateKey) => Promise<void>
 }
 
 const ASSISTANT_EVENT = 'agent://event'
@@ -218,6 +233,7 @@ export const useApp = create<AppState>((set, get) => ({
   approvals: [],
   notifications: [],
   notificationsLoaded: false,
+  systemNotifications: null,
   tasks: [],
   permissionMode: null,
   thinkingLevels: {},
@@ -228,6 +244,7 @@ export const useApp = create<AppState>((set, get) => ({
   locked: false,
   backgroundedAt: null,
   autoSpeak: false,
+  speechRate: 'normal',
 
   /** Cached paint first, then the connection catches up. */
   async bootstrap() {
@@ -239,6 +256,9 @@ export const useApp = create<AppState>((set, get) => ({
     const pairing = activeRecord ? pairingFromRecord(activeRecord) : null
     const appLock = parseLockSetting(await getItem(LOCK_KEY).catch(() => null))
     const autoSpeak = parseSpeakSetting(await getItem(SPEAK_KEY).catch(() => null))
+    const speechRate = parseSpeechRate(await getItem(SPEECH_RATE_KEY).catch(() => null))
+    // Push the persisted speed into the TTS layer before any reply can arrive.
+    setSpeechRate(rateForKey(speechRate))
     // The lock-screen shot is a separate review build so the other screens are
     // not blocked behind a gate no simulator can pass.
     const previewLock = isPreview() && process.env.EXPO_PUBLIC_UI_PREVIEW_LOCK === '1'
@@ -266,6 +286,7 @@ export const useApp = create<AppState>((set, get) => ({
         currentCwd: demo.sessions[0]?.cwd ?? null,
         transcripts: demo.transcripts,
         notifications: demo.notifications,
+        systemNotifications: true,
         approvals: demo.approvals,
         awaiting: demo.awaiting,
         // A queued follow-up makes the chip row part of the review build.
@@ -273,12 +294,13 @@ export const useApp = create<AppState>((set, get) => ({
         appLock: appLock || previewLock,
         locked: appLock || previewLock,
         autoSpeak,
+        speechRate,
       })
       return
     }
 
     set({
-      pairing, booted: true, appLock, locked: appLock, autoSpeak,
+      pairing, booted: true, appLock, locked: appLock, autoSpeak, speechRate,
       pairings: known.list, activePairingId: known.activeId ?? null,
     })
     if (!pairing) return
@@ -297,6 +319,9 @@ export const useApp = create<AppState>((set, get) => ({
     await loadCapabilities(get, set)
     void get().refreshPermissionMode()
     void get().refreshNotifications()
+    // Cold start (also a push deep link): the event stream carries nothing from
+    // before launch, so pull the cards the desktop is still waiting on.
+    void get().refreshApprovals()
     await flushQueue(get, set)
   },
 
@@ -322,6 +347,7 @@ export const useApp = create<AppState>((set, get) => ({
       await loadCapabilities(get, set)
       void get().refreshPermissionMode()
       void get().refreshNotifications()
+      void get().refreshApprovals()
     } catch (error) {
       set({ error: errorText(error) })
       throw error
@@ -353,6 +379,15 @@ export const useApp = create<AppState>((set, get) => ({
   /** Called when the app comes back to the foreground: the tunnel is gone. */
   resume() {
     reconnectTransport()
+    // Coming back from the background: the tunnel was off while the desktop may
+    // have asked for a decision (a push would normally carry it, but not every
+    // device gets one). Refresh what we can and surface anything still pending
+    // that we have no card for (§2.4 path 3).
+    const active = get().activeSessionId
+    if (active) void get().openSession(active)
+    void get().refreshTasks()
+    // Recover approval cards that arrived while we were away (§2.4 path 3).
+    void get().refreshApprovals()
   },
 
   async resync() {
@@ -414,6 +449,7 @@ export const useApp = create<AppState>((set, get) => ({
       approvals: [],
       notifications: [],
       notificationsLoaded: false,
+      systemNotifications: null,
       awaiting: [],
       queues: {},
       tasks: [],
@@ -436,6 +472,7 @@ export const useApp = create<AppState>((set, get) => ({
       await loadCapabilities(get, set)
       void get().refreshPermissionMode()
       void get().refreshNotifications()
+      void get().refreshApprovals()
       return true
     } catch (error) {
       set({ error: errorText(error), connection: 'closed' })
@@ -471,11 +508,12 @@ export const useApp = create<AppState>((set, get) => ({
   async openSession(sessionId) {
     // Reading a conversation clears its badge, even before history arrives.
     await get().markSessionRead(sessionId)
-    // Cards that were asked while the user was away in another conversation are
-    // stale news: they must not ambush the next session they open. The desktop
-    // re-asks (and the approval screen still answers) for anything still live.
+    // Cards that were asked while the user was away in *another* conversation
+    // are stale news: they must not ambush the next session they open. A card
+    // with no session recorded is left alone — dropping it would discard a
+    // question the user may be in the middle of answering (§2.4).
     set(state => ({
-      approvals: state.approvals.filter(item => !item.sessionId || item.sessionId === sessionId),
+      approvals: state.approvals.filter(item => item.sessionId === undefined || item.sessionId === sessionId),
     }))
     void get().refreshQueue(sessionId)
     // Cached transcript paints immediately.
@@ -735,9 +773,16 @@ export const useApp = create<AppState>((set, get) => ({
 
   /** Interrupt the running turn (desktop `agent_steer`). */
   async steer(sessionId, text) {
-    const transport = get().transport
+    const { transport, connection } = get()
     const body = text.trim()
     if (!transport || !body) return
+    // §2.3: steering needs a live desktop. Offline it must not be silently
+    // dropped, so the text goes to the outbox as an ordinary send instead —
+    // the user's intent («say this next») is preserved, minus the interrupt.
+    if (!canSendNow(connection)) {
+      await get().send(sessionId, body)
+      return
+    }
     try {
       await transport.invoke('agent_steer', { sessionId, text: body })
       await get().refreshQueue(sessionId)
@@ -846,6 +891,10 @@ export const useApp = create<AppState>((set, get) => ({
       set(state => ({ approvals: state.approvals.filter(item => item.requestId !== requestId) }))
     } catch (error) {
       set({ error: errorText(error) })
+      // Re-throw so the caller knows the card is still pending (§2.4: the card
+      // must stay answerable). Swallowing it here made every screen believe the
+      // answer had been accepted and drop the card.
+      throw error
     }
   },
 
@@ -862,6 +911,7 @@ export const useApp = create<AppState>((set, get) => ({
       set(state => ({ approvals: state.approvals.filter(item => item.requestId !== requestId) }))
     } catch (error) {
       set({ error: errorText(error) })
+      throw error
     }
   },
 
@@ -873,6 +923,19 @@ export const useApp = create<AppState>((set, get) => ({
       set(state => ({ approvals: state.approvals.filter(item => item.requestId !== `trust:${cwd}`) }))
     } catch (error) {
       set({ error: errorText(error) })
+      throw error
+    }
+  },
+
+  async refreshNotificationPrefs() {
+    const transport = get().transport
+    if (!transport) return
+    if (!canRun(get().capabilities, 'notification_prefs_get')) return
+    try {
+      const prefs = await transport.invoke<{ system?: unknown }>('notification_prefs_get', {})
+      set({ systemNotifications: typeof prefs?.system === 'boolean' ? prefs.system : null })
+    } catch {
+      // Older desktop: leave it unknown; the row stays hidden.
     }
   },
 
@@ -922,6 +985,81 @@ export const useApp = create<AppState>((set, get) => ({
     } catch {
       // Desktop not advertising it: leave the row hidden.
     }
+  },
+
+  async refreshApprovals() {
+    const transport = get().transport
+    if (!transport) return
+    // Older desktops never advertised these; asking anyway would just error.
+    const canPermission = canRun(get().capabilities, 'permission_pending')
+    const canQuestion = canRun(get().capabilities, 'question_pending')
+    const canTrust = canRun(get().capabilities, 'trust_pending')
+    if (!canPermission && !canQuestion && !canTrust) return
+    const recovered: Approval[] = []
+    // A successful fetch is authoritative even when empty; `null` means the
+    // desktop did not advertise the command (or it failed), so we keep ours.
+    let permissionIds: Set<string> | null = null
+    let questionIds: Set<string> | null = null
+    let trustCwds: Set<string> | null = null
+    if (canPermission) {
+      try {
+        const answer = await transport.invoke<{ requests?: PermissionRequest[] }>('permission_pending', {})
+        const requests = Array.isArray(answer?.requests) ? answer.requests : []
+        permissionIds = new Set(requests.flatMap(request => (request?.requestId ? [request.requestId] : [])))
+        for (const request of requests) {
+          const card = permissionApproval(request)
+          if (card) recovered.push(card)
+        }
+      } catch {
+        // Desktop without the command: existing cards stay, nothing to recover.
+      }
+    }
+    if (canQuestion) {
+      try {
+        const answer = await transport.invoke<{ requests?: QuestionRequest[] }>('question_pending', {})
+        const requests = Array.isArray(answer?.requests) ? answer.requests : []
+        questionIds = new Set(requests.flatMap(request => (request?.requestId ? [request.requestId] : [])))
+        for (const request of requests) {
+          if (request?.requestId && request?.sessionId) recovered.push(questionApproval(request))
+        }
+      } catch {
+        // Same: an older desktop simply has no question backlog.
+      }
+    }
+    if (canTrust) {
+      try {
+        const answer = await transport.invoke<{ requests?: { cwd?: unknown; sessionId?: unknown }[] }>('trust_pending', {})
+        const requests = Array.isArray(answer?.requests) ? answer.requests : []
+        trustCwds = new Set(requests.flatMap(request => (typeof request?.cwd === 'string' && request.cwd ? [request.cwd] : [])))
+        for (const request of requests) {
+          if (typeof request?.cwd === 'string' && request.cwd) {
+            recovered.push(trustApproval(
+              request.cwd,
+              Date.now(),
+              typeof request.sessionId === 'string' ? request.sessionId : undefined,
+            ))
+          }
+        }
+      } catch {
+        // Same: no trust backlog to recover.
+      }
+    }
+    if (!recovered.length && permissionIds === null && questionIds === null && trustCwds === null) return
+    set(state => {
+      // Add only the cards we are missing: a live event may already own the
+      // same requestId, and re-adding would reset its receivedAt.
+      const known = new Set(state.approvals.map(entry => entry.requestId))
+      const missing: Approval[] = []
+      for (const card of recovered) {
+        if (known.has(card.requestId)) continue
+        known.add(card.requestId)
+        missing.push(card)
+      }
+      const merged = missing.length ? [...state.approvals, ...missing] : state.approvals
+      // Then drop cards the desktop is no longer waiting on (answered elsewhere).
+      const approvals = reconcileApprovals(merged, { permission: permissionIds, question: questionIds, trustCwds })
+      return approvals === state.approvals ? {} : { approvals }
+    })
   },
 
   async refreshThinkingLevel(sessionId) {
@@ -1151,6 +1289,12 @@ export const useApp = create<AppState>((set, get) => ({
     set({ autoSpeak: enabled })
   },
 
+  async setSpeechRateKey(key) {
+    await setItem(SPEECH_RATE_KEY, serializeSpeechRate(key)).catch(() => {})
+    setSpeechRate(rateForKey(key))
+    set({ speechRate: key })
+  },
+
   dismissError() {
     set({ error: null })
   },
@@ -1228,31 +1372,8 @@ async function attachListeners(transport: Transport, set: SetState, get: () => A
   })
 
   await transport.listen('agent://permission', payload => {
-    const request = payload as {
-      requestId?: string
-      sessionId?: string
-      title?: string
-      rawInput?: unknown
-      options?: { optionId?: unknown; kind?: unknown; title?: unknown }[]
-    }
-    if (!request.requestId) return
-    upsertApproval(set, {
-      requestId: request.requestId,
-      kind: 'permission',
-      sessionId: request.sessionId,
-      title: request.title ?? '需要你的批准',
-      detail: permissionDetail(request.rawInput),
-      permissionOptions: Array.isArray(request.options)
-        ? request.options
-          .filter(option => typeof option?.optionId === 'string')
-          .map(option => ({
-            optionId: String(option.optionId),
-            kind: typeof option.kind === 'string' ? option.kind : 'allow',
-            title: typeof option.title === 'string' ? option.title : String(option.optionId),
-          }))
-        : undefined,
-      receivedAt: Date.now(),
-    })
+    const card = permissionApproval(payload as PermissionRequest)
+    if (card) upsertApproval(set, card)
   })
   await transport.listen('agent://permission-dismiss', payload => {
     const id = (payload as { requestId?: string }).requestId
@@ -1275,6 +1396,25 @@ async function attachListeners(transport: Transport, set: SetState, get: () => A
     if (typeof cwd === 'string' && cwd) {
       upsertApproval(set, trustApproval(cwd, Date.now(), typeof sessionId === 'string' ? sessionId : undefined))
     }
+  })
+
+  /**
+   * A turn that ended in a terminal error (§2.2).
+   *
+   * The engine emits `agent://turn-error` after `agent_settled` when
+   * `slot.finalError` is set, and the bridge forwards it — but the phone never
+   * listened. The user was left with a truncated answer, no error, and a fresh
+   * set of follow-up chips inviting them to continue a conversation that had
+   * actually failed.
+   */
+  await transport.listen('agent://turn-error', payload => {
+    const event = payload as { sessionId?: unknown; kind?: unknown; detail?: unknown }
+    const sessionId = typeof event.sessionId === 'string' ? event.sessionId : null
+    if (!sessionId) return
+    const detail = typeof event.detail === 'string' && event.detail.trim()
+      ? event.detail.trim()
+      : typeof event.kind === 'string' ? event.kind : ''
+    setTurnError(set, sessionId, detail)
   })
 
   await transport.listen('agent://permission-mode', payload => {
@@ -1350,6 +1490,9 @@ function watchTransport(transport: Transport, set: SetState, get: () => AppState
       // so the board is not frozen at the moment the link died.
       void flushQueue(get, set)
       void get().refreshSessions().catch(() => {})
+      // The event stream only carries new requests; one emitted while the link
+      // was down is recovered from the desktop's pending list.
+      void get().refreshApprovals()
     }
     if (state !== 'open' && last === 'open') {
       // The link is gone. Anything still marked streaming keeps a caret
@@ -1358,6 +1501,35 @@ function watchTransport(transport: Transport, set: SetState, get: () => AppState
       void sealOpenTurns(set, get)
     }
     last = state
+  })
+}
+
+/**
+ * Records a failed turn on its transcript.
+ *
+ * Rendered as an `interrupted` system row so it gets the same warning treatment
+ * as a dropped connection, and so follow-up chips stay suppressed: there is no
+ * finished answer to build questions on.
+ */
+function setTurnError(set: SetState, sessionId: string, detail: string): void {
+  const raw = detail || '这一轮失败了'
+  // The detail comes from the model/provider layer and can be English
+  // (`401 invalid api key`); `problemFor` knows how to phrase a failure.
+  const message = `这一轮没有成功：${problemText(raw)}`
+  set(state => {
+    const transcript = state.transcripts[sessionId]
+    if (!transcript) return {}
+    // Do not stack duplicates if the same error is replayed.
+    if (transcript.rows.some(row => row.kind === 'text' && row.interrupted && row.text === message)) return {}
+    const row: TranscriptRow = {
+      kind: 'text',
+      id: `turn-error:${transcript.rows.length}`,
+      role: 'system',
+      text: message,
+      interrupted: true,
+    }
+    const sealed = sealInterruptedTurn(transcript)
+    return { transcripts: { ...state.transcripts, [sessionId]: { ...sealed, rows: [...sealed.rows, row] } } }
   })
 }
 

@@ -16,6 +16,7 @@ import { SparkIcon } from '../../src/components/icons'
 import { Row as SharedRow, Section as SharedSection } from '../../src/components/SettingsList'
 import { PageHeader } from '../../src/components/PageHeader'
 import { canRun, unavailableReason } from '../../src/core/surface'
+import { nextSpeechRate, speechRateLabel } from '../../src/core/speech'
 import { useApp } from '../../src/stores/app'
 import { clearPairing } from '../../src/transport'
 import { pushAvailability, type PushAvailability } from '../../src/native/notifications'
@@ -54,6 +55,8 @@ export default function MeScreen() {
   const setAppLock = useApp(state => state.setAppLock)
   const autoSpeak = useApp(state => state.autoSpeak)
   const setAutoSpeak = useApp(state => state.setAutoSpeak)
+  const speechRate = useApp(state => state.speechRate)
+  const setSpeechRateKey = useApp(state => state.setSpeechRateKey)
   const unpair = useApp(state => state.unpair)
   const pairings = useApp(state => state.pairings)
   const activePairingId = useApp(state => state.activePairingId)
@@ -197,6 +200,14 @@ export default function MeScreen() {
             : explain('library_list'))}
         />
         <Row theme={theme} label="模型与密钥" value="仅在电脑上" onPress={() => explain('providers_save_provider')} />
+        <Row
+          theme={theme}
+          label="技能与指令"
+          value={canRun(capabilities, 'skills_list') || canRun(capabilities, 'prompts_list') ? '只读浏览' : '未开放'}
+          onPress={() => (canRun(capabilities, 'skills_list') || canRun(capabilities, 'prompts_list')
+            ? router.push('/skills')
+            : explain('skills_list'))}
+        />
         <Row theme={theme} label="文件写入" value="仅在电脑上" onPress={() => explain('write_text_file')} last />
       </Section>
 
@@ -206,6 +217,12 @@ export default function MeScreen() {
           label="回复自动播报"
           value={autoSpeak ? '已开启' : '关闭'}
           onPress={() => void setAutoSpeak(!autoSpeak)}
+        />
+        <Row
+          theme={theme}
+          label="语速"
+          value={speechRateLabel(speechRate)}
+          onPress={() => void setSpeechRateKey(nextSpeechRate(speechRate))}
           last
         />
       </Section>

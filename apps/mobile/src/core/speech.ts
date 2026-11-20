@@ -9,6 +9,40 @@
 
 export const SPEAK_KEY = 'openbuddy.autoSpeak'
 
+/** Read-aloud speed preference (§5 Tab 5「音色语速」). */
+export const SPEECH_RATE_KEY = 'openbuddy.speechRate'
+
+export type SpeechRateKey = 'slow' | 'normal' | 'fast'
+
+/** Three presets beat a raw slider: each maps to a rate the TTS engine honours. */
+export const SPEECH_RATES: readonly { key: SpeechRateKey; label: string; rate: number }[] = [
+  { key: 'slow', label: '慢', rate: 0.85 },
+  { key: 'normal', label: '标准', rate: 1 },
+  { key: 'fast', label: '快', rate: 1.25 },
+]
+
+export function parseSpeechRate(raw: string | null | undefined): SpeechRateKey {
+  return raw === 'slow' || raw === 'fast' ? raw : 'normal'
+}
+
+export function serializeSpeechRate(key: SpeechRateKey): string {
+  return key
+}
+
+export function rateForKey(key: SpeechRateKey): number {
+  return SPEECH_RATES.find(item => item.key === key)?.rate ?? 1
+}
+
+export function speechRateLabel(key: SpeechRateKey): string {
+  return SPEECH_RATES.find(item => item.key === key)?.label ?? '标准'
+}
+
+/** Tap-to-cycle: 慢 → 标准 → 快 → 慢, so one row changes the setting. */
+export function nextSpeechRate(key: SpeechRateKey): SpeechRateKey {
+  const index = SPEECH_RATES.findIndex(item => item.key === key)
+  return SPEECH_RATES[(index + 1) % SPEECH_RATES.length]?.key ?? 'normal'
+}
+
 /** Long answers are cut: nobody wants a five-minute monologue after a glance. */
 export const SPEAK_MAX_CHARS = 600
 
