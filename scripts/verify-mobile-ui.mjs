@@ -54,7 +54,7 @@ const screens = [
   { name: 'automations', path: '/automations', expected: ['每日晨报', '每周代码巡检'] },
   { name: 'panel', path: '/session/sess-refactor', expected: ['会话设置', '人格', '思考深度', '本轮产物', '用量', '权限', '允许 bash', '拒绝 any'] },
   { name: 'pair', path: '/pair', expected: ['连接你的电脑', '扫描二维码', '8 位配对码'] },
-  { name: 'approval', path: '/approval/req-preview', expected: ['允许修改这 3 个文件', '拒绝', '允许', 'proxy.ts', 'sse.test.ts'] },
+  { name: 'approval', path: '/approval/req-preview', expected: ['允许修改这 3 个文件', '拒绝', '允许', '稍后处理', 'proxy.ts', 'sse.test.ts'] },
   // A push that outlives its request: shows the "already handled" state.
   { name: 'approval-stale', path: '/approval/req-missing', expected: ['这次请求已经处理过了', '返回'] },
 ]
@@ -158,6 +158,18 @@ try {
       await page.screenshot({ path: join(outDir, scheme, 'interaction-speech-rate.png') })
       if (!rateOk) failures.push({ scheme, screen: 'interaction:speech-rate', missing: ['快'] })
       console.log(`[${rateOk ? 'PASS' : 'FAIL'}] ${scheme} interaction:speech-rate`)
+
+      // A push can cold-start into an approval; "稍后处理" must reach the home
+      // screen even when there is no history to go back to.
+      await page.goto(baseUrl + '/approval/req-preview', { waitUntil: 'load' })
+      await page.waitForFunction(() => document.body.innerText.includes('稍后处理'), null, { timeout: 30_000 })
+      await page.getByText('稍后处理', { exact: true }).click()
+      await page.waitForTimeout(600)
+      const afterDismiss = await page.evaluate(() => document.body.innerText)
+      const dismissOk = afterDismiss.includes('新建任务') || afterDismiss.includes('置顶会话')
+      await page.screenshot({ path: join(outDir, scheme, 'interaction-approval-dismiss.png') })
+      if (!dismissOk) failures.push({ scheme, screen: 'interaction:approval-dismiss', missing: ['会话首页'] })
+      console.log(`[${dismissOk ? 'PASS' : 'FAIL'}] ${scheme} interaction:approval-dismiss`)
     } finally {
       await page.close()
     }

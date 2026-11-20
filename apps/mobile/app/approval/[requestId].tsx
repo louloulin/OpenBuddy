@@ -28,17 +28,34 @@ export default function ApprovalScreen() {
   const resolveTrust = useApp(state => state.resolveTrust)
   const booted = useApp(state => state.booted)
   const transport = useApp(state => state.transport)
+  const capabilities = useApp(state => state.capabilities)
+  const refreshApprovals = useApp(state => state.refreshApprovals)
   const [busy, setBusy] = useState(false)
   // A push notification can outlive its request: the turn may have settled on
   // the desktop before the phone opened the link. Give the tunnel a moment to
   // hand it over, then say so instead of spinning forever.
   const [waited, setWaited] = useState(false)
 
+  // A push can cold-start straight into this screen, so `back()` has nowhere to
+  // go. Falling back to the session list keeps the approval dismissible without
+  // forcing a decision.
+  const dismiss = () => {
+    if (router.canGoBack()) router.back()
+    else router.replace('/')
+  }
+
   useEffect(() => {
     if (approval) return
     const timer = setTimeout(() => setWaited(true), 4000)
     return () => clearTimeout(timer)
   }, [approval])
+
+  // The push tap can be the app's very first screen. The event stream has
+  // nothing from before launch, so actively pull the pending card instead of
+  // waiting for an event that will never arrive.
+  useEffect(() => {
+    if (!approval && booted && transport && capabilities) void refreshApprovals()
+  }, [approval, booted, transport, capabilities, refreshApprovals])
 
   useEffect(() => {
     // The review build has no tunnel by design; it renders the demo request.
@@ -47,6 +64,7 @@ export default function ApprovalScreen() {
 
   const settle = async (action: ApprovalAction) => {
     setBusy(true)
+    let answered = true
     try {
       if (action.type === 'permission') await resolveApproval(requestId, action.approved)
       else if (action.type === 'question') {
@@ -54,10 +72,14 @@ export default function ApprovalScreen() {
       } else if (action.type === 'trust' && approval?.cwd) {
         await resolveTrust(approval.cwd, action.trusted)
       }
-      router.back()
+    } catch {
+      // §2.4: a failed answer keeps the card and says why. Navigating away
+      // would hide both the card and the reason.
+      answered = false
     } finally {
       setBusy(false)
     }
+    if (answered) router.back()
   }
 
   if (!approval) {
@@ -69,7 +91,7 @@ export default function ApprovalScreen() {
             电脑上可能已经批准或取消了它。回到会话看看最新进展。
           </Text>
           <Pressable
-            onPress={() => router.back()}
+            onPress={dismiss}
             accessibilityLabel="返回"
             style={({ pressed }) => ({
               marginTop: 4,
@@ -104,6 +126,17 @@ export default function ApprovalScreen() {
         contentContainerStyle={{ padding: 16, flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 4 }}>
+          <Pressable
+            onPress={dismiss}
+            accessibilityRole="button"
+            accessibilityLabel="稍后处理"
+            hitSlop={8}
+            style={({ pressed }) => ({ paddingHorizontal: 10, paddingVertical: 6, opacity: pressed ? 0.5 : 1 })}
+          >
+            <Text style={{ color: theme.textMedium, fontSize: theme.fontMeta, fontWeight: '600' }}>稍后处理</Text>
+          </Pressable>
+        </View>
         <RequestCard approval={approval} busy={busy} onAction={action => void settle(action)} />
       </ScrollView>
     </KeyboardAvoidingView>
