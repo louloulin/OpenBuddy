@@ -178,6 +178,8 @@ type AppState = {
   cycleThinkingLevel: (sessionId: string) => Promise<ThinkingLevel | null>
   revoked: () => Promise<void>
   resume: () => void
+  /** Manual nudge from the Me screen when auto-reconnect keeps failing. */
+  retryConnection: () => void
   /**
    * The gateway's replay buffer no longer reaches back to us (`resync`): every
    * cached transcript may be missing a gap, so reload the snapshots and drain
@@ -388,6 +390,11 @@ export const useApp = create<AppState>((set, get) => ({
     void get().refreshTasks()
     // Recover approval cards that arrived while we were away (§2.4 path 3).
     void get().refreshApprovals()
+  },
+
+  retryConnection() {
+    if (get().connection === 'open') return
+    reconnectTransport()
   },
 
   async resync() {

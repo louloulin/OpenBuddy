@@ -17,6 +17,7 @@ import { Row as SharedRow, Section as SharedSection } from '../../src/components
 import { PageHeader } from '../../src/components/PageHeader'
 import { canRun, unavailableReason } from '../../src/core/surface'
 import { nextSpeechRate, speechRateLabel } from '../../src/core/speech'
+import { canRetryConnection, connectionLabel, connectionRowValue } from '../../src/core/connection-status'
 import { useApp } from '../../src/stores/app'
 import { clearPairing } from '../../src/transport'
 import { pushAvailability, type PushAvailability } from '../../src/native/notifications'
@@ -61,6 +62,7 @@ export default function MeScreen() {
   const pairings = useApp(state => state.pairings)
   const activePairingId = useApp(state => state.activePairingId)
   const switchPairing = useApp(state => state.switchPairing)
+  const retryConnection = useApp(state => state.retryConnection)
   const [busyPairing, setBusyPairing] = useState(false)
   const [push, setPush] = useState<PushAvailability>('unsupported')
 
@@ -104,7 +106,7 @@ export default function MeScreen() {
   }
 
   const explain = (command: string) => Alert.alert('桌面专属', unavailableReason(command))
-  const statusText = connection === 'open' ? '已连接' : connection === 'connecting' ? '连接中' : '已断开'
+  const statusText = connectionLabel(connection)
 
   return (
     <ScrollView
@@ -136,7 +138,13 @@ export default function MeScreen() {
       <Section theme={theme} label="连接">
         <Row theme={theme} label="电脑" value={pairing ? pairing.gatewayUrl.replace(/^https?:\/\//, '') : '未连接'} />
         <Row theme={theme} label="设备" value={pairing?.deviceName ?? '这台手机'} />
-        <Row theme={theme} label="状态" value={statusText} last />
+        <Row
+          theme={theme}
+          label="状态"
+          value={connectionRowValue(connection)}
+          onPress={canRetryConnection(connection) ? retryConnection : undefined}
+          last
+        />
       </Section>
 
       <Section theme={theme} label="已配对的电脑">
