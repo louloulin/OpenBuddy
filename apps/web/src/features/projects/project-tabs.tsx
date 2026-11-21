@@ -128,8 +128,12 @@ export function TaskTab({ projectId }: { projectId: string }) {
   const addTask = useProjectsStore((s) => s.addTask);
   const removeTask = useProjectsStore((s) => s.removeTask);
   const [q, setQ] = useState("");
+  const [source, setSource] = useState("all");
 
-  const filtered = tasks.filter((t) => t.title.toLowerCase().includes(q.toLowerCase()));
+  const sources = [...new Set(tasks.map((t) => t.source).filter(Boolean))];
+  const filtered = tasks.filter(
+    (t) => t.title.toLowerCase().includes(q.toLowerCase()) && (source === "all" || t.source === source),
+  );
 
   const newTask = async () => {
     const title = await appPrompt({ title: "新建任务", placeholder: "任务标题", confirmLabel: "创建" });
@@ -141,7 +145,10 @@ export function TaskTab({ projectId }: { projectId: string }) {
       <div className="pd-toolbar">
         <div className="pd-toolbar__left">
           <button className="pd-btn" disabled title="当前仅显示本地任务">全部任务 <ChevronDownIcon size="sm" style={{ verticalAlign: "text-bottom" }} /></button>
-          <button className="pd-btn" disabled title="当前仅支持本地来源">全部来源 <ChevronDownIcon size="sm" style={{ verticalAlign: "text-bottom" }} /></button>
+          <select className="pd-select" aria-label="按来源筛选" value={source} onChange={(e) => setSource(e.target.value)} disabled={sources.length === 0}>
+            <option value="all">全部来源</option>
+            {sources.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
           <span className="pd-toolbar__hint">当前是本地任务记录，不会同步给云端成员</span>
         </div>
         <div className="pd-toolbar__right">

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { canSendNow } from '../connection'
 import {
   dispositionFor, queueLabel, queueRows, withoutQueueItem, type TurnQueue,
 } from '../turn-input'
@@ -54,5 +55,16 @@ describe('queueLabel', () => {
   it('distinguishes the two queues', () => {
     expect(queueLabel('steering')).toBe('插话')
     expect(queueLabel('followUp')).toBe('排队')
+  })
+})
+
+describe('steering offline', () => {
+  // §2.3: offline none of the three input modes work. Steer is the one that
+  // cannot degrade silently — there is nothing to interrupt, so the text must
+  // fall back to an ordinary queued send rather than vanish.
+  it('is only offered on a live connection', () => {
+    expect(canSendNow('open')).toBe(true)
+    expect(canSendNow('closed')).toBe(false)
+    expect(canSendNow('connecting')).toBe(false)
   })
 })

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { editCommand } from "@openbuddy/platform/clipboard";
 import { win as windowControls } from "@openbuddy/client/ipc";
 import { XCloseIcon } from "@openbuddy/ui/icon/icons/index";
-import logoMarkUrl from "@/assets/openbuddy-logo.svg";
+import logoMarkUrl from "@/assets/openbuddy-logo.png";
 
 interface MenuItem {
   label: string;

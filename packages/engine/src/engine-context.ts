@@ -16,6 +16,7 @@ import type { Settings } from "@openbuddy/services/settings/settings";
 import type { SkillsService } from "@openbuddy/services/skills/skills";
 import type { CheckpointStore } from "./checkpoints/store.js";
 import type { ExtensionUiBridge } from "./extension-ui/bridge.js";
+import type { FolderTrustRequests } from "./folder-trust-requests.js";
 import type { SessionSearchIndex } from "./session-search.js";
 import type { Emit, Permissions } from "./permissions/permissions.js";
 import type { AgentMode, PoolLimits, PromptImages, SessionRunStatus, Slot, ThinkingLevel } from "./types.js";
@@ -34,6 +35,8 @@ export interface EngineContext {
   readonly limits: PoolLimits;
   readonly permissions: Permissions;
   readonly ui: ExtensionUiBridge;
+  /** Untrusted folders awaiting a decision; replayed by `trust_pending` (§2.4 path 3). */
+  readonly folderTrust: FolderTrustRequests;
   readonly providers: Providers;
   readonly skills: SkillsService;
   readonly mcp: McpService;

@@ -228,3 +228,22 @@ describe('interrupted system row', () => {
     expect(plain.rows[0]).not.toHaveProperty('interrupted')
   })
 })
+
+describe('turn-error handling shape', () => {
+  // The store turns `agent://turn-error` into the same `interrupted` row the
+  // connection-drop path uses, so the chat screen styles it once and suppresses
+  // follow-ups for both. This pins the contract those two paths share.
+  it('an interrupted row seals streaming state before being appended', () => {
+    const streaming: Transcript = {
+      rows: [{ kind: 'text', id: 'a1', role: 'assistant', text: '先看一下', streaming: true }],
+      lastAssistantText: '先看一下',
+    }
+    const sealed = sealInterruptedTurn(streaming)
+    const withNotice: Transcript = {
+      ...sealed,
+      rows: [...sealed.rows, { kind: 'text', id: 'turn-error:1', role: 'system', text: '这一轮没有成功：模型请求失败', interrupted: true }],
+    }
+    expect(isTurnPending(withNotice)).toBe(false)
+    expect(withNotice.rows.at(-1)).toMatchObject({ role: 'system', interrupted: true })
+  })
+})

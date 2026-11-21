@@ -41,7 +41,10 @@ describe("项目后端 (pii W5.4)", () => {
 
     projects.remove("b");
     expect(projects.list().map((p) => p.id)).toEqual(["a"]);
-    expect(JSON.parse(readFileSync(join(settings.dir, "projects.json"), "utf8"))).toHaveLength(1);
+    // A2: the file is versioned; the list lives under `projects`.
+    const file = JSON.parse(readFileSync(join(settings.dir, "projects.json"), "utf8"));
+    expect(file.schemaVersion).toBe(1);
+    expect(file.projects).toHaveLength(1);
   });
 
   it("imports the old localStorage list once (idempotent by id)", () => {

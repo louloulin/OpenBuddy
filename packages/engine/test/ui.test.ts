@@ -74,6 +74,20 @@ it("waits for the user without a default timeout", async () => {
   bridge.resolve({ sessionId: "s", requestId: request.requestId, value: true });
   expect(await answer).toBe(true);
 });
+it("snapshots the exact emitted requests for a client that reconnects", async () => {
+  const events: any[] = [];
+  const bridge = new ExtensionUiBridge((_n, p) => events.push(p));
+  const ui = bridge.context("s");
+  const answer = ui.select("Choose", ["one", "two"]);
+  const emitted = events.at(-1);
+  // Identical to the live event, so the phone rebuilds the same card.
+  expect(bridge.pendingRequests()).toEqual([emitted]);
+  expect(bridge.pendingRequests("other")).toEqual([]);
+  expect(bridge.pendingRequests("s")).toHaveLength(1);
+  bridge.resolve({ sessionId: "s", requestId: emitted.requestId, value: "one" });
+  expect(await answer).toBe("one");
+  expect(bridge.pendingRequests()).toHaveLength(0);
+});
 it("prevents stale contexts from opening new dialogs after cancellation or same-id replacement", async () => {
   const events: any[] = [];
   const bridge = new ExtensionUiBridge((name, p) => events.push({ name, p }));

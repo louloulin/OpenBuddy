@@ -1,18 +1,24 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import type { Settings } from "../settings/settings.js";
+import { join } from "node:path";
+import { JsonStore, type Settings } from "../settings/settings.js";
 import type { ProjectRecord } from "@openbuddy/protocol/projects";
 
 /**
- * 项目后端 (20261116-pii W5.4 / md-R9).
+ * 项目后端 (20261116-pii W5.4 / md-R9, A2 versioning).
  *
  * Replaces the renderer's localStorage-only projects with `projects.json` in the app data dir.
  * The renderer keeps the rich detail object; the host only interprets `id`, `name`, `cwd` and
  * `instructions` (appended to the system prompt of sessions opened in that cwd).
  * Import is an idempotent upsert by id, so re-running it never duplicates a project.
+ *
+ * v1 wraps the legacy bare array as `{ schemaVersion, projects }`; the v0→v1 migration accepts
+ * either shape, so an old file upgrades in place.
  */
 const MAX_PROJECTS = 500;
 const MAX_INSTRUCTIONS = 20_000;
+
+interface ProjectFile {
+  projects: ProjectRecord[];
+}
 
 function normalize(value: unknown): ProjectRecord | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -32,23 +38,34 @@ function normalize(value: unknown): ProjectRecord | null {
 }
 
 export class ProjectsService {
-  private readonly file: string;
+  private readonly store: JsonStore<ProjectFile>;
   private cache?: ProjectRecord[];
 
   constructor(settings: Settings) {
-    this.file = join(settings.dir, "projects.json");
+    this.store = new JsonStore<ProjectFile>(
+      join(settings.dir, "projects.json"),
+      () => ({ projects: [] }),
+      {
+        versioned: true,
+        snapshots: settings.snapshots,
+        migrations: {
+          0: (raw) => {
+            if (Array.isArray(raw)) return { projects: raw };
+            if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+              const file = raw as Record<string, unknown>;
+              return { ...file, projects: Array.isArray(file.projects) ? file.projects : [] };
+            }
+            throw new Error("invalid_projects");
+          },
+        },
+      },
+    );
   }
 
   list(): ProjectRecord[] {
     if (this.cache) return this.cache;
-    try {
-      if (!existsSync(this.file)) return (this.cache = []);
-      const parsed = JSON.parse(readFileSync(this.file, "utf8"));
-      const items = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.projects) ? parsed.projects : [];
-      this.cache = items.map(normalize).filter(Boolean).slice(0, MAX_PROJECTS) as ProjectRecord[];
-    } catch {
-      this.cache = [];
-    }
+    const items = this.store.read().projects;
+    this.cache = (Array.isArray(items) ? items : []).map(normalize).filter(Boolean).slice(0, MAX_PROJECTS) as ProjectRecord[];
     return this.cache;
   }
 
@@ -94,13 +111,6 @@ export class ProjectsService {
 
   private write(list: ProjectRecord[]): void {
     this.cache = list;
-    try {
-      mkdirSync(dirname(this.file), { recursive: true });
-      const tmp = `${this.file}.tmp`;
-      writeFileSync(tmp, `${JSON.stringify(list, null, 2)}\n`);
-      renameSync(tmp, this.file);
-    } catch (error) {
-      console.error("Projects write failed", error);
-    }
+    this.store.write({ projects: list });
   }
 }

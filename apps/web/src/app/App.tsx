@@ -304,7 +304,7 @@ function Shell() {
             // Sync title into the owning project's conversation list.
             const allProjects = useProjectsStore.getState().projects;
             for (const p of allProjects) {
-              if (p.conversations.some((c) => c.sessionId === sessionId)) {
+              if ((p.conversations ?? []).some((c) => c.sessionId === sessionId)) {
                 useProjectsStore.getState().updateConversationTitle(p.id, sessionId, title);
                 break;
               }
@@ -846,7 +846,7 @@ function Shell() {
     else if (matchShortcut(e, "settings")) run(() => setSettingsOpen(true));
     else if (matchShortcut(e, "toggleSidebar")) run(() => setSidebarCollapsed((v) => !v));
     else if (matchShortcut(e, "copyLast")) run(() => {
-      const last = [...sessionStore.getState().messages].reverse().find((m) => m.role === "assistant" && m.parts.some((p) => p.kind === "text" && p.text.trim()));
+      const last = [...sessionStore.getState().messages].reverse().find((m) => m.role === "assistant" && (m.parts ?? []).some((p) => p.kind === "text" && p.text.trim()));
       if (!last) { showToast("还没有可复制的回答"); return; }
       const text = last.parts.filter((p): p is Extract<typeof p, { kind: "text" }> => p.kind === "text").map((p) => p.text).join("\n\n");
       void copyText(text).then(() => showToast("已复制最后一条回答"), () => showToast("复制失败"));

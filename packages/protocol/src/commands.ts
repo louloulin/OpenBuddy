@@ -5,6 +5,8 @@ export const COMMANDS = [
   'agent_session_info', 'agent_session_usage', 'agent_set_model', 'agent_list_workspaces',
   'agent_resolve_permission', 'agent_resolve_question', 'folder_trust_respond',
   'permission_list', 'permission_save', 'permission_mode_get', 'permission_mode_set',
+  // 待决审批补齐 (20261117-mobile.md §2.4): permission/question cards still waiting, for a client reconnecting.
+  'permission_pending', 'question_pending', 'trust_pending',
   // 受保护路径 (20261116-pii W6.2): 安全中心编辑，权限门强制执行。
   'permission_protected_get', 'permission_protected_set',
   'providers_list', 'providers_save_provider', 'providers_save_model', 'providers_delete_provider',
@@ -42,7 +44,7 @@ export const COMMANDS = [
   'agent_extensions_packages', 'agent_extensions_install_package', 'agent_extensions_remove_package', 'agent_extensions_update_packages',
   'agent_extensions_preview_package', 'agent_extensions_check_updates',
   // Pi 包市场与包资源 (S15): npm registry search + what each configured package contributes.
-  'agent_extensions_search_registry', 'agent_extensions_resources',
+  'agent_extensions_search_registry', 'agent_extensions_resources', 'agent_extensions_package_details',
   // 包资源开关 (S17): Pi object-form package filters (`[]` = load none of that type).
   'agent_extensions_set_package_resources',
   'rewind_points', 'rewind_execute', 'agent_regenerate', 'agent_compact',
@@ -76,6 +78,12 @@ export const COMMANDS = [
   'library_list', 'library_add', 'library_remove',
   // 项目 (pii W5.4 / md-R9): host-persisted projects + project instructions.
   'projects_snapshot', 'projects_save', 'projects_delete', 'projects_import',
+  // 数据导出 / 恢复与快照 (A2): versioned bundle, pre-restore snapshot, snapshot rollback.
+  'data_export', 'data_restore', 'data_snapshots', 'data_snapshot_restore',
+  // 更新检查 (A3): fetch the release manifest; installing stays a user action.
+  'update_check', 'update_download',
+  // 运行日志 (O1): list and read the host's own JSONL log files for the in-app viewer.
+  'logs_list', 'logs_read',
   // 技能目录 + 我的指令 (20261116-pii W2.7): the skills host module.
   'skills_catalog_default_root', 'skills_catalog_list_roots', 'skills_catalog_load', 'skills_catalog_read_skill',
   // 技能市场安装与导出 (B1c): copy into <pi>/skills, export a portable ZIP.

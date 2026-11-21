@@ -22,7 +22,7 @@ export class McpService {
     this.auth = new McpAuthService(settings, openUrl, emit);
     this.store = new JsonStore(join(settings.dir, "mcp.json"), () => ({
       mcpServers: {},
-    }));
+    }), { versioned: true, snapshots: settings.snapshots });
   }
   get path() {
     return this.store.path;

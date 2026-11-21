@@ -49,6 +49,15 @@ const RULES: Array<{ match: string[]; kind: ProblemKind; message: string }> = [
   { match: ['cors', 'access-control-allow-origin', 'preflight', 'mixed content', 'blocked by cors policy'], kind: 'blocked', message: '网关不允许这个来源，请用桌面端显示的地址打开，或让网关放行。' },
   { match: ['failed to fetch', 'network request failed', 'networkerror', 'load failed', 'econnrefused', 'enotfound'], kind: 'network', message: '手机连不上网络，检查 Wi-Fi 或蜂窝数据。' },
   { match: ['unknown command', 'not_supported', 'no such command', 'unsupported'], kind: 'unsupported', message: '这台电脑的版本还不支持这个操作。' },
+  // Filesystem refusals from the host (`EACCES: permission denied`, `ENOENT`).
+  { match: ['eacces', 'permission denied', 'eperm'], kind: 'unknown', message: '电脑拒绝了这次文件操作，请检查文件权限。' },
+  { match: ['enoent', 'no such file', 'not found'], kind: 'unknown', message: '电脑上找不到这个文件。' },
+  // Model / provider failures, which reach the phone verbatim through
+  // `agent://turn-error` (e.g. 「模型请求失败：401 invalid api key」).
+  { match: ['invalid api key', 'incorrect api key', 'invalid_api_key', 'authentication_error', 'http 401', 'http_401'], kind: 'auth', message: '模型凭证无效，请在电脑上检查 API Key。' },
+  { match: ['rate limit', '429', 'quota', 'insufficient_quota'], kind: 'upstream', message: '模型调用太频繁或额度用完了，稍后再试。' },
+  { match: ['context length', 'too many tokens', 'maximum context'], kind: 'unknown', message: '对话太长超出了模型上限，压缩一下再继续。' },
+  { match: ['model_not_found', 'no such model', 'model not found'], kind: 'unknown', message: '电脑上配置的模型不存在，请在桌面端重新选择。' },
 ]
 
 /** `http_502` / `http 502` → a status the caller may want to show. */

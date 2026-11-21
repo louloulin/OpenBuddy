@@ -19,6 +19,8 @@ export class ExtensionUiBridge {
       kind: Kind;
       options?: string[];
       finish: (value: string | boolean | undefined, reason: Reason) => void;
+      /** The exact payload emitted as `agent://ui-request`, so a reconnecting client can rebuild the card. */
+      request: Record<string, unknown>;
     }
   >();
   /** 0 = no timeout: like tool approvals, extension dialogs wait for the user (20261115-ui E3). */
@@ -51,21 +53,23 @@ export class ExtensionUiBridge {
         this.emit("agent://ui-dismiss", { requestId, sessionId, reason });
         resolve(value ?? (kind === "confirm" ? false : undefined));
       };
-      this.pending.set(requestId, {
-        sessionId,
-        kind,
-        options: fields.options as string[] | undefined,
-        finish,
-      });
-      opts?.signal?.addEventListener("abort", onAbort, { once: true });
-      this.emit("agent://ui-request", {
+      const request = {
         requestId,
         sessionId,
         kind,
         title,
         ...fields,
         ...(timeout > 0 ? { timeoutMs: timeout } : {}),
+      };
+      this.pending.set(requestId, {
+        sessionId,
+        kind,
+        options: fields.options as string[] | undefined,
+        finish,
+        request,
       });
+      opts?.signal?.addEventListener("abort", onAbort, { once: true });
+      this.emit("agent://ui-request", request);
     });
   }
   resolve(raw: unknown) {
@@ -95,6 +99,18 @@ export class ExtensionUiBridge {
   hasPending(sessionId: string) {
     for (const item of this.pending.values()) if (item.sessionId === sessionId) return true;
     return false;
+  }
+  /**
+   * Question cards still waiting on the user, in the exact shape of
+   * `agent://ui-request` (20261117-mobile.md §2.4 path 3). Recovering the
+   * permission half was not enough: an extension `select`/`confirm`/`input`
+   * blocks the turn the same way, and a phone that missed it saw nothing.
+   */
+  pendingRequests(sessionId?: string): Record<string, unknown>[] {
+    const out: Record<string, unknown>[] = [];
+    for (const item of this.pending.values())
+      if (!sessionId || item.sessionId === sessionId) out.push(item.request);
+    return out;
   }
   cancel(sessionId?: string, reason: Reason = "cancelled") {
     if (sessionId) this.epochs.delete(sessionId);

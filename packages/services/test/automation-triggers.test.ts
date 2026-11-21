@@ -45,13 +45,15 @@ describe("文件触发 watcher (pii W4.7)", () => {
     const changes: unknown[] = [];
     const watcher = new FileTriggerWatcher((change) => changes.push(change));
     watchers.push(watcher);
-    watcher.watch(file, { debounceMs: 60 });
+    // 去抖窗口要明显大于整串写入的跨度（5×10ms），否则全量并行时 fs 事件延迟一抖动
+    // 就会跨过窗口、把一次爆发拆成多次——那是测试余量不足，不是合并逻辑失效。
+    watcher.watch(file, { debounceMs: 300 });
     for (let i = 0; i < 5; i += 1) {
       writeFileSync(file, `x${i}`);
       await new Promise((r) => setTimeout(r, 10));
     }
-    await vi.waitFor(() => expect(changes.length).toBeGreaterThan(0));
-    await new Promise((r) => setTimeout(r, 120));
+    await vi.waitFor(() => expect(changes.length).toBeGreaterThan(0), { timeout: 3000 });
+    await new Promise((r) => setTimeout(r, 400));
     expect(changes).toHaveLength(1);
   });
 
@@ -78,6 +80,8 @@ describe("文件触发 watcher (pii W4.7)", () => {
     expect(watcher.watch(join(dir, "nope.txt"))).toBe(false);
     expect(watcher.watch(dir, { debounceMs: 20 })).toBe(true);
     expect(watcher.watching).toHaveLength(1);
+    // fs.watch can miss a write issued in the same tick it was registered (heavy parallel runs).
+    await new Promise((r) => setTimeout(r, 50));
     writeFileSync(join(dir, "new.txt"), "hello");
     await vi.waitFor(() => expect(changes).toHaveLength(1), { timeout: 5000, interval: 50 });
   });

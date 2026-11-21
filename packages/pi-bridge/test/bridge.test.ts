@@ -47,6 +47,15 @@ describe('scopes', () => {
     expect(scopeForCommand('agent_list_sessions')).toBe('sessions:read')
     expect(scopeForCommand('agent_send')).toBe('sessions:write')
     expect(scopeForCommand('agent_resolve_permission')).toBe('approve')
+    // §2.4 path 3: recovering a pending card is a read, not an approval.
+    expect(scopeForCommand('permission_pending')).toBe('sessions:read')
+    expect(scopeForCommand('question_pending')).toBe('sessions:read')
+    expect(scopeForCommand('trust_pending')).toBe('sessions:read')
+    expect(isAllowedCommand('permission_pending')).toBe(true)
+    expect(isAllowedCommand('question_pending')).toBe(true)
+    expect(isAllowedCommand('trust_pending')).toBe(true)
+    // §7: prompt templates are a read surface (the phone only lists them).
+    expect(scopeForCommand('prompts_list')).toBe('sessions:read')
   })
 })
 

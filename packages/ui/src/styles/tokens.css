@@ -104,7 +104,7 @@ body[data-vscode-theme-name="IDE Light"] {
   --wb-color-mask-color: var(--wb-palette-black-60);
   --wb-color-text-primary: var(--wb-palette-black-90);
   --wb-color-text-secondary: var(--wb-palette-black-70);
-  --wb-color-text-tertiary: var(--wb-palette-black-50);
+  --wb-color-text-tertiary: var(--wb-palette-black-60);
   --wb-color-text-disabled: var(--wb-palette-black-30);
   --wb-color-text-solid: var(--wb-palette-black-100);
   --wb-color-text-brand-default: var(--wb-palette-brand-8);
@@ -244,7 +244,7 @@ body.dark,
   --wb-color-mask-color: rgba(0, 0, 0, 0.8);
   --wb-color-text-primary: rgba(255, 255, 255, 0.92);
   --wb-color-text-secondary: rgba(255, 255, 255, 0.65);
-  --wb-color-text-tertiary: rgba(255, 255, 255, 0.45);
+  --wb-color-text-tertiary: rgba(255, 255, 255, 0.55);
   --wb-color-text-disabled: rgba(255, 255, 255, 0.25);
   --wb-color-text-solid: var(--wb-palette-white-100);
   --wb-color-text-brand-default: var(--wb-palette-brand-7);

@@ -36,6 +36,8 @@ export function extensionsModule(ctx: HostContext): HostModule {
     // Pi 包市场与包资源 (S15): real npm search results + what installed packages contribute.
     agent_extensions_search_registry: (p) =>
       registry.search(typeof p.query === "string" ? p.query : "", { from: typeof p.offset === "number" ? p.offset : 0 }),
+    // 包详情 (E1): integrity / 维护者 / 发布时间 / git commit —— 审查一个包的真实依据。
+    agent_extensions_package_details: (p) => registry.details(text(p.name, "name")),
     agent_extensions_resources: (p) => engine.extensionResources(opt(p.cwd)),
     // 包资源开关 (S17): the payload is validated by the protocol before reaching here.
     agent_extensions_set_package_resources: (p) =>

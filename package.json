@@ -38,6 +38,11 @@
     "audit:ipc": "node tools/audit-contract.mjs",
     "audit:compat": "node tools/compat/check-pi-matrix.mjs",
     "check:ui-tokens": "node tools/check-ui-tokens.mjs",
+    "check:perf": "node tools/check-perf.mjs",
+    "check:docs": "node tools/check-docs.mjs",
+    "check:deps": "node tools/check-deps.mjs",
+    "check:repro": "node tools/check-repro.mjs",
+    "gen:sbom": "node tools/gen-sbom.mjs",
     "test:electron-ui": "node apps/desktop/scripts/electron-ui-check.mjs",
     "verify:mobile-live": "node scripts/verify-mobile-live.mjs",
     "capture:mobile": "node scripts/capture-mobile-shots.mjs",
@@ -52,7 +57,12 @@
     "verify:mobile-metrics": "bun run scripts/verify-mobile-metrics.ts",
     "verify:mobile-gating": "bun run scripts/verify-mobile-gating.ts",
     "verify:mobile-crash": "bun run scripts/verify-mobile-crash.ts",
-    "verify:mobile-revoke": "bun run scripts/verify-mobile-revoke.ts"
+    "verify:mobile-revoke": "bun run scripts/verify-mobile-revoke.ts",
+    "verify:mobile-turn-error": "bun run scripts/verify-mobile-turn-error.ts",
+    "verify:mobile-steer": "bun run scripts/verify-mobile-steer.ts",
+    "verify:mobile-approval-failure": "bun run scripts/verify-mobile-approval-failure.ts",
+    "verify:mobile-foreground": "bun run scripts/verify-mobile-foreground.ts",
+    "verify:mobile-pending": "bun run scripts/verify-mobile-pending.ts"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "1.5.2",

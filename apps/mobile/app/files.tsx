@@ -151,12 +151,14 @@ export default function FilesScreen() {
 
   // Session artifacts link straight at a file; the browser itself is
   // directory-first, so an explicit `file` param opens the preview once.
+  // Retry when the tunnel arrives: a deep link can be the first screen, and
+  // openFile returns early while transport is still null.
   useEffect(() => {
-    if (!initialFile) return
+    if (!initialFile || !transport) return
     void openFile({ path: initialFile, name: basename(initialFile), kind: 'file', size: 0 })
     // The path is fixed for the life of the screen; openFile closes over transport.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialFile])
+  }, [initialFile, transport])
 
   const attach = async (file: { path: string }) => {    if (!sessionId) {
       setError('先打开一个会话，才能把文件交给它。')

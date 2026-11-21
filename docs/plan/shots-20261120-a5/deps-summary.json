@@ -1,0 +1,8 @@
+{
+  "packages": 1332,
+  "withIntegrity": 1332,
+  "importers": 16,
+  "directDependencies": 82,
+  "problems": 0,
+  "note": "pnpm check:deps"
+}

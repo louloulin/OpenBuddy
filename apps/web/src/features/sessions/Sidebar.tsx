@@ -7,6 +7,7 @@ import { usePermissionStore } from "@/features/approvals/state/permission-store"
 import { useQuestionStore } from "@/features/approvals/state/question-store";
 import { useProjectsStore } from "@/features/projects/state/projects-store";
 import { IS_MACOS } from "@openbuddy/platform/platform";
+import logoMarkUrl from "@/assets/openbuddy-logo.png";
 import {
   agentRenameSession,
   agentDeleteSession,
@@ -36,6 +37,7 @@ import { basename, relativeTime, sortPinnedFirst, ProjectNodeIcon } from "./side
 import { filterSessions, TaskFilterMenu } from "./sidebar-parts/TaskFilterMenu";
 import { SessionContextMenu } from "./sidebar-parts/SessionContextMenu";
 import { MoreDropdown } from "./sidebar-parts/MoreDropdown";
+import { useLocale } from "../../shared/i18n";
 import { TasksPanel } from "./TasksPanel";
 
 /** A sidebar / 更多 entry. The app builds the lists from its FeatureRegistry (pii W0.2): the former
@@ -98,6 +100,8 @@ export function Sidebar({
   const tasksOpen = useSessionsStore((s) => s.tasksOpen);
   const spacesOpen = useSessionsStore((s) => s.spacesOpen);
   const expanded = useSessionsStore((s) => s.expanded);
+  const { t, tOptional } = useLocale();
+  const navLabel = (label: string) => tOptional(`nav.${label}`) ?? label;
   const currentSessionId = useSessionsStore((s) => s.currentSessionId);
   const permissionQueues = usePermissionStore((s) => s.queues);
   const unseenIds = useUnseenStore((s) => s.ids);
@@ -313,7 +317,10 @@ export function Sidebar({
           (Windows 的窗口拖拽由自绘 TitleBar 负责,故仅在 mac 加属性)。 */}
       <div className="sidebar__logo-row" {...(IS_MACOS ? { "data-window-drag-region": true } : {})}>
         <div className="sidebar__logo-col" {...(IS_MACOS ? { "data-window-drag-region": true } : {})}>
-          <span className="sidebar__logo">OpenBuddy</span>
+          <span className="sidebar__logo">
+            <img className="sidebar__logo-mark" src={logoMarkUrl} alt="" width={18} height={18} />
+            OpenBuddy
+          </span>
           <span className="sidebar__version">v{APP_VERSION}</span>
         </div>
         <div className="sidebar__logo-spacer" {...(IS_MACOS ? { "data-window-drag-region": true } : {})} />
@@ -325,7 +332,7 @@ export function Sidebar({
         >
           <SidebarToggleIcon size="md" />
         </button>
-        <button className="sidebar__icon-btn" aria-label="搜索任务" data-tip={`搜索任务 (${keyLabel("Mod")}+K)`} onClick={onOpenSearch}>
+        <button className="sidebar__icon-btn" aria-label={t("sidebar.searchTasks")} data-tip={`${t("sidebar.searchTasks")} (${keyLabel("Mod")}+K)`} onClick={onOpenSearch}>
           <SearchIcon size="md" />
         </button>
         <div className="task-filter-wrap" ref={filterRef}>
@@ -363,7 +370,7 @@ export function Sidebar({
           onClick={onNewSession}
         >
           <WbNewTaskIcon size="md" />
-          <span>新建任务</span>
+          <span>{t("nav.newTask")}</span>
         </button>
         {nav.map(({ id, label, icon: Icon }) => (
           <button
@@ -376,7 +383,7 @@ export function Sidebar({
             onClick={() => onNavigate(label)}
           >
             <Icon size="md" />
-            <span>{label}</span>
+            <span>{navLabel(label)}</span>
           </button>
         ))}
         {moreItems.length > 0 && <MoreDropdown items={moreItems} onNavigate={onNavigate} activeNav={activeNav} />}
@@ -388,7 +395,7 @@ export function Sidebar({
       <div className="sidebar__content">
         {/* 任务分组: 收件箱(初始目录)下的会话（WorkBuddy 文案：最近） */}
         <button className="sidebar__section-label" onClick={() => setTasksOpen(!tasksOpen)}>
-          <span>最近 ({hasFilter ? `${filteredIndependent.length}/${independent.length}` : independent.length})</span>
+          <span>{t("sidebar.recent")} ({hasFilter ? `${filteredIndependent.length}/${independent.length}` : independent.length})</span>
           <ChevronDownIcon
             size="sm"
             className={"sidebar__chevron" + (tasksOpen ? "" : " sidebar__chevron--collapsed")}
@@ -514,10 +521,10 @@ export function Sidebar({
           <span>本地用户</span>
         </button>
         <div className="sidebar__logo-spacer" />
-        <button className="sidebar__icon-btn" aria-label="通知" onClick={() => onOpenSettings()}>
+        <button className="sidebar__icon-btn" aria-label={t("sidebar.notifications")} onClick={() => onOpenSettings()}>
           <BellIcon size="md" />
         </button>
-        <button className="sidebar__icon-btn" aria-label="设置" onClick={onOpenSettings}>
+        <button className="sidebar__icon-btn" aria-label={t("sidebar.settings")} onClick={onOpenSettings}>
           <SettingsIcon size="md" />
         </button>
       </div>

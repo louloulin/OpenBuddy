@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
-import { ExtensionRegistryService } from "../src/extensions/registry";
+import { ExtensionRegistryService, deriveCategories } from "../src/extensions/registry";
 
 const row = (overrides: Record<string, unknown> = {}) => ({
   package: {
@@ -14,11 +14,18 @@ const row = (overrides: Record<string, unknown> = {}) => ({
     ...overrides,
   },
   downloads: { weekly: 12, monthly: 34 },
+  score: { final: 0.9123, detail: { quality: 0.9, popularity: 0.55, maintenance: 0.777 } },
   updated: "2026-11-17T10:07:26.630Z",
 });
 
 const json = (body: unknown, ok = true) =>
-  ({ ok, status: ok ? 200 : 503, json: async () => body }) as unknown as Response;
+  ({
+    ok,
+    status: ok ? 200 : 503,
+    headers: { get: () => null },
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+  }) as unknown as Response;
 
 describe("Pi 包市场搜索 (S15)", () => {
   it("searches npm by the pi-package keyword and maps real fields", async () => {
@@ -41,8 +48,23 @@ describe("Pi 包市场搜索 (S15)", () => {
       publisher: "nicopreme",
       weeklyDownloads: 12,
       monthlyDownloads: 34,
+      score: { final: 0.91, quality: 0.9, popularity: 0.55, maintenance: 0.777 },
       keywords: ["pi-package", "search"],
     });
+  });
+
+  it("keeps npm's raw final score and drops only unreadable rows (E1)", async () => {
+    const service = new ExtensionRegistryService({
+      fetchImpl: async () => json({ total: 3, objects: [
+        row({}),
+        { ...row(), score: { final: 202.60645, detail: { quality: 1, popularity: 1, maintenance: 1 } } },
+        { ...row(), score: { final: "high", detail: {} } },
+      ] }),
+    });
+    const result = await service.search("");
+    expect(result.packages[0].score?.final).toBe(0.91);
+    expect(result.packages[1].score).toEqual({ final: 202.61, quality: 1, popularity: 1, maintenance: 1 });
+    expect(result.packages[2].score).toBeUndefined();
   });
 
   it("caches identical queries and skips malformed rows", async () => {
@@ -90,5 +112,63 @@ describe("Pi 包市场搜索 (S15)", () => {
     expect(page.from).toBe(25);
     await expect(service.search("web", { from: 1001 })).rejects.toThrow(/invalid_payload/);
     await expect(service.search("web", { from: 1.5 })).rejects.toThrow(/invalid_payload/);
+  });
+
+  it("derives capability categories from the package's own npm keywords (E1)", async () => {
+    const service = new ExtensionRegistryService({
+      fetchImpl: async () => json({ total: 1, objects: [row({ keywords: ["pi-package", "browser", "web-search", "crawl"] })] }),
+    });
+    const result = await service.search("");
+    expect(result.packages[0].categories).toEqual(["web", "search"]);
+    expect(deriveCategories(["pi-package"])).toEqual(["other"]);
+    expect(deriveCategories(["mcp-server"])).toEqual(["mcp"]);
+  });
+
+  it("reads integrity, maintainers, publish time and git commit from the packument (E1)", async () => {
+    const calls: string[] = [];
+    const service = new ExtensionRegistryService({
+      fetchImpl: async (input) => {
+        calls.push(String(input));
+        return json({
+          name: "pi-web-access",
+          "dist-tags": { latest: "0.48.0" },
+          time: { "0.48.0": "2026-11-17T10:07:26.630Z" },
+          versions: {
+            "0.48.0": {
+              dist: { integrity: "sha512-abc==", shasum: "deadbeef" },
+              maintainers: [{ name: "nicopreme" }, { name: "other" }],
+              keywords: ["pi-package", "browser"],
+              license: "MIT",
+              unpackedSize: 2048,
+              gitHead: "1f0c2d3",
+            },
+          },
+        });
+      },
+    });
+    const details = await service.details("pi-web-access");
+    expect(calls[0]).toContain("pi-web-access");
+    expect(details).toMatchObject({
+      name: "pi-web-access",
+      version: "0.48.0",
+      integrity: "sha512-abc==",
+      shasum: "deadbeef",
+      maintainers: ["nicopreme", "other"],
+      publishedAt: "2026-11-17T10:07:26.630Z",
+      gitHead: "1f0c2d3",
+      license: "MIT",
+      unpackedSize: 2048,
+    });
+    expect(details.categories).toEqual(["web"]);
+  });
+
+  it("refuses names that are not npm packages and reports registry failures (E1)", async () => {
+    const service = new ExtensionRegistryService({ fetchImpl: vi.fn(async () => json({})) });
+    await expect(service.details("../../etc/passwd")).rejects.toThrow(/invalid_payload/);
+    await expect(service.details("Bad Name")).rejects.toThrow(/invalid_payload/);
+    const offline = new ExtensionRegistryService({ fetchImpl: async () => { throw new Error("ENOTFOUND"); } });
+    await expect(offline.details("pi-web-access")).rejects.toThrow(/registry_unreachable/);
+    const missing = new ExtensionRegistryService({ fetchImpl: async () => json({}, false) });
+    await expect(missing.details("pi-web-access")).rejects.toThrow(/registry_unreachable/);
   });
 });

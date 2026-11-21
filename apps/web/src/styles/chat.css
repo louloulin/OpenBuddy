@@ -285,10 +285,10 @@
 /* ---------- dark mode: overrides for hard-coded light colors (light stays pixel-identical) ---------- */
 [data-theme="dark"] body,
 [data-theme="dark"] { background: var(--wb-bg-primary); color-scheme: dark; }
-[data-theme="dark"] .wb-composer__disclaimer { color: rgba(255, 255, 255, 0.35); }
+[data-theme="dark"] .wb-composer__disclaimer { color: var(--wb-text-tertiary); }
 [data-theme="dark"] .sidebar__logo { color: rgba(255, 255, 255, 0.55); }
-[data-theme="dark"] .sidebar__version { color: rgba(255, 255, 255, 0.35); }
-[data-theme="dark"] .sidebar__nav-sub { color: rgba(255, 255, 255, 0.4); }
+[data-theme="dark"] .sidebar__version { color: var(--wb-text-tertiary); }
+[data-theme="dark"] .sidebar__nav-sub { color: var(--wb-text-weak); }
 [data-theme="dark"] .model-selector__trigger { color: var(--wb-text-strong); }
 [data-theme="dark"] .workspace-picker__trigger,
 [data-theme="dark"] .wb-composer-meta__btn { color: var(--wb-text-medium); }

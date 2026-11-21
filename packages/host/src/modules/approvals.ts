@@ -12,6 +12,36 @@ export function approvalsModule(ctx: HostContext): HostModule {
     folder_trust_respond: (p) =>
       engine.setFolderTrust(text(p.cwd), bool(p.trusted)),
     permission_list: () => settings.config.read().rules,
+    /**
+     * 20261117-mobile.md §2.4 path 3: the permission cards still waiting on the user.
+     * Isomorphic to `agent://permission`, so a phone that was disconnected when the
+     * request was emitted can rebuild the card on resume and answer it by `requestId`.
+     */
+    permission_pending: (p) => ({
+      requests: engine.permissions.pendingRequests(
+        typeof p.sessionId === "string" && p.sessionId ? p.sessionId : undefined,
+      ),
+    }),
+    /**
+     * The extension UI questions still waiting on the user, isomorphic to
+     * `agent://ui-request`. Same recovery role as `permission_pending`: a
+     * `select`/`confirm`/`input` blocks the turn just like a tool approval.
+     */
+    question_pending: (p) => ({
+      requests: engine.ui.pendingRequests(
+        typeof p.sessionId === "string" && p.sessionId ? p.sessionId : undefined,
+      ),
+    }),
+    /**
+     * Untrusted folders a session was opened in, isomorphic to
+     * `agent://folder-trust`. The event fires once on open, so a phone that was
+     * away could never see it; this replays it until answered.
+     */
+    trust_pending: (p) => ({
+      requests: engine.folderTrust.pending(
+        typeof p.sessionId === "string" && p.sessionId ? p.sessionId : undefined,
+      ),
+    }),
     permission_save: (p) => {
       if (!Array.isArray(p.rules)) throw Error("rules必须为数组");
       const rules = p.rules.map((raw) => {

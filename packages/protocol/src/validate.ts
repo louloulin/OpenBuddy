@@ -6,7 +6,8 @@ import type { Payload } from './types.js';
 export type { Payload };
 import { validateAgentSettingsPatch } from './agent-settings.js';
 import { EXPERT_LIMITS, isExpertId } from './experts.js';
-import { validExtensionSource, validPackageFilters, validRegistryQuery } from './extensions.js';
+import { validExtensionSource, validPackageFilters, validPackageName, validRegistryQuery } from './extensions.js';
+import { MAX_LOG_LINES, validLogLevel, validLogSource } from './logs.js';
 
 /** Bound structured-clone input before dispatch; services validate their domain fields. */
 export function validatePayload(input: unknown): Payload {
@@ -124,6 +125,33 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'projects_import') {
     if (!Array.isArray(payload.projects) || payload.projects.length > 500) throw new Error('invalid_payload: projects');
   }
+  // 数据恢复 (A2): the bundle is opaque here; DataBackupService re-validates kind/version/files/size.
+  if (command === 'data_restore') {
+    if (!payload.bundle || typeof payload.bundle !== 'object' || Array.isArray(payload.bundle)) throw new Error('invalid_payload: bundle');
+  }
+  if (command === 'data_snapshot_restore') string('id', 200);
+  // 更新检查 (A3): feed URL is re-validated (https or loopback http) in UpdateService.
+  if (command === 'update_check') {
+    string('feedUrl', 4096, true);
+    if (payload.channel !== undefined && !['stable', 'beta'].includes(String(payload.channel))) throw new Error('invalid_payload: channel');
+  }
+  // 更新下载 (A3): the service re-checks the URL; hashes/sizes stay optional but bounded here.
+  if (command === 'update_download') {
+    string('url', 4096);
+    if (payload.sha256 !== undefined && (typeof payload.sha256 !== 'string' || !/^[a-f0-9]{64}$/i.test(payload.sha256))) throw new Error('invalid_payload: sha256');
+    if (payload.size !== undefined && (typeof payload.size !== 'number' || !Number.isFinite(payload.size) || payload.size < 0 || payload.size > 1024 * 1024 * 1024)) throw new Error('invalid_payload: size');
+  }
+  // 运行日志 (O1): only the logger's own file names; never a path.
+  if (command === 'logs_read') {
+    if (!validLogSource(payload.name)) throw new Error('invalid_payload: name');
+    if (payload.level !== undefined && payload.level !== 'all' && !validLogLevel(payload.level)) throw new Error('invalid_payload: level');
+    if (payload.query !== undefined && (typeof payload.query !== 'string' || payload.query.length > 200 || payload.query.includes('\0'))) throw new Error('invalid_payload: query');
+    if (payload.limit !== undefined && (typeof payload.limit !== 'number' || !Number.isInteger(payload.limit) || payload.limit < 1 || payload.limit > MAX_LOG_LINES)) throw new Error('invalid_payload: limit');
+  }
+  // 包详情 (E1): only a real npm package name reaches the registry.
+  if (command === 'agent_extensions_package_details') {
+    if (!validPackageName(payload.name)) throw new Error('invalid_payload: name');
+  }
   // 受保护路径 (W6.2): a bounded list of short patterns.
   if (command === 'permission_protected_set') {
     if (!Array.isArray(payload.paths) || payload.paths.length > 64) throw new Error('invalid_payload: paths');
@@ -155,6 +183,7 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
     }
   }
   if (command === 'agent_set_mode' && !['craft', 'plan', 'ask'].includes(String(payload.mode))) throw new Error('invalid_payload: mode');
+  if ((command === 'permission_pending' || command === 'question_pending' || command === 'trust_pending') && payload.sessionId !== undefined) string('sessionId', 256);
   if (command === 'agent_resolve_permission') string('reason', 500, true);
   if (['rewind_points', 'rewind_execute', 'agent_regenerate', 'agent_compact', 'agent_get_model_state', 'agent_set_model', 'agent_set_thinking_level', 'agent_resolve_ui', 'agent_resolve_question', 'agent_steer', 'agent_follow_up', 'agent_get_queue', 'agent_clear_queue', 'agent_fork_session'].includes(command)) string('sessionId', 256);
   if (command === 'agent_set_model' || command === 'agent_new_session') {

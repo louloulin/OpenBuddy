@@ -66,6 +66,9 @@ export interface PathStat {
 /** Stat one path without reading it (artifact reader's live deletion probe). */
 export const pathStat = (path: string) => invoke<PathStat>("path_stat", { path });
 
+/** Reveal one path in the OS file manager (desktop native). */
+export const revealInFolder = (path: string) => invoke<void>("reveal_in_folder", { path });
+
 /** Read a text file with a byte cap; the host enforces the cap and the workspace grant. */
 export const readTextFile = (path: string, maxBytes?: number) =>
   invoke<string>("read_text_file", { path, ...(maxBytes ? { maxBytes } : {}) });

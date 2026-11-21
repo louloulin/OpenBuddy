@@ -9,7 +9,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { appConfirm, appPrompt } from "../../shared/ui/AppDialog";
-import { AddIcon, SearchIcon, MoreDotsIcon, ChevronDownIcon } from "@openbuddy/ui/icon/icons/index";
+import { AddIcon, SearchIcon, MoreDotsIcon, ChevronDownIcon, PinFilledIcon } from "@openbuddy/ui/icon/icons/index";
 import heroImg from "@/assets/landing-hero.png";
 import { useProjectsStore, type ProjectMeta, type RefItem } from "@/features/projects/state/projects-store";
 import {
@@ -37,6 +37,7 @@ export function ProjectsPanel({ cwd, onToast, onStartProjectConversation }: Proj
   const projects = useProjectsStore((s) => s.projects);
   const rename = useProjectsStore((s) => s.rename);
   const remove = useProjectsStore((s) => s.remove);
+  const setPinned = useProjectsStore((s) => s.setPinned);
   const activeProjectId = useProjectsStore((s) => s.activeProjectId);
   const setActiveProjectId = useProjectsStore((s) => s.setActiveProjectId);
   const [query, setQuery] = useState("");
@@ -51,9 +52,10 @@ export function ProjectsPanel({ cwd, onToast, onStartProjectConversation }: Proj
     }
   }, [activeProjectId, setActiveProjectId]);
 
-  const filtered = projects.filter((p) =>
-    p.name.toLowerCase().includes(query.toLowerCase()),
-  );
+  const filtered = projects
+    .filter((p) => p.name.toLowerCase().includes(query.toLowerCase()))
+    // 置顶优先 (U1): stable sort keeps the user's order inside each group.
+    .sort((a, b) => Number(b.pinned === true) - Number(a.pinned === true));
 
   const openProject = projects.find((p) => p.id === openId) ?? null;
   if (openProject) {
@@ -121,6 +123,7 @@ export function ProjectsPanel({ cwd, onToast, onStartProjectConversation }: Proj
                 onEnter={() => setOpenId(p.id)}
                 onRename={() => handleRename(p)}
                 onDelete={() => handleDelete(p)}
+                onPin={() => setPinned(p.id, p.pinned !== true)}
               />
             ))}
           </div>
@@ -171,12 +174,13 @@ export function ProjectsPanel({ cwd, onToast, onStartProjectConversation }: Proj
 // ============================================================
 
 function ProjectCard({
-  project, onEnter, onRename, onDelete,
+  project, onEnter, onRename, onDelete, onPin,
 }: {
   project: ProjectMeta;
   onEnter: () => void;
   onRename: () => void;
   onDelete: () => void;
+  onPin: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -198,6 +202,16 @@ function ProjectCard({
           <span className="project-card2__sub">{addedLabel(project.createdAt)}</span>
         </span>
       </div>
+      <button
+        type="button"
+        className={"project-card2__pin" + (project.pinned === true ? " project-card2__pin--on" : "")}
+        aria-label={project.pinned === true ? "取消置顶" : "置顶"}
+        aria-pressed={project.pinned === true}
+        title={project.pinned === true ? "取消置顶" : "置顶"}
+        onClick={(e) => { e.stopPropagation(); onPin(); }}
+      >
+        <PinFilledIcon size="sm" />
+      </button>
       <div className="project-card2__more-wrap">
         <button
           type="button"
@@ -210,6 +224,7 @@ function ProjectCard({
         {menuOpen && (
           <div className="project-card2__menu" onClick={(e) => e.stopPropagation()}>
             <button className="project-card2__menu-item" onClick={() => { setMenuOpen(false); onEnter(); }}>进入项目</button>
+            <button className="project-card2__menu-item" onClick={() => { setMenuOpen(false); onPin(); }}>{project.pinned === true ? "取消置顶" : "置顶"}</button>
             <button className="project-card2__menu-item" onClick={() => { setMenuOpen(false); onRename(); }}>重命名</button>
             <div className="project-card2__menu-sep" />
             <button className="project-card2__menu-item project-card2__menu-item--danger" onClick={() => { setMenuOpen(false); onDelete(); }}>删除</button>

@@ -3,8 +3,10 @@
  *
  * The phone browses what the desktop would inject into a session, and may edit
  * a note. Grouping and previews come from `src/core/memory.ts`; the files
- * themselves live on the computer. Only global memory is listed here — project
- * memory is scoped to a trusted workspace, and a workspace is a desktop idea.
+ * themselves live on the computer. Global memory is always listed; project
+ * memory is scoped to the current (trusted) workspace, so every call carries the
+ * phone's `currentCwd` rather than letting the desktop fall back to its focused
+ * session.
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -24,6 +26,7 @@ export default function MemoryScreen() {
   const insets = useSafeAreaInsets()
   const router = useRouter()
   const transport = useApp(state => state.transport)
+  const currentCwd = useApp(state => state.currentCwd)
   const capabilities = useApp(state => state.capabilities)
   const connection = useApp(state => state.connection)
 
@@ -40,7 +43,9 @@ export default function MemoryScreen() {
     }
     if (!transport) { setLoading(false); return }
     try {
-      const list = await transport.invoke<MemoryEntry[]>('memory_list', {})
+      // Project memory is scoped to a workspace: pass the one the list came
+      // from, not whatever session the desktop happens to focus later.
+      const list = await transport.invoke<MemoryEntry[]>('memory_list', currentCwd ? { cwd: currentCwd } : {})
       setEntries(Array.isArray(list) ? list : [])
       setError(null)
     } catch (failure) {
@@ -48,7 +53,7 @@ export default function MemoryScreen() {
     } finally {
       setLoading(false)
     }
-  }, [transport])
+  }, [transport, currentCwd])
 
   useEffect(() => { void load() }, [load])
 
@@ -79,7 +84,7 @@ export default function MemoryScreen() {
       )}
     >
       <Text style={{ color: theme.textWeak, fontSize: 12, lineHeight: 19, paddingHorizontal: 4 }}>
-        这些笔记会在新会话里作为背景注入。编辑会直接写回电脑；项目记忆按工作区隔离，只在桌面端出现。
+        这些笔记会在新会话里作为背景注入。编辑会直接写回电脑；项目记忆跟随当前工作区，需要电脑端信任该文件夹。
       </Text>
 
       {error ? (

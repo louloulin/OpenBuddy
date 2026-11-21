@@ -21,6 +21,88 @@ export type ApprovalAction =
 
 export type PermissionOption = { optionId: string; kind: string; title: string }
 
+/** Session ids with at least one decision waiting (used to badge the session list). */
+export function sessionsWithPendingApprovals(approvals: Pick<Approval, 'sessionId'>[]): Set<string> {
+  const out = new Set<string>()
+  for (const approval of approvals) if (approval.sessionId) out.add(approval.sessionId)
+  return out
+}
+
+/**
+ * The desktop's authoritative pending sets, per card family. `null` means "this
+ * desktop did not advertise the command (or the fetch failed)" — then the phone
+ * keeps what it has instead of guessing.
+ */
+export type PendingSources = {
+  permission?: ReadonlySet<string> | null
+  question?: ReadonlySet<string> | null
+  trustCwds?: ReadonlySet<string> | null
+}
+
+/**
+ * Drops cards the desktop is no longer waiting on (answered on the desktop,
+ * expired, cancelled). A card younger than `graceMs` is kept regardless: a live
+ * `agent://permission` event can land between our fetch and this call, and
+ * dropping it would make the badge flicker.
+ */
+export function reconcileApprovals(
+  approvals: Approval[],
+  sources: PendingSources,
+  now = Date.now(),
+  graceMs = 3000,
+): Approval[] {
+  const setFor = (kind: Approval['kind']) =>
+    kind === 'permission' ? sources.permission : kind === 'question' ? sources.question : sources.trustCwds
+  let changed = false
+  const next = approvals.filter(card => {
+    const set = setFor(card.kind)
+    const key = card.kind === 'trust' ? card.cwd : card.requestId
+    // Unknown source, or no key to match: keep — never hide a card on a guess.
+    if (set == null || !key) return true
+    if (set.has(key)) return true
+    if (now - card.receivedAt <= graceMs) return true
+    changed = true
+    return false
+  })
+  return changed ? next : approvals
+}
+
+/** The wire shape shared by `agent://permission` and `permission_pending`. */
+export type PermissionRequest = {
+  requestId?: string
+  sessionId?: string
+  title?: string
+  rawInput?: unknown
+  options?: { optionId?: unknown; kind?: unknown; title?: unknown }[]
+}
+
+/**
+ * A permission card from the raw request. Used both by the live
+ * `agent://permission` listener and by the resume-time `permission_pending`
+ * fetch (§2.4 path 3), so a card missed while the phone was away looks exactly
+ * like one that arrived live.
+ */
+export function permissionApproval(request: PermissionRequest, receivedAt = Date.now()): Approval | null {
+  if (!request?.requestId) return null
+  return {
+    requestId: request.requestId,
+    kind: 'permission',
+    sessionId: request.sessionId,
+    title: request.title ?? '需要你的批准',
+    detail: permissionDetail(request.rawInput),
+    permissionOptions: Array.isArray(request.options)
+      ? request.options
+        .filter(option => typeof option?.optionId === 'string')
+        .map(option => ({
+          optionId: String(option.optionId),
+          kind: typeof option.kind === 'string' ? option.kind : 'allow',
+          title: typeof option.title === 'string' ? option.title : String(option.optionId),
+        }))
+      : undefined,
+    receivedAt,
+  }
+}
+
 export type QuestionRequest = {
   requestId: string
   sessionId: string

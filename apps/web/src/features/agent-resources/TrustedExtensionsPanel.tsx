@@ -4,25 +4,36 @@ import {
   agentExtensionsSetEnabled, agentExtensionsSetPathEnabled,
   agentExtensionsPackages, agentExtensionsInstallPackage, agentExtensionsRemovePackage, agentExtensionsUpdatePackages,
   agentExtensionsPreviewPackage, agentExtensionsCheckUpdates,
-  agentExtensionsSearchRegistry, agentExtensionsResources,
+  agentExtensionsSearchRegistry, agentExtensionsResources, agentExtensionsPackageDetails,
   agentExtensionsSetPackageResources,
   onExtensionProgress,
   type ExtensionReport, type ExtensionsConfig,
 } from "@openbuddy/client/agent-client";
-import type {
-  ExtensionPackage,
-  ExtensionPackagePreview,
-  ExtensionPackageUpdate,
-  ExtensionRegistrySearch,
-  ExtensionResourceKind,
-  ExtensionResources,
+import {
+  EXTENSION_CATEGORIES,
+  EXTENSION_CATEGORY_LABELS,
+  type ExtensionCategory,
+  type ExtensionPackage,
+  type ExtensionPackageDetails,
+  type ExtensionPackagePreview,
+  type ExtensionPackageUpdate,
+  type ExtensionRegistrySearch,
+  type ExtensionResourceKind,
+  type ExtensionResources,
 } from "@openbuddy/protocol/extensions";
 import { dialog } from "@openbuddy/client/ipc";
+import { readTextFile } from "@openbuddy/client/api/files";
 import { friendlyError } from "@openbuddy/chat-core/error-format";
 import { PuzzlePieceIcon, AddCircleIcon, DeleteIcon, FolderOpenIcon } from "@openbuddy/ui/icon/icons/index";
 
 /** 12 345 → 1.2 万, for npm download counts (S15). */
 const compact = (value: number) => value >= 10_000 ? `${(value / 10_000).toFixed(value >= 100_000 ? 0 : 1)} 万` : String(value);
+
+/** npm scores are 0–1; show a readable 0–100 (E1). */
+const pct = (value: number) => Math.round(value * 100);
+
+/** Only http(s) links from the registry become clickable. */
+const safeLink = (value: string | undefined) => value && /^https?:\/\//i.test(value) ? value : undefined;
 
 /** Per-resource switches a Pi package entry can carry (S17). */
 const RESOURCE_KINDS: Array<[ExtensionResourceKind, string]> = [
@@ -57,11 +68,16 @@ export function TrustedExtensionsPanel() {
   const [registryQuery, setRegistryQuery] = useState("");
   const [registry, setRegistry] = useState<ExtensionRegistrySearch | null>(null);
   const [registryBusy, setRegistryBusy] = useState(false);
-  const [registrySort, setRegistrySort] = useState(false);
+  const [registrySort, setRegistrySort] = useState<"default" | "downloads" | "score">("default");
   const [progress, setProgress] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<ExtensionReport | null>(null);
+  const [changelog, setChangelog] = useState<{ source: string; text: string } | null>(null);
+  const [changelogBusy, setChangelogBusy] = useState(false);
+  const [details, setDetails] = useState<ExtensionPackageDetails | null>(null);
+  const [detailsBusy, setDetailsBusy] = useState(false);
+  const [category, setCategory] = useState<ExtensionCategory | "all">("all");
 
   const reload = useCallback(async () => {
     try {
@@ -127,6 +143,21 @@ export function TrustedExtensionsPanel() {
     } catch (error) { setError(friendlyError(error)); }
     finally { setBusy(false); }
   };
+  /** Pi resolves a package's `changelogPath` while loading it (E1); read it on demand, bounded. */
+  const changelogPathFor = (source: string) => {
+    if (!resources) return undefined;
+    const all = [...resources.extensions, ...resources.skills, ...resources.prompts, ...resources.themes];
+    return all.find((entry) => entry.source === source && entry.changelogPath)?.changelogPath;
+  };
+  const openChangelog = async (source: string) => {
+    const path = changelogPathFor(source);
+    if (!path) return;
+    setChangelogBusy(true); setError("");
+    try {
+      setChangelog({ source, text: await readTextFile(path, 64 * 1024) });
+    } catch (error) { setError(friendlyError(error)); }
+    finally { setChangelogBusy(false); }
+  };
   const updatePackages = async (one?: string) => {
     if (busy) return;
     setBusy(true); setError(""); setProgress("");
@@ -135,6 +166,8 @@ export function TrustedExtensionsPanel() {
       setResources(await agentExtensionsResources().catch(() => null));
       setConfig(await agentExtensionsList());
       setProgress("更新完成");
+      // E1: after a single-package update, show what the package itself says changed.
+      if (one) void openChangelog(one);
     } catch (error) { setError(friendlyError(error)); }
     finally { setBusy(false); }
   };
@@ -217,11 +250,27 @@ export function TrustedExtensionsPanel() {
 
   const items = config?.items ?? [];
   const failed = new Map((config?.errors ?? []).map((entry) => [entry.path, entry.error]));
-  const marketPackages = registry
-    ? registrySort
+  const marketPackages = (registry
+    ? registrySort === "downloads"
       ? [...registry.packages].sort((a, b) => (b.weeklyDownloads ?? 0) - (a.weeklyDownloads ?? 0))
-      : registry.packages
+      : registrySort === "score"
+        ? [...registry.packages].sort((a, b) => (b.score?.final ?? 0) - (a.score?.final ?? 0))
+        : registry.packages
+    : []).filter((item) => category === "all" || (item.categories?.includes(category) ?? false));
+  /** 分类下拉的选项只列真实出现过的分类（来自包的 npm keywords）。 */
+  const availableCategories = registry
+    ? EXTENSION_CATEGORIES.filter((one) => registry.packages.some((item) => item.categories?.includes(one)))
     : [];
+
+  /** 包详情 (E1)：integrity / 维护者 / 发布时间 / git commit，来自真实 npm packument。 */
+  const openDetails = async (name: string) => {
+    setDetailsBusy(true);
+    setError("");
+    try {
+      setDetails(await agentExtensionsPackageDetails(name));
+    } catch (error) { setError(friendlyError(error)); }
+    finally { setDetailsBusy(false); }
+  };
   const canLoadMore = !!registry && registry.packages.length < registry.total && registry.packages.length < 1000;
 
   return <section className="res-panel__body" aria-label="扩展中心">
@@ -283,6 +332,9 @@ export function TrustedExtensionsPanel() {
                   })}
                 </div>
               </div>
+              {changelogPathFor(entry.source) && (
+                <button type="button" className="res-panel__btn" disabled={busy || changelogBusy} onClick={() => void openChangelog(entry.source)}>更新日志</button>
+              )}
               <button type="button" className="res-panel__btn" disabled={busy} onClick={() => void updatePackages(entry.source)}>更新</button>
               <button type="button" className="res-panel__btn res-panel__btn--danger" disabled={busy} aria-label={`移除扩展包 ${entry.source}`} onClick={() => void removePackage(entry.source)}><DeleteIcon size="sm" /></button>
             </div>
@@ -310,7 +362,23 @@ export function TrustedExtensionsPanel() {
       {registry && <>
         <div className="ext-market__bar">
           <p className="res-panel__muted">{registry.query ? `“${registry.query}” 找到 ${registry.total} 个包` : `共 ${registry.total} 个 Pi 扩展包`}（npm 实时结果，已加载 {registry.packages.length} 个）</p>
-          <label className="res-panel__switch"><input type="checkbox" checked={registrySort} onChange={(event) => setRegistrySort(event.target.checked)} />按周下载量排序</label>
+          <label className="res-panel__switch"><span>排序</span>
+            <select className="ext-market__sort" aria-label="市场排序" value={registrySort} onChange={(event) => setRegistrySort(event.target.value as "default" | "downloads" | "score")}>
+              <option value="default">npm 默认</option>
+              <option value="downloads">周下载量</option>
+              <option value="score">npm 评分</option>
+            </select>
+          </label>
+          {availableCategories.length > 0 && (
+            <label className="res-panel__switch"><span>能力</span>
+              <select className="ext-market__sort" aria-label="按能力筛选" value={category} onChange={(event) => setCategory(event.target.value as ExtensionCategory | "all")}>
+                <option value="all">全部能力</option>
+                {availableCategories.map((one) => (
+                  <option key={one} value={one}>{EXTENSION_CATEGORY_LABELS[one]}</option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
         {registry.packages.length === 0 && <div className="res-panel__empty"><PuzzlePieceIcon size="xl" className="ec-empty-icon" /><p>没有匹配的扩展包。</p></div>}
         <div className="ext-market">
@@ -320,11 +388,29 @@ export function TrustedExtensionsPanel() {
                 <code className="ext-market__name">{item.name}</code>
                 {item.version && <span className="ext-market__badge">v{item.version}</span>}
                 {item.weeklyDownloads !== undefined && <span className="ext-market__badge">{compact(item.weeklyDownloads)} 次/周</span>}
+                {item.score && <>
+                  <span className="ext-market__badge ext-market__badge--score" title={`npm final ${item.score.final}`}>质量 {pct(item.score.quality)}</span>
+                  <span className="ext-market__badge">人气 {pct(item.score.popularity)}</span>
+                  <span className="ext-market__badge">维护 {pct(item.score.maintenance)}</span>
+                </>}
                 {item.publisher && <span className="ext-market__meta">@{item.publisher}</span>}
               </div>
+              {item.categories && item.categories.length > 0 && (
+                <p className="ext-market__cats">
+                  {item.categories.map((one) => (
+                    <span key={one} className="ext-market__cat">{EXTENSION_CATEGORY_LABELS[one]}</span>
+                  ))}
+                </p>
+              )}
               {item.description && <p className="ext-market__desc">{item.description}</p>}
               <div className="ext-market__foot">
-                <span className="ext-market__meta">{item.license ? `${item.license} · ` : ""}{item.keywords.filter((keyword) => keyword !== "pi-package").slice(0, 4).join(" · ")}</span>
+                <span className="ext-market__meta">
+                  {item.license ? `${item.license} · ` : ""}
+                  {item.keywords.filter((keyword) => keyword !== "pi-package").slice(0, 4).join(" · ")}
+                </span>
+                {safeLink(item.repository) && <a className="ext-market__link" href={safeLink(item.repository)} target="_blank" rel="noreferrer">仓库</a>}
+                {safeLink(item.npmUrl) && <a className="ext-market__link" href={safeLink(item.npmUrl)} target="_blank" rel="noreferrer">npm</a>}
+                <button type="button" className="res-panel__btn" disabled={detailsBusy} onClick={() => void openDetails(item.name)}>详情</button>
                 <button type="button" className="res-panel__btn" disabled={busy || registryBusy} onClick={() => { setSource(`npm:${item.name}`); void previewPackage(`npm:${item.name}`); }}>检查并安装</button>
               </div>
             </div>
@@ -379,6 +465,37 @@ export function TrustedExtensionsPanel() {
       </div>
       <p className="res-panel__muted">扩展变更会在任务空闲时自动生效；依赖终端专用界面的扩展暂不支持。</p>
     </>}
+
+    {details && <div className="ext-preview" role="dialog" aria-label="包详情">
+      <div className="ext-preview__card">
+        <h3 className="res-panel__card-title">包详情 · {details.name}</h3>
+        <p className="res-panel__muted">来自 npm 官方包文档（packument）的真实信息；这里不提供“官方签名”这类无法验证的说法。</p>
+        <dl className="ext-details">
+          <div><dt>版本</dt><dd>{details.version || "—"}</dd></div>
+          <div><dt>完整性 (integrity)</dt><dd><code className="ext-details__mono">{details.integrity ?? details.shasum ?? "npm 未提供"}</code></dd></div>
+          <div><dt>维护者</dt><dd>{details.maintainers.length ? details.maintainers.map((one) => `@${one}`).join("、") : "npm 未提供"}</dd></div>
+          <div><dt>发布时间</dt><dd>{details.publishedAt ?? "npm 未提供"}</dd></div>
+          <div><dt>git commit</dt><dd><code className="ext-details__mono">{details.gitHead ?? "非 git 包或 npm 未提供"}</code></dd></div>
+          <div><dt>许可</dt><dd>{details.license ?? "—"}</dd></div>
+          <div><dt>解包大小</dt><dd>{details.unpackedSize !== undefined ? `${(details.unpackedSize / 1024).toFixed(1)} KB` : "—"}</dd></div>
+          <div><dt>能力分类</dt><dd>{details.categories.map((one) => EXTENSION_CATEGORY_LABELS[one]).join("、")}</dd></div>
+        </dl>
+        <div className="ext-preview__actions">
+          <button type="button" className="res-panel__btn" onClick={() => setDetails(null)}>关闭</button>
+        </div>
+      </div>
+    </div>}
+
+    {changelog && <div className="ext-preview" role="dialog" aria-label="更新日志">
+      <div className="ext-preview__card">
+        <h3 className="res-panel__card-title">更新日志 · {changelog.source}</h3>
+        <p className="res-panel__muted">来自 Pi 解析到的包内 changelog，本地读取（最多 64 KB），不会上传。</p>
+        <pre className="ext-changelog">{changelog.text.trim() || "这个包没有提供更新日志。"}</pre>
+        <div className="ext-preview__actions">
+          <button type="button" className="res-panel__btn" onClick={() => setChangelog(null)}>关闭</button>
+        </div>
+      </div>
+    </div>}
 
     {packagePreview && <div className="ext-preview" role="dialog" aria-label="扩展包预览">
       <div className="ext-preview__card">

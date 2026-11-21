@@ -19,6 +19,7 @@ import { UsageService } from "@openbuddy/services/usage/usage";
 import { ProjectsService } from "@openbuddy/services/projects/projects";
 import type { Settings } from "@openbuddy/services/settings/settings";
 import { Permissions, type Emit } from "./permissions/permissions.js";
+import { FolderTrustRequests } from "./folder-trust-requests.js";
 import { isBuiltinToolDefinition } from "./builtin/reserved-tools.js";
 import type { HostShell } from "@openbuddy/kernel";
 import { CheckpointStore } from "./checkpoints/store.js";
@@ -63,6 +64,7 @@ export class PiEngine {
   /** @internal */ modes = new Map<string, AgentMode>();
   /** @internal */ slots = new Map<string, Slot>();
   private opening = new Map<string, Promise<Slot>>();
+  readonly folderTrust: FolderTrustRequests;
   /** @internal */ focusedId?: string;
   /** Sessions closed by a rebuild that could not reopen (e.g. a broken extension); retried on the next reload. */
   /** @internal */ lost: Array<{ id: string; manager: SessionManager; focused: boolean }> = [];
@@ -100,6 +102,7 @@ export class PiEngine {
       },
     );
     this.ui = new ExtensionUiBridge(emit);
+    this.folderTrust = new FolderTrustRequests(settings, (cwd) => this.trusted(cwd));
     this.providers = new Providers(settings);
     this.skills = new SkillsService(settings);
     this.mcp = new McpService(settings, openUrl, emit);
@@ -588,6 +591,7 @@ export class PiEngine {
     if (trusted) c.trustedFolders.push(cwd);
     c.folderTrustDecisions = { ...c.folderTrustDecisions, [cwd]: trusted };
     this.settings.config.write(c);
+    this.folderTrust.forget(cwd);
     await this.reload((slot) => slot.session.sessionManager.getCwd() === cwd);
   }
   reload(filter: (slot: Slot) => boolean = () => true) { return pool.reload(this, filter); }

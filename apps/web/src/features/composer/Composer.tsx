@@ -9,6 +9,7 @@ import { clipboardSaveImage, type AgentMode } from "@openbuddy/client/agent-clie
 import { useInputHistoryKeys } from "./useInputHistoryKeys";
 import { useBangCommand } from "./useBangCommand";
 import { getSendKey } from "./send-key";
+import { useLocale } from "../../shared/i18n";
 import { BangHint } from "./BangHint";
 import { ConnectorNeededBar } from "./ConnectorNeededBar";
 import { FileMentionPopover, type FileMentionHandle } from "./FileMentionPopover";
@@ -158,6 +159,7 @@ export function Composer({
   usageMsgCount?: number;
 }) {
   const modelControls = useContext(ModelRuntimeContext);
+  const { t } = useLocale();
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<string[]>([]);
   // 批注托盘 (pii W1.9): quotes collected from the artifact viewer ride along with the next prompt.
@@ -472,7 +474,7 @@ export function Composer({
             apiReady
               ? sceneTag
                 ? "" // 有操作类型标签时不显示占位文案(匹配 WorkBuddy)
-                : placeholder ?? (agentMode === "plan" ? "说说要做什么，Buddy 先调研并给出计划，确认后再动手" : agentMode === "ask" ? "问点什么，Buddy 只回答、不改文件" : "今天帮你做些什么？/ 调用技能与指令，可粘贴截图或拖入文件")
+                : placeholder ?? (agentMode === "plan" ? t("composer.placeholder.plan") : agentMode === "ask" ? t("composer.placeholder.ask") : t("composer.placeholder.default"))
               : ""
           }
           onChange={(e) => {

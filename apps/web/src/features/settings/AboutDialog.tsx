@@ -4,7 +4,7 @@ import { XCloseIcon, CheckIcon } from "@openbuddy/ui/icon/icons/index";
 import { agentAuthStatus } from "@openbuddy/client/agent-client";
 import type { InitResult } from "@openbuddy/client/agent-client";
 import { APP_VERSION } from "@/app/app-version";
-import logoUrl from "@/assets/openbuddy-logo.svg";
+import logoUrl from "@/assets/openbuddy-logo.png";
 // 引擎运行在 Electron 主进程。
 const ENGINE_PACKAGE = "@earendil-works/pi-coding-agent";
 

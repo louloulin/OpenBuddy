@@ -6,7 +6,37 @@ on:
 permissions:
   contents: read
 jobs:
+  # A5: the same gates run locally, on a third platform, before any artifact is packaged.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm check:boundaries
+      - run: pnpm audit:ipc
+      - run: pnpm check:ui-tokens
+      - run: pnpm check:deps
+      - run: pnpm check:docs
+      - run: pnpm build:electron
+      - run: pnpm check:perf
+      - run: pnpm gen:sbom
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: release/sbom.cdx.json
+          if-no-files-found: error
+
   package:
+    needs: verify
     strategy:
       fail-fast: false
       matrix:
@@ -23,6 +53,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+      - run: pnpm build:electron
+      - run: pnpm check:perf
+      - run: pnpm gen:sbom
       - run: pnpm dist:electron
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -32,6 +65,7 @@ jobs:
           path: |
             release/*.dmg
             release/*.exe
+            release/sbom.cdx.json
           if-no-files-found: error
-# Builds unsigned review artifacts. Signing, notarization and publishing require
-# separately configured credentials and an explicit release procedure.
+# Builds unsigned review artifacts. Signing, notarization, update publishing and the
+# clean-machine upgrade/rollback drill still need separately configured credentials.

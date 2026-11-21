@@ -28,6 +28,7 @@ export default function MemoryNoteScreen() {
   const creating = params.create === '1'
 
   const transport = useApp(state => state.transport)
+  const currentCwd = useApp(state => state.currentCwd)
   const [draftPath, setDraftPath] = useState(path)
   const [content, setContent] = useState('')
   const [original, setOriginal] = useState('')
@@ -46,7 +47,7 @@ export default function MemoryNoteScreen() {
     }
     if (!transport) { setLoading(false); return }
     try {
-      const text = await transport.invoke<string>('memory_get', { scope, path })
+      const text = await transport.invoke<string>('memory_get', { scope, path, ...(currentCwd ? { cwd: currentCwd } : {}) })
       setContent(text)
       setOriginal(text)
     } catch (failure) {
@@ -54,7 +55,7 @@ export default function MemoryNoteScreen() {
     } finally {
       setLoading(false)
     }
-  }, [path, scope, transport])
+  }, [path, scope, transport, currentCwd])
 
   useEffect(() => { void load() }, [load])
 
@@ -66,7 +67,7 @@ export default function MemoryNoteScreen() {
     setBusy(true)
     setError(null)
     try {
-      await transport.invoke<MemoryEntry>('memory_save', { scope, path: draftPath.trim(), content })
+      await transport.invoke<MemoryEntry>('memory_save', { scope, path: draftPath.trim(), content, ...(currentCwd ? { cwd: currentCwd } : {}) })
       router.back()
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure))
@@ -84,7 +85,7 @@ export default function MemoryNoteScreen() {
         onPress: async () => {
           if (isPreview() || !transport) { router.back(); return }
           try {
-            await transport.invoke('memory_delete', { scope, path })
+            await transport.invoke('memory_delete', { scope, path, ...(currentCwd ? { cwd: currentCwd } : {}) })
             router.back()
           } catch (failure) {
             setError(failure instanceof Error ? failure.message : String(failure))

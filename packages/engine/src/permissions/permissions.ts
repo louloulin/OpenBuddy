@@ -7,6 +7,18 @@ import { assessCommand } from "./command-risk.js";
 export type { Emit };
 type Reason = "resolved" | "cancelled" | "timeout";
 type Decision = { allow: boolean; note?: string; kind?: "user" | "protected" };
+/** The `agent://permission` payload; `permission_pending` returns these verbatim so a reconnecting client sees the same card. */
+export type PermissionRequestPayload = {
+  requestId: string;
+  sessionId: string;
+  toolCallId: string;
+  subagent?: { parentId: string; name?: string };
+  toolKind: string;
+  title: string;
+  rawInput?: unknown;
+  destructive?: { command?: string; paths?: string[] };
+  options: { optionId: string; kind: string; title: string }[];
+};
 
 /** Tools that mutate a path; the protected-path guard only applies to these. */
 const MUTATING_TOOL = (toolName: string) =>
@@ -73,7 +85,15 @@ function subject(toolName: string, input: unknown): string {
 export class Permissions {
   private pending = new Map<
     string,
-    { sessionId: string; toolName: string; input: unknown; finish: (allow: boolean, reason: Reason, note?: string) => void; userCommand?: boolean }
+    {
+      sessionId: string;
+      toolName: string;
+      input: unknown;
+      finish: (allow: boolean, reason: Reason, note?: string) => void;
+      userCommand?: boolean;
+      /** The exact payload emitted as `agent://permission`, so a reconnecting client can rebuild the card. */
+      request: PermissionRequestPayload;
+    }
   >();
   /** Tools the user allowed for the rest of a session ("本会话允许"). */
   private sessionAllow = new Map<string, Set<string>>();
@@ -181,9 +201,8 @@ export class Permissions {
         this.emit("agent://permission-dismiss", { requestId, sessionId, reason, allowed: allow });
         resolve({ allow, ...(note ? { note } : {}) });
       };
-      this.pending.set(requestId, { sessionId, toolName, input, finish, userCommand });
       const subagent = this.subagentOf(sessionId);
-      this.emit("agent://permission", {
+      const request: PermissionRequestPayload = {
         requestId,
         sessionId,
         toolCallId,
@@ -203,7 +222,9 @@ export class Permissions {
           ...(destructive ? [] : [{ optionId: "allow_always", kind: "allow_always", title: "始终允许" }]),
           { optionId: "deny", kind: "reject_once", title: "拒绝" },
         ],
-      });
+      };
+      this.pending.set(requestId, { sessionId, toolName, input, finish, userCommand, request });
+      this.emit("agent://permission", request);
     });
   }
   resolve(id: string, optionId: unknown, cancelled: unknown, reason?: unknown) {
@@ -229,6 +250,18 @@ export class Permissions {
   hasPending(sessionId: string) {
     for (const item of this.pending.values()) if (item.sessionId === sessionId) return true;
     return false;
+  }
+  /**
+   * Cards still waiting on the user, in the exact shape of `agent://permission`
+   * (20261117-mobile.md §2.4 path 3). A client that was disconnected when the
+   * request was emitted fetches these on resume; the `requestId` it gets back is
+   * the one `agent_resolve_permission` accepts.
+   */
+  pendingRequests(sessionId?: string): PermissionRequestPayload[] {
+    const out: PermissionRequestPayload[] = [];
+    for (const item of this.pending.values())
+      if (!sessionId || item.sessionId === sessionId) out.push(item.request);
+    return out;
   }
   /** 后台任务视图 (W4.5): how many approval cards this session is waiting on. */
   countPending(sessionId: string) {

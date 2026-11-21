@@ -109,8 +109,8 @@ export class AutomationService {
   private tasks: JsonStore<AutomationFile>;
   private history: JsonStore<RecordFile>;
   constructor(private settings: Settings) {
-    this.tasks = new JsonStore(join(settings.dir, "automations.json"), () => ({ automations: [] }));
-    this.history = new JsonStore(join(settings.dir, "automation-records.json"), () => ({ records: [] }));
+    this.tasks = new JsonStore(join(settings.dir, "automations.json"), () => ({ automations: [] }), { versioned: true, snapshots: settings.snapshots });
+    this.history = new JsonStore(join(settings.dir, "automation-records.json"), () => ({ records: [] }), { versioned: true, snapshots: settings.snapshots });
   }
   snapshot(now = new Date()): AutomationSnapshot {
     const automations = this.tasks.read().automations.map((task) => ({

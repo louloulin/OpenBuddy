@@ -202,6 +202,8 @@ app.whenReady().then(async () => {
     // Electron's net.fetch follows the session proxy above; the runtime fetch does not.
     fetchImpl: ((input: string | URL | Request, init?: RequestInit) => net.fetch(input as string, init)) as typeof fetch,
     platform: { kind: 'desktop', commands: NATIVE_COMMANDS, events: DESKTOP_EVENTS },
+    appVersion: app.getVersion(),
+    ...(process.env.OPENBUDDY_UPDATE_FEED ? { updateFeed: process.env.OPENBUDDY_UPDATE_FEED } : {}),
     emit: (event: string, payload: unknown) => {
       events.emit(event, payload);
       if (isEvent(event)) for (const win of windows) if (!win.isDestroyed()) win.webContents.send(event, payload);

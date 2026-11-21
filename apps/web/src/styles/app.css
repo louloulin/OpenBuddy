@@ -1649,13 +1649,13 @@
 
 /* ---------- markdown body (WorkBuddy-aligned) ---------- */
 :root {
-  --md-hljs-comment: #008000;
+  --md-hljs-comment: #006400;
   --md-hljs-keyword: #0000ff;
   --md-hljs-string: #a31515;
-  --md-hljs-number: #098658;
+  --md-hljs-number: #076b47;
   --md-hljs-function: #795e26;
   --md-hljs-variable: #001080;
-  --md-hljs-built-in: #267f99;
+  --md-hljs-built-in: #1b6478;
   --md-hljs-meta: #6a737d;
   --md-hljs-deletion: #b31d28;
   --md-hljs-deletion-bg: #ffeef0;
@@ -4185,7 +4185,7 @@ button.diff__path {
 }
 .titlebar__brand-logo {
   border-radius: 6px;
-  object-fit: cover;
+  object-fit: contain;
   -webkit-user-drag: none;
   user-select: none;
   /* Dark logo variant carries its own contrast; just a soft lift, no ring. */
@@ -4719,7 +4719,7 @@ button.diff__path {
   background: transparent;
   cursor: pointer;
   font-size: 13px;
-  color: rgba(0, 0, 0, 0.5);
+  color: var(--wb-text-weak);
   border-radius: 8px;
   padding: 0 8px;
 }
@@ -5995,7 +5995,7 @@ button.diff__path {
   color: rgb(51, 51, 51);
 }
 .workspace-picker__trigger {
-  color: rgba(0, 0, 0, 0.5);
+  color: var(--wb-text-weak);
 }
 .model-selector__trigger:hover,
 .workspace-picker__trigger:hover {
@@ -7751,7 +7751,7 @@ button.diff__path {
   height: 48px;
   flex-shrink: 0;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 12px;
   /* Dark logo variant reads on white without a ring; soft shadow only. */
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);

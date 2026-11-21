@@ -1,9 +1,10 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { mkdirSync, readFileSync, renameSync } from "node:fs";
+import { join, dirname } from "node:path";
 import type { SafeStorage } from "@openbuddy/kernel";
 import type { NotifyChannel } from "@openbuddy/protocol/notifications";
 import { PiSettingsStore } from "./pi-settings.js";
+import { migrate, SCHEMA_VERSION, type Migration } from "../persistence/schema.js";
+import { SnapshotStore, storeName, writeAtomic } from "../persistence/snapshots.js";
 
 /**
  * 受保护路径 (pii W6.2)：写入类工具默认拒绝触碰的文件。规则是用户可编辑的
@@ -25,24 +26,82 @@ export const DEFAULT_PROTECTED_PATHS = [
 // Moved to @openbuddy/kernel (20261115-md R2); re-exported so existing importers keep working.
 export type { SafeStorage };
 export { object, text, bool, unsupported } from "@openbuddy/kernel";
+export interface JsonStoreOptions {
+  /** Persist `schemaVersion` and run the v0→v1+ migrations on read (A2). */
+  versioned?: boolean;
+  migrations?: Record<number, Migration>;
+  /** Restore the newest readable snapshot when the file no longer parses. */
+  snapshots?: SnapshotStore;
+  onRecover?: (info: { file: string; reason: string; restoredFrom?: string }) => void;
+}
+
+/** JSON store with atomic writes; versioning, snapshots and corrupt-file self-heal are opt-in. */
 export class JsonStore<T> {
   constructor(
     readonly path: string,
     private fallback: () => T,
+    private options: JsonStoreOptions = {},
   ) {}
   read(): T {
+    let raw: unknown;
     try {
-      return JSON.parse(readFileSync(this.path, "utf8")) as T;
+      raw = JSON.parse(readFileSync(this.path, "utf8"));
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT")
-        return this.fallback();
-      throw error;
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return this.fallback();
+      return this.recover(error);
+    }
+    return this.upgrade(raw);
+  }
+  /** Upgrade + persist once; a failed upgrade falls into the snapshot/quarantine path. */
+  private upgrade(raw: unknown, allowRestore = true): T {
+    if (!this.options.versioned) return raw as T;
+    try {
+      const result = migrate(raw, this.options.migrations);
+      if (result.migrated) {
+        try {
+          this.options.snapshots?.capture(`pre-migration-v${result.from}`, [storeName(this.path)]);
+        } catch {
+          // A snapshot failure must not block the migration itself.
+        }
+        this.write(result.data as T);
+      }
+      return result.data as T;
+    } catch (error) {
+      return allowRestore ? this.recover(error) : this.quarantine(error);
     }
   }
+  private recover(reason: unknown): T {
+    const name = storeName(this.path);
+    const hit = this.options.snapshots?.latestFor(name);
+    if (hit) {
+      try {
+        writeAtomic(this.path, readFileSync(hit.path));
+        this.report({ file: name, reason: String(reason), restoredFrom: hit.manifest.id });
+        return this.upgrade(JSON.parse(readFileSync(this.path, "utf8")), false);      } catch {
+        // The snapshot was unreadable: fall through to quarantine.
+      }
+    }
+    return this.quarantine(reason);
+  }
+  private quarantine(reason: unknown): T {
+    const name = storeName(this.path);
+    try {
+      renameSync(this.path, `${this.path}.corrupt-${Date.now()}`);
+    } catch {
+      // ENOENT or a read-only disk: the fallback is still the safe answer.
+    }
+    this.report({ file: name, reason: String(reason) });
+    return this.fallback();
+  }
+  private report(info: { file: string; reason: string; restoredFrom?: string }) {
+    if (this.options.onRecover) this.options.onRecover(info);
+    else console.error("openbuddy: data file recovered", info);
+  }
   write(value: T): void {
-    const temp = `${this.path}.${randomUUID()}.tmp`;
-    writeFileSync(temp, JSON.stringify(value, null, 2), { mode: 0o600 });
-    renameSync(temp, this.path);
+    const versioned = this.options.versioned && value && typeof value === "object" && !Array.isArray(value);
+    const out = versioned ? { ...(value as Record<string, unknown>), schemaVersion: SCHEMA_VERSION } : value;
+    mkdirSync(dirname(this.path), { recursive: true, mode: 0o700 });
+    writeAtomic(this.path, JSON.stringify(out, null, 2));
   }
 }
 export class SecretStore {
@@ -127,8 +186,18 @@ export class SecretStore {
 export function createSettings(userDataDir: string, safe: SafeStorage) {
   const dir = join(userDataDir, "pi");
   mkdirSync(dir, { recursive: true, mode: 0o700 });
+  // 升级前快照 (A2): one per day before the first read can migrate or corrupt-heal anything.
+  const snapshots = new SnapshotStore(dir);
+  try {
+    snapshots.captureStartup();
+  } catch (error) {
+    console.error("openbuddy: startup snapshot failed", error);
+  }
+  const onRecover = (info: { file: string; reason: string; restoredFrom?: string }) =>
+    console.error("openbuddy: data file recovered", info);
   return {
     dir,
+    snapshots,
     secrets: new SecretStore(dir, safe),
     /** Session behaviour read by Pi's SettingsManager (pi-settings.json, 20261116-pii W0.4 / §8). */
     pi: new PiSettingsStore(dir),
@@ -145,7 +214,7 @@ export function createSettings(userDataDir: string, safe: SafeStorage) {
       trustedFolders: [],
       sessions: {},
       notifications: [],
-    })),
+    }), { versioned: true, snapshots, onRecover }),
   };
 }
 export interface AppSettings {

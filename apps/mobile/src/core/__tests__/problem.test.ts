@@ -63,3 +63,26 @@ describe('problemFor — the CORS false alarm', () => {
     expect(problemFor(new TypeError('Failed to fetch')).kind).toBe('network')
   })
 })
+
+describe('problemFor — model/provider failures', () => {
+  // These arrive verbatim through `agent://turn-error`, e.g.
+  // 「模型请求失败：401 invalid api key」. A user cannot act on 「401」.
+  it('turns an invalid API key into an instruction', () => {
+    expect(problemText('模型请求失败：401 invalid api key')).toContain('API Key')
+    expect(problemFor('invalid_api_key').kind).toBe('auth')
+  })
+
+  it('explains quota and context limits', () => {
+    expect(problemText('insufficient_quota')).toContain('额度')
+    expect(problemText('maximum context length exceeded')).toContain('压缩')
+    expect(problemText('model_not_found: GPT-9')).toContain('模型不存在')
+  })
+})
+
+describe('problemFor — filesystem refusals', () => {
+  // The host answers with Node errno text; a user cannot act on `EACCES`.
+  it('explains a refused file operation', () => {
+    expect(problemText('EACCES: permission denied, open /tmp/x')).toContain('权限')
+    expect(problemText('ENOENT: no such file or directory')).toContain('找不到')
+  })
+})

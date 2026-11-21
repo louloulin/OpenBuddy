@@ -26,6 +26,7 @@ import {
   type SessionActionKey, type SessionRow,
 } from '../../src/core/session-actions'
 import { unreadLabel } from '../../src/core/unread'
+import { sessionsWithPendingApprovals } from '../../src/core/approvals'
 import { useApp } from '../../src/stores/app'
 import { themeFor } from '../../src/theme'
 import { relativeTime } from '../../src/core/relative-time'
@@ -52,6 +53,10 @@ export default function SessionsScreen() {
   const compactSession = useApp(state => state.compactSession)
   const setDraft = useApp(state => state.setDraft)
   const connection = useApp(state => state.connection)
+  const approvals = useApp(state => state.approvals)
+  // A decision waiting in a conversation the user is not reading must still be
+  // discoverable from the list — otherwise a recovered card is invisible.
+  const pendingApprovals = useMemo(() => sessionsWithPendingApprovals(approvals), [approvals])
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const [refreshing, setRefreshing] = useState(false)
@@ -251,6 +256,7 @@ export default function SessionsScreen() {
     }
     const session = item.session
     const isSelected = selectMode && selected.includes(item.id)
+    const needsApproval = pendingApprovals.has(item.id)
     return (
     <Pressable
       onPress={() => {
@@ -285,6 +291,11 @@ export default function SessionsScreen() {
         <Text numberOfLines={1} style={{ flex: 1, color: theme.text, fontSize: theme.fontBody, fontWeight: '500' }}>
           {session.title}
         </Text>
+        {needsApproval ? (
+          <View style={{ backgroundColor: theme.danger, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 }}>
+            <Text style={{ color: theme.inkFg, fontSize: theme.fontMicro, fontWeight: '600' }}>待审批</Text>
+          </View>
+        ) : null}
         {session.pinned ? (
           <View style={{ backgroundColor: theme.pressed, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 }}>
             <Text style={{ color: theme.textMedium, fontSize: theme.fontMicro }}>置顶</Text>
@@ -317,7 +328,7 @@ export default function SessionsScreen() {
       ) : null}
     </Pressable>
     )
-  }, [theme, router, manageable, setMenu, selectMode, selected, collapsed, toggleCollapsed])
+  }, [theme, router, manageable, setMenu, selectMode, selected, collapsed, toggleCollapsed, pendingApprovals])
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.surface }}>

@@ -6,6 +6,7 @@ import type { WorkspaceInfo } from "@openbuddy/client/agent-client";
 import type { AgentEntry } from "@openbuddy/protocol/dto";
 import { MoreIcon } from "@openbuddy/ui/icon/icons/index";
 import { useHorizontalScroll } from "../../shared/hooks/use-horizontal-scroll";
+import { useLocale } from "../../shared/i18n";
 import { useSessionsStore, HOME_DRAFT_KEY } from "@/features/sessions/state/sessions-store";
 import { usePendingExpertStore } from "@/features/experts/state/pending-expert-store";
 import {
@@ -74,6 +75,7 @@ export function HomePage({
   onSelectExpert?: (agent: AgentEntry) => void;
   onNavigateConnectors?: (tab?: "experts" | "connectors") => void;
 }) {
+  const { t } = useLocale();
   const [modeId, setModeId] = useState<HomeModeId>("working");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
   const [expanded, setExpanded] = useState(false);
@@ -335,7 +337,7 @@ export function HomePage({
             onClearExpert={pendingExpert ? () => usePendingExpertStore.getState().clear() : undefined}
           />
         </section>
-        <p className="home__disclaimer">内容由 AI 生成，请核实重要信息</p>
+        <p className="home__disclaimer">{t("home.disclaimer")}</p>
       </div>
     </div>
   );

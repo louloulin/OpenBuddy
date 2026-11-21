@@ -51,3 +51,28 @@ describe("自动化完全访问 (pii W4.2)", () => {
     expect(permissions.decide("s1", "write", { path: "/ws/a.txt" })).toBeUndefined();
   });
 });
+
+// 待决审批快照 (20261117-mobile.md §2.4 path 3): a phone that reconnects reads
+// `permission_pending` and must get the exact card the live event carried.
+describe("permission_pending snapshot", () => {
+  it("mirrors agent://permission, filters by session, and clears on resolve", async () => {
+    const { settings } = gate();
+    const events: { event: string; payload: Record<string, unknown> }[] = [];
+    const permissions = new Permissions(settings, (event, payload) =>
+      events.push({ event, payload: payload as Record<string, unknown> }),
+    );
+    const pending = permissions.decision("s1", "call-1", "bash", { command: "rm -rf build" });
+
+    const snapshot = permissions.pendingRequests();
+    expect(snapshot).toHaveLength(1);
+    expect(snapshot[0]).toMatchObject({ sessionId: "s1", toolCallId: "call-1", toolKind: "bash" });
+    // Identical to what the listener would have received.
+    expect(snapshot[0]).toEqual(events.find((entry) => entry.event === "agent://permission")?.payload);
+    // A different session's view is empty.
+    expect(permissions.pendingRequests("s2")).toHaveLength(0);
+
+    permissions.resolve(snapshot[0].requestId, "deny", false);
+    await pending;
+    expect(permissions.pendingRequests()).toHaveLength(0);
+  });
+});

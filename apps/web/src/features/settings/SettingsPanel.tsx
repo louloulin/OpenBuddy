@@ -28,6 +28,7 @@ import {
   MobileAccessPanel,
   ShortcutsSettingsPanel,
 } from "./SettingsSections";
+import { useLocale } from "../../shared/i18n";
 
 
 
@@ -92,6 +93,8 @@ export function SettingsPanel({
   onModelsChanged?: () => void;
 }) {
   const [active, setActive] = useState<string>("model");
+  const { tOptional } = useLocale();
+  const labelOf = (id: string, fallback: string) => tOptional(`settings.nav.${id}`) ?? fallback;
   const nav: Array<{ id: string; label: string; icon: LucideIcon }> = sections ?? NAV;
   const ids = nav.map((item) => item.id).join(" ");
 
@@ -142,7 +145,7 @@ export function SettingsPanel({
                     <span className="settings-navigation__icon">
                       <Icon size={16} strokeWidth={1.75} />
                     </span>
-                    <span className="settings-navigation__label">{item.label}</span>
+                    <span className="settings-navigation__label">{labelOf(item.id, item.label)}</span>
                   </button>
                 </li>
               );

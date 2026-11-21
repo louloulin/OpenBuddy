@@ -47,6 +47,7 @@ export default function ChatScreen() {
   const transcript = useApp(state => state.transcripts[sessionId]) ?? emptyTranscript()
   const session = useApp(state => state.sessions.find(item => item.id === sessionId))
   const openSession = useApp(state => state.openSession)
+  const transport = useApp(state => state.transport)
   const setActiveSession = useApp(state => state.setActiveSession)
   const send = useApp(state => state.send)
   const steer = useApp(state => state.steer)
@@ -76,6 +77,7 @@ export default function ChatScreen() {
   const [editToken, setEditToken] = useState(0)
   const [editText, setEditText] = useState('')
   // Composer chip: the session's thinking level, cycled with one tap.
+  const connection = useApp(state => state.connection)
   const thinkingLevel = useApp(state => state.thinkingLevels[sessionId])
   const refreshThinkingLevel = useApp(state => state.refreshThinkingLevel)
   const cycleThinkingLevel = useApp(state => state.cycleThinkingLevel)
@@ -107,9 +109,12 @@ export default function ChatScreen() {
     }
     : undefined
 
+  // A push tap can land here on a cold launch. The first run paints the cached
+  // transcript and returns before the tunnel exists; re-run when it arrives so
+  // the live history is actually fetched instead of leaving an empty turn list.
   useEffect(() => {
     if (sessionId) void openSession(sessionId)
-  }, [sessionId, openSession])
+  }, [sessionId, openSession, transport])
 
   // While this screen is mounted its settles are read, not counted.
   useEffect(() => {
@@ -184,7 +189,7 @@ export default function ChatScreen() {
 
   useEffect(() => {
     if (sessionId) void refreshThinkingLevel(sessionId)
-  }, [sessionId, refreshThinkingLevel])
+  }, [sessionId, refreshThinkingLevel, transport])
 
   // The handoff draft is read once by the composer; drop it immediately so a
   // later remount does not resurrect text the user already sent or cleared.
@@ -202,6 +207,7 @@ export default function ChatScreen() {
   const handleRequest = async (approval: Approval, action: ApprovalAction) => {
     void haptic('approve')
     setBusyRequest(approval.requestId)
+    let answered = true
     try {
       if (action.type === 'permission') await resolveApproval(approval.requestId, action.approved)
       else if (action.type === 'question') {
@@ -209,13 +215,19 @@ export default function ChatScreen() {
       } else if (action.type === 'trust' && approval.cwd) {
         await resolveTrust(approval.cwd, action.trusted)
       }
-      // Either answer settles the card: 「不信任」 that stays on screen blocks
-      // every following turn from being read as finished.
-      if (shouldDismissAfterAnswer(approval.kind, action)) {
-        useApp.setState(state => ({ approvals: state.approvals.filter(item => item.requestId !== approval.requestId) }))
-      }
+    } catch {
+      // The store keeps the card and records why. Removing it here would throw
+      // that away and leave the user with no way to answer again (§2.4:
+      // 「回答失败保留卡片并提示，不自动重试」).
+      answered = false
     } finally {
       setBusyRequest(null)
+    }
+    // Either answer settles the card: 「不信任」 that stays on screen blocks
+    // every following turn from being read as finished. Only on success —
+    // a failed answer must stay tappable.
+    if (answered && shouldDismissAfterAnswer(approval.kind, action)) {
+      useApp.setState(state => ({ approvals: state.approvals.filter(item => item.requestId !== approval.requestId) }))
     }
   }
 
@@ -348,7 +360,12 @@ export default function ChatScreen() {
             // The list is inverted; RN maps `paddingVertical` here to the
             // physical top, so this is the gap under the header rule. Without
             // it the first line sat flush against the border and read as cut off.
-            contentContainerStyle={{ paddingTop: 10, paddingBottom: 4 }}
+            // While scrolled away, reserve room at the live edge for the
+            // 「回到底部」pill so it floats over blank space instead of the
+            // message underneath it. In an inverted list the logical `paddingTop`
+            // is drawn at the physical bottom (the list is scaled), which is why
+            // it is this side that needs the room.
+            contentContainerStyle={{ paddingTop: atBottom ? 10 : 56, paddingBottom: 4 }}
           />
           {!atBottom ? (
             <Pressable
@@ -513,6 +530,7 @@ export default function ChatScreen() {
         onImage={(bytes, mime, text) => void sendImage(sessionId, bytes, mime, text)}
         onImages={(images, text) => void sendImages(sessionId, images, text)}
         onSteer={text => void steer(sessionId, text)}
+        online={connection === 'open'}
         onStop={() => {
           void haptic('stop')
           void useApp.getState().transport?.invoke('agent_cancel', { sessionId })

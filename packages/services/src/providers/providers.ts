@@ -181,7 +181,7 @@ export class Providers {
     this.catalog = new JsonStore(join(settings.dir, "providers.json"), () => ({
       providers: [],
       models: [],
-    }));
+    }), { versioned: true, snapshots: settings.snapshots });
   }
   async initialize() {
     this.runtime = await ModelRuntime.create({

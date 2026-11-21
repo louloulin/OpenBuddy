@@ -801,6 +801,31 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
       expect.objectContaining({ name: "project-fixture" }),
     );
   });
+  it("replays an untrusted-folder card until it is answered (20261117-mobile.md §2.4 path 3)", async () => {
+    const f = await fixture();
+    // Opening the session is what emits agent://folder-trust once; the request
+    // is kept so a client that was away can rebuild it.
+    await f.call("agent_load_session", { sessionId: f.sid });
+    const pending = (await f.call("trust_pending", {})) as {
+      requests: { cwd: string; sessionId: string }[];
+    };
+    expect(pending.requests).toHaveLength(1);
+    expect(pending.requests[0].sessionId).toBe(f.sid);
+    // The engine realpaths the folder, so compare against what it returned.
+    const cwd = pending.requests[0].cwd;
+    expect(
+      ((await f.call("trust_pending", { sessionId: f.sid })) as typeof pending)
+        .requests,
+    ).toHaveLength(1);
+    expect(
+      ((await f.call("trust_pending", { sessionId: "other" })) as typeof pending)
+        .requests,
+    ).toEqual([]);
+    await f.call("folder_trust_respond", { cwd, trusted: true });
+    expect(
+      ((await f.call("trust_pending", {})) as typeof pending).requests,
+    ).toEqual([]);
+  });
   it("rejects failed extension commands and never reports a synthetic successful completion", async () => {
     const f = await fixture({
       extensions: [

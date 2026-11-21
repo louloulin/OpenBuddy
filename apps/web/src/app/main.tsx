@@ -12,9 +12,11 @@ import { webMarkdownHost } from "../shared/markdown-host";
 import { PairingGate } from "./h5/PairingGate";
 import { installPairing, isBrowserHost, savedPairing } from "./h5/boot";
 import { applyUiPreferences } from "../features/settings/preferences";
+import { applyLocale } from "../shared/i18n";
 import { QuickInput } from "./quick/QuickInput";
 
 applyUiPreferences();
+applyLocale();
 
 const container = document.getElementById("root")!;
 /** 全局快速输入窗口 (W7.2): only the small composer, never the full app. */

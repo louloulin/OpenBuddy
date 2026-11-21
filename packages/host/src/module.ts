@@ -16,6 +16,10 @@ export interface EngineOptions {
   fetchImpl?: typeof fetch;
   /** Trusted host-provided extensions; never accepted in renderer IPC. */
   extensionFactories?: ExtensionFactory[];
+  /** App version for the update check (desktop: `app.getVersion()`). */
+  appVersion?: string;
+  /** Release manifest URL; when unset the renderer reports 未配置更新源 instead of guessing. */
+  updateFeed?: string;
   /**
    * The embedding app, for `host_capabilities`: its kind and the commands/events it serves
    * itself (desktop: native dialogs, windows, clipboard, export; window/focus events).

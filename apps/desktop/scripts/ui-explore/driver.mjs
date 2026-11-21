@@ -3,6 +3,7 @@
 // - runs a local OpenAI-compatible SSE fixture (no real keys)
 // - exposes an HTTP control endpoint: POST /eval with JS body executed as async fn(ctx)
 import { createServer } from 'node:http';
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, writeFile, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -24,7 +25,16 @@ if (fresh) await rm(RUN, { recursive: true, force: true });
 await mkdir(OUT, { recursive: true });
 const profile = join(RUN, 'profile'), harness = join(RUN, 'bootstrap'), home = join(RUN, 'home');
 await mkdir(profile, { recursive: true }); await mkdir(harness, { recursive: true }); await mkdir(home, { recursive: true });
-await writeFile(join(harness, 'package.json'), JSON.stringify({ name: 'openbuddy-ui-explore', main: 'bootstrap.cjs' }));
+// B1a: preconfigure a JS extension through the real settings file (no native dialog in E2E).
+if (process.env.OPENBUDDY_E2E_EXTENSION) {
+  await mkdir(join(profile, 'pi'), { recursive: true });
+  await writeFile(join(profile, 'pi', 'openbuddy.json'), JSON.stringify({
+    permissionMode: 'ask', rules: [], defaults: { defaultModel: '', defaultPermission: 'ask', rememberToolApprovals: false },
+    skillPaths: [], disabledSkills: [], trustedFolders: [], sessions: {}, notifications: [],
+    extensionPaths: [process.env.OPENBUDDY_E2E_EXTENSION], extensionsEnabled: true,
+  }, null, 2));
+}
+await writeFile(join(harness, 'package.json'), JSON.stringify({ name: 'openbuddy-ui-explore', version: '1.0.0', main: 'bootstrap.cjs' }));
 // Session preload: wraps the bridge's invoke so renderer-side (preload) not_implemented rejections are logged too.
 await writeFile(join(harness, 'audit-preload.cjs'), `
 try {
@@ -254,6 +264,16 @@ const fixtureServer = createServer(async (req, res) => {
     await streamText(chunk, '已完成：\n\n- `docs/report.md` 季度分析报告（已定稿）\n- `site/index.html` 可交互的销售看板\n- `data/sales.csv`、`data/summary.json` 整理后的数据\n\n可以在右侧工作台预览、编辑或还原这些文件。', fixture.delayMs / 3);
     finish(); return;
   }
+  // __EXT_DEMO__ (B1a JS 扩展试点): the model calls the example extension's demo_echo tool.
+  if (lastUserText.includes('__EXT_DEMO__')) {
+    if (toolsSinceUser === 0) {
+      await streamText(chunk, '调用示例扩展回显。', fixture.delayMs);
+      await streamToolArgs(chunk, 0, 'call_ext_1', 'demo_echo', { text: 'pi-extension-ok' }, 4, 20);
+      finish('tool_calls'); return;
+    }
+    await streamText(chunk, '扩展回声：demo:pi-extension-ok', fixture.delayMs);
+    finish(); return;
+  }
   // __PLAN__ (20261116-pii W3): 想一想 records the steps with the built-in ob_todo tool; 按此计划执行
   // then works through them across tool rounds (several ob_todo calls per message) and pauses on step 3.
   const userTexts = messages.filter(m => m.role === 'user').map(m => typeof m.content === 'string' ? m.content : Array.isArray(m.content) ? m.content.filter(p => p.type === 'text').map(p => p.text).join('\n') : '');
@@ -375,7 +395,9 @@ fixture.release = () => { const r = fixture.held.shift(); if (r) r(); return !!r
 // ---------------- electron ----------------
 let app, page;
 const consoleLog = [], pageErrors = [];
+let launchStartedAt = 0;
 async function launch() {
+  launchStartedAt = Date.now();
   app = await electron.launch({ executablePath: require('electron'), args: ['--no-sandbox', harness], env: { ...process.env, HOME: home, OPENBUDDY_SMOKE_TEST: '0', LANG: 'zh_CN.UTF-8' }, timeout: 60000 });
   app.process().stdout.on('data', d => { for (const line of String(d).split('\n')) if (line.trim()) consoleLog.push({ src: 'main-stdout', line: line.slice(0, 1000), at: Date.now() }); });
   app.process().stderr.on('data', d => { for (const line of String(d).split('\n')) if (line.trim()) consoleLog.push({ src: 'main-stderr', line: line.slice(0, 1000), at: Date.now() }); });
@@ -397,6 +419,8 @@ async function setSize(w, h) {
 }
 const ctx = {
   get page() { return page; }, get app() { return app; }, fixture, FIXTURE_PORT, profile, home, sleep, shot, setSize, launch,
+  get launchedAt() { return launchStartedAt; },
+  get repo() { return REPO; },
   consoleLog, pageErrors,
   // 20261116-pii W4.7: 文件触发 — the e2e writes the watched file to trigger the task.
   writeFile: (path, content) => writeFile(path, content, 'utf-8'),
@@ -413,6 +437,13 @@ const ctx = {
     for (const name of names.filter((n) => n.endsWith('.log'))) files.push({ name, content: await readFile(join(dir, name), 'utf8').catch(() => '') });
     return files;
   },
+  /** A2: read one user-data file from <userData>/pi for on-disk assertions. */
+  readDataFile: (name) => readFile(join(profile, 'pi', name), 'utf8').catch(() => undefined),
+  /** A3: hash an arbitrary file the host reported (installer download). */
+  fileDigest: async (path) => {
+    const buffer = await readFile(path).catch(() => undefined);
+    return buffer ? { exists: true, size: buffer.length, sha256: createHash('sha256').update(buffer).digest('hex') } : { exists: false };
+  },
   call: (command, payload = {}) => page.evaluate(({ command, payload }) => window.openbuddy.invoke(command, payload), { command, payload }),
   audit: () => app.evaluate(() => ({ main: globalThis.__ipcAudit, renderer: globalThis.__rendererRejects })),
 };
@@ -425,7 +456,7 @@ const control = createServer(async (req, res) => {
     const fn = new AsyncFunction('ctx', 'page', 'app', body);
     const result = await fn(ctx, page, app);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, result }, null, 1));
+    res.end(JSON.stringify({ ok: true, result, errors: pageErrors.map((e) => ({ message: e.message, at: e.at })) }, null, 1));
   } catch (e) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: String(e && e.stack || e).slice(0, 3000) }));

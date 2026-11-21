@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { WbMoreNavIcon } from "@openbuddy/ui/icon/icons/index";
+import { useLocale } from "../../../shared/i18n";
 
 /**
  * "更多" 侧栏按钮的弹出菜单 — 对齐 WorkBuddy：
@@ -17,6 +18,8 @@ export function MoreDropdown({
   activeNav: string;
 }) {
   const [open, setOpen] = useState(false);
+  const { t, tOptional } = useLocale();
+  const itemLabel = (label: string) => tOptional(`nav.${label}`) ?? label;
   const containerRef = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -79,8 +82,8 @@ export function MoreDropdown({
         onFocus={openMenu}
       >
         <WbMoreNavIcon size="md" />
-        <span>更多</span>
-        <span className="sidebar__nav-sub">文件·通知</span>
+        <span>{t("nav.更多")}</span>
+        <span className="sidebar__nav-sub">{t("sidebar.moreSub")}</span>
       </button>
       {open && (
         <div className="sidebar__more-popover" role="menu">
@@ -97,7 +100,7 @@ export function MoreDropdown({
               onClick={() => { setOpen(false); onNavigate(label); }}
             >
               <span className="sidebar__more-item-icon"><Icon size="md" /></span>
-              <span className="sidebar__more-item-label">{label}</span>
+              <span className="sidebar__more-item-label">{itemLabel(label)}</span>
             </button>
           ))}
         </div>

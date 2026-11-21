@@ -10,6 +10,8 @@
 // Usage: node tools/verify/e2e-shots.mjs <outDir>
 //   requires a fresh `pnpm build:electron`; Linux needs xvfb-run.
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { createServer } from 'node:http';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -58,7 +60,34 @@ writeFileSync(join(WB_FIXTURE, 'agents', 'risk-officer.md'), '---\nname: risk-of
 const cleanupFixture = () => { try { rmSync(WB_FIXTURE, { recursive: true, force: true }); } catch { /* already gone */ } };
 process.on('exit', cleanupFixture);
 
-const env = { ...process.env, SHOTS_DIR: OUT, RUN_DIR, CONTROL_PORT: String(CONTROL_PORT), FIXTURE_PORT: String(FIXTURE_PORT) };
+// A3: a local release-manifest mirror + a deterministic installer so 检查更新 and 下载安装包
+// both exercise the real HTTP path (checksum + size verified by the host).
+const UPDATE_PORT = Number(process.env.UPDATE_PORT || 47225);
+const INSTALLER = Buffer.from(Array.from({ length: 4096 }, (_, i) => String.fromCharCode(65 + (i % 26))).join(''));
+const INSTALLER_SHA = createHash('sha256').update(INSTALLER).digest('hex');
+const updateServer = createServer((req, res) => {
+  if (req.url?.startsWith('/latest.json')) {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({
+      version: '9.9.9',
+      channel: 'stable',
+      publishedAt: '2026-11-20T00:00:00.000Z',
+      notes: 'A3 更新说明：修复若干问题。',
+      download: { url: `http://127.0.0.1:${UPDATE_PORT}/installer/OpenBuddy-9.9.9.dmg`, sha256: INSTALLER_SHA, size: INSTALLER.length },
+    }));
+    return;
+  }
+  if (req.url?.startsWith('/installer/OpenBuddy-9.9.9.dmg')) {
+    res.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': String(INSTALLER.length) });
+    res.end(INSTALLER);
+    return;
+  }
+  res.writeHead(404).end('not found');
+});
+await new Promise((done) => updateServer.listen(UPDATE_PORT, '127.0.0.1', done));
+process.on('exit', () => { try { updateServer.close(); } catch { /* already closed */ } });
+
+const env = { ...process.env, SHOTS_DIR: OUT, RUN_DIR, CONTROL_PORT: String(CONTROL_PORT), FIXTURE_PORT: String(FIXTURE_PORT), OPENBUDDY_UPDATE_FEED: `http://127.0.0.1:${UPDATE_PORT}/latest.json`, OPENBUDDY_E2E_EXTENSION: join(REPO, 'examples/pi-extension-demo/extension.mjs') };
 const useXvfb = process.platform === 'linux' && !process.env.DISPLAY;
 const child = useXvfb
   ? spawn('xvfb-run', ['-a', '-s', '-screen 0 1600x1000x24', 'node', driver], { env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -81,7 +110,7 @@ async function ev(name, body) {
   const res = await fetch(`http://127.0.0.1:${CONTROL_PORT}/`, { method: 'POST', body });
   const json = await res.json();
   if (!json.ok) throw new Error(`step "${name}" failed:\n${json.error}`);
-  console.log('E2E_STEP', name, JSON.stringify(json.result ?? null).slice(0, 300));
+  console.log('E2E_STEP', name, JSON.stringify(json.result ?? null).slice(0, 300), `pageErrors=${(json.errors ?? []).length}`);
   return json.result;
 }
 
@@ -94,7 +123,14 @@ try {
     await page.locator('.wb-composer__input').waitFor({ state: 'visible', timeout: 60000 });
     await ctx.setSize(1440, 900);
     await ctx.sleep(800);
-    return await ctx.shot('01-home');`);
+    // A4: cold start = process spawn → composer ready, including the first window's boot.
+    const coldStartMs = Date.now() - ctx.launchedAt;
+    if (coldStartMs > 30000) throw new Error('cold start too slow: ' + coldStartMs + 'ms');
+    // 赛博海豚品牌标识: the SVG must actually decode (not just exist in the DOM).
+    const brand = page.locator('.sidebar__logo-mark');
+    if ((await brand.count()) === 0) throw new Error('sidebar brand mark missing');
+    if (!(await brand.first().evaluate((img) => img.complete && img.naturalWidth > 0))) throw new Error('sidebar brand mark failed to load');
+    return { shot: await ctx.shot('01-home'), coldStartMs, brand: true };`);
   // B3e: the Grok Bot layout holds at 1280 / 1440 / 1920 without horizontal overflow.
   await step('首页三视口（B3e）', `
     const shots = [];
@@ -513,11 +549,36 @@ try {
       if (!/包市场/.test(message)) throw new Error('market search failed: ' + message);
     } else {
       if (!(await row.locator('.ext-market__name').innerText())) throw new Error('market row has no package name');
-      // S16: sort toggle + a real second npm page.
-      await market.getByRole('checkbox', { name: '按周下载量排序' }).check();
+      // E1: npm's own score is shown next to the download count.
+      if ((await market.locator('.ext-market__badge--score').count()) === 0) throw new Error('npm score badge missing');
+      // S16/E1: sort by real download counts, then page to a second npm result set.
+      await market.getByRole('combobox', { name: '市场排序' }).selectOption('downloads');
       const before = await market.locator('.ext-market__item').count();
       await market.getByRole('button', { name: '加载更多' }).click();
       await page.waitForFunction((count) => document.querySelectorAll('.ext-market__item').length > count, before, { timeout: 20000 });
+      // E1: capability categories come from the packages' own npm keywords; the filter must narrow the list.
+      const categories = await market.locator('.ext-market__cat').count();
+      if (categories === 0) throw new Error('no capability categories derived from npm keywords');
+      const categorySelect = market.getByRole('combobox', { name: '按能力筛选' });
+      if ((await categorySelect.count()) === 0) throw new Error('capability filter missing');
+      const allRows = await market.locator('.ext-market__item').count();
+      const firstOption = await categorySelect.locator('option').nth(1).getAttribute('value');
+      await categorySelect.selectOption(firstOption);
+      await ctx.sleep(300);
+      const filteredRows = await market.locator('.ext-market__item').count();
+      if (filteredRows === 0) throw new Error('capability filter hid every package');
+      if (filteredRows > allRows) throw new Error('capability filter widened the list');
+      await categorySelect.selectOption('all');
+      // E1: package details come from the real npm packument (integrity / maintainers / commit).
+      const detailsName = await market.locator('.ext-market__name').first().innerText();
+      const details = await ctx.call('agent_extensions_package_details', { name: detailsName.trim() });
+      if (!details || !details.name) throw new Error('package details empty: ' + JSON.stringify(details).slice(0, 200));
+      if (!Array.isArray(details.categories) || !details.categories.length) throw new Error('details have no categories');
+      await market.locator('.ext-market__item').first().getByRole('button', { name: '详情' }).click();
+      await page.getByRole('dialog', { name: '包详情' }).waitFor({ timeout: 15000 });
+      const detailText = await page.getByRole('dialog', { name: '包详情' }).innerText();
+      if (!detailText.includes('integrity')) throw new Error('details dialog missing integrity: ' + detailText.slice(0, 200));
+      await page.getByRole('button', { name: '关闭' }).click();
     }
     await ctx.sleep(400);
     const shot = await ctx.shot('78-extension-packages');
@@ -895,8 +956,16 @@ try {
     await page.locator('.sidebar__more-popover').waitFor({ timeout: 5000 });
     const moreIds = await page.locator('.sidebar__more-popover [data-feature]').evaluateAll(els => els.map(e => e.getAttribute('data-feature')));
     for (const id of moreIds) {
-      await more.hover();
-      await page.locator('.sidebar__more-popover [data-feature="' + id + '"]').click();
+      // The popover unmounts/re-renders between items; hover again and dispatch the item's own click.
+      if ((await page.locator('.sidebar__more-popover').count()) === 0) {
+        await page.mouse.move(900, 500);
+        await ctx.sleep(200);
+        await more.hover();
+        await page.locator('.sidebar__more-popover').waitFor({ timeout: 5000 });
+      }
+      const item = page.locator('.sidebar__more-popover [data-feature="' + id + '"]');
+      await item.waitFor({ timeout: 5000 });
+      await item.evaluate((el) => el.click());
       await ctx.sleep(1000);
       visited.push(id);
     }
@@ -1614,6 +1683,40 @@ try {
     const last = ctx.fixture.requests.at(-1);
     if (last.project !== 'E2E 项目') throw new Error('project prompt missing: ' + JSON.stringify(last).slice(0, 300));
     return { shot, id: project.id, reloaded: true, projectPrompt: last.project };`);
+
+  // U1: pin persists to projects.json, pinned cards sort first, and tasks filter by their real source.
+  const pins = await step('项目置顶与任务来源筛选（U1）', `
+    await page.locator('.sidebar [data-feature="projects"]').click();
+    await page.getByText('E2E 项目', { exact: true }).first().waitFor({ timeout: 15000 });
+    const card = page.locator('.project-card2').filter({ hasText: 'E2E 项目' }).first();
+    await card.getByRole('button', { name: '置顶' }).click({ force: true });
+    await page.waitForFunction(() => {
+      const node = [...document.querySelectorAll('.project-card2')].find((item) => item.textContent.includes('E2E 项目'));
+      return !!node && !!node.querySelector('.project-card2__pin--on');
+    }, null, { timeout: 10000 });
+    const snapshot = await ctx.call('projects_snapshot');
+    const project = snapshot.projects.find((item) => item.name === 'E2E 项目');
+    if (!project || !project.pinned) throw new Error('pin did not reach the host: ' + JSON.stringify(project).slice(0, 200));
+    await ctx.call('projects_save', { project: { ...project, tasks: [
+      { id: 'u1-manual', title: '手动任务', scope: 'personal', source: 'manual', status: 'pending' },
+      { id: 'u1-import', title: '导入任务', scope: 'personal', source: 'imported', status: 'pending' },
+    ] } });
+    await page.reload();
+    await page.locator('.sidebar [data-feature="projects"]').waitFor({ timeout: 20000 });
+    await page.locator('.sidebar [data-feature="projects"]').click();
+    await page.getByText('E2E 项目', { exact: true }).first().click();
+    await page.getByRole('button', { name: '任务', exact: true }).click();
+    await page.getByText('手动任务').waitFor({ timeout: 10000 });
+    await page.waitForFunction(() => document.querySelectorAll('.pd-select option').length >= 3, null, { timeout: 10000 });
+    const select = page.getByRole('combobox', { name: '按来源筛选' });
+    await select.selectOption('imported');
+    if (await page.getByText('手动任务').count()) throw new Error('source filter kept a manual task');
+    if (!(await page.getByText('导入任务').count())) throw new Error('source filter hid the imported task');
+    const options = await select.locator('option').count();
+    const shot = await ctx.shot('78b-project-pin');
+    await page.getByRole('button', { name: '新建任务', exact: true }).first().click();
+    await page.locator('.wb-composer__input').waitFor({ timeout: 15000 });
+    return { pinned: true, options, shot };`);
   // B4: keyboard + accessible names on the main surfaces, narrow viewport included.
   const a11y = await step('无障碍与键盘（B4）', `
     const scan = () => page.evaluate(() => {
@@ -1698,6 +1801,311 @@ try {
     if (!/"scope":"main"/.test(all)) throw new Error('main-process startup record missing');
     return { files: logs.map(f => f.name), records: all.trim().split('\\n').length, redacted: true };`);
 
+  // O1: the in-app viewer reads the same files through host commands (no renderer-supplied paths).
+  const logViewer = await step('日志查看器（O1）', `
+    const listed = await ctx.call('logs_list');
+    if (!listed.files || !listed.files.length) throw new Error('logs_list returned no files');
+    if (!listed.dir) throw new Error('logs_list did not report its directory');
+    const first = listed.files[0].name;
+    const read = await ctx.call('logs_read', { name: first, limit: 50 });
+    if (!read.entries.length) throw new Error('logs_read returned no entries');
+    if (read.entries.some((entry) => typeof entry.message !== 'string')) throw new Error('bad log entry shape');
+    if (!read.entries.some((entry) => entry.message.includes('O1LOGPROBE'))) throw new Error('probe missing from the viewer payload');
+    let refused = false;
+    try { await ctx.call('logs_read', { name: '../../etc/passwd' }); } catch { refused = true; }
+    if (!refused) throw new Error('logs_read accepted a path instead of a log name');
+    // O1: merged cross-file read returns a time-ordered page.
+    const merged = await ctx.call('logs_read', { name: 'all', limit: 5 });
+    if (merged.name !== 'all' || !merged.entries.length) throw new Error('logs_read all failed: ' + JSON.stringify(merged).slice(0, 200));
+    if ((await page.locator('.settings-modal-overlay').count()) === 0) {
+      await page.getByRole('button', { name: '设置', exact: true }).first().click();
+    }
+    await page.locator('.settings-modal-overlay').waitFor({ state: 'visible', timeout: 15000 });
+    // Dispatch the tab's own click: the modal overlay covers pointer hit-testing mid-animation.
+    await page.locator('.settings-navigation__label').filter({ hasText: '帮助与反馈' }).first().evaluate((el) => el.click());
+    await page.locator('.log-list').waitFor({ state: 'visible', timeout: 15000 });
+    for (let i = 0; i < 25 && (await page.locator('.log-row').count()) === 0; i += 1) await ctx.sleep(200);
+    const rows = await page.locator('.log-row').count();
+    if (rows < 1) throw new Error('log viewer rendered no rows');
+    // O1: switch to the merged view and keep the export action available.
+    await page.getByRole('combobox', { name: '选择日志文件' }).selectOption('all');
+    await page.waitForFunction(() => document.querySelectorAll('.log-row').length > 0, null, { timeout: 10000 });
+    if (await page.getByRole('button', { name: /导出 \.txt/ }).isDisabled()) throw new Error('export action stayed disabled');
+    const shot = await ctx.shot('77-log-viewer');
+    // Leave the app on the home screen for the steps that follow (the modal blocks the sidebar).
+    await page.keyboard.press('Escape');
+    await page.locator('.settings-modal-overlay').waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+    return { files: listed.files.map((file) => file.name), dir: listed.dir, entries: read.entries.length, rows, shot };`);
+
+  // A2: versioned files, full export/restore (credentials omitted) and snapshot rollback on disk.
+  const a2 = await step('数据导出 / 恢复与快照（A2）', `
+    const exported = await ctx.call('data_export');
+    const bundle = exported.bundle;
+    if (bundle.kind !== 'openbuddy-data' || bundle.schemaVersion !== 1) throw new Error('bad bundle header: ' + JSON.stringify(bundle).slice(0, 200));
+    if (!bundle.files['projects.json']) throw new Error('bundle missing projects.json');
+    if (bundle.files['credentials.enc.json']) throw new Error('bundle leaked credentials');
+    if (!bundle.omitted.includes('credentials.enc.json')) throw new Error('credentials not declared omitted');
+
+    const projectsFile = JSON.parse(await ctx.readDataFile('projects.json'));
+    if (projectsFile.schemaVersion !== 1 || !Array.isArray(projectsFile.projects) || !projectsFile.projects.length)
+      throw new Error('projects.json is not versioned: ' + JSON.stringify(projectsFile).slice(0, 200));
+
+    const restored = await ctx.call('data_restore', { bundle });
+    if (!restored.restored.includes('projects.json') || restored.restartRequired !== true) throw new Error('restore result: ' + JSON.stringify(restored));
+    if (!restored.snapshotId) throw new Error('restore did not snapshot the previous state');
+
+    // Mutate after the restore, then roll the pre-restore snapshot back and check the disk.
+    await ctx.call('projects_save', { project: { id: 'e2e-a2-temp', name: 'A2 临时项目' } });
+    const dirty = JSON.parse(await ctx.readDataFile('projects.json'));
+    if (!dirty.projects.some((p) => p.id === 'e2e-a2-temp')) throw new Error('temporary project was not persisted');
+
+    const rolled = await ctx.call('data_snapshot_restore', { id: restored.snapshotId });
+    if (!rolled.restored.includes('projects.json')) throw new Error('snapshot rollback restored nothing');
+    const rolledFile = JSON.parse(await ctx.readDataFile('projects.json'));
+    if (rolledFile.projects.some((p) => p.id === 'e2e-a2-temp')) throw new Error('rollback left the temporary project on disk');
+
+    const { snapshots } = await ctx.call('data_snapshots');
+    return { files: Object.keys(bundle.files), omitted: bundle.omitted, snapshots: snapshots.length, rollbackKept: rolledFile.projects.length };`);
+
+  // A4: runtime budgets — one local turn, then main+renderer working set and renderer heap.
+  const perf = await step('性能预算（A4）', `
+    await page.locator('.sidebar__nav-item', { hasText: '新建任务' }).first().click();
+    await page.locator('.wb-composer__input').waitFor({ state: 'visible', timeout: 20000 });
+    const started = Date.now();
+    await page.locator('.wb-composer__input').fill('A4 性能预算：本地快速回复');
+    await page.getByRole('button', { name: '发送', exact: true }).click();
+    await page.getByText('以上内容由本地测试服务器生成', { exact: false }).first().waitFor({ timeout: 20000 });
+    const turnLatencyMs = Date.now() - started;
+    if (turnLatencyMs > 20000) throw new Error('turn latency too slow: ' + turnLatencyMs + 'ms');
+
+    const metrics = await app.evaluate(({ app }) => app.getAppMetrics().map((m) => ({ type: m.type, wsKb: m.memory.workingSetSize })));
+    const workingSetMb = Math.round(metrics.reduce((sum, m) => sum + m.wsKb, 0) / 1024);
+    const heapMb = await page.evaluate(() => Math.round((performance.memory?.usedJSHeapSize ?? 0) / 1048576));
+    if (workingSetMb > 900) throw new Error('working set too large: ' + workingSetMb + 'MB');
+    if (heapMb > 450) throw new Error('renderer heap too large: ' + heapMb + 'MB');
+    return { turnLatencyMs, workingSetMb, heapMb, processes: metrics.length };`);
+
+  // A3: real manifest fetch through the host, insecure feeds rejected, About UI shows the release.
+  const a3 = await step('更新检查（A3）', `
+    const direct = await ctx.call('update_check');
+    if (direct.status !== 'available' || direct.version !== '9.9.9') throw new Error('update_check: ' + JSON.stringify(direct));
+    if (!String(direct.notes).includes('A3')) throw new Error('update notes missing');
+    let rejected = '';
+    try {
+      await ctx.call('update_check', { feedUrl: 'http://evil.example.com/latest.json' });
+    } catch (error) {
+      rejected = String(error);
+    }
+    if (!/insecure_feed_url/.test(rejected)) throw new Error('insecure feed was not rejected: ' + rejected);
+
+    const settingsBtn = page.getByRole('button', { name: '设置', exact: true }).first();
+    await settingsBtn.focus();
+    await page.keyboard.press('Enter');
+    await page.getByRole('dialog', { name: '设置' }).waitFor({ timeout: 10000 });
+    await page.getByRole('button', { name: '关于', exact: true }).click();
+    await page.getByRole('button', { name: /检查更新/ }).click();
+    await page.getByText('发现新版本 v9.9.9').waitFor({ timeout: 15000 });
+    const region = await page.getByRole('region', { name: '可用更新' }).innerText();
+    if (!region.includes('A3 更新说明')) throw new Error('release notes missing from About: ' + region.slice(0, 200));
+    await page.getByRole('button', { name: /打开下载页/ }).waitFor({ timeout: 5000 });
+    // A3: download the installer; the host must verify size + sha256 before revealing it.
+    await page.getByRole('button', { name: /下载安装包/ }).click();
+    await page.getByText('已下载到本机并通过校验', { exact: false }).waitFor({ timeout: 20000 });
+    const path = (await page.locator('.about-card__path').innerText()).trim();
+    if (!/updates[\\/]OpenBuddy-9\\.9\\.9\\.dmg$/.test(path)) throw new Error('installer path: ' + path);
+    const digest = await ctx.fileDigest(path);
+    if (!digest.exists || digest.size !== 4096) throw new Error('installer missing or wrong size: ' + JSON.stringify(digest));
+    if (digest.sha256 !== ${JSON.stringify(INSTALLER_SHA)}) throw new Error('installer checksum mismatch: ' + digest.sha256);
+    const shot = await ctx.shot('78c-update-download');
+    await page.keyboard.press('Escape');
+    await page.locator('.settings-modal').waitFor({ state: 'detached', timeout: 5000 });
+    return { status: direct.status, version: direct.version, rejected: true, ui: true, downloadedBytes: digest.size, verified: true, shot };`);
+
+  // B4: contrast ratios, 1024×768 and 125% zoom (no overflow, composer stays usable).
+  const contrast = await step('对比度与缩放（B4）', `
+    const scanContrast = () => page.evaluate(() => {
+      const parse = (value) => {
+        const m = String(value).match(/rgba?\\(([^)]+)\\)/);
+        if (!m) return null;
+        const p = m[1].split(',').map((x) => Number(x.trim()));
+        return { r: p[0], g: p[1], b: p[2], a: p[3] === undefined ? 1 : p[3] };
+      };
+      const lum = ({ r, g, b }) => {
+        const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+      };
+      const ratio = (x, y) => { const a = lum(x); const b = lum(y); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
+      const blend = (fg, bg) => ({ r: fg.r * fg.a + bg.r * (1 - fg.a), g: fg.g * fg.a + bg.g * (1 - fg.a), b: fg.b * fg.a + bg.b * (1 - fg.a), a: 1 });
+      const background = (el) => {
+        const layers = [];
+        for (let node = el; node; node = node.parentElement) {
+          const style = getComputedStyle(node);
+          const c = parse(style.backgroundColor);
+          if (c && c.a > 0) layers.push(c);
+          if (c && c.a >= 1) break;
+        }
+        let out = { r: 255, g: 255, b: 255, a: 1 };
+        for (const layer of layers.reverse()) out = blend(layer, out);
+        return out;
+      };
+      const visible = (el) => el.offsetParent !== null || getComputedStyle(el).position === 'fixed';
+      const issues = [];
+      for (const el of document.querySelectorAll('body *')) {
+        if (!visible(el)) continue;
+        const ownText = [...el.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent).join('').trim();
+        if (!ownText) continue;
+        const style = getComputedStyle(el);
+        if (style.visibility === 'hidden' || Number(style.opacity) === 0) continue;
+        if (el.closest('[disabled],[aria-disabled="true"]')) continue;
+        if (style.backgroundImage !== 'none') continue;
+        const fg = parse(style.color);
+        if (!fg) continue;
+        const bg = background(el);
+        const fgFinal = fg.a < 1 ? blend(fg, bg) : fg;
+        const size = parseFloat(style.fontSize);
+        const large = size >= 24 || (Number(style.fontWeight) >= 600 && size >= 18.66);
+        const need = large ? 3 : 4.5;
+        const value = ratio(fgFinal, bg);
+        if (value + 0.01 < need) {
+          issues.push({ text: ownText.slice(0, 24), cls: String(el.className).slice(0, 40), color: style.color, bg: 'rgb(' + Math.round(bg.r) + ',' + Math.round(bg.g) + ',' + Math.round(bg.b) + ')', ratio: Math.round(value * 100) / 100, need });
+        }
+      }
+      return issues.slice(0, 20);
+    });
+    const overflow = () => page.evaluate(() => {
+      const box = document.querySelector('.wb-composer')?.getBoundingClientRect();
+      return {
+        width: innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        composer: box ? { x: Math.round(box.x), right: Math.round(box.right) } : null,
+      };
+    });
+
+    // The A4 step left us on a conversation: audit message text before navigating away.
+    const chatLight = await scanContrast();
+
+    await page.locator('.sidebar__nav-item', { hasText: '新建任务' }).first().click();
+    await page.locator('.wb-composer__input').waitFor({ state: 'visible', timeout: 20000 });
+    await ctx.sleep(400);
+    const light = await scanContrast();
+    const homeShot = await ctx.shot('66-home-contrast');
+
+    // Dark theme: same scanner over the home and the settings dialog.
+    await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
+    await ctx.sleep(500);
+    const darkHome = await scanContrast();
+    const darkShot = await ctx.shot('69-home-dark-contrast');
+    await page.getByRole('button', { name: '设置', exact: true }).first().click();
+    await page.getByRole('dialog', { name: '设置' }).waitFor({ timeout: 10000 });
+    await ctx.sleep(400);
+    const darkSettings = await scanContrast();
+    await page.keyboard.press('Escape');
+    await page.locator('.settings-modal').waitFor({ state: 'detached', timeout: 5000 });
+    await page.evaluate(() => { delete document.documentElement.dataset.theme; });
+    await ctx.sleep(300);
+
+    await ctx.setSize(1024, 768);
+    await ctx.sleep(500);
+    const small = await overflow();
+    if (small.scrollWidth > small.width + 1) throw new Error('horizontal overflow at 1024×768: ' + JSON.stringify(small));
+    if (!small.composer || small.composer.x < 0 || small.composer.right > small.width + 1) throw new Error('composer outside 1024×768: ' + JSON.stringify(small));
+    const smallShot = await ctx.shot('67-home-1024x768');
+
+    await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1.25); });
+    await ctx.sleep(600);
+    const zoomed = await overflow();
+    if (zoomed.scrollWidth > zoomed.width + 1) throw new Error('horizontal overflow at 125%: ' + JSON.stringify(zoomed));
+    if (!zoomed.composer || zoomed.composer.x < 0 || zoomed.composer.right > zoomed.width + 1) throw new Error('composer outside 125%: ' + JSON.stringify(zoomed));
+    const zoomShot = await ctx.shot('68-home-125pct');
+    await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1); });
+    await ctx.setSize(1440, 900);
+    await ctx.sleep(400);
+
+    // Settings (dialog) contrast in the normal viewport.
+    await page.getByRole('button', { name: '设置', exact: true }).first().click();
+    await page.getByRole('dialog', { name: '设置' }).waitFor({ timeout: 10000 });
+    await ctx.sleep(400);
+    const settingsIssues = await scanContrast();
+    await page.keyboard.press('Escape');
+    await page.locator('.settings-modal').waitFor({ state: 'detached', timeout: 5000 });
+
+    const issues = [
+      ...chatLight.map((i) => ({ screen: 'chat', ...i })),
+      ...light.map((i) => ({ screen: 'home', ...i })),
+      ...settingsIssues.map((i) => ({ screen: 'settings', ...i })),
+      ...darkHome.map((i) => ({ screen: 'dark-home', ...i })),
+      ...darkSettings.map((i) => ({ screen: 'dark-settings', ...i })),
+    ];
+    if (issues.length) throw new Error('contrast issues: ' + JSON.stringify(issues.slice(0, 8)));
+    return { issues: 0, screens: ['chat', 'home', 'settings', 'dark-home', 'dark-settings'], sizes: { small, zoomed }, shots: [homeShot, darkShot, smallShot, zoomShot] };`);
+
+  // B4: the settings surface switches to English, survives a reload, and switches back.
+  const i18n = await step('界面语言（B4）', `
+    await page.getByRole('button', { name: '设置', exact: true }).first().click();
+    await page.getByRole('dialog', { name: '设置' }).waitFor({ timeout: 10000 });
+    await page.getByRole('button', { name: '通用', exact: true }).click();
+    await page.getByRole('button', { name: 'English', exact: true }).click();
+    await page.getByRole('button', { name: 'About', exact: true }).waitFor({ timeout: 5000 });
+    await page.getByRole('heading', { name: 'General', exact: true }).waitFor({ timeout: 5000 });
+    await page.getByRole('button', { name: 'New task', exact: true }).waitFor({ timeout: 5000 });
+    await page.getByRole('button', { name: 'Projects', exact: true }).waitFor({ timeout: 5000 });
+    await page.getByRole('button', { name: 'About', exact: true }).click();
+    await page.getByRole('heading', { name: 'About', exact: true }).waitFor({ timeout: 5000 });
+    if (!(await page.getByText('WorkBuddy on Pi', { exact: false }).count())) throw new Error('english About copy missing');
+    await page.keyboard.press('Escape');
+    await page.locator('.settings-modal').waitFor({ state: 'detached', timeout: 5000 });
+
+    // Reload: the choice lives in localStorage and must survive.
+    await page.reload();
+    await page.locator('.sidebar__nav-item').first().waitFor({ timeout: 20000 });
+    await page.getByRole('button', { name: 'Settings', exact: true }).first().click();
+    await page.getByRole('button', { name: 'About', exact: true }).waitFor({ timeout: 10000 });
+    await page.getByRole('button', { name: 'General', exact: true }).click();
+    await page.getByRole('button', { name: '简体中文', exact: true }).click();
+    await page.getByRole('button', { name: '关于', exact: true }).waitFor({ timeout: 5000 });
+    await page.getByRole('button', { name: '新建任务', exact: true }).waitFor({ timeout: 5000 });
+    await page.getByRole('button', { name: '设置', exact: true }).waitFor({ timeout: 5000 });
+    await page.keyboard.press('Escape');
+    await page.locator('.settings-modal').waitFor({ state: 'detached', timeout: 5000 });
+    return { switched: 'en-US', persisted: true, restored: 'zh-CN' };`);
+
+  // B1a: a real JS extension is loaded by Pi's loader, listed, and its tool runs end-to-end.
+  const extension = await step('Pi 扩展试点（B1a）', `
+    const path = ctx.repo + '/examples/pi-extension-demo/extension.mjs';
+    const listed = await ctx.call('agent_extensions_list');
+    const item = (listed.items ?? []).find((entry) => String(entry.path).endsWith('extension.mjs'));
+    if (!item || !item.ok) throw new Error('example extension not loaded: ' + JSON.stringify(listed).slice(0, 400));
+    if (!item.tools.includes('demo_echo')) throw new Error('demo_echo not registered: ' + JSON.stringify(item));
+    if (!item.commands.includes('demo')) throw new Error('demo command not registered: ' + JSON.stringify(item));
+    const inspected = await ctx.call('agent_extensions_inspect', { path });
+    if (!inspected.ok || !inspected.tools.includes('demo_echo')) throw new Error('inspect failed: ' + JSON.stringify(inspected));
+
+    await page.locator('.sidebar__nav-item', { hasText: '新建任务' }).first().click();
+    await page.locator('.wb-composer__input').waitFor({ state: 'visible', timeout: 20000 });
+    await page.locator('.wb-composer__input').fill('__EXT_DEMO__ 用示例扩展回显一段文字');
+    await page.getByRole('button', { name: '发送', exact: true }).click();
+    const allow = page.getByRole('button', { name: '允许本次', exact: true });
+    if (await allow.count()) await allow.first().click();
+    await page.getByText('扩展回声：demo:pi-extension-ok', { exact: false }).first().waitFor({ timeout: 30000 });
+    return { tools: item.tools, commands: item.commands, executed: true };`);
+
+  // B5: the Help panel links to the shipped user docs (real hrefs, no placeholders).
+  const docsStep = await step('帮助文档（B5）', `
+    await page.getByRole('button', { name: '设置', exact: true }).first().click();
+    await page.getByRole('dialog', { name: '设置' }).waitFor({ timeout: 10000 });
+    await page.getByRole('button', { name: '帮助与反馈', exact: true }).click();
+    await page.getByRole('heading', { name: '帮助与反馈', exact: true }).waitFor({ timeout: 5000 });
+    const expected = [['用户手册', 'docs/user-guide.md'], ['常见问题', 'docs/faq.md'], ['故障排查', 'docs/troubleshooting.md'], ['隐私说明', 'docs/privacy.md'], ['更新说明', 'docs/release-notes.md']];
+    for (const [name, suffix] of expected) {
+      const link = page.getByRole('link', { name, exact: true });
+      const href = await link.getAttribute('href');
+      if (!href || !href.endsWith(suffix)) throw new Error('bad doc link ' + name + ': ' + href);
+    }
+    if (await page.getByText('即将上线').count()) throw new Error('help panel still shows a placeholder');
+    await page.keyboard.press('Escape');
+    await page.locator('.settings-modal').waitFor({ state: 'detached', timeout: 5000 });
+    return { links: expected.length };`);
+
   const audit = await step('audit', `
     const a = await ctx.audit();
     const rejected = a.main.filter(r => r.status === 'rejected');
@@ -1707,10 +2115,10 @@ try {
       byCommand: Object.fromEntries(Object.entries(a.main.reduce((m, r) => ({ ...m, [r.command]: (m[r.command] ?? 0) + 1 }), {})).sort()),
       rejected: rejected.map(r => ({ command: r.command, error: r.error })),
       notImplemented: [...a.main.filter(r => /not_implemented/.test(r.error ?? '')), ...a.renderer.filter(r => /not_implemented/.test(r.message))].map(r => r.command),
-      pageErrors: ctx.pageErrors.map(e => e.message),
+      pageErrors: ctx.pageErrors.map(e => ({ message: e.message, stack: e.stack })),
       fixtureRequests: ctx.fixture.requests.length,
     };`);
-  if (audit.pageErrors.length) throw new Error(`renderer page errors: ${audit.pageErrors.join(' | ')}`);
+  if (audit.pageErrors.length) throw new Error(`renderer page errors: ${audit.pageErrors.map(e => e.message + ' @ ' + String(e.stack ?? '').split('\\n').slice(0, 3).join(' <- ')).join(' | ')}`);
   if (audit.notImplemented.length) throw new Error(`not_implemented: ${audit.notImplemented.join(', ')}`);
 } catch (error) {
   failure = error;

@@ -58,6 +58,8 @@ export interface ProjectMeta {
   templateId?: string;
   instructions?: string;
   createdAt: string;
+  /** 置顶 (U1): pinned projects sort first in the list and the sidebar picker. */
+  pinned?: boolean;
   // 详情
   connectors: RefItem[];
   experts: RefItem[];
@@ -92,6 +94,7 @@ function normalize(x: unknown): ProjectMeta | null {
     templateId: o.templateId,
     instructions: o.instructions,
     createdAt: o.createdAt ?? new Date().toISOString(),
+    ...(o.pinned === true ? { pinned: true } : {}),
     connectors: Array.isArray(o.connectors) ? o.connectors : [],
     experts: Array.isArray(o.experts) ? o.experts : [],
     skills: Array.isArray(o.skills) ? o.skills : [],
@@ -169,6 +172,7 @@ interface ProjectsState {
     skills?: RefItem[];
   }) => ProjectMeta;
   rename: (id: string, name: string) => void;
+  setPinned: (id: string, pinned: boolean) => void;
   remove: (id: string) => void;
   updateConfig: (
     id: string,
@@ -223,6 +227,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => {
       return item;
     },
     rename: (id, name) => patch(id, (p) => ({ ...p, name })),
+    setPinned: (id, pinned) => patch(id, (p) => ({ ...p, pinned })),
     remove: (id) => {
       const next = get().projects.filter((p) => p.id !== id);
       set({ projects: next });

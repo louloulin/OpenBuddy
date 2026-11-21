@@ -21,7 +21,7 @@ import { ErrorCard } from "./ErrorCard";
 import { FeedbackButtons } from "./FeedbackButtons";
 import { BranchMenuItems, BranchSwitcher, useBranchRefresh } from "./BranchSwitcher";
 import { ChevronGlyph, CopyGlyph, MoreGlyph, RetryGlyph } from "../../shared/agent-ui/icons";
-import logoMarkUrl from "@/assets/openbuddy-logo.svg";
+import logoMarkUrl from "@/assets/openbuddy-logo.png";
 
 function useNow(active: boolean): number {
   const [now, setNow] = useState(() => Date.now());

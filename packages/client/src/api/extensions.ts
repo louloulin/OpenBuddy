@@ -2,6 +2,7 @@
 // 扩展中心 (pii W2.6): `list` also reports what each path registers and where it failed to load.
 import type {
   ExtensionPackage,
+  ExtensionPackageDetails,
   ExtensionPackageFilters,
   ExtensionPackagePreview,
   ExtensionPackageProgress,
@@ -69,6 +70,10 @@ export const agentExtensionsCheckUpdates = (cwd?: string) =>
 /** Search the real npm registry for packages tagged `pi-package`; empty query browses. */
 export const agentExtensionsSearchRegistry = (query = "", offset = 0, cwd?: string) =>
   invoke<ExtensionRegistrySearch>("agent_extensions_search_registry", { query, ...(offset ? { offset } : {}), cwd: cwd ?? null });
+
+/** One package's integrity / maintainers / publish time / git commit (E1). */
+export const agentExtensionsPackageDetails = (name: string) =>
+  invoke<ExtensionPackageDetails>("agent_extensions_package_details", { name });
 
 /** Extensions / skills / prompts / themes that configured packages contribute (Pi-resolved). */
 export const agentExtensionsResources = (cwd?: string) =>
