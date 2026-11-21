@@ -1,0 +1,110 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "useDefineForClassFields": true,
+    "lib": [
+      "ES2021",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@/*": [
+        "./apps/web/src/*"
+      ],
+      "@openbuddy/gateway/*": [
+        "./packages/gateway/src/*"
+      ],
+      "@openbuddy/pi-bridge/*": [
+        "./packages/pi-bridge/src/*"
+      ],
+      "@openbuddy/protocol": [
+        "./packages/protocol/src/index.ts"
+      ],
+      "@openbuddy/protocol/*": [
+        "./packages/protocol/src/*"
+      ],
+      "@openbuddy/kernel": [
+        "./packages/kernel/src/index.ts"
+      ],
+      "@openbuddy/kernel/*": [
+        "./packages/kernel/src/*"
+      ],
+      "@openbuddy/services": [
+        "./packages/services/src/index.ts"
+      ],
+      "@openbuddy/services/*": [
+        "./packages/services/src/*"
+      ],
+      "@openbuddy/engine": [
+        "./packages/engine/src/index.ts"
+      ],
+      "@openbuddy/engine/*": [
+        "./packages/engine/src/*"
+      ],
+      "@openbuddy/host": [
+        "./packages/host/src/index.ts"
+      ],
+      "@openbuddy/host/*": [
+        "./packages/host/src/*"
+      ],
+      "@openbuddy/client": [
+        "./packages/client/src/index.ts"
+      ],
+      "@openbuddy/client/*": [
+        "./packages/client/src/*"
+      ],
+      "@openbuddy/chat-core": [
+        "./packages/chat-core/src/index.ts"
+      ],
+      "@openbuddy/chat-core/*": [
+        "./packages/chat-core/src/*"
+      ],
+      "@openbuddy/platform": [
+        "./packages/platform/src/index.ts"
+      ],
+      "@openbuddy/platform/*": [
+        "./packages/platform/src/*"
+      ],
+      "@openbuddy/ui": [
+        "./packages/ui/src/index.ts"
+      ],
+      "@openbuddy/ui/*": [
+        "./packages/ui/src/*"
+      ],
+      "@openbuddy/markdown": [
+        "./packages/markdown/src/index.ts"
+      ],
+      "@openbuddy/markdown/*": [
+        "./packages/markdown/src/*"
+      ]
+    }
+  },
+  "include": [
+    "apps/web/src",
+    "packages/protocol/src/dto.ts",
+    "packages/client/src",
+    "packages/chat-core/src",
+    "packages/platform/src",
+    "packages/ui/src",
+    "packages/markdown/src"
+  ],
+  "references": [
+    {
+      "path": "./tsconfig.node.json"
+    }
+  ],
+  "extends": "./tsconfig.base.json"
+}
