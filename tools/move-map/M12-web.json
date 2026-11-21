@@ -1,0 +1,8 @@
+{
+ "step": "M12-web",
+ "note": "Align with 20261115-md §6.2: LetterAvatar -> packages/ui (depends only on react); home-scenes -> shared/content/scenes.ts. AppDialog (imports workbench/DiffBlock) and ThumbImg (imports client) stay in apps/web/src/shared/ui until R6/R8, because ui must not depend on client or features.",
+ "moves": [
+  { "from": "apps/web/src/shared/ui/LetterAvatar.tsx", "to": "packages/ui/src/LetterAvatar.tsx" },
+  { "from": "apps/web/src/shared/content/home-scenes.ts", "to": "apps/web/src/shared/content/scenes.ts" }
+ ]
+}

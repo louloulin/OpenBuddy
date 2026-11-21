@@ -1,0 +1,13 @@
+{ "step": "M6", "moves": [
+  { "from": "electron/main.ts", "to": "apps/desktop/src/main.ts" },
+  { "from": "electron/preload.cjs", "to": "apps/desktop/src/preload.cjs" },
+  { "from": "electron/shared/preload.test.ts", "to": "apps/desktop/src/preload.test.ts" },
+  { "from": "electron/ipc/register.ts", "to": "apps/desktop/src/ipc/register.ts" },
+  { "from": "electron/ipc/register.test.ts", "to": "apps/desktop/src/ipc/register.test.ts" },
+  { "from": "scripts/build-electron.mjs", "to": "apps/desktop/scripts/build-electron.mjs" },
+  { "from": "scripts/dev-electron.mjs", "to": "apps/desktop/scripts/dev-electron.mjs" },
+  { "from": "scripts/electron-ui-check.mjs", "to": "apps/desktop/scripts/electron-ui-check.mjs" },
+  { "from": "scripts/convert-icons.mjs", "to": "apps/desktop/scripts/convert-icons.mjs" },
+  { "from": "scripts/ui-explore/", "to": "apps/desktop/scripts/ui-explore/" },
+  { "from": "scripts/audit-contract.mjs", "to": "tools/audit-contract.mjs" }
+] }

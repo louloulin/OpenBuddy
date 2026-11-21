@@ -1,0 +1,5 @@
+{ "step": "M1", "moves": [
+  { "from": "electron/shared/contract.ts", "to": "packages/protocol/src/contract.ts" },
+  { "from": "electron/shared/contract.test.ts", "to": "packages/protocol/src/contract.test.ts" },
+  { "from": "electron/shared/contract-gate.test.ts", "to": "packages/protocol/src/contract-gate.test.ts" }
+] }

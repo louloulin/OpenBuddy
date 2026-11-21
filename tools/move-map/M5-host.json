@@ -1,0 +1,7 @@
+{ "step": "M5", "moves": [
+  { "from": "electron/ipc/handlers/", "to": "packages/host/src/handlers/" },
+  { "from": "electron/shared/file-access.ts", "to": "packages/host/src/security/file-access.ts" },
+  { "from": "electron/shared/file-access.test.ts", "to": "packages/host/src/security/file-access.test.ts" },
+  { "from": "electron/shared/workspace-access.ts", "to": "packages/host/src/security/workspace-access.ts" },
+  { "from": "electron/shared/workspace-access.test.ts", "to": "packages/host/src/security/workspace-access.test.ts" }
+] }

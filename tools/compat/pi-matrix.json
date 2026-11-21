@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-21",
+  "sdk": {
+    "package": "@earendil-works/pi-coding-agent",
+    "version": "1.6.0"
+  },
+  "packages": [
+    {
+      "source": "builtin:office",
+      "version": "0.6.5",
+      "kind": "builtin-tools",
+      "status": "verified",
+      "hostRequirements": ["node >= 22", "officegen"],
+      "contributions": { "tools": ["ob_docx", "ob_xlsx", "ob_pptx"], "formats": 3 },
+      "failures": [],
+      "verifiedBy": "services/test/office.test.ts, engine/test/office-tool.test.ts, e2e-shots.mjs 办公产物（B2b）"
+    },
+    {
+      "source": "workbuddy:workbuddy-docx",
+      "version": "5.11.3",
+      "kind": "workbuddy-package",
+      "status": "verified",
+      "hostRequirements": ["skills", "prompts", "mcp"],
+      "contributions": { "experts": 3, "skills": 8, "prompts": 0, "mcp": 0 },
+      "failures": [],
+      "skipped": [
+        { "kind": "hook", "reason": "宿主不执行第三方生命周期命令" },
+        { "kind": "extension", "reason": "需要到扩展中心单独确认" }
+      ],
+      "verifiedBy": "docs/plan/20261119.md §10.12"
+    },
+    {
+      "source": "workbuddy:lifecycle-pack",
+      "version": "synthetic",
+      "kind": "workbuddy-package",
+      "status": "verified",
+      "hostRequirements": ["skills", "prompts", "mcp"],
+      "contributions": { "experts": 0, "skills": 1, "prompts": 1, "mcp": 1 },
+      "failures": [],
+      "skipped": [],
+      "verifiedBy": "services/test/workbuddy-import.test.ts, engine/test/capability-packs.test.ts"
+    },
+    {
+      "source": "npm:pi-web-access",
+      "version": "0.48.0",
+      "kind": "pi-package",
+      "status": "market-only",
+      "hostRequirements": ["pi >= 1.5"],
+      "failures": [],
+      "notes": "仅在 npm 市场搜索中可见；未安装、未创建会话验证，不计入已验证。"
+    }
+  ]
+}

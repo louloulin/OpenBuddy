@@ -1,0 +1,969 @@
+{
+ "step": "M8",
+ "moves": [
+  {
+   "from": "src/components/__tests__/CodeApply.test.tsx",
+   "to": "packages/markdown/src/__tests__/CodeApply.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/ImageLightbox.test.tsx",
+   "to": "packages/ui/src/__tests__/ImageLightbox.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/Markdown.test.tsx",
+   "to": "packages/markdown/src/__tests__/Markdown.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/Toast.test.tsx",
+   "to": "packages/ui/src/__tests__/Toast.test.tsx"
+  },
+  {
+   "from": "src/components/ImageLightbox.tsx",
+   "to": "packages/ui/src/ImageLightbox.tsx"
+  },
+  {
+   "from": "src/components/markdown/CodeBlockActions.tsx",
+   "to": "packages/markdown/src/CodeBlockActions.tsx"
+  },
+  {
+   "from": "src/components/markdown/index.ts",
+   "to": "packages/markdown/src/index.ts"
+  },
+  {
+   "from": "src/components/markdown/Markdown.tsx",
+   "to": "packages/markdown/src/Markdown.tsx"
+  },
+  {
+   "from": "src/components/markdown/MarkdownInlineCode.tsx",
+   "to": "packages/markdown/src/MarkdownInlineCode.tsx"
+  },
+  {
+   "from": "src/components/markdown/MarkdownPre.tsx",
+   "to": "packages/markdown/src/MarkdownPre.tsx"
+  },
+  {
+   "from": "src/components/markdown/MarkdownPreMermaid.tsx",
+   "to": "packages/markdown/src/MarkdownPreMermaid.tsx"
+  },
+  {
+   "from": "src/components/markdown/plugins/rehype-code-block.ts",
+   "to": "packages/markdown/src/plugins/rehype-code-block.ts"
+  },
+  {
+   "from": "src/components/markdown/plugins/rehype-fix-autolink-boundary.ts",
+   "to": "packages/markdown/src/plugins/rehype-fix-autolink-boundary.ts"
+  },
+  {
+   "from": "src/components/markdown/plugins/rehype-inline-code.ts",
+   "to": "packages/markdown/src/plugins/rehype-inline-code.ts"
+  },
+  {
+   "from": "src/components/markdown/plugins/remark-code-language.ts",
+   "to": "packages/markdown/src/plugins/remark-code-language.ts"
+  },
+  {
+   "from": "src/components/markdown/plugins/remark-linkify-it.ts",
+   "to": "packages/markdown/src/plugins/remark-linkify-it.ts"
+  },
+  {
+   "from": "src/components/markdown/preprocess.ts",
+   "to": "packages/markdown/src/preprocess.ts"
+  },
+  {
+   "from": "src/components/markdown/types.ts",
+   "to": "packages/markdown/src/types.ts"
+  },
+  {
+   "from": "src/components/markdown/utils/collect-text.ts",
+   "to": "packages/markdown/src/utils/collect-text.ts"
+  },
+  {
+   "from": "src/components/markdown/utils/language-util.ts",
+   "to": "packages/markdown/src/utils/language-util.ts"
+  },
+  {
+   "from": "src/components/markdown/utils/path-detector.ts",
+   "to": "packages/markdown/src/utils/path-detector.ts"
+  },
+  {
+   "from": "src/components/ThemeProvider.tsx",
+   "to": "packages/ui/src/ThemeProvider.tsx"
+  },
+  {
+   "from": "src/components/Toast.tsx",
+   "to": "packages/ui/src/Toast.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/Icon.tsx",
+   "to": "packages/ui/src/icon/Icon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/AddCircleIcon.tsx",
+   "to": "packages/ui/src/icon/icons/AddCircleIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/AddConversationIcon.tsx",
+   "to": "packages/ui/src/icon/icons/AddConversationIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/AddIcon.tsx",
+   "to": "packages/ui/src/icon/icons/AddIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/AgentMailBrandIcon.tsx",
+   "to": "packages/ui/src/icon/icons/AgentMailBrandIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/AgentMailIcon.tsx",
+   "to": "packages/ui/src/icon/icons/AgentMailIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/AgentToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/AgentToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/AlarmClockIcon.tsx",
+   "to": "packages/ui/src/icon/icons/AlarmClockIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ArchivedIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ArchivedIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ArchiveIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ArchiveIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ArrowToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ArrowToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ArrowUpIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ArrowUpIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ArrowUpRightIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ArrowUpRightIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/AssistantFilledIcon.tsx",
+   "to": "packages/ui/src/icon/icons/AssistantFilledIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/AssistantIcon.tsx",
+   "to": "packages/ui/src/icon/icons/AssistantIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/AtmAddFromTemplateIcon.tsx",
+   "to": "packages/ui/src/icon/icons/AtmAddFromTemplateIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/AtmBatchManageIcon.tsx",
+   "to": "packages/ui/src/icon/icons/AtmBatchManageIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/AutomationEmptyAlarmIcon.tsx",
+   "to": "packages/ui/src/icon/icons/AutomationEmptyAlarmIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/AutomationEmptyRecordsIcon.tsx",
+   "to": "packages/ui/src/icon/icons/AutomationEmptyRecordsIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/BatchOperationIcon.tsx",
+   "to": "packages/ui/src/icon/icons/BatchOperationIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/BellIcon.tsx",
+   "to": "packages/ui/src/icon/icons/BellIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/BookIcon.tsx",
+   "to": "packages/ui/src/icon/icons/BookIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/BriefcaseIcon.tsx",
+   "to": "packages/ui/src/icon/icons/BriefcaseIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/BubbleCheckIcon.tsx",
+   "to": "packages/ui/src/icon/icons/BubbleCheckIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/BuildingIcon.tsx",
+   "to": "packages/ui/src/icon/icons/BuildingIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/CableIcon.tsx",
+   "to": "packages/ui/src/icon/icons/CableIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ChatBubbleIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ChatBubbleIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/CheckBoldIcon.tsx",
+   "to": "packages/ui/src/icon/icons/CheckBoldIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/CheckCircleToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/CheckCircleToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/CheckIcon.tsx",
+   "to": "packages/ui/src/icon/icons/CheckIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/CheckinBubbleIcon.tsx",
+   "to": "packages/ui/src/icon/icons/CheckinBubbleIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ChevronDownIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ChevronDownIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ChevronLeftIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ChevronLeftIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ChevronRightIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ChevronRightIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ChevronsDownUpIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ChevronsDownUpIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ChevronsUpDownIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ChevronsUpDownIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/CirclePauseIcon.tsx",
+   "to": "packages/ui/src/icon/icons/CirclePauseIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/CirclePlayIcon.tsx",
+   "to": "packages/ui/src/icon/icons/CirclePlayIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/CircleXIcon.tsx",
+   "to": "packages/ui/src/icon/icons/CircleXIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ClawFilledIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ClawFilledIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ClawIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ClawIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ClawIconV2.tsx",
+   "to": "packages/ui/src/icon/icons/ClawIconV2.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ClockFilledIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ClockFilledIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ClockIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ClockIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ClockIconV2.tsx",
+   "to": "packages/ui/src/icon/icons/ClockIconV2.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/CloseIcon.tsx",
+   "to": "packages/ui/src/icon/icons/CloseIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/CloudToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/CloudToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/CnbIcon.tsx",
+   "to": "packages/ui/src/icon/icons/CnbIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/Code2Icon.tsx",
+   "to": "packages/ui/src/icon/icons/Code2Icon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ConfigureIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ConfigureIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ConnectorButtonIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ConnectorButtonIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ConnectorTabIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ConnectorTabIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/DatabaseToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/DatabaseToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/DateIcon.tsx",
+   "to": "packages/ui/src/icon/icons/DateIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/DebugToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/DebugToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/DeleteIcon.tsx",
+   "to": "packages/ui/src/icon/icons/DeleteIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/DeleteToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/DeleteToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/DiscoverIcon.tsx",
+   "to": "packages/ui/src/icon/icons/DiscoverIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/DownloadIcon.tsx",
+   "to": "packages/ui/src/icon/icons/DownloadIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/EditorIcon.tsx",
+   "to": "packages/ui/src/icon/icons/EditorIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/EditToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/EditToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ErrorCircleIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ErrorCircleIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ExpertFilledIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ExpertFilledIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ExpertIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ExpertIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ExpertIconV2.tsx",
+   "to": "packages/ui/src/icon/icons/ExpertIconV2.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ExpertTabIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ExpertTabIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/FailedIcon.tsx",
+   "to": "packages/ui/src/icon/icons/FailedIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/FigmaIcon.tsx",
+   "to": "packages/ui/src/icon/icons/FigmaIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/FileTextIcon.tsx",
+   "to": "packages/ui/src/icon/icons/FileTextIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/FilterIcon.tsx",
+   "to": "packages/ui/src/icon/icons/FilterIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/FolderDownloadIcon.tsx",
+   "to": "packages/ui/src/icon/icons/FolderDownloadIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/FolderIcon.tsx",
+   "to": "packages/ui/src/icon/icons/FolderIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/FolderOpenIcon.tsx",
+   "to": "packages/ui/src/icon/icons/FolderOpenIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/FolderToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/FolderToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/GemRewardIcon.tsx",
+   "to": "packages/ui/src/icon/icons/GemRewardIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/GitBranchIcon.tsx",
+   "to": "packages/ui/src/icon/icons/GitBranchIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/GithubIcon.tsx",
+   "to": "packages/ui/src/icon/icons/GithubIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/GlobeIcon.tsx",
+   "to": "packages/ui/src/icon/icons/GlobeIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/GongfengIcon.tsx",
+   "to": "packages/ui/src/icon/icons/GongfengIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/HelpCircleIcon.tsx",
+   "to": "packages/ui/src/icon/icons/HelpCircleIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ImageIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ImageIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ImageToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ImageToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ImaKnowledgeIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ImaKnowledgeIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/index.ts",
+   "to": "packages/ui/src/icon/icons/index.ts"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/InspirationIcon.tsx",
+   "to": "packages/ui/src/icon/icons/InspirationIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/InstalledSkillIcon.tsx",
+   "to": "packages/ui/src/icon/icons/InstalledSkillIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/LibraryIcon.tsx",
+   "to": "packages/ui/src/icon/icons/LibraryIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/LightbulbIcon.tsx",
+   "to": "packages/ui/src/icon/icons/LightbulbIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/LinkIcon.tsx",
+   "to": "packages/ui/src/icon/icons/LinkIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/LoaderIcon.tsx",
+   "to": "packages/ui/src/icon/icons/LoaderIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/LoadingIcon.tsx",
+   "to": "packages/ui/src/icon/icons/LoadingIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/LoadingToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/LoadingToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/MailIcon.tsx",
+   "to": "packages/ui/src/icon/icons/MailIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/MaximizeIcon.tsx",
+   "to": "packages/ui/src/icon/icons/MaximizeIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/McpIcon.tsx",
+   "to": "packages/ui/src/icon/icons/McpIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/MemoryIcon.tsx",
+   "to": "packages/ui/src/icon/icons/MemoryIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/MoonIcon.tsx",
+   "to": "packages/ui/src/icon/icons/MoonIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/MoreDotsIcon.tsx",
+   "to": "packages/ui/src/icon/icons/MoreDotsIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/MoreFilledIcon.tsx",
+   "to": "packages/ui/src/icon/icons/MoreFilledIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/MoreIcon.tsx",
+   "to": "packages/ui/src/icon/icons/MoreIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/MoreIconV2.tsx",
+   "to": "packages/ui/src/icon/icons/MoreIconV2.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/MoreMenuImaKnowledgeIcon.tsx",
+   "to": "packages/ui/src/icon/icons/MoreMenuImaKnowledgeIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/MoreMenuInspirationIcon.tsx",
+   "to": "packages/ui/src/icon/icons/MoreMenuInspirationIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/MoreMenuTencentDocsIcon.tsx",
+   "to": "packages/ui/src/icon/icons/MoreMenuTencentDocsIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/MoreMenuTencentLexiangIcon.tsx",
+   "to": "packages/ui/src/icon/icons/MoreMenuTencentLexiangIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/MoreVerticalIcon.tsx",
+   "to": "packages/ui/src/icon/icons/MoreVerticalIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/MyExpertIcon.tsx",
+   "to": "packages/ui/src/icon/icons/MyExpertIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/MyFilesIconV2.tsx",
+   "to": "packages/ui/src/icon/icons/MyFilesIconV2.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/NewChatIcon.tsx",
+   "to": "packages/ui/src/icon/icons/NewChatIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/NewTaskFilledIcon.tsx",
+   "to": "packages/ui/src/icon/icons/NewTaskFilledIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/NewTaskIcon.tsx",
+   "to": "packages/ui/src/icon/icons/NewTaskIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/NewTaskIconV2.tsx",
+   "to": "packages/ui/src/icon/icons/NewTaskIconV2.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/OpenExternalIcon.tsx",
+   "to": "packages/ui/src/icon/icons/OpenExternalIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/PanelIcon.tsx",
+   "to": "packages/ui/src/icon/icons/PanelIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/PauseIcon.tsx",
+   "to": "packages/ui/src/icon/icons/PauseIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/PendingIcon.tsx",
+   "to": "packages/ui/src/icon/icons/PendingIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/PhoneIcon.tsx",
+   "to": "packages/ui/src/icon/icons/PhoneIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/PinFilledIcon.tsx",
+   "to": "packages/ui/src/icon/icons/PinFilledIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/PinTopIcon.tsx",
+   "to": "packages/ui/src/icon/icons/PinTopIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/PlaneIcon.tsx",
+   "to": "packages/ui/src/icon/icons/PlaneIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/PlanInProgressStatusIcon.tsx",
+   "to": "packages/ui/src/icon/icons/PlanInProgressStatusIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/PlanPendingStatusIcon.tsx",
+   "to": "packages/ui/src/icon/icons/PlanPendingStatusIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/PlanToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/PlanToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/PlayIcon.tsx",
+   "to": "packages/ui/src/icon/icons/PlayIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/PlugIcon.tsx",
+   "to": "packages/ui/src/icon/icons/PlugIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/PluginsIcon.tsx",
+   "to": "packages/ui/src/icon/icons/PluginsIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ProjectFilledIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ProjectFilledIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ProjectIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ProjectIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ProjectIconV2.tsx",
+   "to": "packages/ui/src/icon/icons/ProjectIconV2.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/PuzzlePieceIcon.tsx",
+   "to": "packages/ui/src/icon/icons/PuzzlePieceIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/QQIcon.tsx",
+   "to": "packages/ui/src/icon/icons/QQIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/RefreshCwIcon.tsx",
+   "to": "packages/ui/src/icon/icons/RefreshCwIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/RepoConnectIcon.tsx",
+   "to": "packages/ui/src/icon/icons/RepoConnectIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/RepoIcon.tsx",
+   "to": "packages/ui/src/icon/icons/RepoIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/RestoreIcon.tsx",
+   "to": "packages/ui/src/icon/icons/RestoreIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ResumeCircleIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ResumeCircleIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/RunningCheckIcon.tsx",
+   "to": "packages/ui/src/icon/icons/RunningCheckIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/RunningStatusIcon.tsx",
+   "to": "packages/ui/src/icon/icons/RunningStatusIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/SaveIcon.tsx",
+   "to": "packages/ui/src/icon/icons/SaveIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/SearchIcon.tsx",
+   "to": "packages/ui/src/icon/icons/SearchIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/SearchToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/SearchToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/SendPlaneIcon.tsx",
+   "to": "packages/ui/src/icon/icons/SendPlaneIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/SettingsIcon.tsx",
+   "to": "packages/ui/src/icon/icons/SettingsIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ShieldAlertIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ShieldAlertIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ShieldCheckIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ShieldCheckIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/SidebarToggleIcon.tsx",
+   "to": "packages/ui/src/icon/icons/SidebarToggleIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/SkillIcon.tsx",
+   "to": "packages/ui/src/icon/icons/SkillIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/SkillTabIcon.tsx",
+   "to": "packages/ui/src/icon/icons/SkillTabIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/SkillToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/SkillToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/SparklesIcon.tsx",
+   "to": "packages/ui/src/icon/icons/SparklesIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/StarIcon.tsx",
+   "to": "packages/ui/src/icon/icons/StarIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/StatusIcon.tsx",
+   "to": "packages/ui/src/icon/icons/StatusIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/SubRepoIcon.tsx",
+   "to": "packages/ui/src/icon/icons/SubRepoIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/SuccessToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/SuccessToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/SunIcon.tsx",
+   "to": "packages/ui/src/icon/icons/SunIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TaskBubbleIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TaskBubbleIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TaskListIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TaskListIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TemplateAlarmClockIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TemplateAlarmClockIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TemplateCalendarIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TemplateCalendarIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TemplateFilmIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TemplateFilmIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TemplateHospitalIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TemplateHospitalIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TemplateImageIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TemplateImageIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TemplateLanguagesIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TemplateLanguagesIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TemplateLightbulbIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TemplateLightbulbIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TemplateListTodoIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TemplateListTodoIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TemplateMessagesSquareIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TemplateMessagesSquareIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TemplateMoonIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TemplateMoonIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TemplateNewsIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TemplateNewsIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TemplateWeeklyReportIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TemplateWeeklyReportIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TencentDocsBrandIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TencentDocsBrandIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TencentDocsIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TencentDocsIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TencentLexiangColorIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TencentLexiangColorIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TencentLexiangIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TencentLexiangIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/TerminalToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/TerminalToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ToolDefaultIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ToolDefaultIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/UnpinTopIcon.tsx",
+   "to": "packages/ui/src/icon/icons/UnpinTopIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/UserIcon.tsx",
+   "to": "packages/ui/src/icon/icons/UserIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/UserPromptListIcon.tsx",
+   "to": "packages/ui/src/icon/icons/UserPromptListIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/UsersIcon.tsx",
+   "to": "packages/ui/src/icon/icons/UsersIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/VideoIcon.tsx",
+   "to": "packages/ui/src/icon/icons/VideoIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/ViewedToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/ViewedToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WarningOutlineIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WarningOutlineIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WarnToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WarnToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbAssistantNavIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbAssistantNavIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbAutomationNavIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbAutomationNavIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbExpertNavIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbExpertNavIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbFileAudioIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbFileAudioIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbFileDiagramIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbFileDiagramIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbFileDocIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbFileDocIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbFileFolderIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbFileFolderIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbFileHtmlIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbFileHtmlIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbFileImageIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbFileImageIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbFileMarkdownIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbFileMarkdownIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbFilePdfIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbFilePdfIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbFileSheetIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbFileSheetIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbFileSlideIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbFileSlideIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbFileTxtIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbFileTxtIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbFileUnknownIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbFileUnknownIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbFileVideoIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbFileVideoIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbFolderIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbFolderIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbMoreNavIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbMoreNavIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbNewTaskIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbNewTaskIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbPinIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbPinIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbProjectNavIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbProjectNavIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbSettingsIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbSettingsIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WbUnpinIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WbUnpinIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WebToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WebToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/WidgetToolIcon.tsx",
+   "to": "packages/ui/src/icon/icons/WidgetToolIcon.tsx"
+  },
+  {
+   "from": "src/foundation/components/Icon/icons/XCloseIcon.tsx",
+   "to": "packages/ui/src/icon/icons/XCloseIcon.tsx"
+  },
+  {
+   "from": "src/lib/__tests__/markdown-blocks.test.ts",
+   "to": "packages/markdown/src/__tests__/markdown-blocks.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/markdown-host-resolve.test.ts",
+   "to": "packages/markdown/src/__tests__/markdown-host-resolve.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/platform.test.ts",
+   "to": "packages/platform/src/__tests__/platform.test.ts"
+  },
+  {
+   "from": "src/lib/clipboard.ts",
+   "to": "packages/platform/src/clipboard.ts"
+  },
+  {
+   "from": "src/lib/markdown-blocks.ts",
+   "to": "packages/markdown/src/markdown-blocks.ts"
+  },
+  {
+   "from": "src/lib/markdown-host.ts",
+   "to": "packages/markdown/src/markdown-host.ts"
+  },
+  {
+   "from": "src/lib/platform.ts",
+   "to": "packages/platform/src/platform.ts"
+  },
+  {
+   "from": "src/styles/global.css",
+   "to": "packages/ui/src/styles/global.css"
+  },
+  {
+   "from": "src/styles/tokens.css",
+   "to": "packages/ui/src/styles/tokens.css"
+  }
+ ]
+}
