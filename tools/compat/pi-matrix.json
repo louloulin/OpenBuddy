@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-11-19",
+  "recordedAt": "2026-11-21",
   "sdk": {
     "package": "@earendil-works/pi-coding-agent",
-    "version": "1.5.2"
+    "version": "1.6.0"
   },
   "packages": [
     {
