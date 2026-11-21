@@ -1,0 +1,30 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": [
+      "ES2023"
+    ],
+    "types": [
+      "node"
+    ],
+    "sourceMap": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "../../packages/protocol/src/**/*.ts",
+    "../../packages/kernel/src/**/*.ts",
+    "../../packages/services/src/**/*.ts",
+    "../../packages/engine/src/**/*.ts",
+    "../../packages/host/src/**/*.ts",
+    "../../packages/pi-bridge/src/server.ts",
+    "../../packages/pi-bridge/src/event-buffer.ts",
+    "../../packages/pi-bridge/src/scopes.ts",
+    "../../packages/pi-bridge/src/index.ts",
+    "../../packages/gateway/src/agentCore.ts"
+  ],
+  "exclude": [
+    "../../**/*.test.ts",
+    "../../**/__tests__/**"
+  ]
+}
