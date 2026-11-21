@@ -58,6 +58,7 @@ export default function SessionPanelScreen() {
   const [experts, setExperts] = useState<ExpertOption[]>([])
   const [expertId, setExpertId] = useState<string | undefined>()
   const [thinking, setThinking] = useState<ThinkingLevel | undefined>()
+  const [model, setModel] = useState<string | undefined>()
   const [artifacts, setArtifacts] = useState<ArtifactEntry[]>([])
   const [rules, setRules] = useState<PermissionRule[]>([])
   const [cwd, setCwd] = useState<string | undefined>()
@@ -75,6 +76,7 @@ export default function SessionPanelScreen() {
       setExperts(toExpertOptions(demo?.experts ?? []))
       setExpertId(demo?.experts?.[0]?.id)
       setThinking(demo?.thinkingLevel as ThinkingLevel | undefined)
+      setModel(demo?.model)
       setArtifacts(toArtifacts(demo?.artifacts ?? []))
       setRules(permissionRules(demo?.rules ?? []))
       setCwd(previewState().sessions.find(item => item.id === sessionId)?.cwd)
@@ -87,7 +89,7 @@ export default function SessionPanelScreen() {
     try {
       const [list, modelState, artifactList, sessionInfo, ruleList] = await Promise.all([
         transport.invoke<unknown>('agents_list', sessionCwd ? { cwd: sessionCwd } : {}).catch(() => []),
-        transport.invoke<{ thinkingLevel?: string; expert?: { id?: string; expertId?: string } | null }>('agent_get_model_state', { sessionId }).catch(() => ({}) as { thinkingLevel?: string; expert?: { id?: string; expertId?: string } | null }),
+        transport.invoke<{ thinkingLevel?: string; modelId?: string; expert?: { id?: string; expertId?: string } | null }>('agent_get_model_state', { sessionId }).catch(() => ({}) as { thinkingLevel?: string; modelId?: string; expert?: { id?: string; expertId?: string } | null }),
         transport.invoke<unknown>('artifacts_list', { sessionId }).catch(() => []),
         transport.invoke<{ usage?: { used?: number; total?: number }; cwd?: string }>('agent_session_info', { sessionId }).catch(() => ({}) as { usage?: { used?: number; total?: number }; cwd?: string }),
         // Read-only: the desktop owns rule editing (设置·安全中心).
@@ -98,6 +100,7 @@ export default function SessionPanelScreen() {
       setExperts(toExpertOptions(list))
       const level = modelState?.thinkingLevel
       setThinking(typeof level === 'string' && (THINKING_LEVELS as readonly string[]).includes(level) ? level as ThinkingLevel : undefined)
+      setModel(typeof modelState?.modelId === 'string' ? modelState.modelId : undefined)
       // The bound expert lives on the branch, so it must be read rather than
       // remembered; otherwise every remount forgets the "当前" marker.
       setExpertId(modelState?.expert?.id ?? modelState?.expert?.expertId)
@@ -308,6 +311,11 @@ export default function SessionPanelScreen() {
             )
           })}
         </ScrollView>
+      </Section>
+
+      <Section theme={theme} label="模型">
+        {/* Read-only: switching the model needs provider auth, which is desktop-only. */}
+        <Row theme={theme} label="当前模型" value={model ?? '跟随桌面'} last />
       </Section>
 
       <Section theme={theme} label="本轮产物">

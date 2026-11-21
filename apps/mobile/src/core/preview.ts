@@ -60,6 +60,8 @@ export type PreviewState = {
   panel?: {
     experts: { id: string; name: string; description?: string }[]
     thinkingLevel?: string
+    /** The bound model id, shown read-only (agent_get_model_state.modelId). */
+    model?: string
     artifacts: { path: string; kind?: string }[]
     usage?: { used: number; total: number }
     /** Read-only permission rules the desktop applies (permission_list). */
@@ -203,6 +205,7 @@ export function previewState(): PreviewState {
       { id: 'e-test', name: '测试搭子', description: '专盯边界条件与并发' },
     ],
     thinkingLevel: 'medium',
+    model: 'claude-sonnet-5-5',
     artifacts: [
       { path: 'docs/plan/20261115-mobile.md', kind: '文档' },
       { path: 'packages/pi-bridge/src/server.ts', kind: '代码' },

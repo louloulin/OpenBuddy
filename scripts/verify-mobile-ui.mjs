@@ -52,7 +52,7 @@ const screens = [
   { name: 'memory-note', path: '/memory/MEMORY.md', expected: ['MEMORY', '内容（Markdown）', '保存', '删除'] },
   { name: 'branches', path: '/branches/sess-refactor', expected: ['分支与检查点', '2/3', '回到某条提问', '文件检查点', 'proxy.ts'] },
   { name: 'automations', path: '/automations', expected: ['每日晨报', '每周代码巡检'] },
-  { name: 'panel', path: '/session/sess-refactor', expected: ['会话设置', '人格', '思考深度', '本轮产物', '用量', '权限', '允许 bash', '拒绝 any'] },
+  { name: 'panel', path: '/session/sess-refactor', expected: ['会话设置', '人格', '思考深度', '当前模型', '本轮产物', '用量', '权限', '允许 bash', '拒绝 any'] },
   { name: 'pair', path: '/pair', expected: ['连接你的电脑', '扫描二维码', '8 位配对码'] },
   { name: 'approval', path: '/approval/req-preview', expected: ['允许修改这 3 个文件', '拒绝', '允许', '稍后处理', 'proxy.ts', 'sse.test.ts'] },
   // A push that outlives its request: shows the "already handled" state.
