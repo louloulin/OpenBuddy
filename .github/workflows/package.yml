@@ -1,12 +1,19 @@
-# Electron 安装包：macOS DMG + Windows 安装器
+# Electron 安装包：macOS DMG + Windows 安装器（可在 GitHub 上打包并配置发布）
 #
-# 只负责打包，不签名、不公证、不发布自动更新清单 —— 没有证书时产出的是可审查的
-# 未签名安装包。触发方式：
-#   - release.yml 在 tag 上调用（workflow_call），打包成功后挂到 GitHub Release；
-#   - 手动 workflow_dispatch，跳过大而全的 CI 门禁，只产 Actions artifact。
+# 打包：
+#   - macOS runner 一次产出 x64 / arm64 两份 DMG（runner 是 arm64，x64 由
+#     electron-builder 交叉打包，不需要 Rosetta）；
+#   - Windows runner 产出 NSIS 安装器（x64）与 blockmap。
 #
-# mac 同时产出 x64 与 arm64 两份 DMG（runner 本身是 arm64，x64 包由
-# electron-builder 交叉打包，不需要 Rosetta）。
+# 发布（可选）：
+#   - tag 构建由 release.yml 调用并自动挂到同名 GitHub Release；
+#   - 手动 workflow_dispatch 可指定 tag / 标题 / 说明 / draft / prerelease。
+#
+# 签名（可选，全部按 secrets 是否存在自动开启）：
+#   - macOS：MACOS_CSC_LINK_BASE64 + MACOS_CSC_KEY_PASSWORD；公证另需
+#     MACOS_API_KEY_BASE64 + MACOS_API_KEY_ID + MACOS_API_ISSUER；
+#   - Windows：WINDOWS_CSC_LINK_BASE64 + WINDOWS_CSC_KEY_PASSWORD。
+#   没配置时产出未签名包，并在日志里明确说明。
 name: Package installers
 
 on:
@@ -17,6 +24,56 @@ on:
         required: false
         type: string
         default: all
+      mac_arch:
+        description: 'both | x64 | arm64'
+        required: false
+        type: string
+        default: both
+      publish:
+        description: '把安装包挂到 GitHub Release'
+        required: false
+        type: boolean
+        default: false
+      release_tag:
+        description: '发布 tag；留空则用当前 tag（分支构建用 v<package.json version>）'
+        required: false
+        type: string
+        default: ''
+      release_name:
+        description: '发布标题；留空则用 tag'
+        required: false
+        type: string
+        default: ''
+      notes:
+        description: '发布说明；留空则自动生成'
+        required: false
+        type: string
+        default: ''
+      draft:
+        description: '发布为草稿'
+        required: false
+        type: boolean
+        default: false
+      prerelease:
+        description: '标记为预发布'
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      MACOS_CSC_LINK_BASE64:
+        required: false
+      MACOS_CSC_KEY_PASSWORD:
+        required: false
+      MACOS_API_KEY_BASE64:
+        required: false
+      MACOS_API_KEY_ID:
+        required: false
+      MACOS_API_ISSUER:
+        required: false
+      WINDOWS_CSC_LINK_BASE64:
+        required: false
+      WINDOWS_CSC_KEY_PASSWORD:
+        required: false
   workflow_dispatch:
     inputs:
       targets:
@@ -28,6 +85,45 @@ on:
           - all
           - macos
           - windows
+      mac_arch:
+        description: 'macOS 架构'
+        required: true
+        type: choice
+        default: both
+        options:
+          - both
+          - x64
+          - arm64
+      publish:
+        description: '把安装包挂到 GitHub Release（需要 contents: write）'
+        required: true
+        type: boolean
+        default: false
+      release_tag:
+        description: '发布 tag（留空则用当前 tag；分支构建用 v<package.json version>）'
+        required: false
+        type: string
+        default: ''
+      release_name:
+        description: '发布标题（留空则用 tag）'
+        required: false
+        type: string
+        default: ''
+      notes:
+        description: '发布说明（留空则自动生成）'
+        required: false
+        type: string
+        default: ''
+      draft:
+        description: '发布为草稿'
+        required: true
+        type: boolean
+        default: false
+      prerelease:
+        description: '标记为预发布'
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -52,17 +148,67 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build:electron
-      # 产物名由 electron-builder.yml 的 ${productName}-${version}-${os}-${arch} 决定。
-      - name: Build macOS DMG (x64 + arm64)
-        run: pnpm exec electron-builder --mac dmg --x64 --arm64 --publish never
+      # 证书 / 公证密钥都只在配置了 secrets 时启用，否则明确产出未签名包。
+      - name: Configure macOS signing (optional)
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          MACOS_CSC_LINK_BASE64: ${{ secrets.MACOS_CSC_LINK_BASE64 }}
+          MACOS_CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+          MACOS_API_KEY_BASE64: ${{ secrets.MACOS_API_KEY_BASE64 }}
+          MACOS_API_KEY_ID: ${{ secrets.MACOS_API_KEY_ID }}
+          MACOS_API_ISSUER: ${{ secrets.MACOS_API_ISSUER }}
+        run: |
+          set -euo pipefail
+          if [ -n "${MACOS_CSC_LINK_BASE64}" ] && [ -n "${MACOS_CSC_KEY_PASSWORD}" ]; then
+            printf '%s' "$MACOS_CSC_LINK_BASE64" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+            {
+              echo "CSC_LINK=$RUNNER_TEMP/signing.p12"
+              echo "CSC_KEY_PASSWORD=$MACOS_CSC_KEY_PASSWORD"
+              echo "SIGNED=true"
+            } >> "$GITHUB_ENV"
+            echo "macOS 签名证书已导入"
+          else
+            {
+              echo "CSC_IDENTITY_AUTO_DISCOVERY=false"
+              echo "SIGNED=false"
+            } >> "$GITHUB_ENV"
+            echo "::notice::未配置 MACOS_CSC_* secrets，产出未签名 DMG"
+          fi
+          if [ -n "${MACOS_API_KEY_BASE64}" ] && [ -n "${MACOS_API_KEY_ID}" ] && [ -n "${MACOS_API_ISSUER}" ]; then
+            printf '%s' "$MACOS_API_KEY_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey_$MACOS_API_KEY_ID.p8"
+            {
+              echo "APPLE_API_KEY=$RUNNER_TEMP/AuthKey_$MACOS_API_KEY_ID.p8"
+              echo "APPLE_API_KEY_ID=$MACOS_API_KEY_ID"
+              echo "APPLE_API_ISSUER=$MACOS_API_ISSUER"
+              echo "NOTARIZE=true"
+            } >> "$GITHUB_ENV"
+            echo "macOS 公证密钥已导入"
+          else
+            echo "NOTARIZE=false" >> "$GITHUB_ENV"
+            echo "::notice::未配置 MACOS_API_* secrets，跳过公证"
+          fi
+      - name: Build macOS DMG
+        env:
+          MAC_ARCH: ${{ inputs.mac_arch }}
+        run: |
+          set -euo pipefail
+          case "$MAC_ARCH" in
+            x64) ARCH_FLAGS="--x64" ;;
+            arm64) ARCH_FLAGS="--arm64" ;;
+            *) ARCH_FLAGS="--x64 --arm64" ;;
+          esac
+          if [ "${NOTARIZE:-false}" = "true" ]; then
+            ARCH_FLAGS="$ARCH_FLAGS --config.mac.notarize=true"
+          fi
+          # shellcheck disable=SC2086
+          pnpm exec electron-builder --mac dmg $ARCH_FLAGS --publish never
       - name: List artifacts
         run: ls -la release/
       - uses: actions/upload-artifact@v4
         with:
           name: openbuddy-macos
-          path: release/*.dmg
+          path: |
+            release/*.dmg
+            release/*.dmg.blockmap
           if-no-files-found: error
 
   windows:
@@ -80,10 +226,24 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build:electron
+      - name: Configure Windows signing (optional)
+        env:
+          WINDOWS_CSC_LINK_BASE64: ${{ secrets.WINDOWS_CSC_LINK_BASE64 }}
+          WINDOWS_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ($env:WINDOWS_CSC_LINK_BASE64 -and $env:WINDOWS_CSC_KEY_PASSWORD) {
+            $pfx = Join-Path $env:RUNNER_TEMP "signing.pfx"
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CSC_LINK_BASE64))
+            "CSC_LINK=$pfx" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "CSC_KEY_PASSWORD=$env:WINDOWS_CSC_KEY_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            Write-Host "Windows 签名证书已导入"
+          } else {
+            "CSC_IDENTITY_AUTO_DISCOVERY=false" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            Write-Host "::notice::未配置 WINDOWS_CSC_* secrets，产出未签名安装器"
+          }
       - name: Build Windows installer (NSIS)
         run: pnpm exec electron-builder --win nsis --x64 --publish never
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: List artifacts
         run: dir release\
       - uses: actions/upload-artifact@v4
@@ -94,11 +254,11 @@ jobs:
             release/*.exe.blockmap
           if-no-files-found: error
 
-  # tag 构建才发布：把两个平台的安装包挂到同名 GitHub Release。
+  # 配置了 publish 才发布：把两个平台的安装包挂到 GitHub Release。
   release:
     needs: [macos, windows]
     if: >-
-      !cancelled() && startsWith(github.ref, 'refs/tags/v')
+      !cancelled() && inputs.publish
       && (needs.macos.result == 'success' || needs.windows.result == 'success')
       && needs.macos.result != 'failure' && needs.windows.result != 'failure'
     runs-on: ubuntu-latest
@@ -106,17 +266,49 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           pattern: openbuddy-*
           path: installers
           merge-multiple: true
-      - name: Attach installers to the GitHub Release
+      - name: Publish installers
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+          INPUT_NAME: ${{ inputs.release_name }}
+          INPUT_NOTES: ${{ inputs.notes }}
+          DRAFT: ${{ inputs.draft }}
+          PRERELEASE: ${{ inputs.prerelease }}
         run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
-            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          set -euo pipefail
+          tag="${INPUT_TAG}"
+          if [ -z "$tag" ]; then
+            if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+              tag="${GITHUB_REF_NAME}"
+            else
+              tag="v$(node -p "require('./package.json').version")"
+            fi
+          fi
+          name="${INPUT_NAME:-$tag}"
+          echo "发布 ${name}（tag: ${tag}）"
+
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            flags=()
+            [ "$DRAFT" = "true" ] && flags+=(--draft)
+            [ "$PRERELEASE" = "true" ] && flags+=(--prerelease)
+            target=()
+            # tag 已存在时不能再传 --target，否则 gh 会报错。
+            if ! git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+              target=(--target "$GITHUB_SHA")
+            fi
+            if [ -n "$INPUT_NOTES" ]; then
+              gh release create "$tag" "${target[@]}" --title "$name" "${flags[@]}" --notes "$INPUT_NOTES"
+            else
+              gh release create "$tag" "${target[@]}" --title "$name" "${flags[@]}" --generate-notes
+            fi
+          fi
+
           find installers -type f \( -name '*.dmg' -o -name '*.exe' \) -print0 \
-            | xargs -0 -r gh release upload "$GITHUB_REF_NAME" --clobber
+            | xargs -0 -r gh release upload "$tag" --clobber
