@@ -1,0 +1,29 @@
+{
+  "name": "@openbuddy/gateway",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  },
+  "version": "0.1.0",
+  "description": "Self-hosted gateway and relay for OpenBuddy mobile clients (ported from lumos gateway)",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "agent": "bun run src/agent.ts",
+    "test": "bun test",
+    "smoke": "bun run scripts/smoke.ts",
+    "admin:create": "bun run scripts/create-admin.ts",
+    "ui:embed": "bun run scripts/embed-ui.ts",
+    "ui:embed:check": "bun run scripts/embed-ui.ts --check",
+    "build:binary": "bun run scripts/embed-ui.ts && bun build --compile --minify --outfile dist/openbuddy-gateway src/generated/index.embedded.ts",
+    "check": "bunx tsc --noEmit && bun test && bun run smoke"
+  },
+  "dependencies": {
+    "hono": "^4.13.0"
+  },
+  "devDependencies": {
+    "bun-types": "^1.4.3",
+    "typescript": "^5.6.3"
+  }
+}
