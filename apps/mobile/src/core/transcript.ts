@@ -1,0 +1,309 @@
+/**
+ * Turning `SessionUpdate` events into a phone-sized transcript
+ * (20261115-mobile.md §4.2, §5.4).
+ *
+ * The desktop emits a fine-grained event stream (deltas, tool calls, tool
+ * results, queue notices). The phone renders a flat list, so this module is the
+ * single place that folds events into rows. It is pure: the screens own no
+ * transcript logic, and the reducer is covered by unit tests that replay a real
+ * capture shape.
+ */
+
+import type { PiContent, PiMessage, SessionUpdate } from '@openbuddy/protocol/dto'
+
+export type ToolRow = {
+  kind: 'tool'
+  id: string
+  name: string
+  /** Short category label, the way the desktop tags a tool call. */
+  category?: string
+  /** Streamed argument preview (path/command while it arrives). */
+  hint?: string
+  status: 'running' | 'ok' | 'error'
+  /** Result text once the tool finished. */
+  output?: string
+  isError?: boolean
+}
+
+export type TextRow = {
+  kind: 'text'
+  id: string
+  role: 'user' | 'assistant' | 'system'
+  text: string
+  /** True while tokens are still arriving; the view shows a caret. */
+  streaming?: boolean
+  isError?: boolean
+  /** A system row that reports a broken state rather than an aside. */
+  interrupted?: boolean
+}
+
+export type ThinkingRow = {
+  kind: 'thinking'
+  id: string
+  text: string
+  /** True while tokens are still arriving; the header animates. */
+  live: boolean
+}
+
+export type TranscriptRow = TextRow | ToolRow | ThinkingRow
+
+export type Transcript = {
+  rows: TranscriptRow[]
+  /** Assistant text of the row currently streaming, for copy/share. */
+  lastAssistantText: string
+}
+
+export function emptyTranscript(): Transcript {
+  return { rows: [], lastAssistantText: '' }
+}
+
+/** Row id of the thinking block belonging to one session's current turn. */
+function thinkingRowId(sessionId: string | undefined): string {
+  return `${sessionId ?? 'session'}:thinking`
+}
+
+export function contentText(content: PiContent[] | string | undefined): string {
+  if (!content) return ''
+  if (typeof content === 'string') return content
+  return content
+    .filter(part => part.type === 'text' && typeof part.text === 'string')
+    .map(part => part.text as string)
+    .join('')
+}
+
+/** Stable row id for a message that arrived from the engine. */
+function messageRowId(message: PiMessage, sessionId: string | undefined, index: number): string {
+  const stamp = typeof message.timestamp === 'number' ? message.timestamp : index
+  return `${sessionId ?? 'session'}:${message.role}:${stamp}:${index}`
+}
+
+function streamingRowId(sessionId: string | undefined): string {
+  return `${sessionId ?? 'session'}:assistant:streaming`
+}
+
+/**
+ * The short tag a tool card carries, the way the desktop labels one.
+ *
+ * `read_text_file` → `read`, `agent_bash` → `bash`, `mcp_fetch` → `mcp`.
+ * A name the phone does not recognise still gets a tag: the first segment.
+ */
+export function toolCategory(name: string): string {
+  const [first = 'tool'] = name.split('_')
+  if (first === 'agent' || first === 'tool') {
+    const [, second] = name.split('_')
+    // `second` may be an empty string (`agent_`), which is not a tag.
+    return second || first
+  }
+  return first || 'tool'
+}
+
+/**
+ * Applies one update. Rows are appended; the streaming assistant row is
+ * updated in place so the list never re-keys mid-stream (that is what keeps
+ * FlashList from re-rendering the whole transcript).
+ */
+export function applyUpdate(transcript: Transcript, update: SessionUpdate, sessionId?: string): Transcript {
+  const rows = transcript.rows
+  const sid = update.sessionId ?? update.__sessionId ?? sessionId
+
+  switch (update.type) {
+    // Reasoning tokens: folded to one line on the phone (desktop `.msg__thought`).
+    case 'thinking_delta':
+    case 'message_thinking': {
+      const delta = update.assistantMessageEvent
+      const chunk = typeof delta?.delta === 'string'
+        ? delta.delta
+        : typeof delta?.content === 'string' ? delta.content : ''
+      const index = rows.findIndex(row => row.kind === 'thinking' && row.id === thinkingRowId(sid))
+      if (!chunk && index !== -1) return transcript
+      if (!chunk) {
+        const opened: ThinkingRow = { kind: 'thinking', id: thinkingRowId(sid), text: '', live: true }
+        return { rows: [...rows, opened], lastAssistantText: transcript.lastAssistantText }
+      }
+      if (index === -1) {
+        const opened: ThinkingRow = { kind: 'thinking', id: thinkingRowId(sid), text: chunk, live: true }
+        return { rows: [...rows, opened], lastAssistantText: transcript.lastAssistantText }
+      }
+      const current = rows[index] as ThinkingRow
+      const next = [...rows]
+      next[index] = { ...current, text: current.text + chunk, live: true }
+      return { rows: next, lastAssistantText: transcript.lastAssistantText }
+    }
+
+    case 'message_update':
+    case 'message_end': {
+      const message = update.message
+      if (!message) return transcript
+      const text = contentText(message.content)
+      const role = message.role === 'user' ? 'user' : message.role === 'assistant' ? 'assistant' : 'system'
+      if (!text) return transcript
+
+      // The final assistant message replaces the streaming placeholder, so a
+      // completed turn never leaves a half row behind.
+      const placeholder = rows.findIndex(row => row.kind === 'text' && row.id === streamingRowId(sid))
+      const row: TextRow = {
+        kind: 'text',
+        id: placeholder === -1 ? messageRowId(message, sid, rows.length) : streamingRowId(sid),
+        role,
+        text,
+        streaming: false,
+        isError: message.isError === true,
+      }
+      if (placeholder === -1) return { rows: [...rows, row], lastAssistantText: role === 'assistant' ? text : transcript.lastAssistantText }
+      const next = [...rows]
+      next[placeholder] = row
+      return {
+        rows: next,
+        lastAssistantText: role === 'assistant' ? text : transcript.lastAssistantText,
+      }
+    }
+
+    case 'message_delta':
+    case 'message_start': {
+      const delta = update.assistantMessageEvent
+      if (!delta) return transcript
+      // The answer began, so reasoning is done: fold it away.
+      const thoughtIndex = rows.findIndex(row => row.kind === 'thinking' && row.live)
+      const rowsAfterThought = thoughtIndex === -1
+        ? rows
+        : (() => {
+          const next = [...rows]
+          next[thoughtIndex] = { ...(next[thoughtIndex] as ThinkingRow), live: false }
+          return next
+        })()
+      const chunk = typeof delta.delta === 'string' ? delta.delta : typeof delta.content === 'string' ? delta.content : ''
+      const index = rowsAfterThought.findIndex(row => row.kind === 'text' && row.id === streamingRowId(sid))
+
+      if (!chunk) {
+        // A start event with no text still opens the row so later deltas find it.
+        if (index !== -1) return { rows: rowsAfterThought, lastAssistantText: transcript.lastAssistantText }
+        const opened: TextRow = { kind: 'text', id: streamingRowId(sid), role: 'assistant', text: '', streaming: true }
+        return { rows: [...rowsAfterThought, opened], lastAssistantText: transcript.lastAssistantText }
+      }
+
+      if (index === -1) {
+        const opened: TextRow = { kind: 'text', id: streamingRowId(sid), role: 'assistant', text: chunk, streaming: true }
+        return { rows: [...rowsAfterThought, opened], lastAssistantText: chunk }
+      }
+      const current = rowsAfterThought[index] as TextRow
+      const next = [...rowsAfterThought]
+      next[index] = { ...current, text: current.text + chunk, streaming: true }
+      return { rows: next, lastAssistantText: current.text + chunk }
+    }
+
+    case 'toolcall_start':
+    case 'toolcall_delta': {
+      const delta = update.assistantMessageEvent
+      const id = update.toolCallId ?? delta?.toolCall?.id
+      if (!id) return transcript
+      const name = update.toolName ?? delta?.toolCall?.name ?? 'tool'
+      const hint = delta?.partialArgs?.path ?? delta?.partialArgs?.command ?? undefined
+      const index = rows.findIndex(row => row.kind === 'tool' && row.id === id)
+      if (index === -1) {
+        return {
+          rows: [...rows, { kind: 'tool', id, name, category: toolCategory(name), hint, status: 'running' }],
+          lastAssistantText: transcript.lastAssistantText,
+        }
+      }
+      const current = rows[index] as ToolRow
+      const next = [...rows]
+      // A delta without a name must not erase the name the start event gave.
+      next[index] = {
+        ...current,
+        name: update.toolName ?? delta?.toolCall?.name ?? current.name,
+        hint: hint ?? current.hint,
+      }
+      return { rows: next, lastAssistantText: transcript.lastAssistantText }
+    }
+
+    case 'toolcall_end':
+    case 'tool_result': {
+      const id = update.toolCallId
+      if (!id) return transcript
+      const index = rows.findIndex(row => row.kind === 'tool' && row.id === id)
+      const result = update.result ?? update.partialResult
+      const output = result?.content
+        ? result.content.filter(part => typeof part.text === 'string').map(part => part.text).join('\n')
+        : ''
+      if (index === -1) {
+        return {
+          rows: [...rows, {
+            kind: 'tool', id, name: update.toolName ?? 'tool', category: toolCategory(update.toolName ?? 'tool'),
+            status: update.isError ? 'error' : 'ok',
+            output: output || undefined, isError: update.isError === true,
+          }],
+          lastAssistantText: transcript.lastAssistantText,
+        }
+      }
+      const current = rows[index] as ToolRow
+      const next = [...rows]
+      next[index] = {
+        ...current,
+        status: update.isError ? 'error' : 'ok',
+        output: output || current.output,
+        isError: update.isError === true,
+      }
+      return { rows: next, lastAssistantText: transcript.lastAssistantText }
+    }
+
+    case 'agent_settled': {
+      // Nothing is arriving any more: close the streaming row so the caret goes,
+      // and fold any reasoning block that was still live.
+      const next = rows.map(row => {
+        if (row.kind === 'text' && row.streaming) return { ...row, streaming: false }
+        if (row.kind === 'thinking' && row.live) return { ...row, live: false }
+        return row
+      })
+      if (next.every((row, index) => row === rows[index])) return transcript
+      return { rows: next, lastAssistantText: transcript.lastAssistantText }
+    }
+
+    default:
+      return transcript
+  }
+}
+
+/** Folds a whole event batch; used when a session is replayed from its snapshot. */
+export function applyUpdates(updates: readonly SessionUpdate[], sessionId?: string): Transcript {
+  return updates.reduce((transcript, update) => applyUpdate(transcript, update, sessionId), emptyTranscript())
+}
+
+/** True while an assistant turn is still producing something on screen. */
+export function isTurnPending(transcript: Transcript): boolean {
+  return transcript.rows.some(row =>
+    (row.kind === 'text' && row.streaming) || (row.kind === 'thinking' && row.live) || (row.kind === 'tool' && row.status === 'running'))
+}
+
+/**
+ * Seals an interrupted turn (20261117-mobile.md §2.5).
+ *
+ * A stream can end without `agent_settled`: the desktop crashed, the tunnel
+ * died, the device was revoked. Anything still marked streaming keeps its caret
+ * blinking and reads as 「still working」, which is the one thing a supervising
+ * phone must never claim falsely. Closing the rows is safe to repeat and safe to
+ * run on a transcript that has already settled — it becomes a no-op.
+ */
+export function sealInterruptedTurn(transcript: Transcript, note?: string): Transcript {
+  let changed = false
+  const rows = transcript.rows.map(row => {
+    if (row.kind === 'text' && row.streaming) { changed = true; return { ...row, streaming: false } }
+    if (row.kind === 'thinking' && row.live) { changed = true; return { ...row, live: false } }
+    if (row.kind === 'tool' && row.status === 'running') { changed = true; return { ...row, status: 'error' as const } }
+    return row
+  })
+  if (!changed) return transcript
+  if (!note) return { ...transcript, rows }
+  // One system row explains why the answer stops mid-sentence.
+  const notice: TranscriptRow = {
+    kind: 'text', id: `interrupted:${rows.length}`, role: 'system', text: note, interrupted: true,
+  }
+  return { ...transcript, rows: [...rows, notice] }
+}
+
+/** One-line preview for the session list. */
+export function transcriptPreview(transcript: Transcript, max = 80): string {
+  const last = [...transcript.rows].reverse().find(row => row.kind === 'text' && row.text.trim())
+  if (!last || last.kind !== 'text') return ''
+  const line = last.text.replace(/\s+/g, ' ').trim()
+  return line.length > max ? `${line.slice(0, max - 1)}…` : line
+}
