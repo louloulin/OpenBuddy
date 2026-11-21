@@ -1,0 +1,71 @@
+/* Favourite models in the model menu + greyed thinking control (20261116-pii W1.6). */
+.model-selector__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.model-selector__row .model-selector__item {
+  padding-right: 34px;
+}
+.model-selector__star {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  translate: 0 -50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wb-text-weak);
+  cursor: pointer;
+  opacity: 0.3;
+  transition: opacity 120ms ease, color 120ms ease, background 120ms ease;
+}
+.model-selector__row:hover .model-selector__star,
+.model-selector__star:focus-visible,
+.model-selector__star--on {
+  opacity: 1;
+}
+.model-selector__star:hover {
+  color: var(--wb-text-strong);
+  background: var(--wb-bg-hover);
+}
+.model-selector__star:focus-visible {
+  outline: 2px solid var(--wb-border-focus, var(--wb-border-default));
+  outline-offset: -2px;
+}
+.model-selector__star--on {
+  color: #c98a00;
+}
+.model-selector__star--on svg {
+  fill: currentColor;
+}
+/* Ctrl/Cmd+P feedback floats above the picker so the composer toolbar never shifts. */
+.model-selector__notice {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  z-index: 51;
+  padding: 6px 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  background: var(--wb-bg-primary);
+  box-shadow: var(--wb-shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.16));
+  color: var(--wb-text-strong);
+  font-size: 12px;
+  pointer-events: none;
+}
+.model-thinking--unsupported {
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--wb-text-weak);
+  opacity: 0.7;
+  cursor: not-allowed;
+  flex-shrink: 0;
+}
