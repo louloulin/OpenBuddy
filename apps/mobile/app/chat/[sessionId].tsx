@@ -1,0 +1,653 @@
+/**
+ * Chat (20261115-mobile.md §4.2 P0, §4.3, §5.4).
+ *
+ * Layout follows the desktop conversation view: an 800px column becomes the
+ * full width on a phone, a compact in-flow header replaces the window title bar,
+ * a pending approval sits above the transcript as a card, and the composer is a
+ * floating card at the bottom. The list is inverted so streaming tokens append
+ * at the visual bottom without moving the thumb.
+ */
+
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View, useColorScheme, useWindowDimensions } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { FlashList, type FlashListRef } from '@shopify/flash-list'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+
+import { Composer } from '../../src/components/Composer'
+import { RequestCard } from '../../src/components/RequestCard'
+import { LoadingRow } from '../../src/components/LoadingRow'
+import { MessageRow } from '../../src/components/MessageRow'
+import { ArrowLeftIcon, ChevronRightIcon, CloseIcon, SparkIcon } from '../../src/components/icons'
+import { emptyTranscript, isTurnPending, type TranscriptRow, type ToolRow } from '../../src/core/transcript'
+import { thinkingLevelLabel } from '../../src/core/session-panel'
+import { summarizeRevert } from '../../src/core/revert'
+import { canRun } from '../../src/core/surface'
+import { followUpsFor } from '../../src/core/follow-ups'
+import { queueLabel, queueRows } from '../../src/core/turn-input'
+import { shouldDismissAfterAnswer, type ApprovalAction } from '../../src/core/approvals'
+import { problemText } from '../../src/core/problem'
+import type { Approval } from '../../src/core/models'
+import { elapsedLabel, sessionTasks } from '../../src/core/tasks'
+import { haptic } from '../../src/native/haptics'
+import { useApp } from '../../src/stores/app'
+import { themeFor } from '../../src/theme'
+
+export default function ChatScreen() {
+  const theme = themeFor(useColorScheme())
+  const router = useRouter()
+  const insets = useSafeAreaInsets()
+  const { width } = useWindowDimensions()
+  // Tablets get the desktop's two panes: the session rail stays put while the
+  // conversation keeps its own scroll.
+  const wide = width >= 768
+  const params = useLocalSearchParams<{ sessionId: string }>()
+  const sessionId = decodeURIComponent(params.sessionId ?? '')
+
+  const transcript = useApp(state => state.transcripts[sessionId]) ?? emptyTranscript()
+  const session = useApp(state => state.sessions.find(item => item.id === sessionId))
+  const openSession = useApp(state => state.openSession)
+  const transport = useApp(state => state.transport)
+  const setActiveSession = useApp(state => state.setActiveSession)
+  const send = useApp(state => state.send)
+  const steer = useApp(state => state.steer)
+  const removeQueued = useApp(state => state.removeQueued)
+  const clearQueue = useApp(state => state.clearQueue)
+  const queue = useApp(state => state.queues[sessionId])
+  const prefill = useApp(state => state.drafts[sessionId])
+  const setDraft = useApp(state => state.setDraft)
+  const sendImage = useApp(state => state.sendImage)
+  const sendImages = useApp(state => state.sendImages)
+  const approvals = useApp(state => state.approvals.filter(item => !item.sessionId || item.sessionId === sessionId))
+  const resolveApproval = useApp(state => state.resolveApproval)
+  const resolveQuestion = useApp(state => state.resolveQuestion)
+  const resolveTrust = useApp(state => state.resolveTrust)
+  const tasks = useApp(state => state.tasks)
+  const refreshTasks = useApp(state => state.refreshTasks)
+  const killTask = useApp(state => state.killTask)
+  const [tasksOpen, setTasksOpen] = useState(false)
+  const [busyRequest, setBusyRequest] = useState<string | null>(null)
+  const regenerate = useApp(state => state.regenerate)
+  const capabilities = useApp(state => state.capabilities)
+  const awaiting = useApp(state => state.awaiting.includes(sessionId))
+  const [revertingId, setRevertingId] = useState<string | null>(null)
+  const [revertNotes, setRevertNotes] = useState<Record<string, string>>({})
+  // Quote-reply / edit-resend (P1): both are local; a quote rides as a `>` prefix.
+  const [quoted, setQuoted] = useState<string | null>(null)
+  const [editToken, setEditToken] = useState(0)
+  const [editText, setEditText] = useState('')
+  // Composer chip: the session's thinking level, cycled with one tap.
+  const connection = useApp(state => state.connection)
+  const thinkingLevel = useApp(state => state.thinkingLevels[sessionId])
+  const refreshThinkingLevel = useApp(state => state.refreshThinkingLevel)
+  const cycleThinkingLevel = useApp(state => state.cycleThinkingLevel)
+
+  // D5: undo the files one tool call wrote. The desktop owns the checkpoints;
+  // the phone reports what it restored and flags conflicts to resolve there.
+  const revertTool = async (row: ToolRow) => {
+    const transport = useApp.getState().transport
+    if (!transport || revertingId) return
+    setRevertingId(row.id)
+    try {
+      const result = await transport.invoke<unknown>('turn_revert', { sessionId, toolCallIds: [row.id] })
+      const summary = summarizeRevert(result)
+      setRevertNotes(notes => ({ ...notes, [row.id]: summary.message }))
+    } catch (error) {
+      setRevertNotes(notes => ({
+        ...notes,
+        [row.id]: problemText(error),
+      }))
+    } finally {
+      setRevertingId(null)
+    }
+  }
+  const toolActions = canRun(capabilities, 'turn_revert')
+    ? {
+      onRevert: (row: ToolRow) => void revertTool(row),
+      revertingId: revertingId ?? undefined,
+      noteFor: (row: ToolRow) => revertNotes[row.id],
+    }
+    : undefined
+
+  // A push tap can land here on a cold launch. The first run paints the cached
+  // transcript and returns before the tunnel exists; re-run when it arrives so
+  // the live history is actually fetched instead of leaving an empty turn list.
+  useEffect(() => {
+    if (sessionId) void openSession(sessionId)
+  }, [sessionId, openSession, transport])
+
+  // While this screen is mounted its settles are read, not counted.
+  useEffect(() => {
+    if (!sessionId) return
+    setActiveSession(sessionId)
+    return () => setActiveSession(null)
+  }, [sessionId, setActiveSession])
+
+  // Approvals sit inline at the newest end, the way the desktop puts a
+  // permission dialog inside the conversation rather than over it.
+  type ChatItem = TranscriptRow | { kind: 'approval'; id: string; approval: typeof approvals[number] }
+  const data = useMemo<ChatItem[]>(() => {
+    const items: ChatItem[] = transcript.rows.map(row => row)
+    for (const approval of approvals) {
+      items.push({ kind: 'approval', id: `approval:${approval.requestId}`, approval })
+    }
+    return items.reverse()
+  }, [transcript.rows, approvals])
+  // The list is inverted, so offset 0 is the live edge. `offsetRef` is what the
+  // last scroll reported; the pin effect reads it before the browser can
+  // deliver the scroll event caused by the new content itself.
+  const listRef = useRef<FlashListRef<ChatItem>>(null)
+  const offsetRef = useRef(0)
+  const [atBottom, setAtBottom] = useState(true)
+  const tailLength = data[0] && data[0].kind === 'text' ? data[0].text.length : 0
+  useEffect(() => {
+    // Follow new tokens only while the reader is at the live edge; once they
+    // scroll up, appending must not yank them back.
+    if (offsetRef.current <= 24) listRef.current?.scrollToOffset({ offset: 0, animated: false })
+  }, [data.length, tailLength])
+  const jumpToLatest = () => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: true })
+    offsetRef.current = 0
+    setAtBottom(true)
+  }
+  const streaming = isTurnPending(transcript)
+  // `agent_regenerate` always redoes the newest answer, so the button belongs
+  // on that row only — offering it on an older message would silently replace
+  // a different turn.
+  const lastAssistantId = useMemo(() => {
+    for (let index = transcript.rows.length - 1; index >= 0; index -= 1) {
+      const row = transcript.rows[index]
+      if (row && row.kind === 'text' && row.role === 'assistant') return row.id
+    }
+    return null
+  }, [transcript.rows])
+  // The waiting row is for the gap before the first token. Once text is
+  // streaming, its own assistant header is the waiting state; keeping both
+  // puts two "OpenBuddy" identities on screen at once.
+  const streamingText = transcript.rows.some(row => row.kind === 'text' && row.role === 'assistant' && row.streaming)
+  // Kimi / Grok put next-question chips under the finished reply. They only
+  // make sense once the turn is over and the answer is the latest one.
+  // Follow-ups assume a finished answer. After an interruption the turn has no
+  // conclusion to build on, so offering 「展开细节」 would ask the user to chase
+  // a reply that never arrived.
+  const interrupted = useMemo(
+    () => transcript.rows.some(row => row.kind === 'text' && row.role === 'system' && row.interrupted),
+    [transcript.rows],
+  )
+  const suggestions = useMemo(
+    () => (!streaming && !awaiting && !interrupted && approvals.length === 0 && transcript.lastAssistantText
+      ? followUpsFor(transcript.lastAssistantText)
+      : []),
+    [streaming, awaiting, interrupted, approvals.length, transcript.lastAssistantText],
+  )
+  const queued = useMemo(() => queueRows(queue), [queue])
+  const sessionTaskRows = useMemo(() => sessionTasks(tasks, sessionId), [tasks, sessionId])
+
+  useEffect(() => {
+    if (sessionId) void refreshTasks()
+  }, [sessionId, refreshTasks])
+
+  useEffect(() => {
+    if (sessionId) void refreshThinkingLevel(sessionId)
+  }, [sessionId, refreshThinkingLevel, transport])
+
+  // The handoff draft is read once by the composer; drop it immediately so a
+  // later remount does not resurrect text the user already sent or cleared.
+  useEffect(() => {
+    if (prefill) setDraft(sessionId, '')
+  }, [prefill, sessionId, setDraft])
+
+  // Poll only while the drawer is open: running tasks are a foreground view.
+  useEffect(() => {
+    if (!tasksOpen) return
+    const timer = setInterval(() => { void refreshTasks() }, 2000)
+    return () => clearInterval(timer)
+  }, [tasksOpen, refreshTasks])
+
+  const handleRequest = async (approval: Approval, action: ApprovalAction) => {
+    void haptic('approve')
+    setBusyRequest(approval.requestId)
+    let answered = true
+    try {
+      if (action.type === 'permission') await resolveApproval(approval.requestId, action.approved)
+      else if (action.type === 'question') {
+        await resolveQuestion(approval.requestId, approval.sessionId ?? sessionId, action.value, action.cancelled)
+      } else if (action.type === 'trust' && approval.cwd) {
+        await resolveTrust(approval.cwd, action.trusted)
+      }
+    } catch {
+      // The store keeps the card and records why. Removing it here would throw
+      // that away and leave the user with no way to answer again (§2.4:
+      // 「回答失败保留卡片并提示，不自动重试」).
+      answered = false
+    } finally {
+      setBusyRequest(null)
+    }
+    // Either answer settles the card: 「不信任」 that stays on screen blocks
+    // every following turn from being read as finished. Only on success —
+    // a failed answer must stay tappable.
+    if (answered && shouldDismissAfterAnswer(approval.kind, action)) {
+      useApp.setState(state => ({ approvals: state.approvals.filter(item => item.requestId !== approval.requestId) }))
+    }
+  }
+
+  return (
+    <View style={{ flex: 1, flexDirection: wide ? 'row' : 'column', backgroundColor: theme.surface }}>
+      {wide ? (
+        <SessionRail
+          theme={theme}
+          currentId={sessionId}
+          topInset={insets.top}
+          onPick={id => router.replace(`/chat/${encodeURIComponent(id)}`)}
+        />
+      ) : null}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1, paddingTop: insets.top }}
+      >
+      {/* In-flow header, like the desktop's `.main-topbar`: no shadow, one line. */}
+      <View
+        style={{
+          height: 52,
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingLeft: 4,
+          paddingRight: theme.gutter,
+          borderBottomWidth: theme.hairline,
+          borderBottomColor: theme.cardBorder,
+        }}
+      >
+        <Pressable
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="返回"
+          style={({ pressed }) => ({
+            width: theme.touch,
+            height: theme.touch,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: theme.touch / 2,
+            backgroundColor: pressed ? theme.pressed : 'transparent',
+          })}
+        >
+          <ArrowLeftIcon size={20} color={theme.text} />
+        </Pressable>
+        {/* Title opens the session panel; the chevron is the only affordance
+            that says so, so it rides tight against the text. */}
+        <Pressable
+          onPress={() => router.push(`/session/${encodeURIComponent(sessionId)}`)}
+          accessibilityRole="button"
+          accessibilityLabel={`${session?.title ?? '会话'}，打开会话设置`}
+          style={({ pressed }) => ({ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.6 : 1 })}
+        >
+          <Text numberOfLines={1} style={{ flexShrink: 1, color: theme.text, fontSize: theme.fontHeading, fontWeight: '600' }}>
+            {session?.title ?? '会话'}
+          </Text>
+          <ChevronRightIcon size={15} color={theme.textWeak} />
+        </Pressable>
+      </View>
+
+      {transcript.rows.length === 0 && approvals.length === 0 ? (
+        // Grok-style empty state: the product name as the hero, then prompts
+        // that can be sent with one tap instead of a centred "no messages".
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            justifyContent: 'center',
+            paddingHorizontal: theme.gutter,
+            paddingBottom: 24,
+          }}
+        >
+          <SparkIcon size={24} color={theme.textWeak} />
+          <Text style={{ color: theme.text, fontSize: theme.fontTitle, fontWeight: '700', letterSpacing: -0.6, marginTop: 12 }}>
+            OpenBuddy
+          </Text>
+          <Text style={{ color: theme.textWeak, fontSize: theme.fontBody, marginTop: 6, lineHeight: 21 }}>
+            把任务发过来，在电脑上执行。
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 20 }}>
+            {['总结一下今天的改动', '把计划里的未完成项列出来', '这段代码为什么慢？'].map(text => (
+              <Pressable
+                key={text}
+                onPress={() => void send(sessionId, text)}
+                accessibilityRole="button"
+                style={({ pressed }) => ({
+                  minHeight: 38,
+                  justifyContent: 'center',
+                  borderWidth: theme.hairline,
+                  borderColor: theme.cardBorder,
+                  borderRadius: theme.radiusPill,
+                  paddingHorizontal: 14,
+                  backgroundColor: pressed ? theme.pressed : 'transparent',
+                })}
+              >
+                <Text style={{ color: theme.textMedium, fontSize: theme.fontMeta }}>{text}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </ScrollView>
+      ) : (
+        <View style={{ flex: 1 }}>
+          <FlashList
+            ref={listRef}
+            data={data}
+            inverted
+            style={{ flex: 1 }}
+            onScroll={event => {
+              offsetRef.current = event.nativeEvent.contentOffset.y
+              setAtBottom(offsetRef.current <= 24)
+            }}
+            scrollEventThrottle={32}
+            renderItem={({ item }: { item: ChatItem }) => (item.kind === 'approval'
+              ? (
+                <RequestCard
+                  approval={item.approval}
+                  busy={busyRequest === item.approval.requestId}
+                  onAction={action => void handleRequest(item.approval, action)}
+                />
+              )
+              : (
+                <MessageRow
+                  row={item}
+                  onRegenerate={!streaming && item.id === lastAssistantId ? () => void regenerate(sessionId) : undefined}
+                  toolActions={toolActions}
+                  onQuote={text => setQuoted(text)}
+                  onEdit={text => { setQuoted(null); setEditText(text); setEditToken(token => token + 1) }}
+                />
+              ))}
+            keyExtractor={row => row.id}
+            // The list is inverted; RN maps `paddingVertical` here to the
+            // physical top, so this is the gap under the header rule. Without
+            // it the first line sat flush against the border and read as cut off.
+            // While scrolled away, reserve room at the live edge for the
+            // 「回到底部」pill so it floats over blank space instead of the
+            // message underneath it. In an inverted list the logical `paddingTop`
+            // is drawn at the physical bottom (the list is scaled), which is why
+            // it is this side that needs the room.
+            contentContainerStyle={{ paddingTop: atBottom ? 10 : 56, paddingBottom: 4 }}
+          />
+          {!atBottom ? (
+            <Pressable
+              onPress={jumpToLatest}
+              accessibilityLabel="回到底部"
+              style={({ pressed }) => ({
+                position: 'absolute',
+                // Clear of the newest message: the button used to sit on top of
+                // it, hiding the very text the user scrolled away from.
+                bottom: 8,
+                right: theme.gutter,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                borderRadius: theme.radiusPill,
+                borderWidth: theme.hairline,
+                borderColor: theme.cardBorder,
+                backgroundColor: pressed ? theme.pressed : theme.card,
+              })}
+            >
+              <Text style={{ color: theme.textMedium, fontSize: 12 }}>回到底部</Text>
+              <View style={{ transform: [{ rotate: '90deg' }] }}>
+                <ChevronRightIcon size={12} color={theme.textWeak} />
+              </View>
+            </Pressable>
+          ) : null}
+        </View>
+      )}
+
+      {sessionTaskRows.length ? (
+        <Pressable
+          onPress={() => { setTasksOpen(true); void refreshTasks() }}
+          accessibilityLabel="查看运行中的任务"
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            marginHorizontal: theme.gutter,
+            minHeight: 34,
+            opacity: pressed ? 0.6 : 1,
+          })}
+        >
+          <Text style={{ flex: 1, color: theme.textMedium, fontSize: theme.fontMeta }}>
+            运行中 {sessionTaskRows.length}
+          </Text>
+          <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta }}>
+            {elapsedLabel(Math.min(...sessionTaskRows.map(task => task.startedAt ?? Date.now())))}
+          </Text>
+          <ChevronRightIcon size={13} color={theme.textWeak} />
+        </Pressable>
+      ) : null}
+
+      {queued.length ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: theme.gutter }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ gap: 8, paddingVertical: 6, paddingRight: 8 }}
+          >
+            {queued.map(row => (
+              <View
+                key={`${row.kind}-${row.index}`}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  borderWidth: theme.hairline,
+                  borderColor: theme.cardBorder,
+                  borderRadius: theme.radiusPill,
+                  paddingLeft: 10,
+                  paddingRight: 6,
+                  paddingVertical: 6,
+                  backgroundColor: theme.card,
+                }}
+              >
+                <Text style={{ color: theme.textWeak, fontSize: theme.fontMicro }}>{queueLabel(row.kind)}</Text>
+                <Text numberOfLines={1} style={{ maxWidth: 140, color: theme.textMedium, fontSize: theme.fontMeta }}>{row.text}</Text>
+                <Pressable
+                  onPress={() => void removeQueued(sessionId, row)}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel="移除排队消息"
+                >
+                  <CloseIcon size={12} color={theme.textWeak} />
+                </Pressable>
+              </View>
+            ))}
+          </ScrollView>
+          {/* Pinned outside the scroller: clearing is a queue-level action and
+              must stay reachable while the chips run off-screen. */}
+          {queued.length > 1 ? (
+            <Pressable
+              onPress={() => void clearQueue(sessionId)}
+              accessibilityRole="button"
+              accessibilityLabel="清空排队消息"
+              style={({ pressed }) => ({
+                minHeight: 34,
+                justifyContent: 'center',
+                paddingLeft: 10,
+                paddingRight: theme.gutter,
+                opacity: pressed ? 0.5 : 1,
+              })}
+            >
+              <Text style={{ color: theme.textWeak, fontSize: theme.fontMeta }}>清空</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
+      {suggestions.length ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flexGrow: 0 }}
+          contentContainerStyle={{ gap: 8, paddingHorizontal: theme.gutter, paddingVertical: 6 }}
+        >
+          {suggestions.map(text => (
+            <Pressable
+              key={text}
+              onPress={() => void send(sessionId, text)}
+              accessibilityRole="button"
+              style={({ pressed }) => ({
+                borderWidth: theme.hairline,
+                borderColor: theme.cardBorder,
+                borderRadius: theme.radiusPill,
+                paddingHorizontal: 12,
+                minHeight: 34,
+                justifyContent: 'center',
+                backgroundColor: pressed ? theme.pressed : 'transparent',
+              })}
+            >
+              <Text style={{ color: theme.textMedium, fontSize: theme.fontMeta }}>{text}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
+
+      {/* A pending approval *is* the reason nothing is streaming: the desktop is
+          blocked on the user. Showing 「等待模型响应」 under the card contradicts
+          the card and reads like a second, stuck queue. */}
+      {!streamingText && approvals.length === 0
+        && (awaiting || (streaming && transcript.rows.every(row => row.kind === 'thinking' || (row.kind === 'text' && row.role === 'user')))) ? (
+        <LoadingRow />
+      ) : null}
+
+      <Composer
+        streaming={streaming}
+        initialDraft={prefill ?? ''}
+        quoted={quoted}
+        onClearQuote={() => setQuoted(null)}
+        prefill={editToken ? { text: editText, token: editToken } : undefined}
+        thinkingLabel={canRun(capabilities, 'agent_set_thinking_level')
+          ? (thinkingLevel ? thinkingLevelLabel(thinkingLevel) : '跟随')
+          : undefined}
+        onCycleThinking={canRun(capabilities, 'agent_set_thinking_level')
+          ? () => { void cycleThinkingLevel(sessionId) }
+          : undefined}
+        onSend={text => void send(sessionId, text)}
+        onImage={(bytes, mime, text) => void sendImage(sessionId, bytes, mime, text)}
+        onImages={(images, text) => void sendImages(sessionId, images, text)}
+        onSteer={text => void steer(sessionId, text)}
+        online={connection === 'open'}
+        onStop={() => {
+          void haptic('stop')
+          void useApp.getState().transport?.invoke('agent_cancel', { sessionId })
+        }}
+      />
+
+      <Modal visible={tasksOpen} transparent animationType="fade" onRequestClose={() => setTasksOpen(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: theme.scrim }}
+            onPress={() => setTasksOpen(false)}
+          />
+          <View style={{
+            backgroundColor: theme.surface,
+            borderTopLeftRadius: theme.radiusSheet,
+            borderTopRightRadius: theme.radiusSheet,
+            paddingHorizontal: theme.gutter,
+            paddingTop: 14,
+            paddingBottom: 12 + insets.bottom,
+            gap: 4,
+          }}>
+            <Text style={{ color: theme.text, fontSize: theme.fontHeading, fontWeight: '700', marginBottom: 6 }}>运行中的任务</Text>
+            {sessionTaskRows.length === 0 ? (
+              <Text style={{ color: theme.textWeak, fontSize: 13, paddingVertical: 12 }}>没有运行中的任务。</Text>
+            ) : (
+              // A busy turn can spawn many children; keep the sheet on-screen.
+              <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+                {sessionTaskRows.map(task => (
+                  <View
+                    key={task.id}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
+                      paddingVertical: 12,
+                      borderTopWidth: theme.hairline,
+                      borderTopColor: theme.cardBorder,
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text numberOfLines={1} style={{ color: theme.text, fontSize: 14 }}>{task.title || task.description || task.id}</Text>
+                      <Text style={{ color: theme.textWeak, fontSize: 12, marginTop: 2 }}>
+                        {[task.kind, elapsedLabel(task.startedAt), task.pending ? `待确认 ${task.pending}` : ''].filter(Boolean).join(' · ')}
+                      </Text>
+                    </View>
+                    <Pressable onPress={() => void killTask(task.id)} hitSlop={8}>
+                      <Text style={{ color: theme.danger, fontSize: 13, fontWeight: '600' }}>结束</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+            <Pressable
+              onPress={() => setTasksOpen(false)}
+              style={({ pressed }) => ({
+                marginTop: 10,
+                paddingVertical: 12,
+                borderRadius: theme.radiusPill,
+                backgroundColor: pressed ? theme.pressed : theme.card,
+                alignItems: 'center',
+              })}
+            >
+              <Text style={{ color: theme.textMedium, fontSize: 14, fontWeight: '600' }}>关闭</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+      </KeyboardAvoidingView>
+    </View>
+  )
+}
+
+/** Tablet rail: the session list the phone shows in its own tab. */
+function SessionRail({
+  theme, currentId, topInset, onPick,
+}: {
+  theme: ReturnType<typeof themeFor>
+  currentId: string
+  topInset: number
+  onPick: (sessionId: string) => void
+}) {
+  const sessions = useApp(state => state.sessions)
+  return (
+    <View
+      style={{
+        width: 280,
+        paddingTop: topInset + 16,
+        paddingBottom: 16,
+        borderRightWidth: theme.hairline,
+        borderRightColor: theme.cardBorder,
+        backgroundColor: theme.surface,
+      }}
+    >
+      <Text style={{ color: theme.text, fontSize: 20, fontWeight: '700', paddingHorizontal: 16, marginBottom: 10 }}>
+        会话
+      </Text>
+      <ScrollView>
+        {sessions.map(session => {
+          const active = session.id === currentId
+          return (
+            <Pressable
+              key={session.id}
+              onPress={() => onPick(session.id)}
+              accessibilityLabel={`切换到 ${session.title}`}
+              style={({ pressed }) => ({
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                backgroundColor: active ? theme.pressed : pressed ? theme.hover : 'transparent',
+              })}
+            >
+              <Text numberOfLines={1} style={{ color: active ? theme.text : theme.textMedium, fontSize: 14, fontWeight: active ? '600' : '400' }}>
+                {session.title}
+              </Text>
+            </Pressable>
+          )
+        })}
+      </ScrollView>
+    </View>
+  )
+}
