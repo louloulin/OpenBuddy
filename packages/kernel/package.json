@@ -1,0 +1,11 @@
+{
+  "name": "@openbuddy/kernel",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "端口接口（事件、宿主 shell、密钥存储、时钟、日志）与参数校验工具。纯 TS，只依赖 protocol；不依赖 electron/DOM/react。",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  }
+}
