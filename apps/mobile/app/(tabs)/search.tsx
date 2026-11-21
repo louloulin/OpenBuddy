@@ -10,7 +10,7 @@ import { useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native'
 import { useRouter } from 'expo-router'
 
-import { SearchIcon } from '../../src/components/icons'
+import { CloseIcon, SearchIcon } from '../../src/components/icons'
 import { PageHeader } from '../../src/components/PageHeader'
 import { isPreview, previewState } from '../../src/core/preview'
 import { problemText } from '../../src/core/problem'
@@ -30,6 +30,12 @@ export default function SearchScreen() {
   const [busy, setBusy] = useState(false)
   const [hits, setHits] = useState<Hit[]>([])
   const [note, setNote] = useState<string | null>(null)
+
+  const clear = () => {
+    setQuery('')
+    setHits([])
+    setNote(null)
+  }
 
   const search = async () => {
     const text = query.trim()
@@ -100,7 +106,13 @@ export default function SearchScreen() {
           returnKeyType="search"
           style={{ flex: 1, color: theme.text, fontSize: 14 }}
         />
-        {busy ? <ActivityIndicator color={theme.textMedium} /> : null}
+        {busy ? (
+          <ActivityIndicator color={theme.textMedium} />
+        ) : query ? (
+          <Pressable onPress={clear} accessibilityRole="button" accessibilityLabel="清空搜索" hitSlop={8}>
+            <CloseIcon size={15} color={theme.textWeak} />
+          </Pressable>
+        ) : null}
       </View>
 
       {note || hits.length ? (
@@ -110,6 +122,9 @@ export default function SearchScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {note ? <Text style={{ color: theme.textWeak, fontSize: 13, paddingHorizontal: 4 }}>{note}</Text> : null}
+          {hits.length ? (
+            <Text style={{ color: theme.textWeak, fontSize: 12, paddingHorizontal: 4 }}>找到 {hits.length} 条结果</Text>
+          ) : null}
 
           {hits.map((hit, index) => (
             <Pressable

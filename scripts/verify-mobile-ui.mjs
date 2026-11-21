@@ -143,10 +143,26 @@ try {
       await page.waitForTimeout(700)
       const results = await page.evaluate(() => document.body.innerText)
       const placeholderOk = await page.getByPlaceholder('搜索会话内容').count() > 0
-      const searchOk = placeholderOk && results.includes('手机端配对流程')
+      const countOk = results.includes('找到 1 条结果')
+      const searchOk = placeholderOk && results.includes('手机端配对流程') && countOk
       await page.screenshot({ path: join(outDir, scheme, 'interaction-search.png') })
-      if (!searchOk) failures.push({ scheme, screen: 'interaction:search', missing: ['手机端配对流程'] })
+      if (!searchOk) failures.push({ scheme, screen: 'interaction:search', missing: ['手机端配对流程/找到 1 条结果'] })
       console.log(`[${searchOk ? 'PASS' : 'FAIL'}] ${scheme} interaction:search`)
+
+      // The clear button empties the query and restores the empty state.
+      let clearOk = true
+      const clearButton = page.getByLabel('清空搜索')
+      if (await clearButton.count() > 0) {
+        await clearButton.first().click()
+        await page.waitForTimeout(300)
+        const cleared = await page.evaluate(() => document.body.innerText)
+        clearOk = cleared.includes('搜索所有会话的正文') && !cleared.includes('手机端配对流程')
+      } else {
+        clearOk = false
+      }
+      await page.screenshot({ path: join(outDir, scheme, 'interaction-search-clear.png') })
+      if (!clearOk) failures.push({ scheme, screen: 'interaction:search-clear', missing: ['清空恢复空态'] })
+      console.log(`[${clearOk ? 'PASS' : 'FAIL'}] ${scheme} interaction:search-clear`)
 
       // Speech rate is a one-tap cycle on the Me screen (§5 Tab 5).
       await page.goto(baseUrl + '/me', { waitUntil: 'load' })
