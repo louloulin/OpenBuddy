@@ -1,0 +1,211 @@
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { Composer } from "../Composer";
+import { useAnnotationStore } from "@/shared/state/annotations-store";
+
+const base = { streaming: false, onSend: vi.fn(), onCancel: vi.fn() };
+
+describe("Composer", () => {
+  it("输入后 Enter 发送", () => {
+    const onSend = vi.fn();
+    render(<Composer {...base} onSend={onSend} />);
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "你好 agent" } });
+    fireEvent.keyDown(input, { key: "Enter", shiftKey: false });
+    expect(onSend).toHaveBeenCalledWith("你好 agent");
+  });
+
+  it("apiReady=false 时输入禁用并显示配置提示,点击触发 onOpenSettings", () => {
+    const onOpenSettings = vi.fn();
+    render(<Composer {...base} apiReady={false} onOpenSettings={onOpenSettings} />);
+    expect(screen.getByRole("textbox")).toBeDisabled();
+    fireEvent.click(screen.getByText(/请先配置 API Key/));
+    expect(onOpenSettings).toHaveBeenCalled();
+  });
+
+  it("showMeta 时渲染权限模式选择器（PermissionPicker）", () => {
+    // 默认 ask → 触发器显示"审批模式"。
+    render(<Composer {...base} showMeta onPlaceholder={vi.fn()} />);
+    expect(screen.getByText(/审批模式/)).toBeInTheDocument();
+  });
+
+  it("未传 workspaces / models 时不渲染只弹 toast 的兜底按钮 (pii W0.3)", () => {
+    // Without a workspace list or model list there is nothing to pick: no "选择工作空间" / "Auto"
+    // buttons that would only raise a placeholder toast.
+    const onPlaceholder = vi.fn();
+    render(<Composer {...base} showMeta onPlaceholder={onPlaceholder} />);
+    expect(screen.queryByText("选择工作空间")).toBeNull();
+    expect(screen.queryByText("Auto")).toBeNull();
+    expect(onPlaceholder).not.toHaveBeenCalled();
+  });
+
+  it("streaming 时显示停止按钮", () => {
+    const onCancel = vi.fn();
+    render(<Composer {...base} streaming onCancel={onCancel} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "x" } });
+    fireEvent.click(screen.getByRole("button", { name: "停止生成" }));
+    expect(onCancel).toHaveBeenCalled();
+  });
+
+  // ---------- 批注托盘 (pii W1.9) ----------
+  it("批注进入托盘，随下一条消息一起发送并清空", () => {
+    const onSend = vi.fn();
+    useAnnotationStore.getState().add("s-anno", "report.md", "关于 `report.md` 中的这段：\n> 旧文案");
+    render(<Composer {...base} onSend={onSend} usageSessionId="s-anno" />);
+    expect(screen.getByText("批注（1）")).toBeInTheDocument();
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "改成新文案" } });
+    fireEvent.keyDown(input, { key: "Enter", shiftKey: false });
+    expect(onSend).toHaveBeenCalledWith("关于 `report.md` 中的这段：\n> 旧文案\n\n改成新文案");
+    expect(useAnnotationStore.getState().bySession["s-anno"]).toEqual([]);
+  });
+
+  it("批注可以单条移除", () => {
+    useAnnotationStore.getState().add("s-anno-2", "a.md", "关于 `a.md` 中的这段：\n> x");
+    render(<Composer {...base} usageSessionId="s-anno-2" />);
+    fireEvent.click(screen.getByRole("button", { name: "移除批注 a.md" }));
+    expect(screen.queryByText("批注（1）")).toBeNull();
+  });
+
+  // ---------- 按会话持久化草稿 ----------
+  it("draft + draftKey 初始回填草稿内容", () => {
+    render(
+      <Composer
+        {...base}
+        draft="北京天气怎么样"
+        draftKey="s1"
+      />,
+    );
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
+      "北京天气怎么样",
+    );
+  });
+
+  it("draftKey 变化时回填新草稿(切会话场景)", () => {
+    const { rerender } = render(
+      <Composer {...base} draft="会话A草稿" draftKey="s1" />,
+    );
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
+      "会话A草稿",
+    );
+    rerender(<Composer {...base} draft="会话B草稿" draftKey="s2" />);
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
+      "会话B草稿",
+    );
+  });
+
+  it("用户输入触发 onDraftChange 并带上最新文本", () => {
+    const onDraftChange = vi.fn();
+    render(
+      <Composer {...base} draft="" draftKey="s1" onDraftChange={onDraftChange} />,
+    );
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "你好" },
+    });
+    expect(onDraftChange).toHaveBeenCalledWith("你好");
+  });
+
+  it("草稿回填(draftKey 变化)不触发 onDraftChange(避免把恢复内容当用户输入回写)", () => {
+    const onDraftChange = vi.fn();
+    const { rerender } = render(
+      <Composer {...base} draft="" draftKey="s1" onDraftChange={onDraftChange} />,
+    );
+    onDraftChange.mockClear();
+    rerender(
+      <Composer {...base} draft="恢复出来的字" draftKey="s2" onDraftChange={onDraftChange} />,
+    );
+    expect(onDraftChange).not.toHaveBeenCalled();
+  });
+
+  it("发送后清空草稿(onDraftChange 收到空串)", () => {
+    const onDraftChange = vi.fn();
+    render(
+      <Composer {...base} draft="待发送" draftKey="s1" onDraftChange={onDraftChange} />,
+    );
+    onDraftChange.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "发送" }));
+    expect(onDraftChange).toHaveBeenLastCalledWith("");
+  });
+
+  // ---------- 消息队列:流式时入队 ----------
+  it("streaming + onEnqueue 时显示入队按钮,点击触发 onEnqueue 并清空输入", async () => {
+    const onEnqueue = vi.fn();
+    const onDraftChange = vi.fn();
+    render(
+      <Composer
+        {...base}
+        streaming
+        onEnqueue={onEnqueue}
+        draft="排队中"
+        draftKey="s1"
+        onDraftChange={onDraftChange}
+      />,
+    );
+    // 入队按钮可访问名 = "加入待发送队列"。
+    const btn = screen.getByRole("button", { name: "加入待发送队列" });
+    fireEvent.click(btn);
+    expect(onEnqueue).toHaveBeenCalledWith("排队中", [], "followUp");
+    await waitFor(() => expect(onDraftChange).toHaveBeenLastCalledWith(""));
+  });
+
+  it("steer 入队失败保留草稿并保持忙碌防止重复点击", async () => {
+    let reject!: (error: Error) => void;
+    const enqueue = vi.fn(() => new Promise<void>((_resolve, fail) => { reject = fail; }));
+    render(<Composer {...base} streaming onEnqueue={enqueue} draft="引导输入" draftKey="steer-test" />);
+    fireEvent.click(screen.getByRole("radio", { name: "立即插话" }));
+    const button = screen.getByRole("button", { name: "加入待发送队列" });
+    fireEvent.click(button);
+    expect(enqueue).toHaveBeenCalledWith("引导输入", [], "steer");
+    expect(button).toBeDisabled(); expect(screen.getByRole("textbox")).toHaveValue("引导输入");
+    reject(new Error("queue rejected"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("入队失败");
+    expect(screen.getByRole("textbox")).toHaveValue("引导输入");
+    await waitFor(() => expect(button).toBeEnabled());
+  });
+
+  it("streaming 但文本为空时不渲染入队按钮", () => {
+    render(
+      <Composer {...base} streaming onEnqueue={vi.fn()} draft="" draftKey="s1" />,
+    );
+    expect(screen.queryByRole("button", { name: "加入待发送队列" })).toBeNull();
+    // 停止按钮仍在。
+    expect(screen.getByRole("button", { name: "停止生成" })).toBeInTheDocument();
+  });
+
+  it("未传 onEnqueue 时 streaming 不渲染入队按钮(保持原行为)", () => {
+    render(<Composer {...base} streaming draft="x" draftKey="s1" />);
+    expect(screen.queryByRole("button", { name: "加入待发送队列" })).toBeNull();
+  });
+
+  // ---------- 输入历史(arrow-key recall)----------
+  it("发送后按 ↑ 召回上一条历史,按 ↓ 回到输入框", () => {
+    const onSend = vi.fn();
+    render(<Composer {...base} onSend={onSend} />);
+    const input = screen.getByRole("textbox") as HTMLTextAreaElement;
+    // 发送一条。
+    fireEvent.change(input, { target: { value: "第一条" } });
+    fireEvent.keyDown(input, { key: "Enter", shiftKey: false });
+    expect(onSend).toHaveBeenCalledWith("第一条");
+    // 输入框已清空;按 ↑ 召回「第一条」。
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("第一条");
+    // 按 ↓ 回到输入框(空)。
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("多次发送后 ↑ 连续上翻历史", () => {
+    const onSend = vi.fn();
+    render(<Composer {...base} onSend={onSend} />);
+    const input = screen.getByRole("textbox") as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "a" } });
+    fireEvent.keyDown(input, { key: "Enter", shiftKey: false });
+    fireEvent.change(input, { target: { value: "b" } });
+    fireEvent.keyDown(input, { key: "Enter", shiftKey: false });
+    // ↑ → b(最新),再 ↑ → a。
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("b");
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("a");
+  });
+});
