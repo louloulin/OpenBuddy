@@ -1,0 +1,135 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { useSessionStore } from "../session-store";
+
+const emit = (event: Record<string, unknown>, sessionId = "A") =>
+  useSessionStore.getState().applyUpdate({ ...event, type: String(event.type), sessionId });
+const text = () => useSessionStore.getState().messages.flatMap(m => m.parts).filter(p => p.kind === "text").map(p => p.kind === "text" ? p.text : "").join("");
+
+beforeEach(() => {
+  useSessionStore.setState({ sessionId: null, transcripts: {}, messages: [], streaming: false, streamingMessageId: null, usage: {}, plan: null, error: null });
+  useSessionStore.getState().setSession("A");
+});
+
+describe("Pi transcript events", () => {
+  it("merges deltas by contentIndex and replaces final content without duplication", () => {
+    useSessionStore.getState().startStreaming();
+    emit({ type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 1, delta: "second" } });
+    emit({ type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "first" } });
+    expect(text()).toBe("firstsecond");
+    emit({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "final" }] } });
+    expect(text()).toBe("final");
+    expect(useSessionStore.getState().streaming).toBe(true);
+    emit({ type: "agent_end" });
+    expect(useSessionStore.getState().streaming).toBe(true);
+    emit({ type: "agent_settled" });
+    expect(useSessionStore.getState().streaming).toBe(false);
+  });
+
+  it("keeps retry and compaction events busy without surfacing a terminal error", () => {
+    useSessionStore.getState().startStreaming();
+    for (const type of ["auto_retry_start", "auto_retry_end", "auto_compaction_start", "auto_compaction_end", "compaction_start", "compaction_end", "agent_end"]) {
+      emit({ type });
+      expect(useSessionStore.getState().streaming).toBe(true);
+      expect(useSessionStore.getState().error).toBeNull();
+    }
+    emit({ type: "agent_settled" });
+    expect(useSessionStore.getState().streaming).toBe(false);
+  });
+
+  it("sums model calls within a turn and resets usage for a handled extension command", () => {
+    useSessionStore.getState().startStreaming();
+    emit({ type: "message_end", message: { role: "assistant", content: "first", usage: { input: 2, output: 1, totalTokens: 3 } } });
+    emit({ type: "message_end", message: { role: "assistant", content: "second", usage: { input: 4, output: 2, totalTokens: 6 } } });
+    expect(useSessionStore.getState().usage).toEqual({ promptTokens: 6, completionTokens: 3, totalTokens: 9 });
+    emit({ type: "agent_settled" });
+    useSessionStore.getState().startStreaming();
+    emit({ type: "agent_settled", commandHandled: true });
+    expect(useSessionStore.getState().usage).toEqual({});
+  });
+
+  it("does not route late events into the newly selected session", () => {
+    useSessionStore.getState().setSession("B");
+    emit({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "old" }] } }, "A");
+    expect(text()).toBe("");
+  });
+
+  it("hydrates a loaded session from its snapshot without duplicating cached live state", () => {
+    const history = [
+      { role: "user", content: [{ type: "text", text: "question" }], timestamp: 1 },
+      { role: "assistant", content: [{ type: "text", text: "answer" }], usage: { input: 10, output: 5, totalTokens: 15 }, timestamp: 2 },
+    ];
+    useSessionStore.getState().hydrate("A", history as never, false);
+    expect(useSessionStore.getState().messages.map(m => m.role)).toEqual(["user", "assistant"]);
+    // History usage is not a turn's usage.
+    expect(useSessionStore.getState().usage).toEqual({});
+    useSessionStore.getState().setSession("B");
+    useSessionStore.getState().setSession("A");
+    useSessionStore.getState().hydrate("A", history as never, false);
+    expect(useSessionStore.getState().messages).toHaveLength(2);
+    // A forced hydrate (history branch moved) replaces the transcript.
+    useSessionStore.getState().hydrate("A", history.slice(0, 1) as never, false, true);
+    expect(useSessionStore.getState().messages.map(m => m.role)).toEqual(["user"]);
+  });
+
+  it("rebuilds the transcript from session_rewound", () => {
+    emit({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "q1" }] } });
+    emit({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "a1" }] } });
+    emit({ type: "session_rewound", messages: [{ role: "user", content: [{ type: "text", text: "q1" }] }] });
+    expect(useSessionStore.getState().messages.map(m => m.role)).toEqual(["user"]);
+  });
+
+  it("starts each turn with fresh usage so stats are recorded once per turn", () => {
+    useSessionStore.getState().startStreaming();
+    emit({ type: "message_end", message: { role: "assistant", content: "one", usage: { input: 2, output: 1, totalTokens: 3 } } });
+    emit({ type: "agent_settled" });
+    useSessionStore.getState().startStreaming();
+    emit({ type: "agent_start" });
+    emit({ type: "message_end", message: { role: "assistant", content: "two", usage: { input: 4, output: 2, totalTokens: 6 } } });
+    expect(useSessionStore.getState().usage).toEqual({ promptTokens: 4, completionTokens: 2, totalTokens: 6 });
+  });
+
+  it("overwrites thinking and toolcall end snapshots at their content indices", () => {
+    useSessionStore.getState().startStreaming();
+    emit({ type: "message_update", assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "draft" } });
+    emit({ type: "message_update", assistantMessageEvent: { type: "thinking_end", contentIndex: 0, content: "final reasoning" } });
+    emit({ type: "message_update", assistantMessageEvent: { type: "toolcall_end", contentIndex: 1, toolCall: { type: "toolCall", id: "tc", name: "read", arguments: { path: "a.ts" } } } });
+    const parts = useSessionStore.getState().messages[0].parts;
+    expect(parts[0]).toMatchObject({ kind: "thought", text: "final reasoning" });
+    expect(parts[1]).toMatchObject({ kind: "tool_call", toolCall: { toolCallId: "tc", rawInput: { path: "a.ts" } } });
+  });
+
+  it("clears busy on cancellation and errors without dropping streamed content", () => {
+    useSessionStore.getState().startStreaming();
+    emit({ type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "kept" } });
+    useSessionStore.getState().stopStreaming();
+    expect(useSessionStore.getState().streaming).toBe(false);
+    expect(text()).toBe("kept");
+    useSessionStore.getState().startStreaming();
+    useSessionStore.getState().setError("network error");
+    expect(useSessionStore.getState().streaming).toBe(false);
+    expect(useSessionStore.getState().messages).toHaveLength(1);
+  });
+
+  it("does not accept an event without a session identity", () => {
+    useSessionStore.getState().applyUpdate({ type: "message_end", message: { role: "assistant", content: "unattributed" } });
+    expect(text()).toBe("");
+  });
+
+  it("restores image tool results from persisted messages and settles replay without busy state", () => {
+    emit({ type: "message_end", message: { role: "assistant", content: [{ type: "toolCall", id: "image", name: "read", arguments: { path: "plot.png" } }] } });
+    emit({ type: "message_end", message: { role: "toolResult", toolCallId: "image", toolName: "read", content: [{ type: "image", data: "aW1hZ2U=", mimeType: "image/png" }] } });
+    emit({ type: "agent_settled", replay: true });
+    expect(useSessionStore.getState().streaming).toBe(false);
+    const card = useSessionStore.getState().messages.flatMap(m => m.parts).find(p => p.kind === "tool_call");
+    expect(card?.kind === "tool_call" && card.toolCall).toMatchObject({ status: "completed", content: [{ type: "image", data: "aW1hZ2U=", mimeType: "image/png" }] });
+  });
+
+  it("updates a tool card with the complete execution result", () => {
+    useSessionStore.getState().startStreaming();
+    emit({ type: "tool_execution_start", toolCallId: "t1", toolName: "bash", args: { command: "pwd" } });
+    emit({ type: "tool_execution_update", toolCallId: "t1", toolName: "bash", partialResult: { content: [{ type: "text", text: "part" }] } });
+    emit({ type: "tool_execution_end", toolCallId: "t1", toolName: "bash", result: { content: [{ type: "text", text: "/workspace" }] }, isError: false });
+    const card = useSessionStore.getState().messages.flatMap(m => m.parts).find(p => p.kind === "tool_call");
+    expect(card?.kind === "tool_call" && card.toolCall).toMatchObject({ status: "completed", content: [{ type: "text", text: "/workspace" }] });
+  });
+});
