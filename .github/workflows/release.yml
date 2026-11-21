@@ -1,0 +1,57 @@
+name: Electron packages
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  # A5: the same gates run locally, on a third platform, before any artifact is packaged.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # 产物名与 Release tag 必须一致，否则 dmg/exe 会和版本号漂移。
+      - name: Tag must match package.json version
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          VERSION="v$(node -p "require('./package.json').version")"
+          if [ "$VERSION" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} != package.json version ${VERSION} — bump the version or fix the tag"
+            exit 1
+          fi
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm check:boundaries
+      - run: pnpm audit:ipc
+      - run: pnpm check:ui-tokens
+      - run: pnpm check:deps
+      - run: pnpm check:docs
+      - run: pnpm build:electron
+      - run: pnpm check:perf
+      - run: pnpm gen:sbom
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: release/sbom.cdx.json
+          if-no-files-found: error
+
+  # .github/workflows/package.yml: dmg (x64 + arm64) + Windows NSIS；tag 构建自动挂 Release。
+  package:
+    needs: verify
+    permissions:
+      contents: write
+    uses: ./.github/workflows/package.yml
+    with:
+      publish: ${{ startsWith(github.ref, 'refs/tags/') }}
+    secrets: inherit
+# Builds unsigned review artifacts. Signing, notarization, update publishing and the
+# clean-machine upgrade/rollback drill still need separately configured credentials.

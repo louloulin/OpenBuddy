@@ -1,0 +1,373 @@
+# Mobile path gates + packaging (20261115-mobile.md §9).
+#
+# Push / PR: unit + E2E gates, plus an Expo bundle export with a downloadable
+# JS/asset artifact. v* tags and manual dispatches additionally run EAS native
+# builds when EXPO_TOKEN is configured; those installers can be attached to the
+# same GitHub Release that the desktop package workflow publishes.
+#
+# Both package managers are required: pnpm for the workspace (client and
+# Expo app), bun for the gateway and bridge.
+name: Mobile
+on:
+  push:
+    # Defining tags alone would disable branch pushes; declare both.
+    branches: ['main']
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/client/**'
+      - 'packages/pi-bridge/**'
+      - 'packages/gateway/**'
+      - 'packages/protocol/**'
+      - 'scripts/e2e-mobile*.ts'
+      - 'apps/web/src/app/h5/**'
+      - 'scripts/e2e-desktop-bridge.ts'
+      - 'scripts/e2e-gateway-process.ts'
+      - 'scripts/run-desktop-bridge-e2e.mjs'
+      - 'scripts/bench-mobile.ts'
+      - '.github/workflows/mobile.yml'
+    # Path filters are not evaluated for tag pushes; v* always runs.
+    tags: ['v*']
+  pull_request:
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/client/**'
+      - 'packages/pi-bridge/**'
+      - 'packages/gateway/**'
+      - 'packages/protocol/**'
+      - 'scripts/e2e-mobile*.ts'
+      - 'apps/web/src/app/h5/**'
+      - 'scripts/e2e-desktop-bridge.ts'
+      - 'scripts/e2e-gateway-process.ts'
+      - 'scripts/run-desktop-bridge-e2e.mjs'
+      - 'scripts/bench-mobile.ts'
+      - '.github/workflows/mobile.yml'
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'EAS 构建平台'
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - android
+          - ios
+      profile:
+        description: >-
+          EAS 构建 profile（preview 测试包，production 商店包）
+        required: true
+        type: choice
+        default: preview
+        options:
+          - preview
+          - production
+      publish:
+        description: '把安装包挂到 GitHub Release'
+        required: true
+        type: boolean
+        default: false
+      release_tag:
+        description: >-
+          发布 tag；留空用当前 tag 或 v<package.json version>
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # tag 与两个版本号必须一致。
+      - name: Tag must match package.json and app.json versions
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          set -euo pipefail
+          ROOT_VERSION="v$(node -p "require('./package.json').version")"
+          expo_version=$(node -p \
+            "require('./apps/mobile/app.json').expo.version")
+          EXPO_VERSION="v${expo_version}"
+          TAG="${GITHUB_REF_NAME}"
+          for version in "$ROOT_VERSION" "$EXPO_VERSION"; do
+            if [ "$version" != "$TAG" ]; then
+              echo "::error::tag ${TAG} != ${version}; fix the version/tag"
+              exit 1
+            fi
+          done
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: pnpm install --frozen-lockfile
+      - name: Shared client + Expo logic tests
+        run: npx vitest run packages/client apps/mobile
+      - name: Expo app typecheck
+        run: npx tsc --noEmit -p apps/mobile/tsconfig.json
+      - name: Module boundaries (including the mobile layer)
+        run: node tools/check-boundaries.mjs --check
+      - name: PiBridge tests
+        run: cd packages/pi-bridge && bun test
+      - name: Gateway regression
+        run: cd packages/gateway && bun test
+
+  e2e:
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: pnpm install --frozen-lockfile
+      - name: Protocol bridge end-to-end (no LLM key)
+        run: bun run scripts/e2e-mobile.ts
+      - name: Expo logic layer end-to-end
+        run: bun run scripts/e2e-mobile-app.ts
+      - name: Build the H5 bundle
+        run: npx vite build --config apps/web/vite.config.ts
+      - name: H5 end-to-end (gateway-served bundle)
+        run: bun run scripts/e2e-mobile-h5.ts
+      - name: Push loop end-to-end (desktop → gateway → device)
+        run: bun run scripts/e2e-mobile-push.ts
+      - name: Scheduled tasks end-to-end
+        run: bun run scripts/e2e-mobile-automations.ts
+      - name: Weak-network end-to-end (heartbeat, revocation, reconnect)
+        run: bun run scripts/e2e-mobile-weaknet.ts
+      - name: Desktop bridge end-to-end (Bun gateway + Node desktop + phone)
+        run: node scripts/run-desktop-bridge-e2e.mjs
+      - name: Mobile-path benchmark (smoke)
+        run: bun run scripts/bench-mobile.ts --commands 20 --events 200
+      - name: Multi-phone concurrency (20 clients)
+        run: bun run scripts/bench-mobile-clients.ts --clients 20
+
+  # Every relevant change produces a reviewable JS/asset bundle, even without
+  # Expo credentials. Native builders consume the same source, not this bundle.
+  export:
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Export iOS + Android bundles
+        run: pnpm --filter @openbuddy/mobile export
+      - name: Verify exported bundle
+        run: |
+          set -euo pipefail
+          test -f apps/mobile/dist/metadata.json
+          find apps/mobile/dist -name '*.hbc' -print -quit | grep -q .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-bundle
+          path: apps/mobile/dist
+          if-no-files-found: error
+
+  # Secrets cannot be read in job-level if; publish their presence as outputs.
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.trigger.outputs.should_build }}
+      has_token: ${{ steps.token.outputs.has_token }}
+    steps:
+      - name: Decide whether native build applies
+        id: trigger
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          is_tag=false
+          [[ "$REF" == refs/tags/v* ]] && is_tag=true
+          if [[ "$is_tag" == true ||
+                "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Check Expo credentials
+        id: token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -n "$EXPO_TOKEN" ]; then
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::EXPO_TOKEN missing; skip native build/release"
+          fi
+      # 把跳过原因写进运行摘要，避免 build/release 无解释地 skipped。
+      - name: Explain native build decision
+        env:
+          SHOULD_BUILD: ${{ steps.trigger.outputs.should_build }}
+          HAS_TOKEN: ${{ steps.token.outputs.has_token }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Mobile native build decision"
+            echo ""
+            echo "| Condition | Value |"
+            echo "| --- | --- |"
+            echo "| event / ref | \`$EVENT_NAME\` / \`$REF\` |"
+            echo "| should_build | $SHOULD_BUILD |"
+            echo "| has_token (EXPO_TOKEN) | $HAS_TOKEN |"
+            echo ""
+            if [ "$SHOULD_BUILD" != "true" ]; then
+              echo "Native build skipped: only \`v*\` tag pushes and manual"
+              echo "dispatches request EAS installers."
+            fi
+            if [ "$HAS_TOKEN" != "true" ]; then
+              echo ""
+              echo "Native build skipped: repository secret \`EXPO_TOKEN\` is"
+              echo "not configured. Add it (Settings → Secrets → Actions)"
+              echo "to enable APK/AAB/IPA output."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Optional: cloud-native APK/AAB + IPA. Requires EXPO_TOKEN; Apple/Android
+  # signing credentials must already exist in the Expo account.
+  build:
+    needs: [unit, e2e, export, gate]
+    if: >-
+      needs.gate.outputs.should_build == 'true'
+      && needs.gate.outputs.has_token == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PLATFORM: ${{ inputs.platform || 'all' }}
+      PROFILE: ${{ inputs.profile || 'preview' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # EAS requires the project to be linked to an Expo account; without
+      # extra.eas.projectId the CLI aborts before any build starts.
+      - name: Verify EAS project linkage
+        run: |
+          set -euo pipefail
+          project_id=$(node -p \
+            "require('./apps/mobile/app.json').expo.extra?.eas?.projectId \
+            || ''")
+          if [ -z "$project_id" ]; then
+            echo "::error::missing expo.extra.eas.projectId in app.json"
+            echo "::error::link the project first: cd apps/mobile && eas init"
+            exit 1
+          fi
+          echo "EAS project: $project_id"
+      - name: EAS build (Android)
+        if: env.PLATFORM == 'all' || env.PLATFORM == 'android'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          out_dir="$GITHUB_WORKSPACE/apps/mobile/build"
+          mkdir -p "$out_dir"
+          ext="apk"
+          [ "$PROFILE" = "production" ] && ext="aab"
+          cd apps/mobile
+          pnpm dlx eas-cli@27.11.0 build \
+            --platform android --profile "$PROFILE" \
+            --non-interactive --wait \
+            --output "$out_dir/openbuddy-$PROFILE.$ext"
+      - name: EAS build (iOS)
+        if: env.PLATFORM == 'all' || env.PLATFORM == 'ios'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          out_dir="$GITHUB_WORKSPACE/apps/mobile/build"
+          mkdir -p "$out_dir"
+          cd apps/mobile
+          pnpm dlx eas-cli@27.11.0 build \
+            --platform ios --profile "$PROFILE" \
+            --non-interactive --wait \
+            --output "$out_dir/openbuddy-$PROFILE.ipa"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-installers
+          path: |
+            apps/mobile/build/*.apk
+            apps/mobile/build/*.aab
+            apps/mobile/build/*.ipa
+          if-no-files-found: error
+
+  release:
+    needs: [build, gate]
+    if: >-
+      !cancelled() && needs.gate.outputs.should_build == 'true'
+      && needs.build.result == 'success'
+      && (startsWith(github.ref, 'refs/tags/') || inputs.publish)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: mobile-installers
+          path: installers
+      - name: Attach mobile installers to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          tag="${INPUT_TAG}"
+          if [ -z "$tag" ]; then
+            if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+              tag="${GITHUB_REF_NAME}"
+            else
+              tag="v$(node -p "require('./package.json').version")"
+            fi
+          fi
+          echo "发布移动端安装包到 ${tag}"
+
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            target=()
+            # tag 已存在时不能再传 --target，否则 gh 会报错。
+            if ! git ls-remote --exit-code --tags origin \
+              "refs/tags/$tag" >/dev/null 2>&1; then
+              target=(--target "$GITHUB_SHA")
+            fi
+            # 桌面 tag 流水线可能并发创建同名 Release；
+            # 已存在时继续上传即可。
+            gh release create "$tag" "${target[@]}" \
+              --title "$tag" --generate-notes || true
+          fi
+
+          find installers -type f \
+            \( -name '*.apk' -o -name '*.aab' -o -name '*.ipa' \) -print0 \
+            | xargs -0 -r gh release upload "$tag" --clobber
