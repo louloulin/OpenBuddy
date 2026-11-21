@@ -1,0 +1,70 @@
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { ToolCallCard, ToolCallDetailBody } from "../ToolCallCard";
+import type { ToolCallView } from "@/features/chat/state/session-store";
+
+const base: ToolCallView = {
+  toolCallId: "tc1",
+  title: "edit",
+  kind: "edit",
+  status: "completed",
+  content: [],
+  rawInput: { path: "/work/proj/src/hello.txt" },
+  details: { patch: "@@ -1,2 +1,2 @@\n-old line\n+new line\n context" },
+  durationMs: 1500,
+};
+
+describe("ToolCallCard", () => {
+  it("renders one row: plain label, workspace-relative path, diff stats and time; opens detail on click", () => {
+    const onOpen = vi.fn();
+    render(<ToolCallCard tc={base} cwd="/work/proj" onOpen={onOpen} />);
+    expect(screen.getByText("编辑文件")).toBeInTheDocument();
+    expect(screen.getByText("src/hello.txt")).toBeInTheDocument();
+    expect(screen.getByText("+1")).toBeInTheDocument();
+    expect(screen.getByText("−1")).toBeInTheDocument();
+    expect(screen.getByText("2s")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button"));
+    expect(onOpen).toHaveBeenCalledWith(base);
+  });
+
+  it("summarises a command by its first line", () => {
+    render(<ToolCallCard tc={{ ...base, kind: "bash", title: "bash", details: undefined, rawInput: { command: "npm test\necho done" } }} />);
+    expect(screen.getByText("执行命令")).toBeInTheDocument();
+    expect(screen.getByText("npm test")).toBeInTheDocument();
+  });
+
+  it("names MCP tools by server and tool, and falls back to the first string argument", () => {
+    render(<ToolCallCard tc={{ ...base, kind: "mcp__github__create_issue", title: "mcp__github__create_issue", details: undefined, rawInput: { title: "Bug: crash" } }} />);
+    expect(screen.getByText("github · create_issue")).toBeInTheDocument();
+    expect(screen.getByText("Bug: crash")).toBeInTheDocument();
+  });
+
+  it("truncates very long output at 2000 lines (U3.3) and can show all", () => {
+    const output = Array.from({ length: 2500 }, (_, i) => `line ${i + 1}`).join("\n");
+    const tc: ToolCallView = {
+      ...base,
+      kind: "bash",
+      title: "bash",
+      details: undefined,
+      rawInput: { command: "cat big.log" },
+      content: [{ type: "command_output", command: "cat big.log", output } as never],
+    };
+    render(<ToolCallDetailBody tc={tc} />);
+    expect(screen.getByText(/已显示前 2000 行（共 2500 行）/)).toBeInTheDocument();
+    expect(screen.getByText(/line 2000/)).toBeInTheDocument();
+    expect(screen.queryByText(/line 2001$/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "显示全部" }));
+    expect(screen.queryByText(/已显示前 2000 行/)).toBeNull();
+    expect(screen.getByText(/line 2500$/)).toBeInTheDocument();
+  });
+
+  it("shows a spinner and the last output line while running, and a failure mark when failed", () => {
+    const { rerender, container } = render(
+      <ToolCallCard tc={{ ...base, kind: "bash", status: "in_progress", details: undefined, rawInput: { command: "make" }, content: [{ type: "text", text: "step 1\nstep 2" }] }} />,
+    );
+    expect(container.querySelector(".toolrow__spinner")).not.toBeNull();
+    expect(screen.getByText("step 2")).toBeInTheDocument();
+    rerender(<ToolCallCard tc={{ ...base, kind: "bash", status: "failed", details: undefined, rawInput: { command: "make" } }} />);
+    expect(screen.getByRole("button")).toHaveAccessibleName(/失败/);
+  });
+});

@@ -1,0 +1,341 @@
+
+import { useCallback, useEffect, useState } from "react";
+import { appConfirm } from "../../shared/ui/AppDialog";
+import {
+  BookIcon,
+  SearchIcon,
+  AddIcon,
+  EditToolIcon,
+  DeleteIcon,
+  RefreshCwIcon,
+  SparklesIcon,
+} from "@openbuddy/ui/icon/icons/index";
+import {
+  memoryDelete,
+  memoryList,
+  memoryRewrite,
+  memorySave,
+} from "@openbuddy/client/agent-client";
+import type { MemoryEntry } from "@openbuddy/protocol/dto";
+import { MyFilesPanel } from "./MyFilesPanel";
+import { KnowledgeBasePanel } from "./KnowledgeBasePanel";
+
+interface ResourcesPanelProps {
+  cwd?: string;
+  onToast?: (msg: string) => void;
+  initialTab?: "library" | "inspiration";
+}
+
+/** 资料库 (pii W5.5): 记忆 / 我的文件 / 知识库 in one page. */
+type LibraryTab = "memory" | "files" | "knowledge";
+
+export function ResourcesPanel({ cwd, onToast }: ResourcesPanelProps) {
+  const [tab, setTab] = useState<LibraryTab>("memory");
+  const [entries, setEntries] = useState<MemoryEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [query, setQuery] = useState("");
+  const [editing, setEditing] = useState<{ scope: string; path: string; content: string; isNew: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      setEntries(await memoryList(cwd));
+    } catch (e) {
+      onToast?.(`加载资料库失败：${String(e).replace(/^Error:\s*/, "")}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [cwd, onToast]);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  const handleSave = useCallback(
+    async (scope: string, path: string, content: string, isNew: boolean) => {
+      if (!path.trim()) {
+        onToast?.("文件名不能为空");
+        return;
+      }
+      if (!path.endsWith(".md")) {
+        onToast?.("文件名需以 .md 结尾");
+        return;
+      }
+      setBusy(true);
+      try {
+        await memorySave(scope === "workspace" ? "workspace" : "global", path, content, cwd);
+        onToast?.(isNew ? "已创建记忆" : "已保存");
+        setEditing(null);
+        reload();
+      } catch (e) {
+        onToast?.(`保存失败：${String(e).replace(/^Error:\s*/, "")}`);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [cwd, onToast, reload],
+  );
+
+  const handleDelete = useCallback(
+    async (entry: MemoryEntry) => {
+      if (!(await appConfirm({ title: `确定删除「${entry.path}」？`, confirmLabel: "删除", danger: true }))) return;
+      try {
+        await memoryDelete(entry.scope === "workspace" ? "workspace" : "global", entry.path, cwd);
+        onToast?.("已删除");
+        reload();
+      } catch (e) {
+        onToast?.(`删除失败：${String(e).replace(/^Error:\s*/, "")}`);
+      }
+    },
+    [cwd, onToast, reload],
+  );
+
+  const handleRewrite = useCallback(async () => {
+    if (!(await appConfirm({ title: "整理记忆会把全局记忆合并去重到 MEMORY.md，其余文件移除。继续？" }))) return;
+    setBusy(true);
+    try {
+      const result = await memoryRewrite();
+      onToast?.(`已整理：${result.merged} 个文件合并为 ${result.kept} 条`);
+      reload();
+    } catch (e) {
+      onToast?.(`重写失败：${String(e).replace(/^Error:\s*/, "")}`);
+    } finally {
+      setBusy(false);
+    }
+  }, [onToast, reload]);
+
+  const filtered = entries.filter(
+    (e) =>
+      e.path.toLowerCase().includes(query.toLowerCase()) ||
+      e.content.toLowerCase().includes(query.toLowerCase()),
+  );
+
+  const globalCount = entries.filter((e) => e.scope === "global").length;
+  const workspaceCount = entries.filter((e) => e.scope === "workspace").length;
+
+  const tabs: Array<{ id: LibraryTab; label: string }> = [
+    { id: "memory", label: "记忆" },
+    { id: "files", label: "我的文件" },
+    { id: "knowledge", label: "知识库" },
+  ];
+  const tabsRow = (
+    <div className="resources-panel__tabs" role="tablist" aria-label="资料库">
+      {tabs.map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          role="tab"
+          aria-selected={tab === item.id}
+          className={"resources-panel__tab" + (tab === item.id ? " resources-panel__tab--on" : "")}
+          onClick={() => setTab(item.id)}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (tab === "files") return <div className="resources-panel">{tabsRow}<MyFilesPanel cwd={cwd} onToast={onToast} /></div>;
+  if (tab === "knowledge") return <div className="resources-panel">{tabsRow}<KnowledgeBasePanel onToast={onToast} /></div>;
+
+  return (
+    <div className="resources-panel">
+      {tabsRow}
+      <div className="resources-panel__header">
+        <h2 className="resources-panel__title">资料库</h2>
+          <div className="resources-panel__header-actions">
+            <button
+              className="resources-panel__action-btn"
+              onClick={handleRewrite}
+              disabled={busy}
+              title="把全局记忆合并去重到 MEMORY.md"
+            >
+              <SparklesIcon size="sm" /> 整理
+            </button>
+            <button
+              className="resources-panel__action-btn"
+              onClick={reload}
+              disabled={loading}
+              title="刷新"
+            >
+              <RefreshCwIcon size="sm" /> 刷新
+            </button>
+          </div>
+      </div>
+
+      <div className="resources-panel__search">
+        <SearchIcon size="md" className="resources-panel__search-icon" />
+        <input
+          type="text"
+          className="resources-panel__search-input"
+          placeholder="搜索记忆…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
+
+      <div className="resources-panel__stats">
+        <span>全局记忆 {globalCount} 条</span>
+        {cwd && <span>· 工作区记忆 {workspaceCount} 条</span>}
+      </div>
+
+      <button
+        className="resources-panel__create-btn"
+        onClick={() =>
+          setEditing({
+            scope: "global",
+            path: "",
+            content: "# 新记忆\n\n",
+            isNew: true,
+          })
+        }
+      >
+        <AddIcon size="sm" /> 新建记忆
+      </button>
+
+      <div className="resources-panel__list">
+        {filtered.length === 0 && !loading && (
+          <div className="resources-panel__empty">
+            <BookIcon size="xl" color="var(--wb-text-tertiary)" />
+            <p>
+              暂无记忆。agent 会在对话中自动学习并写入
+              <code>应用数据目录/pi/memory/MEMORY.md</code>。
+            </p>
+          </div>
+        )}
+        {filtered.map((entry) => (
+          <div
+            key={`${entry.scope}/${entry.path}`}
+            className="resources-panel__item"
+          >
+            <div className="resources-panel__item-icon">
+              <BookIcon size="md" />
+            </div>
+            <div className="resources-panel__item-content">
+              <div className="resources-panel__item-name">
+                {entry.path}
+                <span className="resources-panel__item-scope">
+                  {entry.scope === "global" ? "全局" : "工作区"}
+                </span>
+              </div>
+              <pre className="resources-panel__item-preview">
+                {entry.content.slice(0, 200)}
+                {entry.content.length > 200 ? "…" : ""}
+              </pre>
+            </div>
+            <div className="resources-panel__item-actions">
+              <button
+                className="resources-panel__icon-btn"
+                onClick={() =>
+                  setEditing({
+                    scope: entry.scope,
+                    path: entry.path,
+                    content: entry.content,
+                    isNew: false,
+                  })
+                }
+                title="编辑"
+              >
+                <EditToolIcon size="sm" />
+              </button>
+              <button
+                className="resources-panel__icon-btn resources-panel__icon-btn--danger"
+                onClick={() => handleDelete(entry)}
+                title="删除"
+              >
+                <DeleteIcon size="sm" />
+              </button>
+            </div>
+          </div>
+        ))}
+        {loading && <div className="resources-panel__empty">加载中…</div>}
+      </div>
+
+      {editing && (
+        <MemoryEditor
+          initial={editing}
+          cwd={cwd}
+          busy={busy}
+          onCancel={() => setEditing(null)}
+          onSave={(scope, path, content, isNew) =>
+            handleSave(scope, path, content, isNew)
+          }
+        />
+      )}
+    </div>
+  );
+}
+
+function MemoryEditor({
+  initial,
+  cwd,
+  busy,
+  onCancel,
+  onSave,
+}: {
+  initial: { scope: string; path: string; content: string; isNew: boolean };
+  cwd?: string;
+  busy: boolean;
+  onCancel: () => void;
+  onSave: (scope: string, path: string, content: string, isNew: boolean) => void;
+}) {
+  const [scope, setScope] = useState(initial.scope);
+  const [path, setPath] = useState(initial.path);
+  const [content, setContent] = useState(initial.content);
+
+  return (
+    <div className="modal-overlay memory-editor__overlay" onClick={onCancel}>
+      <div
+        className="memory-editor"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+      >
+        <div className="memory-editor__header">
+          <h3>{initial.isNew ? "新建记忆" : `编辑 ${initial.path}`}</h3>
+          <button className="memory-editor__close" onClick={onCancel}>
+            ✕
+          </button>
+        </div>
+        <div className="memory-editor__meta">
+          <label>
+            范围
+            <select value={scope} onChange={(e) => setScope(e.target.value)}>
+              <option value="global">全局（应用数据目录/pi/memory/）</option>
+              {cwd && <option value="workspace">工作区（&lt;cwd&gt;/.pi/memory/）</option>}
+            </select>
+          </label>
+          <label>
+            文件名
+            <input
+              type="text"
+              value={path}
+              onChange={(e) => setPath(e.target.value)}
+              placeholder="MEMORY.md 或 notes/foo.md"
+              disabled={!initial.isNew}
+            />
+          </label>
+        </div>
+        <textarea
+          className="memory-editor__content"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          spellCheck={false}
+        />
+        <div className="memory-editor__footer">
+          <button className="btn btn--ghost" onClick={onCancel}>
+            取消
+          </button>
+          <button
+            className="btn btn--primary"
+            disabled={busy}
+            onClick={() => onSave(scope, path, content, initial.isNew)}
+          >
+            {busy ? "保存中…" : "保存"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
