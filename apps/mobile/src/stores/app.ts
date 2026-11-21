@@ -818,10 +818,17 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async removeQueued(sessionId, row) {
-    const transport = get().transport
     const queue = get().queues[sessionId]
-    if (!transport || !queue) return
+    if (!queue) return
     const next = withoutQueueItem(queue, row.kind, row.index)
+    // The review build has no tunnel; drop the local copy so the chip reacts,
+    // the same way clearQueue already does.
+    if (isPreview()) {
+      set(state => ({ queues: { ...state.queues, [sessionId]: next } }))
+      return
+    }
+    const transport = get().transport
+    if (!transport) return
     try {
       const result = await transport.invoke<TurnQueue>('agent_set_queue', {
         sessionId,

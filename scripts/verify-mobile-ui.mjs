@@ -186,6 +186,22 @@ try {
       await page.screenshot({ path: join(outDir, scheme, 'interaction-approval-dismiss.png') })
       if (!dismissOk) failures.push({ scheme, screen: 'interaction:approval-dismiss', missing: ['会话首页'] })
       console.log(`[${dismissOk ? 'PASS' : 'FAIL'}] ${scheme} interaction:approval-dismiss`)
+
+      // Removing one queued follow-up must drop that chip and keep the rest.
+      // This path had no review-build branch, so the × was dead in preview.
+      await page.goto(baseUrl + '/chat/sess-refactor', { waitUntil: 'load' })
+      await page.waitForFunction(() => document.body.innerText.includes('顺便补一条并发断言'), null, { timeout: 30_000 })
+      const removeButtons = page.getByLabel('移除排队消息')
+      const chipCount = await removeButtons.count()
+      await removeButtons.first().click()
+      await page.waitForTimeout(350)
+      const afterQueue = await page.evaluate(() => document.body.innerText)
+      const queueOk = chipCount >= 2
+        && !afterQueue.includes('顺便补一条并发断言')
+        && afterQueue.includes('再跑一次基准')
+      await page.screenshot({ path: join(outDir, scheme, 'interaction-queue-remove.png') })
+      if (!queueOk) failures.push({ scheme, screen: 'interaction:queue-remove', missing: ['移除单条队列'] })
+      console.log(`[${queueOk ? 'PASS' : 'FAIL'}] ${scheme} interaction:queue-remove`)
     } finally {
       await page.close()
     }
