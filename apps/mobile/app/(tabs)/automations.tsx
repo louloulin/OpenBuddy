@@ -99,6 +99,11 @@ export default function AutomationsScreen() {
   }
 
   const toggle = async (automation: Automation) => {
+    // The review build has no desktop; flip the local row so the tap reacts.
+    if (isPreview()) {
+      setItems(prev => prev.map(item => item.id === automation.id ? { ...item, status: toggledStatus(item) } : item))
+      return
+    }
     if (!transport) return
     setBusyId(automation.id)
     try {
@@ -137,11 +142,13 @@ export default function AutomationsScreen() {
   }
 
   const remove = async (automation: Automation) => {
-    if (!transport) return
-    if (Platform.OS === 'web') {
+    // The review build and the browser have no native confirm sheet; drop the
+    // row directly (deleteNow handles the preview copy without a transport).
+    if (isPreview() || Platform.OS === 'web') {
       await deleteNow(automation)
       return
     }
+    if (!transport) return
     Alert.alert('删除这个定时任务？', `「${automation.name}」会从电脑上移除，运行记录保留。`, [
       { text: '取消', style: 'cancel' },
       { text: '删除', style: 'destructive', onPress: () => { void deleteNow(automation) } },
@@ -149,6 +156,11 @@ export default function AutomationsScreen() {
   }
 
   const deleteNow = async (automation: Automation) => {
+    // The review build has no desktop; drop the local row so the tap reacts.
+    if (isPreview()) {
+      setItems(prev => prev.filter(item => item.id !== automation.id))
+      return
+    }
     if (!transport) return
     setBusyId(automation.id)
     try {
@@ -300,7 +312,13 @@ export default function AutomationsScreen() {
               </Pressable>
             ) : null}
             {canDelete ? (
-              <Pressable onPress={() => void remove(item)} disabled={busyId === item.id} style={{ paddingHorizontal: 10, paddingVertical: 8 }}>
+              <Pressable
+                onPress={() => void remove(item)}
+                disabled={busyId === item.id}
+                accessibilityRole="button"
+                accessibilityLabel={`删除 ${item.name}`}
+                style={{ paddingHorizontal: 10, paddingVertical: 8 }}
+              >
                 <Text style={{ color: theme.danger, fontSize: 13 }}>删除</Text>
               </Pressable>
             ) : null}

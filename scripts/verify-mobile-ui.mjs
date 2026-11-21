@@ -202,6 +202,18 @@ try {
       await page.screenshot({ path: join(outDir, scheme, 'interaction-queue-remove.png') })
       if (!queueOk) failures.push({ scheme, screen: 'interaction:queue-remove', missing: ['移除单条队列'] })
       console.log(`[${queueOk ? 'PASS' : 'FAIL'}] ${scheme} interaction:queue-remove`)
+
+      // Automations are interactive in the review build too: deleting a local
+      // row must remove it instead of silently no-op'ing without a transport.
+      await page.goto(baseUrl + '/automations', { waitUntil: 'load' })
+      await page.waitForFunction(() => document.body.innerText.includes('每日晨报'), null, { timeout: 30_000 })
+      await page.getByLabel('删除 每日晨报').click()
+      await page.waitForTimeout(300)
+      const afterDelete = await page.evaluate(() => document.body.innerText)
+      const autoDeleteOk = !afterDelete.includes('每日晨报') && afterDelete.includes('每周代码巡检')
+      await page.screenshot({ path: join(outDir, scheme, 'interaction-automation-delete.png') })
+      if (!autoDeleteOk) failures.push({ scheme, screen: 'interaction:automation-delete', missing: ['删除后行消失'] })
+      console.log(`[${autoDeleteOk ? 'PASS' : 'FAIL'}] ${scheme} interaction:automation-delete`)
     } finally {
       await page.close()
     }
