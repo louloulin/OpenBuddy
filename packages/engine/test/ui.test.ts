@@ -1,0 +1,110 @@
+// @vitest-environment node
+import { expect, it } from "vitest";
+import { ExtensionUiBridge } from "../src/extension-ui/bridge.js";
+it("validates typed select/input/confirm responses with matching session identity", async () => {
+  const events: Array<{ name: string; value: any }> = [];
+  const bridge = new ExtensionUiBridge((name, value) =>
+    events.push({ name, value }),
+  );
+  const ui = bridge.context("session");
+  const answer = ui.select("Choose", ["one", "two"]);
+  const request = events.at(-1)!.value;
+  expect(() =>
+    bridge.resolve({
+      sessionId: "other",
+      requestId: request.requestId,
+      value: "one",
+    }),
+  ).toThrow();
+  expect(() =>
+    bridge.resolve({
+      sessionId: "session",
+      requestId: request.requestId,
+      value: "invalid",
+    }),
+  ).toThrow();
+  bridge.resolve({
+    sessionId: "session",
+    requestId: request.requestId,
+    value: "two",
+  });
+  expect(await answer).toBe("two");
+  const confirm = ui.confirm("Confirm", "Proceed?");
+  bridge.cancel("session", "session_closed");
+  expect(await confirm).toBe(false);
+  expect(events.at(-1)!.value.reason).toBe("session_closed");
+});
+it("cancels on SDK AbortSignal and timeout and rejects stale resolutions", async () => {
+  const events: any[] = [];
+  const bridge = new ExtensionUiBridge((_n, p) => events.push(p));
+  const ui = bridge.context("s");
+  const c = new AbortController();
+  const input = ui.input("Value", "hint", { signal: c.signal });
+  const id = events.at(-1).requestId;
+  c.abort();
+  expect(await input).toBeUndefined();
+  expect(() =>
+    bridge.resolve({ sessionId: "s", requestId: id, value: "stale" }),
+  ).toThrow();
+  const timed = ui.select("Timeout", ["x"], { timeout: 10 });
+  expect(await timed).toBeUndefined();
+  expect(events.at(-1).reason).toBe("timeout");
+  // Terminal-only APIs degrade instead of throwing; the user is told once.
+  expect(
+    await ui.custom(() => {
+      throw Error("should not run");
+    }),
+  ).toBeUndefined();
+  await ui.custom(() => { throw Error("x"); });
+  expect(events.filter((e) => typeof e.message === "string" && e.message.includes("自定义界面"))).toHaveLength(1);
+  expect(ui.theme.fg("accent", "hi")).toBe("hi");
+  ui.setEditorText("draft");
+  expect(ui.getEditorText()).toBe("draft");
+  expect(() => ui.setFooter(() => ({}) as never)).not.toThrow();
+  expect(ui.setTheme("dark").success).toBe(false);
+});
+it("waits for the user without a default timeout", async () => {
+  const events: any[] = [];
+  const bridge = new ExtensionUiBridge((_n, p) => events.push(p));
+  const ui = bridge.context("s");
+  const answer = ui.confirm("Sure?", "msg");
+  const request = events.at(-1);
+  expect(request.timeoutMs).toBeUndefined();
+  await new Promise((r) => setTimeout(r, 20));
+  bridge.resolve({ sessionId: "s", requestId: request.requestId, value: true });
+  expect(await answer).toBe(true);
+});
+it("snapshots the exact emitted requests for a client that reconnects", async () => {
+  const events: any[] = [];
+  const bridge = new ExtensionUiBridge((_n, p) => events.push(p));
+  const ui = bridge.context("s");
+  const answer = ui.select("Choose", ["one", "two"]);
+  const emitted = events.at(-1);
+  // Identical to the live event, so the phone rebuilds the same card.
+  expect(bridge.pendingRequests()).toEqual([emitted]);
+  expect(bridge.pendingRequests("other")).toEqual([]);
+  expect(bridge.pendingRequests("s")).toHaveLength(1);
+  bridge.resolve({ sessionId: "s", requestId: emitted.requestId, value: "one" });
+  expect(await answer).toBe("one");
+  expect(bridge.pendingRequests()).toHaveLength(0);
+});
+it("prevents stale contexts from opening new dialogs after cancellation or same-id replacement", async () => {
+  const events: any[] = [];
+  const bridge = new ExtensionUiBridge((name, p) => events.push({ name, p }));
+  const old = bridge.context("s");
+  const pending = old.input("old");
+  bridge.cancel("s", "session_closed");
+  expect(await pending).toBeUndefined();
+  const next = bridge.context("s"),
+    count = events.length;
+  expect(await old.input("stale")).toBeUndefined();
+  expect(events).toHaveLength(count);
+  const current = next.input("current");
+  const request = events.at(-1).p;
+  bridge.resolve({
+    requestId: request.requestId,
+    sessionId: "s",
+    value: "active",
+  });
+  expect(await current).toBe("active");
+});
