@@ -1,0 +1,49 @@
+/*
+ * OpenBuddy global stylesheet.
+ *
+ * The base reset / body / scrollbar rules live inline in index.html (ported
+ * from workbuddy/renderer/index.html). Design tokens (--wb-*) are loaded
+ * here from tokens.css so any ported WorkBuddy component resolves against
+ * the real palette rather than the VS Code fallbacks.
+ *
+ * Import order matters: tokens first, then app-level aliases.
+ */
+@import "./tokens.css";
+
+/* Foundation Icon base (ported from WorkBuddy agent-ui). */
+.wb-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.wb-icon--spin {
+  animation: wb-icon-spin 1.2s linear infinite;
+  transform-origin: center;
+}
+@keyframes wb-icon-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* themable monochrome brand assets: invert under dark theme. */
+.wb-icon--themable {
+  filter: none;
+  transition: filter var(--wb-motion-duration-fast, 160ms)
+    var(--wb-motion-easing-standard, ease);
+}
+.dark .wb-icon--themable,
+[data-theme="dark"] .wb-icon--themable,
+.wb-theme--dark .wb-icon--themable {
+  filter: brightness(0) invert(1);
+}
+
+/* Brand alias used by OpenBuddy components (theme tokens live in tokens.css). */
+:root {
+  --wb-brand: var(--wb-brand-primary, #00c29a);
+}
+
+[data-window-drag-region] { -webkit-app-region: drag; }
+[data-window-drag-region] button, [data-window-drag-region] input, [data-window-drag-region] textarea, [data-window-drag-region] [role="menu"] { -webkit-app-region: no-drag; }

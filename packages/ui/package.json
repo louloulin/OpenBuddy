@@ -1,0 +1,11 @@
+{
+  "name": "@openbuddy/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "UI 基础件：Icon、Toast、ImageLightbox、ThemeProvider、设计 token。",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  }
+}
