@@ -1,0 +1,14 @@
+{
+  "entryJs": 1300000,
+  "largestJs": 1300000,
+  "totalJs": 6200000,
+  "css": 650000,
+  "distElectron": 2600000,
+  "lazyChunks": ["mermaid", "katex", "cytoscape"],
+  "runtime": {
+    "coldStartMs": 30000,
+    "turnLatencyMs": 20000,
+    "workingSetMb": 900,
+    "heapMb": 450
+  }
+}

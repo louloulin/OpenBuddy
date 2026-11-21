@@ -1,0 +1,11 @@
+{
+  "unresolved": 0,
+  "layer": 1,
+  "forbidden": 0,
+  "bridge": 27,
+  "feature-deep": 45,
+  "feature-edge": 21,
+  "cycle": 1,
+  "unreachable": 99,
+  "size": 4
+}
