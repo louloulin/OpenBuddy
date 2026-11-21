@@ -51,31 +51,34 @@ export function packageSourceOf(entry: PackageSource): string {
 }
 
 /**
- * Read a configured package's per-resource switches (S17). Pi's object form uses `[]` to load
- * none of a type and omits the key to load all; only explicitly filtered types are reported.
+ * Read a configured package's per-resource filters (S17 / E1). Pi's object form uses `[]` to load
+ * none of a type, a pattern list to load only what matches, and omits the key to load all.
  */
 export function packageFilterState(entry: PackageSource | undefined): ExtensionPackageFilters | undefined {
   if (!entry || typeof entry === "string") return undefined;
   const filters: ExtensionPackageFilters = {};
   for (const kind of EXTENSION_RESOURCE_KINDS) {
     const value = entry[kind];
-    if (Array.isArray(value)) filters[kind] = value.length > 0;
+    if (!Array.isArray(value)) continue;
+    filters[kind] = value.length > 0 ? [...value] : false;
   }
   return Object.keys(filters).length ? filters : undefined;
 }
 
 /**
- * Apply enabled/disabled switches to one configured package (S17), keeping any other Pi options
- * (`autoload`, custom globs). An enabled type drops the filter (load everything); a disabled type
- * becomes `[]`. Collapses back to the plain string form when nothing else remains.
+ * Apply the per-resource filters to one configured package (S17 / E1), keeping any other Pi options
+ * (`autoload`, custom globs). `true` drops the filter (load everything), `false` becomes `[]` and a
+ * pattern list is written verbatim so Pi applies its own glob rules. Collapses back to the plain
+ * string form when nothing else remains.
  */
 export function applyPackageFilters(entry: PackageSource, enabled: ExtensionPackageFilters): PackageSource {
   const next: Exclude<PackageSource, string> = typeof entry === "string" ? { source: entry } : { ...entry };
   for (const kind of EXTENSION_RESOURCE_KINDS) {
-    const on = enabled[kind];
-    if (on === undefined) continue;
-    if (on) delete next[kind];
-    else next[kind] = [];
+    const value = enabled[kind];
+    if (value === undefined) continue;
+    if (value === true) delete next[kind];
+    else if (value === false) next[kind] = [];
+    else next[kind] = [...value];
   }
   return Object.keys(next).length === 1 ? next.source : next;
 }

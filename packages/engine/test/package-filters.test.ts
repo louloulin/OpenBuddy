@@ -8,7 +8,7 @@ describe("Pi 包资源开关 (S17)", () => {
     expect(packageFilterState("npm:a")).toBeUndefined();
     expect(packageFilterState({ source: "npm:a" })).toBeUndefined();
     expect(packageFilterState({ source: "npm:a", skills: [] })).toEqual({ skills: false });
-    expect(packageFilterState({ source: "npm:a", skills: ["x"], themes: [] })).toEqual({ skills: true, themes: false });
+    expect(packageFilterState({ source: "npm:a", skills: ["x"], themes: [] })).toEqual({ skills: ["x"], themes: false });
   });
 
   it("writes [] when a type is off and drops the key when it is on", () => {
@@ -16,6 +16,21 @@ describe("Pi 包资源开关 (S17)", () => {
     expect(applyPackageFilters({ source: "npm:a", autoload: false, prompts: [] }, { prompts: true })).toEqual({ source: "npm:a", autoload: false });
     // Nothing left beyond the source: collapse back to Pi's string form.
     expect(applyPackageFilters({ source: "npm:a", skills: [] }, { skills: true })).toBe("npm:a");
+  });
+
+  it("writes Pi's glob patterns verbatim (E1)", () => {
+    // Pi applies these itself: `+` force-includes, `-` force-excludes, `!` excludes, bare includes.
+    expect(applyPackageFilters("npm:a", { skills: ["docs/**", "-drafts/*"] })).toEqual({
+      source: "npm:a",
+      skills: ["docs/**", "-drafts/*"],
+    });
+    // A pattern list replaces the previous one, and other kinds are untouched.
+    expect(applyPackageFilters({ source: "npm:a", autoload: false, skills: ["old/*"] }, { skills: ["new/*"] })).toEqual({
+      source: "npm:a",
+      autoload: false,
+      skills: ["new/*"],
+    });
+    expect(packageFilterState({ source: "npm:a", skills: ["new/*"] })).toEqual({ skills: ["new/*"] });
   });
 
   it("attaches filters to the list the panel renders", () => {

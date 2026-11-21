@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { validateCommandPayload } from "../src/validate.js";
-import { validExtensionSource, validRegistryQuery } from "../src/extensions.js";
+import { validExtensionSource, validPackagePatterns, validRegistryQuery } from "../src/extensions.js";
 
 describe("扩展包来源 (pii W2.6 P2 / S14)", () => {
   it("accepts npm, git and owner/repo sources", () => {
@@ -61,5 +61,17 @@ describe("Pi 包市场与包资源 (S15)", () => {
       expect(() => validateCommandPayload("agent_extensions_set_package_resources", { source: "npm:a", resources })).toThrow(/invalid_payload/);
     }
     expect(() => validateCommandPayload("agent_extensions_set_package_resources", { source: "/local", resources: {} })).toThrow(/invalid_payload/);
+  });
+
+  it("accepts Pi glob patterns and refuses escaping ones (E1)", () => {
+    for (const patterns of [["docs/**"], ["+keep.md", "-drop.md"], ["!drafts/*"], ["a/b/c.md"]]) {
+      expect(validPackagePatterns(patterns)).toBe(true);
+      expect(() => validateCommandPayload("agent_extensions_set_package_resources", { source: "npm:a", resources: { skills: patterns } })).not.toThrow();
+    }
+    for (const patterns of [["/etc/passwd"], ["../escape"], ["a\nb"], [""], ["x".repeat(201)], new Array(33).fill("a")]) {
+      expect(validPackagePatterns(patterns)).toBe(false);
+      expect(() => validateCommandPayload("agent_extensions_set_package_resources", { source: "npm:a", resources: { skills: patterns } })).toThrow(/invalid_payload/);
+    }
+    expect(validPackagePatterns("docs/**")).toBe(false);
   });
 });

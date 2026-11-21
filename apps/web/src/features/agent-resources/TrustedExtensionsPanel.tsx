@@ -15,6 +15,7 @@ import {
   type ExtensionCategory,
   type ExtensionPackage,
   type ExtensionPackageDetails,
+  type ExtensionPackageFilters,
   type ExtensionPackagePreview,
   type ExtensionPackageUpdate,
   type ExtensionRegistrySearch,
@@ -22,6 +23,7 @@ import {
   type ExtensionResources,
 } from "@openbuddy/protocol/extensions";
 import { dialog } from "@openbuddy/client/ipc";
+import { PackagePatternEditor } from "./PackagePatternEditor";
 import { readTextFile } from "@openbuddy/client/api/files";
 import { friendlyError } from "@openbuddy/chat-core/error-format";
 import { PuzzlePieceIcon, AddCircleIcon, DeleteIcon, FolderOpenIcon } from "@openbuddy/ui/icon/icons/index";
@@ -78,6 +80,8 @@ export function TrustedExtensionsPanel() {
   const [details, setDetails] = useState<ExtensionPackageDetails | null>(null);
   const [detailsBusy, setDetailsBusy] = useState(false);
   const [category, setCategory] = useState<ExtensionCategory | "all">("all");
+  /** 过滤模式编辑 (E1): which package card shows its Pi glob editor. */
+  const [patternOpen, setPatternOpen] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -182,15 +186,21 @@ export function TrustedExtensionsPanel() {
     finally { setBusy(false); }
   };
   /** 包资源开关 (S17): Pi's object-form filter — `[]` for off, key removed for on. */
-  const setPackageResources = async (one: string, kind: ExtensionResourceKind, enabled: boolean) => {
+  const setPackageResources = async (one: string, filters: ExtensionPackageFilters) => {
     if (busy) return;
     setBusy(true); setError("");
     try {
-      setPackages(await agentExtensionsSetPackageResources(one, { [kind]: enabled }));
+      setPackages(await agentExtensionsSetPackageResources(one, filters));
       setResources(await agentExtensionsResources().catch(() => null));
       setConfig(await agentExtensionsList());
     } catch (error) { setError(friendlyError(error)); }
     finally { setBusy(false); }
+  };
+  /** 模式编辑 (E1): 保留已有的 glob，再开关该类型。 */
+  const toggleResource = (entry: ExtensionPackage, kind: ExtensionResourceKind, enabled: boolean) => {
+    const current = entry.filters?.[kind];
+    const patterns = Array.isArray(current) ? current : [];
+    void setPackageResources(entry.source, { [kind]: enabled ? (patterns.length ? patterns : true) : false });
   };
   const previewPackage = async (value = source.trim()) => {
     if (!value || busy) return;
@@ -325,12 +335,19 @@ export function TrustedExtensionsPanel() {
                     return (
                       <label key={kind} className={"ext-package__filter" + (off ? " ext-package__filter--off" : "")} title={off ? `已关闭：${label}` : `已启用：${label}`}>
                         <input type="checkbox" checked={!off} disabled={busy} aria-label={`${entry.source} ${label}`}
-                          onChange={(event) => void setPackageResources(entry.source, kind, event.target.checked)} />
+                          onChange={(event) => toggleResource(entry, kind, event.target.checked)} />
                         {label}{total ? ` ${total}` : ""}
                       </label>
                     );
                   })}
+                  <button type="button" className="res-panel__btn" aria-expanded={patternOpen === entry.source}
+                    aria-label={`${entry.source} 过滤模式`} disabled={busy}
+                    onClick={() => setPatternOpen(patternOpen === entry.source ? null : entry.source)}>过滤</button>
                 </div>
+                {patternOpen === entry.source && (
+                  <PackagePatternEditor key={`${entry.source}:${JSON.stringify(entry.filters ?? {})}`} entry={entry}
+                    onApply={(filters) => void setPackageResources(entry.source, filters)} />
+                )}
               </div>
               {changelogPathFor(entry.source) && (
                 <button type="button" className="res-panel__btn" disabled={busy || changelogBusy} onClick={() => void openChangelog(entry.source)}>更新日志</button>

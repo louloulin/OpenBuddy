@@ -9,14 +9,20 @@ export interface ExtensionPackage {
   filtered: boolean;
   installedPath?: string;
   /**
-   * Per-resource switches written through Pi's object-form package entry (S17).
-   * Only resource types that are explicitly on/off appear; `false` means "do not load".
+   * Per-resource switches written through Pi's object-form package entry (S17 / E1).
+   * Only resource types that are explicitly filtered appear: `false` means "do not load",
+   * a pattern list means "load only what matches".
    */
   filters?: ExtensionPackageFilters;
 }
 
 export type ExtensionResourceKind = "extensions" | "skills" | "prompts" | "themes";
-export type ExtensionPackageFilters = Partial<Record<ExtensionResourceKind, boolean>>;
+/**
+ * One resource filter (E1): `true` loads every resource of the type, `false` loads none, and a
+ * list of glob patterns loads only what matches — Pi's own package filter syntax.
+ */
+export type ExtensionPackageFilterValue = boolean | string[];
+export type ExtensionPackageFilters = Partial<Record<ExtensionResourceKind, ExtensionPackageFilterValue>>;
 export const EXTENSION_RESOURCE_KINDS: readonly ExtensionResourceKind[] = ["extensions", "skills", "prompts", "themes"];
 
 export interface ExtensionPackageProgress {
@@ -164,12 +170,32 @@ export interface ExtensionResources {
   failures: Array<{ source: string; message: string }>;
 }
 
-/** Validate the per-resource switch payload: known keys, boolean values only (S17). */
+/**
+ * Validate one glob pattern list (E1). Patterns are matched by Pi *inside the package folder*,
+ * so they must stay relative, stay short and cannot walk out of it.
+ */
+export function validPackagePatterns(value: unknown): value is string[] {
+  if (!Array.isArray(value) || value.length > 32) return false;
+  return value.every((pattern) => {
+    if (typeof pattern !== "string" || pattern.length === 0 || pattern.length > 200) return false;
+    if (/[\0\r\n]/.test(pattern)) return false;
+    if (pattern.startsWith("/")) return false;
+    if (pattern.split("/").includes("..")) return false;
+    // A pattern must carry something besides its override prefix.
+    return /[^\s!+-]/.test(pattern);
+  });
+}
+
+/**
+ * Validate the per-resource switch payload (S17): known keys, `true` / `false`, or a glob list.
+ */
 export function validPackageFilters(value: unknown): value is ExtensionPackageFilters {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  return Object.entries(value as Record<string, unknown>).every(
-    ([key, on]) => (EXTENSION_RESOURCE_KINDS as readonly string[]).includes(key) && typeof on === "boolean",
-  );
+  return Object.entries(value as Record<string, unknown>).every(([key, on]) => {
+    if (!(EXTENSION_RESOURCE_KINDS as readonly string[]).includes(key)) return false;
+    if (typeof on === "boolean") return true;
+    return validPackagePatterns(on);
+  });
 }
 
 /** Search text for the registry: bounded, no control characters (empty = browse). */

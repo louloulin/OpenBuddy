@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { AgentResourcesPanel } from "../AgentResourcesPanel";
-import { agentExtensionsPackageDetails, agentExtensionsPackages, agentExtensionsPreviewPackage, agentExtensionsResources, agentExtensionsSearchRegistry, agentExtensionsSetEnabled, capabilityPackSetEnabled, capabilityPacksList, mcpAuthTrigger, mcpList, mcpTest } from "@openbuddy/client/agent-client";
+import { agentExtensionsPackageDetails, agentExtensionsPackages, agentExtensionsPreviewPackage, agentExtensionsResources, agentExtensionsSearchRegistry, agentExtensionsSetEnabled, agentExtensionsSetPackageResources, capabilityPackSetEnabled, capabilityPacksList, mcpAuthTrigger, mcpList, mcpTest } from "@openbuddy/client/agent-client";
 import { readTextFile } from "@openbuddy/client/api/files";
 
 vi.mock("@openbuddy/client/api/files", () => ({ readTextFile: vi.fn() }));
@@ -25,6 +25,7 @@ vi.mock("@openbuddy/client/agent-client", () => ({
   agentExtensionsCheckUpdates: vi.fn(async () => []),
   agentExtensionsResources: vi.fn(async () => ({ extensions: [], skills: [], prompts: [], themes: [], failures: [] })),
   agentExtensionsSetPackageResources: vi.fn(async () => []),
+
   agentExtensionsSearchRegistry: vi.fn(async () => ({ query: "", source: "npm", total: 1, fetchedAt: 0, packages: [{ name: "pi-web-access", version: "1.2.0", description: "Web search", publisher: "pi", weeklyDownloads: 1234, keywords: ["pi-package"] }] })),
   agentExtensionsPackageDetails: vi.fn(async () => ({ name: "pi-web-access", version: "1.2.0", maintainers: [], categories: [] })),
   onExtensionProgress: vi.fn(async () => () => {}),
@@ -156,6 +157,24 @@ describe("MCP explicit OAuth", () => {
     expect(screen.getByText("@nicopreme")).toBeInTheDocument();
     expect(screen.getByText("1f0c2d3")).toBeInTheDocument();
     expect(screen.getByText("MIT")).toBeInTheDocument();
+  });
+
+  it("edits Pi's glob patterns for an installed package (E1)", async () => {
+    const installed = { source: "npm:pi-web-access", scope: "user" as const, filtered: false, installedPath: "/pi/pi-web-access", filters: { skills: ["docs/**"] } };
+    vi.mocked(agentExtensionsPackages).mockResolvedValue([installed]);
+    vi.mocked(agentExtensionsSetPackageResources).mockResolvedValue([{ ...installed, filters: { skills: ["docs/**", "!drafts/*"] } }]);
+    render(<AgentResourcesPanel sessionId="A" />);
+    fireEvent.click(screen.getByRole("button", { name: "可信扩展" }));
+
+    // The editor shows the patterns Pi already applies, and writes new ones back.
+    fireEvent.click(await screen.findByRole("button", { name: "npm:pi-web-access 过滤模式" }));
+    const input = await screen.findByLabelText("npm:pi-web-access 技能 模式");
+    expect(input).toHaveValue("docs/**");
+    fireEvent.change(input, { target: { value: "docs/**, !drafts/*" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存过滤" }));
+    await waitFor(() => expect(agentExtensionsSetPackageResources).toHaveBeenCalledWith("npm:pi-web-access", {
+      extensions: true, skills: ["docs/**", "!drafts/*"], prompts: true, themes: true,
+    }));
   });
 
   it("manages an installed capability pack (B1a)", async () => {

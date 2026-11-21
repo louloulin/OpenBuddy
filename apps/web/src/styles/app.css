@@ -12719,6 +12719,11 @@ button.diff__path {
 .ext-package__filter { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--wb-text-medium); cursor: pointer; }
 .ext-package__filter input { width: 13px; height: 13px; margin: 0; }
 .ext-package__filter--off { color: var(--wb-text-tertiary); text-decoration: line-through; }
+.ext-package__patterns { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.4rem; padding: 0.5rem; border: var(--wb-hairline) solid var(--wb-border-default); border-radius: 0.5rem; }
+.ext-package__pattern { display: flex; align-items: center; gap: 0.4rem; font-size: 0.6875rem; color: var(--wb-text-medium); }
+.ext-package__pattern input[type="checkbox"] { width: 0.8rem; height: 0.8rem; margin: 0; }
+.ext-package__pattern-label { min-width: 2.5rem; }
+.ext-package__pattern-input { flex: 1; min-width: 0; font-size: 0.6875rem; }
 .ext-market { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .ext-market__bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
 .ext-market__bar .res-panel__muted { margin: 0; }
