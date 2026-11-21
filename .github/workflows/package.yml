@@ -1,0 +1,122 @@
+# Electron 安装包：macOS DMG + Windows 安装器
+#
+# 只负责打包，不签名、不公证、不发布自动更新清单 —— 没有证书时产出的是可审查的
+# 未签名安装包。触发方式：
+#   - release.yml 在 tag 上调用（workflow_call），打包成功后挂到 GitHub Release；
+#   - 手动 workflow_dispatch，跳过大而全的 CI 门禁，只产 Actions artifact。
+#
+# mac 同时产出 x64 与 arm64 两份 DMG（runner 本身是 arm64，x64 包由
+# electron-builder 交叉打包，不需要 Rosetta）。
+name: Package installers
+
+on:
+  workflow_call:
+    inputs:
+      targets:
+        description: 'all | macos | windows'
+        required: false
+        type: string
+        default: all
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: '要打包的平台'
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - macos
+          - windows
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    if: ${{ inputs.targets == 'all' || inputs.targets == 'macos' }}
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:electron
+      # 产物名由 electron-builder.yml 的 ${productName}-${version}-${os}-${arch} 决定。
+      - name: Build macOS DMG (x64 + arm64)
+        run: pnpm exec electron-builder --mac dmg --x64 --arm64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: List artifacts
+        run: ls -la release/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openbuddy-macos
+          path: release/*.dmg
+          if-no-files-found: error
+
+  windows:
+    if: ${{ inputs.targets == 'all' || inputs.targets == 'windows' }}
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:electron
+      - name: Build Windows installer (NSIS)
+        run: pnpm exec electron-builder --win nsis --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: List artifacts
+        run: dir release\
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openbuddy-windows
+          path: |
+            release/*.exe
+            release/*.exe.blockmap
+          if-no-files-found: error
+
+  # tag 构建才发布：把两个平台的安装包挂到同名 GitHub Release。
+  release:
+    needs: [macos, windows]
+    if: >-
+      !cancelled() && startsWith(github.ref, 'refs/tags/v')
+      && (needs.macos.result == 'success' || needs.windows.result == 'success')
+      && needs.macos.result != 'failure' && needs.windows.result != 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: openbuddy-*
+          path: installers
+          merge-multiple: true
+      - name: Attach installers to the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          find installers -type f \( -name '*.dmg' -o -name '*.exe' \) -print0 \
+            | xargs -0 -r gh release upload "$GITHUB_REF_NAME" --clobber
