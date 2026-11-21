@@ -61,7 +61,7 @@ OpenBuddy 将 Pi 编码代理放进 Electron 桌面外壳，提供统一的聊�
 | Node.js | `>= 22.19.0`（建议 Node 24） |
 | pnpm | `10.29.3` |
 | Electron | `45.3.0`（已精确固定） |
-| Pi SDK | `@earendil-works/pi-coding-agent` `1.5.2`（已精确固定） |
+| Pi SDK | `@earendil-works/pi-coding-agent` `1.6.0`（已精确固定） |
 
 本机 arm64 二进制实测环境为 Electron `45.3.0` / Node `24.22.2` / Chromium `156.0.8078.96`。
 
@@ -122,7 +122,7 @@ flowchart LR
   Bridge --> Main[Electron 主进程<br/>发送方 / 命令 / 参数校验]
   Main --> Host[host + services]
   Host --> Engine[engine<br/>Pi 会话 / 权限 / 检查点]
-  Engine --> Pi[Pi SDK 1.5.2]
+  Engine --> Pi[Pi SDK 1.6.0]
   Main --> Store[(userData/pi<br/>配置与会话)]
 ```
 

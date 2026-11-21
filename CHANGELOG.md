@@ -5,7 +5,8 @@
 ## v1.0.0（未发布，Electron + Pi 迁移）
 
 - 桌面外壳迁移到 Electron，保留 React 界面；引擎改为进程内 Pi SDK。
-- 精确固定已核实可安装的 Electron 45.3.0、Pi 1.5.2，要求构建 Node >=22.19.0。
+- 精确固定已核实可安装的 Electron 45.3.0、Pi 1.6.0，要求构建 Node >=22.19.0。
+- 将 Pi SDK（`pi-coding-agent` / `pi-mcp`）升级到 1.6.0，同步兼容矩阵与文档，并通过类型检查和全量测试。
 - 增加隔离 preload、IPC 命令/事件白名单、sender 与参数校验、CSP、导航和外链限制。
 - 删除旧 Rust/Tauri 后端、Grok vendor 子模块和旧构建工具，增加 Electron DMG/NSIS 构建配置。
 - 应用数据迁移到 Electron userData/pi；旧 ACP 会话尚无自动转换。
