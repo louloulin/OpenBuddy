@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build output
+dist/
+dist-ssr/
+
+# Electron packages
+dist-electron/
+release/
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.local
+*.log
+
+# TypeScript build artifacts
+*.tsbuildinfo
+
+# Local debugging / inspection artifacts
+.cdp-inspect/
+.workbuddy-ref/
+.zcode/plans/
+nul
+test-grok-connection.mjs
+
+
+# Sensitive certificates / keys
+*.p12
+*.p12.base64
+*.p8
+p12-password.txt
+
+# One-off debugging / inspection scripts under scripts/
+scripts/check-*.js
+scripts/debug-*.js
+scripts/deep-dom-check.js
+scripts/detailed-dom-check.js
+scripts/direct-check.js
+scripts/dom-only-check.js
+scripts/final-check.js
+scripts/get-*.js
+scripts/inspect-*.js
+scripts/quick-test.js
+scripts/simple-*.js
+scripts/test-*.js
+scripts/compare-dom-structure.js
+scripts/cdp-audit.py
+screenshot.png
+
+# moon task-runner cache
+.moon/cache/
+
+# Pi session runtime state
+.pi-glla/
+
+# Playwright MCP browser snapshots
+.playwright-mcp/
+
+# Plan iteration screenshots (dev artifacts, ~1.3GB)
+docs/plan/shots-*/
