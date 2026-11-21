@@ -1,0 +1,53 @@
+{
+ "ok": true,
+ "result": {
+  "label": "baseline",
+  "turns": 200,
+  "sessionId": "01a1da52-77e0-74c6-a58f-3c54201be0c1",
+  "buildS": 1.8,
+  "median": {
+   "interactiveMs": 1029,
+   "longFrames": 1,
+   "maxBlockingMs": 0
+  },
+  "runs": [
+   {
+    "firstScreenMs": null,
+    "interactiveMs": 1029,
+    "longFrames": 1,
+    "maxBlockingMs": 0,
+    "turnsInDom": 200,
+    "codeBlocksInDom": 180,
+    "domNodes": 18461,
+    "keystrokeSlowEvents": 2,
+    "keystrokeMaxMs": 16
+   },
+   {
+    "firstScreenMs": null,
+    "interactiveMs": 1029,
+    "longFrames": 1,
+    "maxBlockingMs": 0,
+    "turnsInDom": 200,
+    "codeBlocksInDom": 180,
+    "domNodes": 18461,
+    "keystrokeSlowEvents": 2,
+    "keystrokeMaxMs": 16
+   },
+   {
+    "firstScreenMs": null,
+    "interactiveMs": 1010,
+    "longFrames": 1,
+    "maxBlockingMs": 0,
+    "turnsInDom": 200,
+    "codeBlocksInDom": 180,
+    "domNodes": 18461,
+    "keystrokeSlowEvents": 2,
+    "keystrokeMaxMs": 16
+   }
+  ],
+  "budget": {
+   "firstScreenMs": 300,
+   "interactiveMs": 800
+  }
+ }
+}
