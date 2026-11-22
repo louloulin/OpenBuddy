@@ -42,6 +42,8 @@ const COMMAND_TIMEOUT_MS = 30_000
 
 export class WsBridgeTransport implements Transport {
   private readonly socketUrl: string
+  /** Set when the configured base URL cannot be parsed; the transport stays closed. */
+  private readonly configError: Error | null
   private readonly maxBackoffMs: number
   private readonly heartbeatMs: number
   private readonly socketFactory: (url: string) => WebSocket
@@ -62,14 +64,27 @@ export class WsBridgeTransport implements Transport {
 
   constructor(options: WsBridgeTransportOptions) {
     const base = options.baseUrl.replace(/\/+$/, '')
-    const url = new URL(`${base}/ws`)
-    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-    url.searchParams.set('token', options.token)
-    if (this.lastSeq > 0) url.searchParams.set('since', String(this.lastSeq))
-    this.socketUrl = url.toString()
+    let socketUrl = ''
+    let configError: Error | null = null
+    try {
+      const url = new URL(`${base}/ws`)
+      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+      url.searchParams.set('token', options.token)
+      socketUrl = url.toString()
+    } catch (e) {
+      // A malformed base URL must not throw out of the constructor: the app
+      // builds the transport during boot and would die with it.
+      configError = e instanceof Error ? e : new Error(String(e))
+    }
+    this.socketUrl = socketUrl
+    this.configError = configError
     this.maxBackoffMs = options.maxBackoffMs ?? 15_000
     this.heartbeatMs = options.heartbeatMs ?? 25_000
     this.socketFactory = options.socketFactory ?? (target => new WebSocket(target))
+    if (configError) {
+      this.setState('closed')
+      return
+    }
     void this.connect()
   }
 
@@ -172,9 +187,17 @@ export class WsBridgeTransport implements Transport {
   }
 
   private connect(): void {
-    if (this.stopped) return
+    if (this.stopped || this.configError) return
     // The socket URL carries the last seq, so a reconnect replays the gap.
-    const url = new URL(this.socketUrl)
+    let url: URL
+    try {
+      url = new URL(this.socketUrl)
+    } catch {
+      // The URL parsed at construction, so this cannot become invalid later:
+      // stop instead of retrying forever.
+      this.setState('closed')
+      return
+    }
     if (this.lastSeq > 0) url.searchParams.set('since', String(this.lastSeq))
     this.setState(this.stateValue === 'open' ? 'open' : 'connecting')
 

@@ -218,7 +218,20 @@ export const modelsZh: Record<string, string> = {
   "models.local.unknownError": "未知错误",
   "models.local.loadFailed": "读取本地模型配置失败：{err}",
   "models.local.saveFailed": "保存失败：{err}",
-};
+
+  "models.field.modelIdPlaceholder": "如 deepseek-chat、glm-4.6",
+  "models.field.displayNamePlaceholder": "如 DeepSeek V3",
+  "models.field.contextWindowPlaceholder": "如 128000",
+  "models.field.maxOutputPlaceholder": "如 8192",
+  "models.provider.autoBaseUrlNote": "已自动改为 {url}（这个地址返回了模型列表）",
+  "models.action.test": "测试连接",
+  "models.field.apiKey": "API Key",
+  "models.field.protocol": "协议",
+  "models.import.filterPlaceholder": "筛选模型",
+  "models.chip.image": "图片",
+  "models.chip.thinking": "思考",
+  "models.local.modelPlaceholder": "例如 qwen2.5-7b-instruct",
+  "models.aria.fetchModels": "拉取模型",};
 
 export const modelsEn: Record<string, string> = {
   // Panel
@@ -439,4 +452,17 @@ export const modelsEn: Record<string, string> = {
   "models.local.unknownError": "Unknown error",
   "models.local.loadFailed": "Failed to load the local model configuration: {err}",
   "models.local.saveFailed": "Save failed: {err}",
-};
+
+  "models.field.modelIdPlaceholder": "e.g. deepseek-chat, glm-4.6",
+  "models.field.displayNamePlaceholder": "e.g. DeepSeek V3",
+  "models.field.contextWindowPlaceholder": "e.g. 128000",
+  "models.field.maxOutputPlaceholder": "e.g. 8192",
+  "models.provider.autoBaseUrlNote": "Changed to {url} automatically (that address returned the model list)",
+  "models.action.test": "Test connection",
+  "models.field.apiKey": "API Key",
+  "models.field.protocol": "Protocol",
+  "models.import.filterPlaceholder": "Filter models",
+  "models.chip.image": "Image",
+  "models.chip.thinking": "Thinking",
+  "models.local.modelPlaceholder": "e.g. qwen2.5-7b-instruct",
+  "models.aria.fetchModels": "Fetch models",};

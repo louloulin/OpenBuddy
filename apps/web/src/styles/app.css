@@ -5220,7 +5220,10 @@ button.diff__path {
   /* WB CDP: home bg=transparent (inherits app #F2F2F2) */
   background: transparent;
   display: flex;
-  justify-content: center;
+  /* `safe` keeps the vertical centering when the home block fits, but falls back to
+     flex-start when it overflows: with plain `center` the headline is pushed above the
+     top of the scroll box and can never be scrolled back into view. */
+  justify-content: safe center;
   /* WB: max-width 800px,在主区内水平居中 */
   max-width: 800px;
   width: 100%;

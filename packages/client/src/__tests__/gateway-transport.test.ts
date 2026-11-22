@@ -286,3 +286,27 @@ describe("GatewayTransport resync", () => {
     transport.close();
   });
 });
+
+describe("GatewayTransport 出站 URL 白名单", () => {
+  it("非法 base URL 不在构造期抛出，而是让调用失败", async () => {
+    // A mistyped setting must not kill the app during boot: the transport is
+    // built while the renderer starts, and a throw here was a white screen.
+    const transport = new GatewayTransport({
+      baseUrl: "not a url",
+      token: "t",
+      fetchImpl: (async () => new Response("{}", { status: 200 })) as typeof fetch,
+    });
+    await expect(transport.invoke("ping")).rejects.toThrow(/not a valid URL/);
+    transport.close();
+  });
+
+  it("拒绝非 http(s) 的 base URL", async () => {
+    const transport = new GatewayTransport({
+      baseUrl: "file:///etc/passwd",
+      token: "t",
+      fetchImpl: (async () => new Response("{}", { status: 200 })) as typeof fetch,
+    });
+    await expect(transport.invoke("ping")).rejects.toThrow(/must be http/);
+    transport.close();
+  });
+});

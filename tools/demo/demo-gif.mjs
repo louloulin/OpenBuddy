@@ -119,8 +119,8 @@ const CAPTURE_STOP = `
 
 // ---------------------------------------------------------------- the demo story
 const DEMO_SETUP = `
-  await ctx.setSize(1200, 760);
-  await ctx.sleep(900);
+  await ctx.setSize(1200, 800);
+  await ctx.sleep(1400);
   // Slow the fixture down so the streaming answer is actually readable in the clip.
   ctx.fixture.delayMs = 300;
   await ctx.call('providers_save_provider', { provider: { id: 'fixture', providerKind: 'custom', label: 'Demo', baseUrl: 'http://127.0.0.1:${FIXTURE_PORT}/v1', apiBackend: 'chat_completions', authScheme: 'bearer', apiKey: 'local-fixture-only' } });
@@ -140,7 +140,23 @@ const DEMO_SETUP = `
     })).join('\\n') + '\\n';
   await ctx.writeFile(cwd + '/data/sales-raw.csv', csv);
   await page.getByRole('button', { name: /^选择模型：/ }).first().waitFor({ timeout: 20000 });
-  return { cwd, ok: true };
+  // The composer takes focus on mount, which can scroll the home pane; and a centered
+  // flex column clips its own top when the content overflows. Reset the scroll and
+  // assert the headline is fully visible, so a clipped hero frame fails loudly.
+  await page.evaluate(() => {
+    const home = document.querySelector('.home');
+    if (home) home.scrollTop = 0;
+    window.scrollTo(0, 0);
+  });
+  await ctx.sleep(900);
+  const headline = await page.evaluate(() => {
+    const home = document.querySelector('.home');
+    const title = document.querySelector('.home__title');
+    const top = title?.getBoundingClientRect().top ?? 0;
+    return { top: Math.round(top), scrollTop: home?.scrollTop ?? 0 };
+  });
+  if (headline.top < 0) throw new Error('home headline is clipped: ' + JSON.stringify(headline));
+  return { cwd, ok: true, headline };
 `;
 
 const DEMO_ACT = `
@@ -149,6 +165,7 @@ const DEMO_ACT = `
 
   // 0) 开场：让首页模板入口先被看清
   await sleep(3600);
+  await page.evaluate(() => { const home = document.querySelector('.home'); if (home) home.scrollTop = 0; });
 
   // 1) 选模板 —— 日常办公 → 数据分析及可视化 → 销售数据看板
   await page.locator('.home__chip[aria-label="数据分析及可视化"]').click();

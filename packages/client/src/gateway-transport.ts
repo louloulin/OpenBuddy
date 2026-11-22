@@ -53,8 +53,32 @@ export type GatewayTransportOptions = {
   onResync?: () => void
 }
 
+/**
+ * Only http(s) gateways are allowed.
+ *
+ * The request host always comes from the configured base URL — no request
+ * target can move it — so validating the scheme is what keeps a mistyped
+ * URL (`file:`, `data:`, `javascript:`) from turning the transport into an
+ * arbitrary fetch sink. A malformed URL is reported, not thrown: the app
+ * builds the transport during boot and must survive a bad setting.
+ */
+function validateGatewayBaseUrl(baseUrl: string): Error | null {
+  let url: URL
+  try {
+    url = new URL(baseUrl)
+  } catch {
+    return new Error(`gateway base URL is not a valid URL: ${baseUrl}`)
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return new Error(`gateway base URL must be http(s): ${baseUrl}`)
+  }
+  return null
+}
+
 export class GatewayTransport implements Transport {
   private readonly baseUrl: string
+  /** Set when the configured base URL is unusable (malformed or non-http scheme). */
+  private readonly configError: Error | null
   private readonly token: string
   private readonly maxBackoffMs: number
   private readonly fetchImpl: typeof fetch
@@ -87,6 +111,7 @@ export class GatewayTransport implements Transport {
 
   constructor(options: GatewayTransportOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '')
+    this.configError = validateGatewayBaseUrl(this.baseUrl)
     this.token = options.token
     this.maxBackoffMs = options.maxBackoffMs ?? 15_000
     // Never store the bare global: browsers implement `fetch` on Window, and
@@ -100,8 +125,23 @@ export class GatewayTransport implements Transport {
     void this.connect()
   }
 
+  /** Build a request URL from the configured base; the path is fixed by us. */
+  private url(path: string): string {
+    let url: URL
+    try {
+      url = new URL(`${this.baseUrl}${path}`)
+    } catch (e) {
+      throw new Error(`gateway URL is not valid: ${e instanceof Error ? e.message : String(e)}`)
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw new Error(`gateway URL scheme is not allowed: ${url.protocol}`)
+    }
+    return url.toString()
+  }
+
   async invoke<T = unknown>(command: string, payload?: unknown): Promise<T> {
-    const response = await this.fetchImpl(`${this.baseUrl}/cmd/${encodeURIComponent(command)}`, {
+    if (this.configError) throw this.configError
+    const response = await this.fetchImpl(this.url(`/cmd/${encodeURIComponent(command)}`), {
       method: 'POST',
       headers: { authorization: `Bearer ${this.token}`, 'content-type': 'application/json' },
       body: JSON.stringify(payload ?? {}),
@@ -190,7 +230,7 @@ export class GatewayTransport implements Transport {
       this.abort = new AbortController()
       this.setStateInternal(this.stateValue === 'open' ? 'open' : 'connecting')
       try {
-        const url = `${this.baseUrl}/events?since=${this.lastSeq}`
+        const url = this.url(`/events?since=${this.lastSeq}`)
         const response = await this.fetchImpl(url, {
           headers: { authorization: `Bearer ${this.token}`, accept: 'text/event-stream' },
           signal: this.abort.signal,
