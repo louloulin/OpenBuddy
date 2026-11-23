@@ -1,5 +1,5 @@
 import { ArtifactCards, useArtifacts } from "./ArtifactCards";
-import { agentAbortRetry } from "@openbuddy/client/agent-client";
+import { agentAbortRetry, openUrl } from "@openbuddy/client/agent-client";
 import { filesTouchedBy } from "../workbench/revert";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatMessage, RetryState, ToolCallView } from "@/features/chat/state/session-store";
@@ -15,12 +15,18 @@ import { useSmoothText } from "@/features/chat/use-smooth-text";
 import { splitMarkdownBlocks } from "@openbuddy/markdown/markdown-blocks";
 import { useUiPrefs } from "@/app/state/ui-prefs-store";
 import { extractToolCallText } from "@openbuddy/chat-core/extract-text";
+import { extractSources } from "@openbuddy/chat-core/extract-sources";
+import { suggestFollowUps } from "@openbuddy/chat-core/follow-up-suggestions";
+import { estimateConversationTokens } from "@openbuddy/chat-core/token-estimate";
 import { selectFindFocus, useFindFocusStore } from "./state/find-focus-store";
 import { splitTurn, turnError, turnMarkdown, turnModel, turnTiming } from "@openbuddy/chat-core/turns";
 import { ErrorCard } from "./ErrorCard";
 import { FeedbackButtons } from "./FeedbackButtons";
 import { BranchMenuItems, BranchSwitcher, useBranchRefresh } from "./BranchSwitcher";
 import { ChevronGlyph, CopyGlyph, MoreGlyph, RetryGlyph } from "../../shared/agent-ui/icons";
+import { getActiveTts } from "../composer/voice-contract";
+import { useLocale } from "../../shared/i18n";
+import { Square, Volume2 } from "lucide-react";
 import logoMarkUrl from "@/assets/openbuddy-logo.png";
 
 function useNow(active: boolean): number {
@@ -152,6 +158,11 @@ function TurnViewInner(props: TurnViewProps) {
   useEffect(() => setExpanded(!concise), [concise]);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { locale } = useLocale();
+  const [speaking, setSpeaking] = useState(false);
+  const [followUpsHidden, setFollowUpsHidden] = useState(false);
+  const ttsStopRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => { ttsStopRef.current?.(); }, []);
   const content = useMemo(() => splitTurn(messages), [messages]);
   // U3.5: when the find bar's current hit lies in the folded steps, unfold them.
   const findQuery = useFindFocusStore(useMemo(() => selectFindFocus(messages.map((m) => m.id)), [messages])).toLowerCase();
@@ -205,6 +216,33 @@ function TurnViewInner(props: TurnViewProps) {
               ? "正在处理"
               : "";
   const answerText = content.answer || messages.flatMap((m) => m.parts).filter((p) => p.kind === "text").map((p) => (p.kind === "text" ? p.text : "")).join("\n\n");
+  const tts = getActiveTts();
+  const toggleSpeak = () => {
+    if (!tts) return;
+    if (speaking) {
+      ttsStopRef.current?.();
+      ttsStopRef.current = null;
+      setSpeaking(false);
+      return;
+    }
+    ttsStopRef.current = tts.speak(answerText, locale === "zh-CN" ? "zh-CN" : "en-US", {
+      onEnd: () => { setSpeaking(false); ttsStopRef.current = null; },
+    });
+    setSpeaking(true);
+  };
+  // 来源卡：只汇总 Pi 工具输出里真实出现的 http(s) 链接。
+  const sourceTexts = content.process.flatMap((item) =>
+    item.part.kind === "tool_call"
+      ? item.part.toolCall.content.flatMap((c) => (c.type === "text" ? [c.text] : c.type === "command_output" ? [c.output] : []))
+      : [],
+  );
+  const sources = extractSources(sourceTexts);
+  const toolKinds = content.process.flatMap((item) => (item.part.kind === "tool_call" ? [item.part.toolCall.kind] : []));
+  const suggestions = !running && isLast && !inlineError
+    ? suggestFollowUps({ answer: answerText, artifactCount: turnArtifacts.length, toolKinds, hadError: !!inlineError })
+    : [];
+  // 逐轮 token 为本地估算（Pi 的累计 stats 无法精确切到单轮），UI 明确标注估算。
+  const turnTokens = estimateConversationTokens(user ? [...messages, user] : messages);
   /** 逐条回答 (W1.8): collect question lines from this answer into a numbered prompt. */
   const askOneByOne = () => {
     if (!onInsertPrompt) return;
@@ -264,7 +302,12 @@ function TurnViewInner(props: TurnViewProps) {
           </div>
         )}
         {content.answer && (
-          <div className={"turn__answer" + (running ? " turn__answer--live" : "")}>
+          <div
+            className={"turn__answer" + (running ? " turn__answer--live" : "")}
+            role={running ? "log" : undefined}
+            aria-live={running ? "polite" : undefined}
+            aria-atomic="false"
+          >
             <LiveMarkdown text={content.answer} live={running} markdownConfig={markdownConfig} />
           </div>
         )}
@@ -272,10 +315,30 @@ function TurnViewInner(props: TurnViewProps) {
         {aborted && !content.process.length && <div className="turn__stopped">已停止</div>}
         {!running && artifactsApi && turnArtifacts.length > 0 && <ArtifactCards items={turnArtifacts} total={artifactsApi.all.length} api={artifactsApi} />}
         {inlineError && !running && <ErrorCard error={inlineError} onRetry={isLast ? onRetry : undefined} onToast={onToast} />}
+        {!running && sources.length > 0 && (
+          <details className="turn-sources">
+            <summary>来源（{sources.length}）</summary>
+            <ul>
+              {sources.map((source) => (
+                <li key={source.url}>
+                  <button type="button" className="turn-sources__link" onClick={() => { void openUrl(source.url).catch(() => onToast?.("无法打开链接")); }}>
+                    {source.title}
+                  </button>
+                  <span className="turn-sources__host">{source.url}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
         {!running && hasAnything && (
           <div className="turn__actions">
             <BranchSwitcher sessionId={sessionId} userTimestamp={userTimestamp} onToast={onToast} />
             <button type="button" className="turn-action" onClick={() => copyText(answerText).then(() => onToast?.("已复制"), () => onToast?.("复制失败"))} aria-label="复制" data-tip="复制"><CopyGlyph /></button>
+            {tts && answerText.trim() && (
+              <button type="button" className={"turn-action" + (speaking ? " turn-action--active" : "")} onClick={toggleSpeak} aria-label={speaking ? "停止朗读" : "朗读回答"} aria-pressed={speaking} data-tip={speaking ? "停止朗读" : "朗读回答"}>
+                {speaking ? <Square size={13} strokeWidth={2.4} /> : <Volume2 size={15} strokeWidth={2} />}
+              </button>
+            )}
             {isLast && onRetry && <button type="button" className="turn-action" onClick={onRetry} aria-label="重试" data-tip="重新生成"><RetryGlyph /></button>}
             <FeedbackButtons sessionId={sessionId} turnKey={turnKey} />
             <div className="turn-action__menu" ref={menuRef}>
@@ -292,9 +355,19 @@ function TurnViewInner(props: TurnViewProps) {
                 </div>
               )}
             </div>
-            <span className="turn__meta">
-              {[clock(timing.end ?? timing.start), elapsed !== undefined && elapsed >= 1000 ? `用时 ${formatDuration(elapsed)}` : "", model].filter(Boolean).join(" · ")}
+            <span className="turn__meta" title="token 为本地估算，不是上游账单">
+              {[clock(timing.end ?? timing.start), elapsed !== undefined && elapsed >= 1000 ? `用时 ${formatDuration(elapsed)}` : "", model, turnTokens > 0 ? `≈${turnTokens} tokens` : ""].filter(Boolean).join(" · ")}
             </span>
+          </div>
+        )}
+        {!followUpsHidden && onInsertPrompt && suggestions.length > 0 && (
+          <div className="turn-followups" aria-label="下一步建议">
+            {suggestions.map((suggestion) => (
+              <button key={suggestion.id} type="button" className="turn-followups__chip" onClick={() => onInsertPrompt(suggestion.prompt)}>
+                {suggestion.label}
+              </button>
+            ))}
+            <button type="button" className="turn-followups__close" aria-label="隐藏建议" onClick={() => setFollowUpsHidden(true)}>×</button>
           </div>
         )}
       </div>

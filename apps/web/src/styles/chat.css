@@ -440,3 +440,44 @@
 .bench-share__item:hover:not(:disabled) { background: var(--grok-hover, var(--wb-bg-hover)); }
 .bench-share__item:disabled { opacity: 0.45; cursor: default; }
 .bench-share__hint { color: var(--wb-text-tertiary); font-size: 0.72rem; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- AI Chat 2.0: sources / follow-ups / background tasks ---------- */
+.turn-sources {
+  margin: 0.45rem 0 0.2rem;
+  border: 0.0625rem solid var(--grok-line, var(--wb-border-default));
+  border-radius: 0.7rem;
+  background: var(--wb-bg-secondary);
+  padding: 0.45rem 0.65rem;
+  font-size: 0.78rem;
+}
+.turn-sources > summary { cursor: pointer; color: var(--wb-text-medium); }
+.turn-sources ul { margin: 0.35rem 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+.turn-sources li { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.turn-sources__link { border: none; background: none; padding: 0; text-align: left; color: var(--wb-color-text-link, #2f6fed); cursor: pointer; font-size: 0.8rem; }
+.turn-sources__link:hover { text-decoration: underline; }
+.turn-sources__host { color: var(--wb-text-tertiary); font-size: 0.7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.turn-followups { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-top: 0.35rem; }
+.turn-followups__chip {
+  border: 0.0625rem solid var(--grok-line, var(--wb-border-default));
+  border-radius: 999px; background: var(--wb-bg-secondary); color: var(--wb-text-medium);
+  padding: 0.25rem 0.65rem; font-size: 0.76rem; cursor: pointer;
+}
+.turn-followups__chip:hover { background: var(--grok-hover, var(--wb-bg-hover)); color: var(--wb-text-strong); }
+.turn-followups__close { border: none; background: none; color: var(--wb-text-tertiary); cursor: pointer; padding: 0 0.25rem; font-size: 0.9rem; }
+
+.background-tasks {
+  margin: 0 0 0.4rem; padding: 0.4rem 0.6rem;
+  border: 0.0625rem solid var(--grok-line, var(--wb-border-default)); border-radius: 0.7rem;
+  background: var(--wb-bg-secondary);
+}
+.background-tasks__head { display: flex; gap: 0.6rem; align-items: center; font-size: 0.74rem; color: var(--wb-text-medium); }
+.background-tasks__done { color: var(--wb-text-tertiary); }
+.background-tasks__list { margin: 0.3rem 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.2rem; }
+.background-tasks__item { display: flex; align-items: center; gap: 0.45rem; min-width: 0; }
+.background-tasks__kind { flex: none; font-size: 0.68rem; color: var(--wb-text-tertiary); border: 0.0625rem solid var(--grok-line, var(--wb-border-default)); border-radius: 0.35rem; padding: 0 0.3rem; }
+.background-tasks__title { flex: 1; min-width: 0; border: none; background: none; padding: 0; text-align: left; font-size: 0.76rem; color: var(--wb-text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.background-tasks__title:disabled { cursor: default; color: var(--wb-text-medium); }
+.background-tasks__stop { flex: none; border: none; background: none; color: var(--wb-text-tertiary); font-size: 0.72rem; cursor: pointer; }
+.background-tasks__stop:hover { color: #b42318; }
+.background-tasks__item--done .background-tasks__title { color: var(--wb-text-tertiary); }

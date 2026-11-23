@@ -17,6 +17,7 @@ import { WorkspacePicker } from "./WorkspacePicker";
 import { PermissionPicker } from "../approvals/PermissionPicker";
 import { SlashCommands, slashToken, type SlashCommandsHandle } from "./SlashCommands";
 import { InputAddMenu } from "./InputAddMenu";
+import { VoiceInputButton } from "./VoiceInputButton";
 import { EMPTY_ANNOTATIONS, useAnnotationStore } from "@/shared/state/annotations-store";
 import {
   collectDroppedPaths,
@@ -159,7 +160,7 @@ export function Composer({
   usageMsgCount?: number;
 }) {
   const modelControls = useContext(ModelRuntimeContext);
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<string[]>([]);
   // 批注托盘 (pii W1.9): quotes collected from the artifact viewer ride along with the next prompt.
@@ -593,6 +594,7 @@ export function Composer({
             </div>
           )}
           <div className="wb-composer__spacer" />
+          <VoiceInputButton text={text} onChange={updateText} lang={locale === "zh-CN" ? "zh-CN" : "en-US"} disabled={disabled || !apiReady} onToast={onToast} />
           {usageSessionId && <ContextUsagePill sessionId={usageSessionId} onRefreshSignal={usageMsgCount} />}
           {showModelPicker ? (
             <ModelSelector

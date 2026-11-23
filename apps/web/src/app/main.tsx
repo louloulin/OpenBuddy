@@ -14,6 +14,7 @@ import { installPairing, isBrowserHost, savedPairing } from "./h5/boot";
 import { applyUiPreferences } from "../features/settings/preferences";
 import { applyLocale } from "../shared/i18n";
 import { installTerminalBridge } from "../features/chat/state/terminal-bridge";
+import { installWebVoiceProviders } from "../features/composer/voice-web";
 import { QuickInput } from "./quick/QuickInput";
 
 applyUiPreferences();
@@ -21,6 +22,8 @@ applyLocale();
 // Background sessions' command output is cached app-wide so the sidebar and
 // task overview can read it without a feature dependency.
 installTerminalBridge();
+// Browser Web Speech as the default ASR/TTS provider; unsupported environments stay silent.
+installWebVoiceProviders();
 
 const container = document.getElementById("root")!;
 /** 全局快速输入窗口 (W7.2): only the small composer, never the full app. */

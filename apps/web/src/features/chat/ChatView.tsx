@@ -13,7 +13,6 @@ import { filesTouchedBy, revertToolCalls } from "../workbench/revert";
 import { ArtifactsContext, type ArtifactsApi } from "./ArtifactCards";
 import { appConfirm, appConfirmWithOption } from "../../shared/ui/AppDialog";
 import { friendlyError } from "@openbuddy/chat-core/error-format";
-import { invoke } from "@openbuddy/client/ipc";
 import { parseUserText, baseName, withModeInstruction } from "@openbuddy/chat-core/user-text";
 import { Composer } from "../composer/Composer";
 import { UserNode, NoticeRow } from "./chat-view/rows";
@@ -23,7 +22,7 @@ import { STICK_THRESHOLD, ANCHOR_GAP, RENDER_WINDOW, charsOf, blocksOf, nodeIds 
 import { PermissionInlineCard } from "../approvals/PermissionDialog";
 import { QuestionInlineCard } from "../approvals/QuestionInlineCard";
 import { FindBar, isFindHit } from "./FindBar";
-import { ShareMenu } from "./ShareMenu";
+import { ChatToolbar } from "./chat-view/ChatToolbar";
 import { QueuePanel } from "../composer/QueuePanel";
 import { usePiQueueStore } from "@/features/composer/state/pi-queue-store";
 import { useAnnotationStore } from "@/shared/state/annotations-store";
@@ -34,12 +33,11 @@ import { openLightbox } from "@openbuddy/ui/ImageLightbox";
 import { matchShortcut } from "@/shared/lib/shortcuts";
 import { TurnView } from "./TurnView";
 import { ErrorCard } from "./ErrorCard";
-import { PromptHistory } from "./PromptHistory";
 import { PlanPanel } from "./PlanPanel";
 import { SubagentCards } from "./SubagentCards";
+import { BackgroundTaskCapsule } from "./BackgroundTaskCapsule";
 import { onTaskOverview } from "./task-overview-bus";
 import { ArrowDown } from "lucide-react";
-import { FolderIcon, PanelIcon, SearchIcon } from "@openbuddy/ui/icon/icons/index";
 import type { ModelOption } from "../models/ModelSelector";
 import type { HomeModeId } from "../../shared/content/scenes";
 import type { AgentEntry } from "@openbuddy/protocol/dto";
@@ -467,44 +465,25 @@ export function ChatView({
   };
   // Tool rows that render their own approval card; the footer shows the rest.
   const inlineToolIds = useMemo(() => new Set(messages.flatMap((m) => m.parts.flatMap((p) => (p.kind === "tool_call" ? [p.toolCall.toolCallId] : [])))), [messages]);
-  const workspaceLabel = !cwd ? "" : cwd === homeCwd ? "默认空间" : baseName(cwd);
-  const panelActive = panelOpen;
-
-  const toolbar = (
-    <div className="chat-toolbar">
-      {workspaceLabel && (
-        <button
-          type="button"
-          className="chat-toolbar__workspace"
-          onClick={() => { if (cwd) void invoke("reveal_in_folder", { path: cwd, cwd }).catch(() => onToast?.("无法打开文件夹")); }}
-          data-tip={cwd}
-          aria-label={`工作空间：${workspaceLabel}（在文件夹中显示）`}
-        >
-          <FolderIcon size={14} />
-          <span>{workspaceLabel}</span>
-        </button>
-      )}
-      <button type="button" className={"main-topbar__btn" + (findOpen ? " main-topbar__btn--active" : "")} onClick={() => setFindOpen((v) => !v)} aria-label="在对话中搜索" data-tip="搜索 (Ctrl/Cmd+F)" disabled={!messages.length}>
-        <SearchIcon size="md" />
-      </button>
-      <PromptHistory messages={messages} onJump={jumpToMessage} />
-      {messages.length > 0 && <ShareMenu messages={messages} title={activeEntry?.title} onDone={onToast} sessionId={sessionId ?? undefined} />}
-      <button
-        type="button"
-        className={"main-topbar__btn" + (panelActive ? " main-topbar__btn--active" : "")}
-        onClick={() => (panelActive ? setPanelOpen(false) : handleOpenArtifacts())}
-        aria-label={panelActive ? "收起右侧栏" : "展开右侧栏"}
-        data-tip={panelActive ? "收起工作台 (Ctrl/Cmd+\\)" : `产物与文件${artifacts.length ? `（${artifacts.length}）` : ""} (Ctrl/Cmd+\\)`}
-      >
-        <PanelIcon size="md" />
-        {!panelActive && artifacts.length > 0 && <span className="main-topbar__count">{artifacts.length}</span>}
-      </button>
-    </div>
-  );
-
   return (
     <div className={"chatview" + (panelOpen ? " chatview--with-panel" : "")}>
-      {toolbarSlot && createPortal(toolbar, toolbarSlot)}
+      {toolbarSlot && createPortal(
+        <ChatToolbar
+          workspaceLabel={!cwd ? "" : cwd === homeCwd ? "默认空间" : baseName(cwd)}
+          cwd={cwd}
+          findOpen={findOpen}
+          onToggleFind={() => setFindOpen((v) => !v)}
+          messages={messages}
+          title={activeEntry?.title}
+          sessionId={sessionId ?? undefined}
+          onToast={onToast}
+          panelActive={panelOpen}
+          onTogglePanel={() => (panelOpen ? setPanelOpen(false) : handleOpenArtifacts())}
+          artifactCount={artifacts.length}
+          onJumpToMessage={jumpToMessage}
+        />,
+        toolbarSlot,
+      )}
       <div className="chatview__main">
         <FindBar
           messages={messages} sessionId={sessionId} onRequestOpen={() => setFindOpen(true)}
@@ -593,6 +572,7 @@ export function ChatView({
           )}
           {sessionId && <QueuePanel key={sessionId} sessionId={sessionId} onEdit={putInComposer} />}
           {sessionId && <PlanPanel sessionId={sessionId} ready={planReady} running={streaming} onExecute={() => void runPlan()} onModify={putInComposer} onDismiss={() => setPlanDismissed(lastUserId)} />}
+          <BackgroundTaskCapsule currentSessionId={sessionId ?? undefined} onOpenSession={onOpenSession} onToast={toast} />
           <Composer
             streaming={streaming}
             onSend={sendWithMode}

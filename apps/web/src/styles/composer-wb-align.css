@@ -17,3 +17,26 @@
   flex-direction: column;
   gap: 0;
 }
+
+/* 语音输入：与模型/发送同排的轻量按钮；录音时用暖色焦点环提示。 */
+.wb-composer__voice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-right: 0.25rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--wb-color-text-secondary, #6b6b6b);
+  cursor: pointer;
+}
+.wb-composer__voice:hover { background: var(--wb-bg-hover, rgb(0 0 0 / 0.05)); }
+.wb-composer__voice--on {
+  color: #b42318;
+  background: var(--wb-bg-error-subtle, rgb(180 35 24 / 0.08));
+  box-shadow: 0 0 0 2px color-mix(in srgb, #b42318 24%, transparent);
+}
+.wb-composer__voice:disabled { opacity: 0.45; cursor: default; }
+
