@@ -18,6 +18,7 @@ import { PermissionPicker } from "../approvals/PermissionPicker";
 import { SlashCommands, slashToken, type SlashCommandsHandle } from "./SlashCommands";
 import { InputAddMenu } from "./InputAddMenu";
 import { VoiceInputButton } from "./VoiceInputButton";
+import { estimateSendCost } from "@openbuddy/chat-core/token-estimate";
 import { EMPTY_ANNOTATIONS, useAnnotationStore } from "@/shared/state/annotations-store";
 import {
   collectDroppedPaths,
@@ -595,6 +596,7 @@ export function Composer({
           )}
           <div className="wb-composer__spacer" />
           <VoiceInputButton text={text} onChange={updateText} lang={locale === "zh-CN" ? "zh-CN" : "en-US"} disabled={disabled || !apiReady} onToast={onToast} />
+          {text.trim() && <span className="wb-composer__estimate" title="本地 token 估算，不是上游账单">{estimateSendCost(text).label}</span>}
           {usageSessionId && <ContextUsagePill sessionId={usageSessionId} onRefreshSignal={usageMsgCount} />}
           {showModelPicker ? (
             <ModelSelector

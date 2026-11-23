@@ -164,8 +164,8 @@ export function createWebSpeechTtsProvider(deps: {
     rate?: number;
     pitch?: number;
     lang?: string;
-    onend?: () => void;
-    onerror?: () => void;
+    onend?: (() => void) | null;
+    onerror?: (() => void) | null;
   };
   synth: SpeechSynthesisLike;
 }): TtsProvider {

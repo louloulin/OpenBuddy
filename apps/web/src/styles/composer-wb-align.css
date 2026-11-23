@@ -40,3 +40,15 @@
 }
 .wb-composer__voice:disabled { opacity: 0.45; cursor: default; }
 
+
+/* 发送前 token 估算：弱提示，明确标注为估算。 */
+.wb-composer__estimate {
+  margin-right: 0.35rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--wb-bg-secondary);
+  color: var(--wb-text-tertiary);
+  font-size: 0.7rem;
+  line-height: 1.5;
+  white-space: nowrap;
+}

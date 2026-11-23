@@ -13286,3 +13286,37 @@ button.diff__path {
   background: var(--wb-bg-primary); color: var(--wb-text-medium); font-size: 0.75rem;
   font-feature-settings: var(--wb-font-numeric-feature);
 }
+
+/* ---------- Settings nav: grouped + searchable ---------- */
+.settings-nav-search {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.55rem;
+  padding: 0.35rem 0.55rem;
+  border: 0.0625rem solid var(--wb-border-default);
+  border-radius: 0.55rem;
+  background: var(--wb-bg-secondary);
+  color: var(--wb-text-tertiary);
+}
+.settings-nav-search input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--wb-text-strong);
+  font-size: 0.8rem;
+}
+.settings-navigation__group { margin-bottom: 0.45rem; }
+.settings-navigation__group-title {
+  padding: 0.2rem 0.55rem;
+  font-size: 0.68rem;
+  color: var(--wb-text-tertiary);
+  letter-spacing: 0.02em;
+}
+.settings-nav-empty {
+  margin: 0.4rem 0.55rem;
+  font-size: 0.76rem;
+  color: var(--wb-text-tertiary);
+}

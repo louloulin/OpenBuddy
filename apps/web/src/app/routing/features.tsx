@@ -1,4 +1,4 @@
-import { Bot, Brain, Cpu, HardDrive, HelpCircle, Info, Keyboard, Mail, Palette, Settings2, Shield, SlidersHorizontal, Smartphone } from "lucide-react";
+import { Bot, Brain, Cpu, HardDrive, HelpCircle, Info, Keyboard, Mail, MessagesSquare, Palette, Settings2, Shield, SlidersHorizontal, Smartphone } from "lucide-react";
 import {
   LibraryIcon, MoreMenuImaKnowledgeIcon, MoreMenuInspirationIcon, MoreMenuTencentDocsIcon, MoreMenuTencentLexiangIcon, MyFilesIconV2,
   WbAssistantNavIcon, WbAutomationNavIcon, WbExpertNavIcon, WbProjectNavIcon,
@@ -24,7 +24,7 @@ import { ModelsSettingsPanel } from "../../features/models/settings/ModelsSettin
 import {
   AboutSettingsPanel, AgentMailSettingsPanel, AgentSettingsPanel, AssistantSettingsPanel, DataSettingsPanel,
   GeneralPreferencesPanel, HelpSettingsPanel, MemorySettingsPanel, MobileAccessPanel, PersonalizeSettingsPanel, SecuritySettingsPanel,
-  ShortcutsSettingsPanel,
+  ShortcutsSettingsPanel, ConversationFlowPanel,
 } from "../../features/settings/SettingsSections";
 import { ExpertsHub } from "./ExpertsHub";
 import { PluginsMarketTabs } from "./PluginsMarketTabs";
@@ -196,6 +196,7 @@ export const FEATURES: FeatureEntry<FeatureRouteProps>[] = [
   { id: "settings-personalize", settingsSections: [{ id: "personalize", label: "个性化", icon: Palette, order: 60, render: () => <PersonalizeSettingsPanel /> }], requires: [] },
   { id: "settings-memory", settingsSections: [{ id: "memory", label: "记忆", icon: Brain, order: 70, render: () => <MemorySettingsPanel /> }], requires: ["memory_list", "memory_rewrite"] },
   { id: "settings-shortcuts", settingsSections: [{ id: "shortcuts", label: "快捷键", icon: Keyboard, order: 80, render: () => <ShortcutsSettingsPanel /> }], requires: [] },
+  { id: "settings-conversation", settingsSections: [{ id: "conversation", label: "对话流", icon: MessagesSquare, order: 82, render: () => <ConversationFlowPanel /> }], requires: [] },
   { id: "settings-agent-mail", settingsSections: [{ id: "agent-mail", label: "智能体邮箱", icon: Mail, order: 85, render: () => <AgentMailSettingsPanel /> }], requires: ["notification_list"] },
   { id: "settings-data", settingsSections: [{ id: "data", label: "数据管理", icon: HardDrive, order: 90, render: () => <DataSettingsPanel /> }], requires: [] },
   // 手机接入 (20261115-mobile §4.4): 桌面宿主提供 mobile_pair_* 才出现；浏览器预览不亮。
