@@ -1,13 +1,27 @@
 import type { EngineContext } from "../engine-context.js";
-import { deriveTitle } from "../titles.js";
+import { deriveTitle, messageText } from "../titles.js";
 import type { Slot } from "../types.js";
 import { moveLeaf } from "./branch-state.js";
 
-/** User prompts on the current branch, newest last (for 历史 / 从这里编辑). */
+/**
+ * User prompts on the current branch, newest last (for 历史 / 从这里编辑).
+ *
+ * The list is built from the session *projection* (what the model actually sees), so its
+ * order matches the transcript on screen one-to-one — including messages that were removed
+ * from the context (删除该消息) and versions that live on another branch.
+ */
 export function rewindPoints(engine: EngineContext, id: string) {
-  return engine.live(id)
-    .getUserMessagesForForking()
-    .map((m, index) => ({ entryId: m.entryId, index, preview: deriveTitle(m.text) ?? m.text.slice(0, 60) }));
+  const manager = engine.live(id).sessionManager;
+  const points: Array<{ entryId: string; index: number; preview: string }> = [];
+  for (const entry of manager.buildSessionProjection().entries) {
+    for (const message of entry.messages) {
+      if (message.role !== "user") continue;
+      const text = messageText(message as { content?: unknown });
+      if (!text) continue;
+      points.push({ entryId: entry.sourceEntry.id, index: points.length, preview: deriveTitle(text) ?? text.slice(0, 60) });
+    }
+  }
+  return points;
 }
 /**
  * Move the branch leaf to just before `entryId`; the renderer rebuilds from `session_rewound`.
@@ -28,7 +42,7 @@ export async function rewind(engine: EngineContext, id: string, entryId: string)
   return { editorText: await engine.navigateBefore(slot, entryId) };
 }
 /** 重新生成: branch before the last prompt and send it again (images included). */
-export async function regenerate(engine: EngineContext, id: string) {
+export async function regenerate(engine: EngineContext, id: string, modelId?: string, providerId?: string) {
   const slot = engine.slot(id);
   const last = slot.session.getUserMessagesForForking().at(-1);
   if (!last) throw Error("rewind_point_not_found: 没有可重新生成的消息");
@@ -37,6 +51,8 @@ export async function regenerate(engine: EngineContext, id: string) {
   const images = content
     .filter((part) => part.type === "image" && part.data && part.mimeType)
     .map((part) => ({ type: "image" as const, data: part.data!, mimeType: part.mimeType! }));
+  // 换模型重新生成 (G1-27): the new model applies to the branch the prompt is sent on.
+  if (modelId) await engine.setModel(id, modelId, providerId);
   const text = (await engine.navigateBefore(slot, last.entryId)) || last.text;
   await engine.send(id, text, images.length ? images : undefined);
 }

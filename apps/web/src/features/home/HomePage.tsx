@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Composer } from "../composer/Composer";
+import { useStatusStore } from "@/shared/state/status-store";
 import type { ModelOption } from "../models/ModelSelector";
 import type { WorkspaceInfo } from "@openbuddy/client/agent-client";
 import type { AgentEntry, SessionSummary } from "@openbuddy/protocol/dto";
@@ -88,6 +89,9 @@ export function HomePage({
 }) {
   const { t, locale } = useLocale();
   const [modeId, setModeId] = useState<HomeModeId>("working");
+  // G1-17: the scene decides whether the status chips show; a task started in the design
+  // scene keeps them (WorkBuddy carries the design tab into the conversation).
+  useEffect(() => { useStatusStore.getState().setScene(modeId); }, [modeId]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
   const [expanded, setExpanded] = useState(false);
   // 输入框内黑色"操作类型"标签。

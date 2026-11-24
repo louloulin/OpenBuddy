@@ -9,6 +9,8 @@ export const COMMANDS = [
   'permission_pending', 'question_pending', 'trust_pending',
   // 受保护路径 (20261116-pii W6.2): 安全中心编辑，权限门强制执行。
   'permission_protected_get', 'permission_protected_set',
+  // 沙箱与网络策略 + 安全审计 (G2-3 / G2-5).
+  'security_policy_get', 'security_policy_set', 'security_audit_list',
   'providers_list', 'providers_save_provider', 'providers_save_model', 'providers_delete_provider',
   'providers_delete_model', 'providers_fetch_models', 'providers_test', 'account_get_api_key', 'account_set_api_key',
   // 本地模型 (pii W8): llama.cpp / OpenAI-compatible local server.
@@ -48,6 +50,14 @@ export const COMMANDS = [
   // 包资源开关 (S17): Pi object-form package filters (`[]` = load none of that type).
   'agent_extensions_set_package_resources',
   'rewind_points', 'rewind_execute', 'agent_regenerate', 'agent_compact',
+  // G1-27 消息级操作: 删除该消息 / 继续生成。
+  'agent_delete_message', 'agent_continue',
+  // G1-30 会话快捷操作: 清空上下文并新开。
+  'agent_clear_context',
+  // G1-31 快速问答: 一次性会话，不动当前任务的上下文。
+  'agent_quick_answer',
+  // G2-7 工具内容注入审查: 用户明确放行被拦下的工具输出。
+  'agent_allow_tool_content',
   'artifacts_list', 'checkpoint_list', 'checkpoint_read', 'checkpoint_restore', 'turn_revert', 'artifact_save',
   'agent_export_html', 'agent_export_jsonl', 'agent_import_jsonl', 'agent_set_mode', 'agent_abort_retry', 'clipboard_save_image',
   'notification_prefs_get', 'notification_prefs_set', 'agent_set_queue',

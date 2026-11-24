@@ -9,7 +9,7 @@ import { createEngineHandlers } from "@openbuddy/host/handlers";
 
 export interface FixtureRequest { messages: Array<{ role: string; content?: unknown }>; [key: string]: unknown }
 /** What the fixture model streams back for one request: plain text, or tool calls. */
-export type FixtureReply = { text: string } | { toolCalls: Array<{ id: string; name: string; arguments: unknown }> };
+export type FixtureReply = { text: string; finishReason?: string } | { toolCalls: Array<{ id: string; name: string; arguments: unknown }> };
 
 const secureStorage = {
   isEncryptionAvailable: () => true,
@@ -51,7 +51,7 @@ export async function sdkFixture(
     chunk({ role: "assistant" });
     if ("text" in out) {
       chunk({ content: out.text });
-      chunk({}, "stop");
+      chunk({}, out.finishReason ?? "stop");
     } else {
       chunk({ tool_calls: out.toolCalls.map((call, index) => ({ index, id: call.id, type: "function", function: { name: call.name, arguments: JSON.stringify(call.arguments) } })) });
       chunk({}, "tool_calls");

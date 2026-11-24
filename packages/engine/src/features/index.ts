@@ -8,6 +8,8 @@ export * from "./fork.js";
 export * from "./handoff.js";
 export * from "./mode.js";
 export * from "./rewind.js";
+export * from "./message-actions.js";
+export * from "./quick-answer.js";
 export * from "./branches.js";
 export * from "./bash.js";
 export * from "./expert.js";

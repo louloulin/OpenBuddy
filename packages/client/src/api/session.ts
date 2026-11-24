@@ -163,8 +163,40 @@ export async function rewindExecute(sessionId: string, entryId: string): Promise
 }
 
 /** 重新生成: branch before the last prompt and send it again. */
-export async function agentRegenerate(sessionId: string): Promise<void> {
-  await invoke<void>("agent_regenerate", { sessionId });
+export async function agentRegenerate(sessionId: string, modelId?: string, providerId?: string): Promise<void> {
+  await invoke<void>("agent_regenerate", { sessionId, ...(modelId ? { modelId } : {}), ...(providerId ? { providerId } : {}) });
+}
+
+/** 删除该消息 (G1-27): take this turn out of the conversation and the model's context. */
+export async function agentDeleteMessage(sessionId: string, entryId: string): Promise<{ removed: number }> {
+  return invoke<{ removed: number }>("agent_delete_message", { sessionId, entryId });
+}
+
+/** 继续生成 (G1-27): the last answer was cut off by the output limit — carry on from there. */
+export async function agentContinue(sessionId: string): Promise<{ continued: boolean }> {
+  return invoke<{ continued: boolean }>("agent_continue", { sessionId });
+}
+
+/** 清空上下文并新开 (G1-30): the task stays, the conversation starts over. */
+export async function agentClearContext(sessionId: string): Promise<{ cleared: boolean }> {
+  return invoke<{ cleared: boolean }>("agent_clear_context", { sessionId });
+}
+
+/** 快速问答 (G1-31): a throwaway session answers the question; the task's context is untouched. */
+export async function agentQuickAnswer(options: {
+  prompt: string;
+  context?: string;
+  cwd?: string;
+  modelId?: string;
+  providerId?: string;
+}): Promise<{ sessionId: string }> {
+  return invoke<{ sessionId: string }>("agent_quick_answer", {
+    prompt: options.prompt,
+    ...(options.context ? { context: options.context } : {}),
+    ...(options.cwd ? { cwd: options.cwd } : {}),
+    ...(options.modelId ? { modelId: options.modelId } : {}),
+    ...(options.providerId ? { providerId: options.providerId } : {}),
+  });
 }
 
 // ---------- branches ‹1/2› (20261116-pii W1.1) ----------

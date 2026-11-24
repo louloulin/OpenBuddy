@@ -89,13 +89,17 @@ describe("favourite models (pii W1.6)", () => {
     renderSelector({ modelId: "model:b/plain", controls: { thinkingLevels: ["off"], supportsThinking: false } });
     await waitFor(() => expect(useFavoriteModels.getState().loaded).toBe(true));
     expect(screen.getByRole("img", { name: "当前模型不支持思考" })).toHaveAttribute("aria-disabled", "true");
-    expect(screen.queryByRole("radiogroup", { name: "思考等级" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /思考等级/ })).toBeNull();
   });
 
   it("keeps the live thinking control for a model that can think", async () => {
     renderSelector({ modelId: "model:b/vision", controls: { thinkingLevels: ["off", "low", "high"], thinkingLevel: "low", supportsThinking: true, onThinkingChange: vi.fn(async () => {}) } });
     await waitFor(() => expect(useFavoriteModels.getState().loaded).toBe(true));
-    expect(screen.getByRole("radiogroup", { name: "思考等级" })).toBeInTheDocument();
+    // WorkBuddy 对齐：思考等级是一个药丸按钮，展开后才是等级列表。
+    const pill = screen.getByRole("button", { name: "思考等级：低" });
+    expect(pill).toBeInTheDocument();
+    fireEvent.click(pill);
+    expect(screen.getByRole("listbox", { name: "思考等级" })).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "当前模型不支持思考" })).toBeNull();
   });
 

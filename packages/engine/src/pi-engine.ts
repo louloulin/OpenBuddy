@@ -20,6 +20,7 @@ import { BudgetService } from "@openbuddy/services/usage/budgets";
 import { ProjectsService } from "@openbuddy/services/projects/projects";
 import type { Settings } from "@openbuddy/services/settings/settings";
 import { Permissions, type Emit } from "./permissions/permissions.js";
+import { AuditLog } from "./permissions/audit-log.js";
 import { FolderTrustRequests } from "./folder-trust-requests.js";
 import { isBuiltinToolDefinition } from "./builtin/reserved-tools.js";
 import type { HostShell } from "@openbuddy/kernel";
@@ -82,16 +83,32 @@ export class PiEngine {
   /** @internal */ modelCache = new Map<string, { mtime: number; model?: { provider: string; modelId: string } }>();
   /** @internal */ readonly searchIndex: SessionSearchIndex;
   /** @internal */ evictTimer?: ReturnType<typeof setInterval>;
+  /**
+   * The host's event sink. 快速问答 (G1-31) 的一次性会话在这里被挡下：它不是任务，
+   * 因此不向渲染层播报模型状态（否则界面会以为多了一个任务）。
+   */
+  readonly emit: Emit;
+  /** 安全审计 (G2-5): tool calls and permission decisions land here as JSONL. */
+  readonly audit: AuditLog;
   constructor(
     readonly settings: Settings,
-    readonly emit: Emit,
+    emit: Emit,
     openUrl: (url: string) => Promise<void>,
     /** @internal */ public extensionFactories: ExtensionFactory[] = [],
     readonly limits: PoolLimits = { maxLive: 6, maxRunning: 3, idleMs: 15 * 60_000 },
     /** The host's `HostShell.trash` (desktop: Electron `shell.trashItem`), injected so the engine never imports electron (R2). */
     private readonly hostTrash?: HostShell["trash"],
   ) {
+    this.emit = (name, payload) => {
+      if (name === "agent://model-state") {
+        const sessionId = (payload as { sessionId?: string } | undefined)?.sessionId;
+        if (sessionId && this.slots.get(sessionId)?.hidden) return;
+      }
+      emit(name, payload);
+    };
     this.cwd = this.inbox = join(settings.dir, "inbox");
+    // 安全审计 (G2-5): JSONL under the settings dir, append-only.
+    this.audit = new AuditLog(join(settings.dir, "security", "audit.jsonl"));
     // Auto-approval of built-in bookkeeping tools (`ob_todo`) needs the session's tool to be the built-in's own.
     this.permissions = new Permissions(
       settings,
@@ -103,6 +120,10 @@ export class PiEngine {
         const slot = this.slots.get(sessionId);
         return slot?.parentId ? { parentId: slot.parentId, name: slot.agentName } : undefined;
       },
+      // 沙箱与网络策略 (G2-3): read fresh on every tool call.
+      () => settings.config.read().sandboxPolicy,
+      // 安全审计 (G2-5).
+      this.audit,
     );
     this.ui = new ExtensionUiBridge(emit);
     this.folderTrust = new FolderTrustRequests(settings, (cwd) => this.trusted(cwd));
@@ -186,7 +207,7 @@ export class PiEngine {
   /** @internal */ toolArgProgress(slot: Slot, source: { contentIndex?: number; delta?: string; partial?: { content?: Array<{ arguments?: unknown }> } }) { return pipeline.toolArgProgress(this, slot, source); }
   /** @internal */ onEvent(slot: Slot, event: AgentSessionEvent) { return pipeline.onEvent(this, slot, event); }
   /** @internal */ ensureTitle(slot: Slot, text: string) { return catalog.ensureTitle(this, slot, text); }
-  /** @internal */ open(manager: SessionManager, modelId?: string, providerId?: string, thinkingLevel?: ThinkingLevel): Promise<Slot> { return pool.open(this, manager, modelId, providerId, thinkingLevel); }
+  /** @internal */ open(manager: SessionManager, modelId?: string, providerId?: string, thinkingLevel?: ThinkingLevel, subagent?: { parentId: string; agentName?: string }, hidden?: boolean): Promise<Slot> { return pool.open(this, manager, modelId, providerId, thinkingLevel, subagent, hidden); }
   /** @internal */ focus(id: string) { return pool.focus(this, id); }
   newSession(cwd: string, modelId?: string, providerId?: string, thinkingLevel?: ThinkingLevel, background = false) { return pool.newSession(this, cwd, modelId, providerId, thinkingLevel, background); }
   all() { return catalog.all(this); }
@@ -233,7 +254,17 @@ export class PiEngine {
   rewindPoints(id: string) { return features.rewindPoints(this, id); }
   /** @internal */ navigateBefore(slot: Slot, entryId: string) { return features.navigateBefore(this, slot, entryId); }
   rewind(id: string, entryId: string) { return features.rewind(this, id, entryId); }
-  regenerate(id: string) { return features.regenerate(this, id); }
+  regenerate(id: string, modelId?: string, providerId?: string) { return features.regenerate(this, id, modelId, providerId); }
+  /** G1-27: 删除该消息 (Pi 的 context_edit：把这一轮从模型上下文里摘掉)。 */
+  deleteMessage(id: string, entryId: string) { return features.deleteMessage(this, id, entryId); }
+  /** G1-27: 继续生成 (回答被输出上限截断时，从断点接着写)。 */
+  continueAnswer(id: string) { return features.continueAnswer(this, id); }
+  /** G1-30: 清空上下文并新开 (任务本身留着，对话从头开始)。 */
+  clearContext(id: string) { return features.clearContext(this, id); }
+  /** G1-31: 快速问答 (一次性会话，不动当前任务的上下文)。 */
+  quickAnswer(options: { prompt: string; context?: string; cwd?: string; modelId?: string; providerId?: string }) {
+    return features.quickAnswer(this, options);
+  }
   /** 20261116-pii W1.1: versions of each user turn, and switching between them. */
   tree(id: string) { return features.tree(this, id); }
   navigate(id: string, entryId: string, opts?: Parameters<typeof features.navigate>[3]) { return features.navigate(this, id, entryId, opts); }
@@ -577,16 +608,9 @@ export class PiEngine {
     }
     return this.extensionsList();
   }
-  get currentCwd() {
-    const focused = this.focusedId ? this.slots.get(this.focusedId) : undefined;
-    return focused?.session.sessionManager.getCwd() ?? this.cwd;
-  }
-  get currentSessionId() {
-    return this.focusedId;
-  }
-  get inboxCwd() {
-    return this.inbox;
-  }
+  get currentCwd() { const focused = this.focusedId ? this.slots.get(this.focusedId) : undefined; return focused?.session.sessionManager.getCwd() ?? this.cwd; }
+  get currentSessionId() { return this.focusedId; }
+  get inboxCwd() { return this.inbox; }
   async setFolderTrust(cwd: string, trusted: boolean) {
     cwd = await this.validCwd(cwd);
     const c = this.settings.config.read();

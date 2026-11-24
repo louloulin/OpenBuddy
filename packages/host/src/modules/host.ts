@@ -2,7 +2,6 @@ import { COMMANDS } from "@openbuddy/protocol/commands";
 import { EVENTS } from "@openbuddy/protocol/events";
 import { PROTOCOL_VERSION } from "@openbuddy/protocol/version";
 import type { HostCapabilities } from "@openbuddy/protocol/host";
-import type { ProviderQuotaResponse } from "@openbuddy/protocol/usage";
 import { buildDiagnostics, sanitizeDiagnostics } from "@openbuddy/services/support/diagnostics";
 import { text } from "@openbuddy/services/settings/settings";
 import { getQuotaProviderForProvider } from "@openbuddy/services/usage/quota";
@@ -27,7 +26,7 @@ export function hostModule(ctx: HostContext): HostModule {
        * `GET /v1/credits`). Failures come back as a reason, not an exception: a refused key
        * (`unauthorized`) and a dead network (`network`) need different wording.
        */
-      usage_provider_quota: async (p): Promise<ProviderQuotaResponse> => {
+      usage_provider_quota: async (p) => {
         const providerId = text(p.providerId, "providerId");
         const catalog = ctx.engine.providers.list();
         const provider = catalog.providers.find((entry) => entry.id === providerId);

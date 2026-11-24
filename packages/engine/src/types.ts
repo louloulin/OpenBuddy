@@ -65,6 +65,8 @@ export interface Slot {
    * are tagged with it, its usage is attributed to it, and stopping the parent cascades down.
    */
   parentId?: string;
+  /** 快速问答 (G1-31): a throwaway session. It is never a task: it stays out of the sidebar and out of the running list. */
+  hidden?: boolean;
   /** The expert / label the child was spawned as (shown on its approval and subagent card). */
   agentName?: string;
   /** Never evicted while its parent runs; an in-memory child is closed with the parent anyway. */

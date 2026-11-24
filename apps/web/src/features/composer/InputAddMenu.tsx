@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Paperclip, ChevronRight, Wand2 } from "lucide-react";
+import { AtSign, Paperclip, ChevronRight, Wand2, Blocks } from "lucide-react";
 import {
   AddIcon,
   ExpertTabIcon,
   McpIcon,
   SkillTabIcon,
 } from "@openbuddy/ui/icon/icons/index";
-import { expertsLoad, skillsList, sessionMcpGet, sessionMcpSet } from "@openbuddy/client/agent-client";
+import { artifactsList, expertsLoad, listDir, skillsList, sessionMcpGet, sessionMcpSet, type AgentMode } from "@openbuddy/client/agent-client";
 import { HOME_MODES, type HomeModeId } from "../../shared/content/scenes";
+import { ApplicationPicker } from "./ApplicationPicker";
 import type { AgentEntry, SkillInfo } from "@openbuddy/protocol/dto";
 
 interface InputAddMenuProps {
@@ -16,11 +17,18 @@ interface InputAddMenuProps {
   onSelectExpert?: (agent: AgentEntry) => void;
   onSelectSkill?: (skillName: string) => void;
   onNavigateConnectors?: (tab?: "experts" | "connectors") => void;
+  /** G1-15: insert a file produced in this task as a composer reference. */
+  onReferenceFile?: (path: string) => void;
+  /** Workspace root, so 引用对话中的文件 can also offer top-level workspace files. */
+  workspaceCwd?: string;
+  /** Chat page: 做一做 / 想一想 / 问一问 lives in the menu instead of the footer (WorkBuddy layout). */
+  agentMode?: AgentMode;
+  onAgentModeChange?: (mode: AgentMode) => void;
   /** 本任务连接器开关 (pii W2.4 P2); omitted on the home page (no task yet). */
   sessionId?: string;
 }
 
-type MenuItemId = "add-files" | "mode" | "experts" | "skills" | "connectors";
+type MenuItemId = "add-files" | "session-files" | "mode" | "agent-mode" | "experts" | "skills" | "apps" | "connectors";
 
 interface MenuItem {
   id: MenuItemId;
@@ -31,11 +39,14 @@ interface MenuItem {
 const MENU_GROUPS: MenuItem[][] = [
   [
     { id: "add-files", label: "添加文件", icon: <Paperclip size={16} /> },
+    { id: "session-files", label: "引用对话中的文件", icon: <AtSign size={16} /> },
   ],
   [
     { id: "mode", label: "模式", icon: <Wand2 size={16} /> },
+    { id: "agent-mode", label: "工作方式", icon: <Wand2 size={16} /> },
     { id: "experts", label: "专家", icon: <ExpertTabIcon size="md" /> },
     { id: "skills", label: "技能", icon: <SkillTabIcon size="md" /> },
+    { id: "apps", label: "应用", icon: <Blocks size={16} /> },
     { id: "connectors", label: "连接器", icon: <McpIcon size="md" /> },
   ],
 ];
@@ -46,6 +57,10 @@ export function InputAddMenu({
   onSelectExpert,
   onSelectSkill,
   onNavigateConnectors,
+  onReferenceFile,
+  workspaceCwd,
+  agentMode,
+  onAgentModeChange,
   sessionId,
 }: InputAddMenuProps) {
   const [open, setOpen] = useState(false);
@@ -59,6 +74,7 @@ export function InputAddMenu({
   const [experts, setExperts] = useState<AgentEntry[]>([]);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [sessionMcp, setSessionMcp] = useState<Array<{ name: string; enabled: boolean }>>([]);
+  const [sessionFiles, setSessionFiles] = useState<Array<{ path: string; status: string }>>([]);
   const [mcpBusy, setMcpBusy] = useState("");
   const [dataLoaded, setDataLoaded] = useState(false);
 
@@ -91,6 +107,27 @@ export function InputAddMenu({
       .catch(() => { /* menu stays usable without connectors */ });
     return () => { disposed = true; };
   }, [open, sessionId]);
+
+  // G1-15 引用对话中的文件：Pi 产物优先，其次工作区根目录的普通文件。
+  useEffect(() => {
+    if (!open || !sessionId || !onReferenceFile) return;
+    let disposed = false;
+    void Promise.all([
+      artifactsList(sessionId).catch(() => []),
+      workspaceCwd ? listDir(workspaceCwd, workspaceCwd, 80).catch(() => []) : Promise.resolve([]),
+    ]).then(([artifacts, entries]) => {
+      if (disposed) return;
+      const known = new Set(artifacts.filter((item) => item.exists).map((item) => item.path));
+      const files = [
+        ...artifacts.filter((item) => item.exists).map((item) => ({ path: item.path, status: item.status })),
+        ...entries
+          .filter((entry) => entry.kind === "file" && !known.has(entry.path))
+          .map((entry) => ({ path: entry.path, status: "workspace" })),
+      ];
+      setSessionFiles(files.slice(0, 20));
+    });
+    return () => { disposed = true; };
+  }, [open, sessionId, onReferenceFile, workspaceCwd]);
 
   const toggleConnector = async (name: string, enabled: boolean) => {
     if (!sessionId || mcpBusy) return;
@@ -160,8 +197,19 @@ export function InputAddMenu({
     if (id === "add-files") { close(); onPickFiles(); }
   };
 
+  /** "会话文件" only exists inside a task and only when the composer can insert it. */
+  const canReference = Boolean(sessionId && onReferenceFile);
+  const groups = useMemo(
+    () => MENU_GROUPS.map((group) => group.filter((item) =>
+      (item.id !== "session-files" || canReference) &&
+      // 聊天页用「工作方式」替代只对首页有意义的场景「模式」。
+      (item.id !== "agent-mode" || Boolean(onAgentModeChange)) &&
+      (item.id !== "mode" || !onAgentModeChange)
+    )),
+    [canReference, onAgentModeChange],
+  );
   /** Keyboard parity for the “+” menu (B4 follow-up): hover-only submenus are unusable without a mouse. */
-  const menuIds = useMemo(() => MENU_GROUPS.flat().map((item) => item.id), []);
+  const menuIds = useMemo(() => groups.flat().map((item) => item.id), [groups]);
 
   const focusItem = (id: MenuItemId) => {
     setHoveredItem(id);
@@ -198,11 +246,61 @@ export function InputAddMenu({
     close();
     onNavigateConnectors?.("experts");
   };
+  /** G1-16: 应用（能力包 / 扩展包）在「专家·技能·连接器」里安装与管理。 */
+  const handleOpenAppCenter = () => {
+    close();
+    onNavigateConnectors?.("experts");
+  };
 
   const renderSubmenu = () => {
     if (!hoveredItem) return null;
 
     let items: React.ReactNode = null;
+
+    if (hoveredItem === "session-files") {
+      items = sessionFiles.length > 0 ? (
+        sessionFiles.map((file) => (
+          <button
+            key={file.path}
+            type="button"
+            className="iam-sub-item"
+            title={file.path}
+            onClick={() => { close(); onReferenceFile?.(file.path); }}
+          >
+            <AtSign size={14} />
+            <span className="iam-sub-text">
+              <span className="iam-sub-name">{file.path.split(/[\\/]/).pop() || file.path}</span>
+              <span className="iam-sub-desc">{file.status === "created" ? "本任务创建" : file.status === "modified" ? "本任务修改" : "工作区文件"}</span>
+            </span>
+          </button>
+        ))
+      ) : (
+        <div className="iam-sub-empty">本任务还没有产物文件</div>
+      );
+    }
+
+    if (hoveredItem === "agent-mode") {
+      const modes: ReadonlyArray<readonly [AgentMode, string, string]> = [
+        ["craft", "做一做", "直接动手：可以读写文件、执行命令"],
+        ["plan", "想一想", "先调研并给出计划，确认后再执行（只读）"],
+        ["ask", "问一问", "只回答问题，不改文件（只读）"],
+      ];
+      items = modes.map(([mode, label, hint]) => (
+        <button
+          key={mode}
+          type="button"
+          className={"iam-sub-item" + ((agentMode ?? "craft") === mode ? " iam-sub-item--active" : "")}
+          aria-pressed={(agentMode ?? "craft") === mode}
+          onClick={() => { close(); onAgentModeChange?.(mode); }}
+          data-tip={hint}
+        >
+          <span className="iam-sub-text">
+            <span className="iam-sub-name">{label}</span>
+            <span className="iam-sub-desc">{hint}</span>
+          </span>
+        </button>
+      ));
+    }
 
     if (hoveredItem === "mode") {
       items = HOME_MODES.map((m) => (
@@ -258,6 +356,15 @@ export function InputAddMenu({
         ))
       ) : (
         <div className="iam-sub-empty">暂无已启用技能</div>
+      );
+    }
+
+    if (hoveredItem === "apps") {
+      items = (
+        <ApplicationPicker
+          cwd={workspaceCwd}
+          onManage={handleOpenAppCenter}
+        />
       );
     }
 
@@ -352,7 +459,7 @@ export function InputAddMenu({
             }
           }}
         >
-          {MENU_GROUPS.map((group, gi) => (
+          {groups.map((group, gi) => (
             <div key={gi}>
               {gi > 0 && <div className="iam-divider" />}
               <div className="iam-group">

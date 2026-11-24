@@ -33,8 +33,8 @@ export function useSessionNavigation(options: {
   };
   const openForked = async (newId: string) => {
     const source = options.getSourceTitle?.();
-    await go(newId, source ? `${source}（分叉）` : "分叉任务");
-    await agentRenameSession(newId, source ? `${source}（分叉）` : "分叉任务", options.getCwd()).catch(() => {});
+    await go(newId, source ? `${source}（副本）` : "副本任务");
+    await agentRenameSession(newId, source ? `${source}（副本）` : "副本任务", options.getCwd()).catch(() => {});
   };
   const openHandoff = (newId: string, prompt: string) => go(newId, "交接任务", prompt);
   return { handoffFrom, setHandoffFrom, openForked, openHandoff };

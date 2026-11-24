@@ -7,6 +7,7 @@ import "../styles/automation-wb.css";
 import "../styles/chat.css";
 import "../styles/polish.css";
 import "../styles/grok.css";
+import "../styles/composer-wb-align.css";
 import { MarkdownHostProvider } from "@openbuddy/markdown/host";
 import { webMarkdownHost } from "../shared/markdown-host";
 import { PairingGate } from "./h5/PairingGate";

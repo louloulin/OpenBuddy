@@ -221,7 +221,7 @@ export interface ErrorDescription {
   /** Suggested next step. */
   hint?: string;
   /** Primary recovery action the UI can offer. */
-  action?: "retry" | "settings" | "model" | "wait";
+  action?: "retry" | "settings" | "model" | "wait" | "compact";
   /** Original message for the expandable detail. */
   raw: string;
 }
@@ -297,7 +297,7 @@ export function describeError(e: unknown): ErrorDescription {
   if (raw.includes("安全密钥存储不可用")) return d("系统钥匙串不可用，无法安全保存 API Key", "Linux 请安装并解锁 gnome-keyring 或 KWallet 后重启应用", "settings");
   if (/\b429\b/.test(raw) || lower.includes("rate limit") || lower.includes("too many requests")) return d("已达到模型用量上限", "稍等片刻再重试，或换一个模型", "retry");
   if (/\b(401|403)\b/.test(raw) || lower.includes("unauthorized") || lower.includes("invalid api key") || lower.includes("authentication")) return d("API Key 无效或已过期", "在设置 → 模型中检查 API Key", "settings");
-  if (lower.includes("context") && (lower.includes("length") || lower.includes("too long") || lower.includes("overflow"))) return d("对话太长，超出了模型的上下文", "输入 /compact 压缩上下文，或新建任务", "retry");
+  if (lower.includes("context") && (lower.includes("length") || lower.includes("too long") || lower.includes("overflow"))) return d("对话太长，超出了模型的上下文", "输入 /compact 压缩上下文，或新建任务", "compact");
   if (/\b(500|502|503|504)\b/.test(raw) || lower.includes("overloaded") || lower.includes("internal server error")) return d("模型服务暂时不可用", "稍后重试，或换一个模型", "retry");
   if (lower.includes("econnrefused") || lower.includes("enotfound") || lower.includes("network") || lower.includes("fetch failed") || lower.includes("timeout") || lower.includes("connection")) return d("无法连接到模型服务", "检查网络或代理，以及服务商的接口地址", "retry");
   if (lower.includes("aborted")) return d("已停止", undefined, undefined);

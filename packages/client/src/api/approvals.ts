@@ -1,7 +1,8 @@
 // §5.3 `approvals` module: agent_resolve_permission, agent_resolve_ui, agent_resolve_question, permission_list, permission_save,
 // permission_mode_get, permission_mode_set, folder_trust_respond.
 import type { PermissionRule } from "@openbuddy/protocol/dto";
-import { invoke } from "../ipc";
+import { invoke, listen, type UnlistenFn } from "../ipc";
+import type { ToolContentRiskEvent } from "@openbuddy/protocol/tool-content-risk";
 
 export async function agentResolvePermission(
   requestId: string,
@@ -58,6 +59,57 @@ export async function permissionProtectedGet(): Promise<{ paths: string[]; defau
 
 export async function permissionProtectedSet(paths: string[]): Promise<{ paths: string[] }> {
   return invoke<{ paths: string[] }>("permission_protected_set", { paths });
+}
+
+// ---------- 沙箱与网络策略 (G2-3) + 安全审计 (G2-5) ----------
+
+/** The hard boundary checked before every permission rule; empty lists mean "not restricted". */
+export interface SandboxPolicy {
+  fileWriteAllow: string[];
+  commandAllow: string[];
+  networkAllow: string[];
+}
+
+export async function securityPolicyGet(): Promise<SandboxPolicy> {
+  return invoke<SandboxPolicy>("security_policy_get");
+}
+
+export async function securityPolicySet(policy: SandboxPolicy): Promise<SandboxPolicy> {
+  return invoke<SandboxPolicy>("security_policy_set", { ...policy });
+}
+
+export interface AuditEvent {
+  ts: string;
+  sessionId?: string;
+  tool?: string;
+  action: string;
+  target?: string;
+  reason?: string;
+  actor?: string;
+}
+
+export async function securityAuditList(limit = 200): Promise<AuditEvent[]> {
+  const result = await invoke<{ events: AuditEvent[] }>("security_audit_list", { limit });
+  return result?.events ?? [];
+}
+
+// ---------- 工具内容注入审查 (G2-7) ----------
+
+/** Subscribe to the tool results the engine withheld for a possible prompt injection. */
+export async function subscribeToolContentRisk(
+  handler: (event: ToolContentRiskEvent) => void,
+): Promise<UnlistenFn> {
+  return listen<ToolContentRiskEvent>("agent://tool-content-risk", (event) => {
+    const payload = event.payload;
+    if (payload && typeof payload.sessionId === "string" && typeof payload.toolCallId === "string") handler(payload);
+  });
+}
+
+/** The user lets a withheld tool output through; the original text comes back. */
+export async function agentAllowToolContent(
+  toolCallId: string,
+): Promise<{ text: string; toolName: string }> {
+  return invoke<{ text: string; toolName: string }>("agent_allow_tool_content", { toolCallId });
 }
 
 export type PermissionMode = "ask" | "auto" | "always-approve";

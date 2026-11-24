@@ -66,6 +66,8 @@ describe("friendlyError", () => {
   it("maps rate limits, context overflow and IPC wrappers to plain words", () => {
     expect(friendlyError("Error invoking remote method 'agent_prompt': Error: 429 Too Many Requests")).toContain("已达到模型用量上限");
     expect(friendlyError("prompt is too long: context length exceeded")).toContain("超出了模型的上下文");
+    // G1-28: context overflow offers in-place compaction, not just retry.
+    expect(describeError("prompt is too long: context length exceeded").action).toBe("compact");
     expect(friendlyError("Error invoking remote method 'agent_prompt': Error: 会话未加载")).toContain("任务已关闭或不存在");
   });
 

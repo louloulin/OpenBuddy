@@ -48,8 +48,16 @@ export function withModeInstruction(text: string, mode: "craft" | "plan" | "ask"
   return `<openbuddy-${mode}-mode>\n${MODE_TEXT[mode]}\n</openbuddy-${mode}-mode>\n${text}`;
 }
 
+/**
+ * 状态 chip 的 prompt 前缀（G1-17）：`【风格：专业严谨】` / `【风格：… · 补图：…】`。
+ * 它是给模型看的上下文，不该出现在用户气泡里，所以显示前剥掉。
+ */
+const STATUS_PREFIX = /^\s*【风格：[^】]*(?: · 补图：[^】]*)?】/;
+
 export function parseUserText(raw: string): UserDisplay {
   let text = raw;
+  const status = text.match(STATUS_PREFIX);
+  if (status) text = text.slice(status[0].length);
   let mode: "plan" | "ask" | undefined;
   const modeBlock = text.match(MODE_BLOCK);
   if (modeBlock) {

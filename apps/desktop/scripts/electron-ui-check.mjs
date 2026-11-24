@@ -67,10 +67,22 @@ async function launch() {
   assert.equal(actualProfile, profile, 'must never use the user profile');
   await page.evaluate(() => { window.__modelStates = []; window.openbuddy.listen('agent://model-state', state => window.__modelStates.push(state)); });
 }
+// The model list re-renders while it scrolls, so a plain click can hit a detached
+// node ("element is not stable"). Retry a few times instead of failing the run.
+async function clickStable(locator, attempts = 4) {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await locator.click({ timeout: 10000 });
+      return;
+    } catch (error) {
+      if (i === attempts - 1) throw error;
+    }
+  }
+}
 async function choose(providerLabel) {
-  await page.getByRole('button', { name: /^选择模型：/ }).click();
+  await clickStable(page.getByRole('button', { name: /^选择模型：/ }));
   await page.getByRole('searchbox', { name: '搜索模型或提供商' }).fill(providerLabel);
-  await page.getByRole('group', { name: providerLabel, exact: true }).getByRole('option').click();
+  await clickStable(page.getByRole('group', { name: providerLabel, exact: true }).getByRole('option'));
 }
 async function send(text) {
   const input = page.locator('.wb-composer__input');
@@ -85,7 +97,8 @@ async function waitForRequestCount(count) {
   await page.getByRole('button', { name: '发送', exact: true }).waitFor();
 }
 async function state() {
-  const latest = await page.evaluate(() => window.__modelStates.at(-1));
+  // 快速问答 (G1-31) 的一次性会话也会广播模型状态：它不是任务，状态助手要跳过。
+  const latest = await page.evaluate(() => window.__modelStates.filter((s) => s.sessionId !== window.__qaExcluded).at(-1));
   assert.ok(latest?.sessionId, 'the UI must receive an actual session model state');
   return call('agent_get_model_state', { sessionId: latest.sessionId });
 }
@@ -110,12 +123,68 @@ try {
   await page.getByText('fixture B answered', { exact: true }).first().waitFor({ timeout: 15000 });
   assert.equal(requests.at(-1).provider, 'b'); assert.equal(requests.at(-1).model, 'shared-model');
   checkpoint('provider B same slug sends actual request to B', { provider: actual.providerId, modelKey: actual.modelKey });
-  await page.getByRole('combobox', { name: '思考等级', exact: true }).selectOption('high');
+  await page.screenshot({ path: 'release/ui-composer.png' });
+  // G1-22: a real selection inside the answer opens the floating toolbar; 引用 keeps a source.
+  const selectedAnswer = await page.evaluate(() => {
+    const answer = [...document.querySelectorAll('.turn__answer')].at(-1);
+    const node = answer?.querySelector('p') ?? answer;
+    if (!node) return false;
+    const range = document.createRange(); range.selectNodeContents(node);
+    const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+    return selection.toString().trim().length > 0;
+  });
+  assert.equal(selectedAnswer, true, 'answer text is selectable');
+  await page.getByRole('toolbar', { name: '选中文字操作' }).waitFor();
+  await page.screenshot({ path: 'release/ui-selection-toolbar.png' });
+  await page.getByRole('button', { name: '引用到输入框' }).click();
+  await page.waitForFunction(() => document.querySelector('.wb-composer__input')?.value.includes('—— 来自'));
+  const quoted = await page.locator('.wb-composer__input').inputValue();
+  assert.match(quoted, /^> fixture B answered/);
+  await page.locator('.wb-composer__input').fill('');
+  checkpoint('selecting answer text quotes it with its source', { quoted: quoted.slice(0, 60) });
+
+  // G1-16: `+ → 应用` lists what is really installed (here: nothing) and says so.
+  await page.getByRole('button', { name: '添加', exact: true }).click();
+  await page.getByRole('menuitem', { name: '应用', exact: true }).hover();
+  await page.getByText('还没有安装任何应用', { exact: true }).waitFor({ timeout: 10000 });
+  await page.screenshot({ path: 'release/ui-app-picker.png' });
+  await page.keyboard.press('Escape');
+  checkpoint('the app picker lists the installed applications and has an empty state', {});
+
+  // G1-31: 快速问答 — the selected fragment is answered in its own session.
+  await page.evaluate(() => {
+    const answer = [...document.querySelectorAll('.turn__answer')].at(-1);
+    const node = answer?.querySelector('p') ?? answer;
+    if (!node) return;
+    const range = document.createRange(); range.selectNodeContents(node);
+    const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+  });
+  await page.getByRole('toolbar', { name: '选中文字操作' }).waitFor();
+  await page.getByRole('button', { name: '快速问答' }).click();
+  await page.getByRole('dialog', { name: '快速问答' }).waitFor();
+  const qaDialog = page.getByRole('dialog', { name: '快速问答' });
+  await qaDialog.getByRole('textbox', { name: '快速问答的问题' }).fill('这段在说什么');
+  const qaRequests = requests.length;
+  await qaDialog.getByRole('button', { name: '提问' }).click();
+  await page.waitForFunction(() => (document.querySelector('.quick-qa__answer')?.textContent ?? '').length > 0, undefined, { timeout: 30000 });
+  const qaAnswer = (await page.locator('.quick-qa__answer').innerText()).trim();
+  const qaSession = await page.evaluate(() => document.querySelector('.quick-qa')?.getAttribute('data-qa-session') ?? '');
+  await page.evaluate((id) => { window.__qaExcluded = id; }, qaSession);
+  assert.ok(requests.length > qaRequests, 'quick QA sent its own request');
+  assert.ok(!qaAnswer.includes('MAGIC'), 'quick QA answered in its own session');
+  await page.screenshot({ path: 'release/ui-quick-qa.png' });
+  await qaDialog.getByRole('button', { name: '关闭快速问答' }).click();
+  await qaDialog.waitFor({ state: 'hidden' });
+  checkpoint('quick QA answers the quoted fragment in its own session', { answer: qaAnswer.slice(0, 40) });
+  // 思考等级是一个药丸按钮（WorkBuddy 对齐），展开后才是等级列表。
+  const thinkingPill = page.getByRole('button', { name: /思考等级/ });
+  await thinkingPill.click();
+  await page.getByRole('option', { name: '高', exact: true }).click();
   actual = await state(); assert.equal(actual.thinkingLevel, 'high');
   const thinkingRequest = requests.length + 1;
   await send('check fixture reasoning request'); await waitForRequestCount(thinkingRequest);
   assert.equal(requests.at(-1).input.reasoning_effort, 'high');
-  checkpoint('thinking changed through actual select and SDK request', { level: actual.thinkingLevel, reasoningEffort: requests.at(-1).input.reasoning_effort });
+  checkpoint('thinking changed through the actual pill and SDK request', { level: actual.thinkingLevel, reasoningEffort: requests.at(-1).input.reasoning_effort });
   await choose('Fixture C');
   await page.getByRole('alert').filter({ hasText: '模型切换失败' }).waitFor();
   actual = await state(); assert.equal(actual.providerId, 'fixture-b');
@@ -172,33 +241,57 @@ try {
   checkpoint('DOM drop of genuine native File becomes SDK image bytes', { mimeType: 'image/png' });
   await send('__HOLD_FIXTURE__');
   await page.getByRole('button', { name: '停止生成', exact: true }).waitFor();
-  await page.getByRole('combobox', { name: '排队模式', exact: true }).selectOption('followUp');
   await page.locator('.wb-composer__input').fill('fixture follow-up');
+  await page.getByRole('radiogroup', { name: '排队模式' }).getByRole('radio', { name: '完成后发送' }).click();
   await page.getByRole('button', { name: '加入待发送队列', exact: true }).click();
-  await page.getByRole('region', { name: 'Pi 待处理队列' }).getByText('fixture follow-up', { exact: true }).waitFor();
-  await page.getByRole('combobox', { name: '排队模式', exact: true }).selectOption('steer');
+  await page.getByRole('region', { name: '排队中的消息' }).getByText('fixture follow-up', { exact: true }).waitFor();
   await page.locator('.wb-composer__input').fill('fixture steering');
+  await page.getByRole('radiogroup', { name: '排队模式' }).getByRole('radio', { name: '立即插话' }).click();
   await page.getByRole('button', { name: '加入待发送队列', exact: true }).click();
-  await page.getByRole('region', { name: 'Pi 待处理队列' }).getByText('fixture steering', { exact: true }).waitFor();
+  await page.getByRole('region', { name: '排队中的消息' }).getByText('fixture steering', { exact: true }).waitFor();
   const queueSession = (await state()).sessionId;
   const queued = await call('agent_get_queue', { sessionId: queueSession });
   assert.deepEqual(queued.steering, ['fixture steering']); assert.deepEqual(queued.followUp, ['fixture follow-up']);
-  await page.getByRole('button', { name: '清空 Pi 队列', exact: true }).click();
-  await page.getByRole('region', { name: 'Pi 待处理队列' }).waitFor({ state: 'hidden' });
+  await page.getByRole('button', { name: '全部撤回', exact: true }).click();
+  await page.getByRole('region', { name: '排队中的消息' }).waitFor({ state: 'hidden' });
   assert.deepEqual(await call('agent_get_queue', { sessionId: queueSession }), { steering: [], followUp: [] });
   assert.equal(typeof releaseHeldResponse, 'function'); releaseHeldResponse();
   await page.getByRole('button', { name: '发送', exact: true }).waitFor();
   checkpoint('actual composer queues steering and follow-up in Pi then clears both', {});
   const parent = await state();
   await page.getByRole('button', { name: '更多操作', exact: true }).click();
-  await page.getByRole('button', { name: '分叉为新会话', exact: true }).click();
+  await page.getByRole('button', { name: '复制会话', exact: true }).click();
   await page.waitForFunction(parentId => window.__modelStates.at(-1)?.sessionId !== parentId, parent.sessionId);
   const child = await state(); assert.notEqual(child.sessionId, parent.sessionId); assert.equal(child.providerId, parent.providerId); assert.equal(child.thinkingLevel, parent.thinkingLevel);
   await page.getByRole('button', { name: '编辑标题', exact: true }).click();
   await page.locator('.main-topbar__title-input').fill('Fixture fork child');
   await page.locator('.main-topbar__title-input').press('Enter');
   await page.getByText('Fixture fork child', { exact: true }).first().waitFor();
-  checkpoint('actual topbar fork selects new session and retains provider/thinking', { parent: parent.sessionId, child: child.sessionId });
+  checkpoint('actual topbar copy selects new session and retains provider/thinking', { parent: parent.sessionId, child: child.sessionId });
+
+  // G1-27/G1-30: 删除该消息 / 清空上下文并新开 (真实 UI → 真实会话)。
+  const promptsBefore = await page.locator('.msg--user').count();
+  assert.ok(promptsBefore > 0, 'the copied session shows the copied prompts');
+  await page.locator('.msg--user').first().hover();
+  await page.screenshot({ path: 'release/ui-delete-message.png' });
+  await page.getByRole('button', { name: '删除该消息', exact: true }).first().click();
+  await page.getByRole('alertdialog').getByRole('button', { name: '删除', exact: true }).click();
+  await page.waitForFunction(count => document.querySelectorAll('.msg--user').length === count - 1, promptsBefore);
+  const afterDelete = await page.locator('.msg--user').count();
+  assert.equal(afterDelete, promptsBefore - 1, 'deleting a message removes that prompt from the transcript');
+  checkpoint('actual user message delete removes the turn from the transcript', { before: promptsBefore, after: afterDelete });
+  // WorkBuddy 对齐：聊天页顶栏是「📁 空间 / 会话名」的面包屑。
+  const crumb = await page.locator('.main-topbar__crumb').first().innerText().catch(() => '');
+  assert.ok(crumb.includes('/'), 'the chat topbar shows the WorkBuddy breadcrumb');
+  await page.screenshot({ path: 'release/ui-topbar-crumb.png', clip: { x: 0, y: 0, width: 1200, height: 90 } }).catch(() => {});
+
+  await page.getByRole('button', { name: '更多操作', exact: true }).click();
+  await page.getByRole('button', { name: '清空上下文并新开', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: '清空并重新开始', exact: true }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.msg--user').length === 0);
+  assert.equal(await page.locator('.msg--user').count(), 0, 'clearing the context empties the conversation');
+  checkpoint('actual clear-context keeps the task and empties the conversation', {});
+
   await call('window_toggle_maximize');
   await page.waitForFunction(() => window.openbuddy.window.isMaximized());
   await call('window_toggle_maximize');
@@ -248,6 +341,23 @@ try {
   await page.getByRole('button', { name: /选择模型：.*Fixture B/ }).waitFor({ timeout: 15000 });
   const restored = await state(); assert.equal(restored.providerId, 'fixture-b'); assert.equal(restored.thinkingLevel, 'high');
   checkpoint('restart and actual sidebar restore provider and thinking', { provider: restored.providerId, thinkingLevel: restored.thinkingLevel });
+  // G1-30: selection mode toggles rows instead of navigating; cancel leaves the list intact.
+  await page.getByRole("button", { name: "批量选择任务" }).click();
+  const bulkRows = page.locator(".sidebar__conv");
+  await bulkRows.first().click(); await bulkRows.nth(1).click();
+  await page.getByText("已选 2 项").waitFor();
+  await page.screenshot({ path: 'release/ui-batch-select.png' });
+  await page.getByRole("region", { name: "批量操作" }).getByRole("button", { name: "取消" }).click();
+  await page.getByText("已选 2 项").waitFor({ state: "hidden" });
+  checkpoint('sidebar batch selection counts rows without navigating', {});
+  // G1-15: a workspace file shows up under + → 引用对话中的文件.
+  await writeFile(join(init.cwd, 'ui-reference.md'), '# reference\n');
+  await page.getByRole('button', { name: '添加', exact: true }).click();
+  await page.locator('.iam-item').filter({ hasText: '引用对话中的文件' }).hover();
+  await page.getByText('ui-reference.md', { exact: true }).waitFor();
+  await page.screenshot({ path: 'release/ui-reference-menu.png' });
+  await page.keyboard.press('Escape');
+  checkpoint('reference menu lists a workspace file', {});
   const beforeFiles = await app.evaluate(() => globalThis.__ipcAudit.length);
   await writeFile(join(init.cwd, 'ui-local-marker.txt'), 'local listing fixture');
   const more = page.getByRole('button', { name: /更多.*文件/ });
@@ -263,11 +373,126 @@ try {
   await page.getByText('本地策略预览，尚未强制执行', { exact: true }).waitFor();
   checkpoint('policy clearly states local preview without enforcement', {});
   await more.hover(); await page.getByRole('menuitem', { name: '用量统计', exact: true }).click();
-  await page.getByText('阈值仅作本地用量提醒，不会阻止发送。费用为估算，实际以提供商账单为准。', { exact: true }).waitFor();
+  await page.getByText('数据来自本机各任务的真实用量（含缓存读取）。阈值只作提醒，不会阻止发送；费用按模型定价估算。', { exact: true }).waitFor();
   checkpoint('quota clearly states reminder rather than send enforcement', {});
   await more.hover(); await page.getByRole('menuitem', { name: '通知渠道', exact: true }).click();
-  await page.getByText('渠道配置尚未接入主进程，当前仅可管理本地草稿；外部发送与测试暂不可用。', { exact: true }).waitFor();
-  checkpoint('notification channels clearly state drafts and no external send', {});
+  await page.getByText('渠道由主进程发送：审批请求、后台任务完成与失败都会推送到已启用的渠道。', { exact: true }).waitFor();
+  checkpoint('notification channels state host-side delivery for enabled channels', {});
+
+  // G2-4: the security centre lists the installed skills and can review them statically.
+  await page.getByRole('button', { name: '设置', exact: true }).first().click();
+  await page.getByText('安全中心', { exact: true }).first().click();
+  await page.getByText('受保护路径', { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByRole('tab', { name: '技能审查' }).click();
+  await page.getByText('技能安全审查', { exact: true }).waitFor({ timeout: 15000 });
+  await page.screenshot({ path: 'release/ui-security-skills.png' });
+  checkpoint('the security centre shows the tool rules and the skill review card', {});
+  // G2-1: five sections, keyboard reachable; the sandbox policy is editable for real.
+  const tabNames = await page.getByRole('tab').allInnerTexts();
+  assert.deepEqual(tabNames, ['工具管控', '沙箱与网络', '技能审查', '审计日志', '系统授权']);
+  await page.getByRole('tab', { name: '沙箱与网络' }).click();
+  await page.getByText('沙箱与网络策略', { exact: true }).waitFor();
+  const fileInput = page.getByPlaceholder('允许写入的路径片段，例如 /work/output');
+  await fileInput.fill('/work/output');
+  const fileGroup = page.locator('.sec-sandbox__group').first();
+  await fileGroup.getByRole('button', { name: '添加' }).click();
+  await page.waitForFunction(() => document.body.innerText.includes('/work/output'), undefined, { timeout: 10000 });
+  await page.getByRole('tab', { name: '审计日志' }).click();
+  await page.getByText('审计日志', { exact: true }).first().waitFor();
+  await page.screenshot({ path: 'release/ui-security-audit.png' });
+  await page.getByRole('tab', { name: '系统授权' }).click();
+  await page.getByText('麦克风', { exact: true }).waitFor();
+  checkpoint('the security centre exposes the sandbox policy and the audit log', { tabs: tabNames });
+  await page.getByRole('button', { name: '关闭' }).first().click().catch(() => {});
+
+  // G1-17: 设计风格 chip sits after the model selector and lands in the prompt as a
+  // prefix. This runs last because it opens a new task, which resets the current
+  // session's model to the home default.
+  await page.getByRole('button', { name: '新建任务', exact: true }).first().click();
+  await page.getByRole('tab', { name: '设计创意' }).click();
+  const styleChip = page.getByRole('button', { name: /设计风格：/ });
+  await styleChip.waitFor({ timeout: 15000 });
+  await styleChip.click();
+  await page.getByRole('option', { name: /专业严谨/ }).click();
+  await page.getByRole('button', { name: '设计风格：专业严谨' }).waitFor();
+  await page.screenshot({ path: 'release/ui-status-chip.png' });
+  const styleRequest = requests.length + 1;
+  await send('check fixture design style');
+  await waitForRequestCount(styleRequest);
+  const styleContent = requests.at(-1).input.messages.findLast(message => message.role === 'user')?.content;
+  const styleText = typeof styleContent === 'string'
+    ? styleContent
+    : Array.isArray(styleContent)
+      ? styleContent.filter(part => part.type === 'text').map(part => part.text).join('\n')
+      : '';
+  assert.match(styleText, /【风格：专业严谨】/);
+  // The chip lives on the home design scene only; the chat composer has no status chip.
+  await page.locator('.msg--user').first().waitFor({ timeout: 15000 });
+  const bubbleText = await page.locator('.msg--user').first().innerText();
+  assert.ok(!bubbleText.includes('【风格：'), 'the style prefix stays out of the user bubble');
+  assert.equal(await page.getByRole('button', { name: /设计风格：/ }).count(), 0);
+  checkpoint('the design-style chip writes its prefix into the prompt but not the bubble', { prefix: '【风格：专业严谨】', bubble: bubbleText.trim() });
+
+  // WorkBuddy chat input (real app, 1440×900): a 16px hairline card whose main area
+  // stays transparent (`.cr-input-box__main{background:0 0}`), a 15px editor, the
+  // WorkBuddy placeholder, and a filled round send button with a white arrow.
+  const composerSkin = await page.evaluate(() => {
+    const card = document.querySelector('.wb-composer');
+    const slot = document.querySelector('.wb-composer__main');
+    const input = document.querySelector('.wb-composer__input');
+    const send = document.querySelector('.wb-composer__send');
+    const sendStyle = send ? getComputedStyle(send) : null;
+    const inputStyle = input ? getComputedStyle(input) : null;
+    return {
+      cardRadius: card ? getComputedStyle(card).borderRadius : '',
+      cardWidth: card ? Math.round(card.getBoundingClientRect().width) : 0,
+      viewport: window.innerWidth,
+      slotFill: slot ? getComputedStyle(slot).backgroundColor : '',
+      slotGradient: slot ? getComputedStyle(slot).backgroundImage : '',
+      sendFill: sendStyle?.backgroundColor ?? '',
+      sendSize: sendStyle ? [sendStyle.width, sendStyle.height] : [],
+      sendRadius: sendStyle?.borderRadius ?? '',
+      inputFont: inputStyle?.fontSize ?? '',
+      inputLineHeight: inputStyle?.lineHeight ?? '',
+      placeholder: input?.getAttribute('placeholder') ?? '',
+    };
+  });
+  assert.match(composerSkin.cardRadius, /^16px/);
+  // WorkBuddy's chat card is exactly 800px wide, centred in the content area.
+  assert.equal(composerSkin.cardWidth, 800);
+  assert.equal(composerSkin.slotFill, 'rgba(0, 0, 0, 0)');
+  assert.equal(composerSkin.slotGradient, 'none');
+  assert.deepEqual(composerSkin.sendSize, ['32px', '32px']);
+  assert.equal(composerSkin.sendRadius, '50%');
+  assert.equal(composerSkin.inputFont, '15px');
+  assert.equal(composerSkin.placeholder, '今天帮你做些什么？ @ 引用资产文件、项目待办或调用技能');
+  // Empty input keeps the WorkBuddy disabled look (20% black circle); typing switches
+  // it to the near-black circle (#000000e6).
+  assert.equal(composerSkin.sendFill, 'rgba(0, 0, 0, 0.2)');
+  await page.locator('.wb-composer__input').fill('对齐检查');
+  await page.waitForFunction(() => {
+    const send = document.querySelector('.wb-composer__send');
+    return !!send && getComputedStyle(send).backgroundColor === 'rgba(0, 0, 0, 0.9)';
+  }, undefined, { timeout: 10000 });
+  const sendFillReady = await page.evaluate(() => {
+    const send = document.querySelector('.wb-composer__send');
+    return send ? getComputedStyle(send).backgroundColor : '';
+  });
+  assert.equal(sendFillReady, 'rgba(0, 0, 0, 0.9)');
+  await page.screenshot({ path: 'release/ui-composer.png' });
+  await page.locator('.wb-composer__input').fill('');
+  checkpoint('the chat composer matches the WorkBuddy input skin', { ...composerSkin, sendFillReady });
+
+  // WorkBuddy home: the gradient input slot lives on the home composer only.
+  await page.getByRole('button', { name: '新建任务', exact: true }).first().click();
+  await page.locator('.wb-composer--home').waitFor({ timeout: 15000 });
+  const homeSkin = await page.evaluate(() => {
+    const slot = document.querySelector('.wb-composer--home .wb-composer__main');
+    return { gradient: slot ? getComputedStyle(slot).backgroundImage : '' };
+  });
+  assert.match(homeSkin.gradient, /linear-gradient/);
+  await page.screenshot({ path: 'release/ui-composer-home.png' });
+  checkpoint('the home composer keeps the WorkBuddy gradient input slot', homeSkin);
   const ipcAudit = await app.evaluate(() => globalThis.__ipcAudit);
   assert.deepEqual(consoleErrors, []);
   await writeFile('release/electron-ui-check.json', JSON.stringify({ mode: 'Electron bootstrap imports supplied main in isolated profile; not installation verification', main, artifact, artifactSha256, profile, checks, ipcAudit, requestSummary: requests.map(({ provider, model, input }) => ({ provider, model, reasoningEffort: input.reasoning_effort, imageCount: input.messages.flatMap(message => Array.isArray(message.content) ? message.content : []).filter(part => part.type === 'image_url').length })), screenshot: 'release/electron-ui-check.png', consoleErrors }, null, 2));

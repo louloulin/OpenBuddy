@@ -159,6 +159,19 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
       if (typeof path !== 'string' || !path.trim() || path.length > 200 || path.includes('\0')) throw new Error('invalid_payload: path');
     }
   }
+  // 沙箱与网络策略 (G2-3): three bounded lists of short patterns.
+  if (command === 'security_policy_set') {
+    for (const key of ['fileWriteAllow', 'commandAllow', 'networkAllow']) {
+      const list = payload[key];
+      if (!Array.isArray(list) || list.length > 64) throw new Error(`invalid_payload: ${key}`);
+      for (const item of list) {
+        if (typeof item !== 'string' || !item.trim() || item.length > 200 || item.includes('\0')) throw new Error(`invalid_payload: ${key}`);
+      }
+    }
+  }
+  if (command === 'security_audit_list') {
+    if (payload.limit !== undefined && (typeof payload.limit !== 'number' || !Number.isInteger(payload.limit) || payload.limit < 1 || payload.limit > 1000)) throw new Error('invalid_payload: limit');
+  }
   if (command === 'agent_set_queue') {
     string('sessionId', 256);
     // Items are strings, or `{ text, attachments }` so queued images survive reordering (pii W1.8).
@@ -185,7 +198,18 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'agent_set_mode' && !['craft', 'plan', 'ask'].includes(String(payload.mode))) throw new Error('invalid_payload: mode');
   if ((command === 'permission_pending' || command === 'question_pending' || command === 'trust_pending') && payload.sessionId !== undefined) string('sessionId', 256);
   if (command === 'agent_resolve_permission') string('reason', 500, true);
-  if (['rewind_points', 'rewind_execute', 'agent_regenerate', 'agent_compact', 'agent_get_model_state', 'agent_set_model', 'agent_set_thinking_level', 'agent_resolve_ui', 'agent_resolve_question', 'agent_steer', 'agent_follow_up', 'agent_get_queue', 'agent_clear_queue', 'agent_fork_session'].includes(command)) string('sessionId', 256);
+  if (['rewind_points', 'rewind_execute', 'agent_regenerate', 'agent_compact', 'agent_get_model_state', 'agent_set_model', 'agent_set_thinking_level', 'agent_resolve_ui', 'agent_resolve_question', 'agent_steer', 'agent_follow_up', 'agent_get_queue', 'agent_clear_queue', 'agent_fork_session', 'agent_delete_message', 'agent_continue', 'agent_clear_context'].includes(command)) string('sessionId', 256);
+  // G1-27: 删除该消息 / 换模型重新生成。
+  if (command === 'agent_delete_message') string('entryId', 256);
+  // G1-31: 快速问答。
+  if (command === 'agent_quick_answer') {
+    string('prompt', 20_000);
+    string('context', 40_000, true);
+    string('cwd', 4096, true);
+    string('modelId', 4096, true);
+    string('providerId', 512, true);
+  }
+  if (command === 'agent_regenerate') { string('modelId', 4096, true); string('providerId', 512, true); }
   if (command === 'agent_set_model' || command === 'agent_new_session') {
     string('modelId', 4096, command === 'agent_new_session');
     string('providerId', 512, true);

@@ -3,10 +3,13 @@ import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { DEFAULT_PROTECTED_PATHS, type Settings } from "@openbuddy/services/settings/settings";
 import type { Emit } from "@openbuddy/kernel";
 import { assessCommand } from "./command-risk.js";
+import { policyViolation, type SandboxPolicy } from "./sandbox-policy.js";
+import type { AuditLog } from "./audit-log.js";
+import { scanToolContent, toolContentText, withheldNotice, type ToolContentRisk } from "./tool-content-risk.js";
 // The event port moved to @openbuddy/kernel (20261115-md R2); re-exported for existing importers.
 export type { Emit };
 type Reason = "resolved" | "cancelled" | "timeout";
-type Decision = { allow: boolean; note?: string; kind?: "user" | "protected" };
+type Decision = { allow: boolean; note?: string; kind?: "user" | "protected" | "policy" };
 /** The `agent://permission` payload; `permission_pending` returns these verbatim so a reconnecting client sees the same card. */
 export type PermissionRequestPayload = {
   requestId: string;
@@ -99,6 +102,8 @@ export class Permissions {
   private sessionAllow = new Map<string, Set<string>>();
   /** 自动化 (W4.2): sessions configured for 完全访问 run unattended; deny rules still win. */
   private sessionAll = new Set<string>();
+  /** 工具内容注入审查 (G2-7): the withheld original, until the user lets it through. */
+  private withheld = new Map<string, { sessionId: string; toolName: string; text: string; risk: ToolContentRisk }>();
   constructor(
     private settings: Settings,
     private emit: Emit,
@@ -108,9 +113,45 @@ export class Permissions {
     private builtinTool: (sessionId: string, toolName: string) => boolean = () => false,
     /** 子代理 (W3.4): the parent of a child session, so its approvals can say 来自子代理 X. */
     private subagentOf: (sessionId: string) => { parentId: string; name?: string } | undefined = () => undefined,
+    /** 沙箱与网络策略 (G2-3): read on every call, so editing the policy takes effect immediately. */
+    private sandbox: () => SandboxPolicy | undefined = () => undefined,
+    /** 安全审计 (G2-5): tool calls and decisions are appended here. */
+    private audit?: AuditLog,
   ) {}
   extension(sessionId: string): ExtensionFactory {
     return (pi) => {
+      // G2-7: tool output is untrusted input. A result that carries an injection attempt is
+      // withheld from the model until the user explicitly lets it through.
+      pi.on("tool_result", async (event) => {
+        const text = toolContentText(event.content);
+        const risk = scanToolContent(text);
+        if (!risk) return undefined;
+        this.withheld.set(event.toolCallId, {
+          sessionId,
+          toolName: event.toolName,
+          text,
+          risk,
+        });
+        this.emit("agent://tool-content-risk", {
+          sessionId,
+          toolCallId: event.toolCallId,
+          toolName: event.toolName,
+          rule: risk.rule,
+          severity: risk.severity,
+          reason: risk.reason,
+          excerpt: risk.excerpt,
+        });
+        this.audit?.append({
+          ts: new Date().toISOString(),
+          sessionId,
+          tool: event.toolName,
+          action: "tool-content-blocked",
+          target: risk.excerpt,
+          reason: risk.reason,
+          actor: "policy",
+        });
+        return { content: [{ type: "text", text: withheldNotice(risk, event.toolName) }] };
+      });
       pi.on("tool_call", async (event) => {
         const decision = await this.decision(
           sessionId,
@@ -160,10 +201,40 @@ export class Permissions {
         kind: "protected",
         note: `受保护路径（${guard}）：写入被拒绝。可在 设置 · 安全中心 调整受保护路径。`,
       };
+    // 沙箱与网络策略 (G2-3): a hard boundary like the protected paths — it is checked before
+    // any rule, mode or session grant, so "完全访问" cannot bypass it.
+    const violation = policyViolation(this.sandbox(), toolName, input);
+    if (violation) {
+      this.audit?.append({
+        ts: new Date().toISOString(),
+        sessionId,
+        tool: toolName,
+        action: "policy-deny",
+        target: String((input as Record<string, unknown>)?.path ?? (input as Record<string, unknown>)?.command ?? ""),
+        reason: violation.reason,
+        actor: "policy",
+      });
+      return { allow: false, kind: "policy", note: violation.reason };
+    }
     const decided = this.decide(sessionId, toolName, input);
-    if (decided !== undefined) return { allow: decided };
+    if (decided !== undefined) {
+      this.audit?.append({
+        ts: new Date().toISOString(),
+        sessionId,
+        tool: toolName,
+        action: decided ? "tool-allow" : "tool-deny",
+        target: this.subjectOf(toolName, input),
+        actor: "rule",
+      });
+      return { allow: decided };
+    }
     return this.ask(sessionId, toolCallId, toolName, input, destructiveInfo(toolName, input));
   }
+  /** The path / command a call touches, for the audit log. */
+  private subjectOf(toolName: string, input: unknown): string {
+    return subject(toolName, input);
+  }
+
   /** The first rule matching this call (rules are checked in order). */
   private rule(toolName: string, input: unknown) {
     const target = subject(toolName, input);
@@ -199,6 +270,15 @@ export class Permissions {
         if (timer) clearTimeout(timer);
         this.pending.delete(requestId);
         this.emit("agent://permission-dismiss", { requestId, sessionId, reason, allowed: allow });
+        this.audit?.append({
+          ts: new Date().toISOString(),
+          sessionId,
+          tool: toolName,
+          action: allow ? "tool-resolve" : "tool-deny",
+          target: this.subjectOf(toolName, input),
+          reason: note,
+          actor: "user",
+        });
         resolve({ allow, ...(note ? { note } : {}) });
       };
       const subagent = this.subagentOf(sessionId);
@@ -280,6 +360,26 @@ export class Permissions {
   revokeAll(sessionId: string) {
     this.sessionAll.delete(sessionId);
   }
+  /**
+   * The user lets a withheld tool output through (G2-7): the original text comes back so the
+   * client can pass it on as user-provided context, and the decision is audited.
+   */
+  allowToolContent(toolCallId: string): { text: string; toolName: string; risk: ToolContentRisk } | undefined {
+    const held = this.withheld.get(toolCallId);
+    if (!held) return undefined;
+    this.withheld.delete(toolCallId);
+    this.audit?.append({
+      ts: new Date().toISOString(),
+      sessionId: held.sessionId,
+      tool: held.toolName,
+      action: "tool-content-allowed",
+      target: held.risk.excerpt,
+      reason: held.risk.reason,
+      actor: "user",
+    });
+    return { text: held.text, toolName: held.toolName, risk: held.risk };
+  }
+
   /** Forget per-session grants when a session is deleted. */
   forget(sessionId: string) {
     this.sessionAllow.delete(sessionId);

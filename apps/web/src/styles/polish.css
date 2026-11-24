@@ -1094,6 +1094,46 @@ body.bench-resizing iframe { pointer-events: none; }
 }
 .sec-rule__delete:hover { background: var(--ob-active); color: #dc2626; }
 .sec-muted { padding: 14px 18px; font-size: 12px; color: var(--wb-text-tertiary); }
+/* 安全中心 2.0 (G2-1)：分区标签栏。 */
+.sec-tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.75rem; }
+.sec-tabs__tab {
+  height: 1.75rem; padding: 0 0.75rem; border: var(--wb-hairline) solid transparent; border-radius: var(--wb-radius-pill);
+  background: transparent; color: var(--wb-text-tertiary); font-size: 0.75rem; cursor: pointer;
+  transition: background var(--ob-dur-fast) var(--ob-ease), color var(--ob-dur-fast) var(--ob-ease);
+}
+.sec-tabs__tab:hover { color: var(--wb-text-strong); background: var(--ob-hover); }
+.sec-tabs__tab.is-on { background: var(--ob-active); color: var(--wb-text-strong); font-weight: 500; }
+.sec-tabs__tab:focus-visible { outline: none; box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--ob-focus) 30%, transparent); }
+
+/* 沙箱与网络策略 (G2-3)：三组白名单。 */
+.sec-sandbox__group + .sec-sandbox__group { border-top: var(--wb-hairline) solid var(--ob-card-border); }
+.sec-sandbox__head { display: flex; align-items: baseline; gap: 0.5rem; padding: 0.875rem 1.125rem 0; }
+.sec-sandbox__title { font-size: 0.8125rem; font-weight: 600; color: var(--wb-text-strong); }
+.sec-sandbox__hint { font-size: 0.6875rem; color: var(--wb-text-tertiary); }
+
+/* 审计日志 (G2-5)：事件流水。 */
+.sec-audit { display: flex; flex-direction: column; padding: 0.25rem 0 0.5rem; }
+.sec-audit__row { display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 1.125rem; font-size: 0.6875rem; }
+.sec-audit { padding-bottom: 0.5rem; }
+.sec-audit__row + .sec-audit__row { border-top: var(--wb-hairline) solid var(--ob-card-border); }
+.sec-audit__time { flex: none; color: var(--wb-text-tertiary); font-variant-numeric: tabular-nums; }
+.sec-audit__tool { flex: none; color: var(--wb-text-strong); }
+.sec-audit__target { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--wb-text-tertiary); }
+
+/* 技能安全审查 (G2-4)：技能列表 + 风险徽章 + 命中明细。 */
+.sec-list { display: flex; flex-direction: column; }
+.sec-list__row { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1.125rem; }
+.sec-list__row + .sec-list__row { border-top: var(--wb-hairline) solid var(--ob-card-border); }
+.sec-list__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: var(--wb-text-strong); }
+.sec-list__meta { font-size: 0.6875rem; color: var(--wb-text-tertiary); }
+.sec-badge {
+  display: inline-flex; align-items: center; height: 1.25rem; padding: 0 0.5rem; border-radius: var(--wb-radius-pill);
+  font-size: 0.6875rem; line-height: 1; background: var(--ob-active); color: var(--wb-text-medium);
+}
+.sec-badge--high { background: color-mix(in srgb, #dc2626 12%, transparent); color: #dc2626; }
+.sec-badge--medium { background: color-mix(in srgb, #b45309 14%, transparent); color: #b45309; }
+[data-theme="dark"] .sec-badge--high { color: #f87171; }
+[data-theme="dark"] .sec-badge--medium { color: #fbbf24; }
 .sec-error { margin-bottom: 10px; padding: 8px 12px; border-radius: 10px; background: color-mix(in srgb, #dc2626 10%, transparent); color: #dc2626; font-size: 12px; }
 
 /* ---------- 20261117 · W6.5：数据管理与诊断反馈 ---------- */
@@ -1409,3 +1449,60 @@ html[data-density="compact"] .pref-row { padding-top: 7px; padding-bottom: 7px; 
   color: var(--wb-text-medium); font: inherit; font-size: 11px; cursor: pointer;
 }
 .toolcall__truncated-btn:hover { background: var(--ob-active); color: var(--wb-text-strong); }
+
+/* 表格块操作 (WorkBuddy 对齐, 20261124 §0.4-M)：添加到对话 / 放大 / 下载。 */
+.md-table-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  margin: 0.375rem 0 -0.375rem;
+}
+.md-table-action {
+  height: 1.5rem;
+  padding: 0 0.5rem;
+  border: 0;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--wb-text-tertiary);
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.md-table-action:hover { background: var(--wb-bg-hover); color: var(--wb-text-strong); }
+.md-table-action:focus-visible { outline: var(--wb-outline-2) solid var(--wb-border-focus); outline-offset: 0.0625rem; }
+.md-table-expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgb(0 0 0 / 0.35);
+}
+.md-table-expanded__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: min(60rem, 100%);
+  max-height: 80vh;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: var(--wb-bg-primary);
+  box-shadow: var(--wb-shadow-lg);
+}
+.md-table-expanded__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  color: var(--wb-text-medium);
+}
+.md-table-expanded__body {
+  margin: 0;
+  overflow: auto;
+  font-family: var(--wb-font-code-family, monospace);
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+}

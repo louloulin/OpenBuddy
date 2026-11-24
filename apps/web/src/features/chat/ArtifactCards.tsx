@@ -11,6 +11,10 @@ export interface ArtifactsApi {
   open: (path: string) => void;
   openChanges: (path: string) => void;
   openList: () => void;
+  /** WorkBuddy 产物块「添加到对话」：把文件路径作为引用写进输入框。 */
+  addToChat?: (path: string) => void;
+  /** WorkBuddy 产物块「下载」：导出到用户选择的位置。 */
+  export?: (path: string) => void;
   revert: (toolCallIds: string[], files: ArtifactInfo[]) => void;
 }
 export const ArtifactsContext = createContext<ArtifactsApi | null>(null);
@@ -42,6 +46,12 @@ export const ArtifactCards = memo(function ArtifactCards({ items, total, api }: 
             <button type="button" className="artifact-card__side" onClick={() => (a.status === "created" && a.exists ? api.open(a.path) : api.openChanges(a.path))}>
               {a.status === "created" && a.exists ? "预览" : "查看变更"}
             </button>
+            {api.addToChat && (
+              <button type="button" className="artifact-card__op" onClick={() => api.addToChat!(a.path)} aria-label={`添加到对话 ${name(a.path)}`} data-tip="添加到对话">＋</button>
+            )}
+            {api.export && (
+              <button type="button" className="artifact-card__op" onClick={() => api.export!(a.path)} aria-label={`下载 ${name(a.path)}`} data-tip="下载">↓</button>
+            )}
           </div>
         );
       })}

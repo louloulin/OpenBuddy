@@ -62,21 +62,28 @@ describe("App model runtime flow", () => {
     expect(picker()).toHaveAccessibleName(/Provider B/);
   });
   it("restores each session model, ignores background model state, and records usage under model identity", async () => {
-    const backend = fixture(); render(<App />); await screen.findByText("Session One");
-    fireEvent.click(screen.getByText("Session One"));
+    const backend = fixture(); render(<App />);
+    const sidebar = screen.getByRole("complementary");
+    await within(sidebar).findByText("Session One");
+    fireEvent.click(await within(sidebar).findByText("Session One"));
     await waitFor(() => expect(picker()).toHaveAccessibleName(/Provider A/));
-    fireEvent.click(screen.getByText("Session Two"));
+    fireEvent.click(within(sidebar).getByText("Session Two"));
     await waitFor(() => expect(picker()).toHaveAccessibleName(/Provider B/));
     backend.emit("agent://model-state", state("one", "a")); expect(picker()).toHaveAccessibleName(/Provider B/);
-    // Two levels → a segmented control with the session's level checked.
-    expect(within(screen.getByRole("radiogroup", { name: "思考等级" })).getByRole("radio", { name: "高" })).toHaveAttribute("aria-checked", "true");
+    // Two levels → a pill button (WorkBuddy 对齐) that opens the level list.
+    const thinking = screen.getByRole("button", { name: "思考等级：高" });
+    expect(thinking).toBeInTheDocument();
+    fireEvent.click(thinking);
+    expect(within(screen.getByRole("listbox", { name: "思考等级" })).getByRole("option", { name: "高" })).toHaveAttribute("aria-selected", "true");
     backend.emit("agent://event", { sessionId: "two", event: { type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "done" }], usage: { input: 3, output: 2, totalTokens: 5 } } } });
     backend.emit("agent://event", { sessionId: "two", event: { type: "agent_settled" } });
     expect(loadUsage()[0]).toMatchObject({ modelId: keyB, promptTokens: 3, completionTokens: 2 });
   });
   it("keeps an extension input pending for its session when navigating away, without saving the draft", async () => {
     // Sessions keep running in the background pool, so leaving a task must not cancel its pending input.
-    const backend = fixture(); render(<App />); fireEvent.click(await screen.findByText("Session One"));
+    const backend = fixture(); render(<App />);
+    const sidebar = screen.getByRole("complementary");
+    fireEvent.click(await within(sidebar).findByText("Session One"));
     await waitFor(() => expect(picker()).toHaveAccessibleName(/Provider A/));
     backend.emit("agent://ui-request", { requestId: "secret", sessionId: "one", kind: "input", title: "API Key" });
     fireEvent.change(screen.getByLabelText("API Key", { selector: "input" }), { target: { value: "private-key" } });

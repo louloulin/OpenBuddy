@@ -62,6 +62,11 @@
   -webkit-app-region: no-drag;
 }
 /* Transparent icon buttons — no background until hover (WorkBuddy style). */
+/* 聊天页顶栏面包屑 (WorkBuddy 对齐)：📁 空间 / 会话名。 */
+.main-topbar__crumb { display: inline-flex; align-items: center; gap: 0.25rem; min-width: 0; color: var(--wb-text-tertiary); font-size: 0.8125rem; }
+.main-topbar__crumb-icon { flex: none; }
+.main-topbar__crumb-text { max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.main-topbar__crumb-sep { color: var(--wb-text-weak, var(--wb-text-tertiary)); }
 .main-topbar__btn {
   width: 32px;
   height: 32px;
@@ -338,7 +343,8 @@
   text-decoration: underline;
 }
 .chatview__footer {
-  max-width: 800px;
+  /* WorkBuddy 实机：输入卡 800 宽（内容区居中）。 */
+  max-width: 53rem;
   width: 100%;
   margin: 0 auto;
   padding: 8px 24px 20px;
@@ -4307,6 +4313,8 @@ button.diff__path {
   display: flex;
   flex-direction: column;
   gap: 0;
+  /* 让小机器人能从卡片后面探出。 */
+  position: relative;
 }
 /* WB 首页: composer 外层托盘(input-slot)灰渐变背景,包裹白卡+meta行 */
 .wb-composer-wrap--home {
@@ -4390,12 +4398,13 @@ button.diff__path {
 .wb-composer__footer {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
-  height: 32px;
+  min-height: 32px;
   padding: 0;
 }
 .wb-composer--home .wb-composer__footer {
-  height: 56px;
+  min-height: 56px;
 }
 .wb-composer__spacer {
   flex: 1;
@@ -4543,6 +4552,7 @@ button.diff__path {
 .iam-sub-item:hover {
   background: var(--wb-bg-hover);
 }
+.iam-sub-item--active { background: var(--wb-bg-secondary); font-weight: 500; }
 .iam-sub-avatar {
   display: flex;
   align-items: center;
@@ -4584,6 +4594,13 @@ button.diff__path {
   font-size: 12px;
   color: var(--wb-text-tertiary);
   text-align: center;
+}
+/* 应用选择器 (G1-16): 开关作用范围的说明。 */
+.iam-sub-hint {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.6875rem;
+  line-height: 0.875rem;
+  color: var(--wb-text-tertiary);
 }
 /* 本任务连接器开关 (pii W2.4 P2). */
 .iam-sub-heading {
@@ -5534,6 +5551,7 @@ button.diff__path {
   border-radius: var(--wb-radius-lg);
   color: var(--wb-text-medium);
 }
+.sidebar__icon-btn--active { background: var(--wb-palette-gray-5); color: var(--wb-text-strong); }
 .sidebar__icon-btn:hover {
   background: var(--wb-bg-hover);
 }
@@ -5921,12 +5939,67 @@ button.diff__path {
 .sidebar__conv:hover .sidebar__conv-pin {
   display: none;
 }
+/* 批量选择 (G1-30)：勾选框替代状态点，行点击切换选中。 */
+.sidebar__conv--selecting { cursor: pointer; }
+.sidebar__conv--selected { background: var(--wb-palette-gray-5); }
+.sidebar__conv-check {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.125rem;
+  border: var(--wb-hairline) solid var(--wb-border-default);
+  border-radius: 0.25rem;
+  background: var(--wb-bg-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.sidebar__conv-check--on {
+  border-color: transparent;
+  background: var(--wb-bg-pill-active, #2f6fed);
+}
+.sidebar__conv-check--on::after {
+  content: "";
+  width: 0.3rem;
+  height: 0.55rem;
+  border: solid #fff;
+  border-width: 0 0.125rem 0.125rem 0;
+  transform: rotate(45deg) translate(-0.05rem, -0.05rem);
+}
+.sidebar-bulk {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0.5rem 0.75rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.625rem;
+  background: var(--wb-bg-secondary);
+}
+.sidebar-bulk__count {
+  flex: 1;
+  font-size: 0.75rem;
+  color: var(--wb-text-medium);
+  white-space: nowrap;
+}
+.sidebar-bulk__btn {
+  height: 1.625rem;
+  padding: 0 0.5rem;
+  border: 0;
+  border-radius: 0.375rem;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.sidebar-bulk__btn:hover:not(:disabled) { background: var(--wb-bg-hover); }
+.sidebar-bulk__btn:disabled { opacity: 0.5; cursor: default; }
+.sidebar-bulk__btn--danger { color: var(--wb-text-error, #b42318); }
 .sidebar__conv-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 22px;  height: 22px;
   border-radius: 6px;
   color: var(--wb-text-tertiary);
   cursor: pointer;
@@ -12646,10 +12719,112 @@ button.diff__path {
 .model-selector__item--focused { outline: var(--wb-outline-2) solid var(--wb-border-default); outline-offset: -2px; }
 .model-selector__feedback { font-size: 11px; white-space: nowrap; color: var(--wb-text-medium); }
 .model-selector__error { position: absolute; bottom: calc(100% + 8px); right: 0; max-width: 320px; padding: 8px 12px; border-radius: 6px; background: var(--wb-bg-primary); color: var(--wb-text-error, #b42318); z-index: 51; font-size: 12px; box-shadow: var(--wb-shadow-lg); }
-.model-thinking { display: inline-flex; gap: 5px; align-items: center; font-size: 12px; color: var(--wb-text-medium); white-space: nowrap; }
+.model-thinking { position: relative; display: inline-flex; gap: 5px; align-items: center; font-size: 12px; color: var(--wb-text-medium); white-space: nowrap; }
 .model-thinking select { background: var(--wb-bg-primary); color: var(--wb-text-strong); border: var(--wb-hairline) solid var(--wb-border-default); border-radius: 6px; padding: 4px; }
 .model-thinking--seg { gap: 1px; padding: 2px; border-radius: 8px; background: var(--wb-bg-secondary); flex-shrink: 0; }
 .model-thinking__label { display: inline-flex; padding: 0 3px 0 5px; color: var(--wb-text-medium); }
+/* WorkBuddy 输入区控件 (cr-input-footer-item): 2rem 高的无边框药丸按钮 ——
+   图标 + 文案 + 箭头；hover / 展开时文案转主色并出现浅底。 */
+.wb-footer-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: 2rem;
+  padding: 0 0.5rem;
+  border: none;
+  border-radius: var(--wb-radius-pill);
+  background: transparent;
+  color: var(--wb-text-tertiary);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color .15s ease, background-color .15s ease;
+}
+.wb-footer-item:hover:not(:disabled),
+.wb-footer-item[aria-expanded="true"] { color: var(--wb-text-strong); background: var(--wb-bg-hover); }
+.wb-footer-item:disabled { opacity: .5; cursor: default; }
+.wb-footer-item__icon,
+.wb-footer-item__chevron { flex: none; }
+.wb-footer-item__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 8.75rem; }
+/* 状态 chip 行 (WorkBuddy wb-status-chips): 落在模型选择器之后，横向排列。 */
+.wb-status-chips { display: flex; align-items: center; gap: 0.25rem; flex-wrap: nowrap; flex-shrink: 0; }
+.wb-status-chip__wrap { position: relative; display: inline-flex; }
+.wb-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  height: 2rem;
+  padding: 0 0.25rem 0 0.5rem;
+  border-radius: var(--wb-radius-pill);
+  color: var(--wb-text-tertiary);
+  transition: color .15s ease, background-color .15s ease;
+}
+.wb-status-chip:hover { background: var(--wb-bg-hover); color: var(--wb-text-strong); }
+.wb-status-chip__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.wb-status-chip__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.wb-status-chip__close:hover { background: var(--wb-bg-hover); }
+/* 药丸按钮的浮层：与模型菜单同一套视觉。 */
+.wb-footer-menu {
+  position: absolute;
+  bottom: calc(100% + 0.375rem);
+  left: 0;
+  min-width: 12.5rem;
+  max-height: 20rem;
+  overflow-y: auto;
+  padding: 0.25rem;
+  background: var(--wb-bg-primary);
+  border: var(--wb-hairline) solid var(--wb-border-default);
+  border-radius: var(--wb-radius-md, 0.375rem);
+  box-shadow: var(--wb-shadow-lg, 0 0.5rem 1.5rem rgba(0, 0, 0, 0.16));
+  z-index: 60;
+}
+.wb-footer-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: none;
+  border-radius: var(--wb-radius-md, 0.375rem);
+  background: transparent;
+  color: var(--wb-text-strong);
+  font: inherit;
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+}
+.wb-footer-menu__item:hover { background: var(--wb-bg-hover); }
+.wb-footer-menu__item[aria-selected="true"] { font-weight: 500; }
+.wb-footer-menu__desc { display: block; font-size: 0.75rem; font-weight: 400; color: var(--wb-text-tertiary); }
 /* The composer toolbar is tight: its text buttons never wrap into two lines. */
 .wb-composer__footer .wb-composer-meta__btn { white-space: nowrap; }
 .model-thinking__opt { height: 22px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--wb-text-medium); font: inherit; font-size: 11.5px; cursor: pointer; }
@@ -13320,3 +13495,21 @@ button.diff__path {
   font-size: 0.76rem;
   color: var(--wb-text-tertiary);
 }
+
+/* 产物块操作（WorkBuddy：添加到对话 / 下载）。 */
+.artifact-card__op {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border: none;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--wb-text-tertiary);
+  font-size: 0.8125rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.artifact-card__op:hover { background: var(--wb-bg-hover); color: var(--wb-text-strong); }

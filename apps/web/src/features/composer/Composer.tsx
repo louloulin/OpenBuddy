@@ -1,7 +1,5 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { ArrowUp, X, type LucideIcon } from "lucide-react";
-import { open as openDialog } from "@openbuddy/client/ipc";
-import { getPathForFile } from "@openbuddy/client/ipc";
 import { ModelRuntimeContext, ModelSelector, type ModelOption } from "../models/ModelSelector";
 import { ThumbImg } from "../../shared/ui/ThumbImg";
 import { ContextUsagePill } from "./ContextUsagePill";
@@ -21,17 +19,14 @@ import { VoiceInputButton } from "./VoiceInputButton";
 import { estimateSendCost } from "@openbuddy/chat-core/token-estimate";
 import { EMPTY_ANNOTATIONS, useAnnotationStore } from "@/shared/state/annotations-store";
 import {
-  collectDroppedPaths,
 } from "@/shared/lib/files/drop-utils";
 import type { HomeModeId } from "../../shared/content/scenes";
+import { StatusChips } from "./StatusChips";
+import { useComposerFiles } from "./use-composer-files";
+import { statusPrefix, useStatusStore } from "@/shared/state/status-store";
 import type { AgentEntry } from "@openbuddy/protocol/dto";
 import type { WorkspaceInfo } from "@openbuddy/client/agent-client";
-
-const AGENT_MODES: ReadonlyArray<readonly [AgentMode, string, string]> = [
-  ["craft", "做一做", "直接动手：可以读写文件、执行命令"],
-  ["plan", "想一想", "先调研并给出计划，确认后再执行（只读）"],
-  ["ask", "问一问", "只回答问题，不改文件（只读）"],
-];
+import mascotUrl from "@/assets/mascot-new.png";
 
 /**
  * WorkBuddy 风格输入卡片(圆角16):左下 +,右下 Auto 下拉/麦克风/发送;
@@ -51,6 +46,7 @@ export function Composer({
   showMeta = false,
   showDisclaimer = false,
   permissionInline = false,
+  permissionBelow = false,
   // Model picker
   modelId,
   models,
@@ -89,6 +85,7 @@ export function Composer({
   /** Session id powering the context-usage pill (omit on the home page). */
   usageSessionId,
   usageMsgCount,
+  sceneProp,
 }: {
   streaming: boolean;
   disabled?: boolean;
@@ -106,6 +103,8 @@ export function Composer({
   showDisclaimer?: boolean;
   /** 把权限选择器放进卡片内 footer（+ 之后），匹配 WorkBuddy 本地助理页；为 true 时不再渲染卡片外 meta 行。 */
   permissionInline?: boolean;
+  /** 把权限选择器移到卡片下方一行（WorkBuddy 聊天页：卡片内只留 + / 模型 / 麦克风 / 发送）。 */
+  permissionBelow?: boolean;
   /** Currently selected model id (shown on the model trigger). */
   modelId?: string;
   /** Available models for the picker. */
@@ -159,11 +158,21 @@ export function Composer({
   usageSessionId?: string;
   /** Triggers pill re-fetch when messages change. */
   usageMsgCount?: number;
+  /** 当前场景（首页的设计创意 = "design"）；省略时用 store 里的最近一次选择。 */
+  sceneProp?: HomeModeId | null;
 }) {
   const modelControls = useContext(ModelRuntimeContext);
   const { t, locale } = useLocale();
+  // G1-17 状态 chip: WorkBuddy 只在**首页的设计创意场景**里挂这两个 chip
+  // (main-content-core: `selectedWelcomeMode === "design"` 才是唯一入口),
+  // 聊天页的 chat input 没有它们。
+  const designStyle = useStatusStore((state) => state.designStyle);
+  const imageMode = useStatusStore((state) => state.imageMode);
+  const storeScene = useStatusStore((state) => state.scene);
+  const scene = sceneProp ?? storeScene;
+  const imageCapable = !!models?.find(model => model.id === modelId)?.input?.includes("image");
+  const inDesignScene = showMeta && scene === "design";
   const [text, setText] = useState("");
-  const [attachments, setAttachments] = useState<string[]>([]);
   // 批注托盘 (pii W1.9): quotes collected from the artifact viewer ride along with the next prompt.
   const annotations = useAnnotationStore((state) => (usageSessionId ? state.bySession[usageSessionId] ?? EMPTY_ANNOTATIONS : EMPTY_ANNOTATIONS));
   const [sendError, setSendError] = useState("");
@@ -272,10 +281,11 @@ export function Composer({
         ? `${body}\n\n相关文件:\n${fileList}`
         : `请查看以下文件:\n${fileList}`;
     }
-    // 把"操作类型"标签作为上下文前缀一并发出(后端正文仍是可运行的 prompt)。
-    if (sceneTag) {
-      body = body ? `【${sceneTag.label}】${body}` : `【${sceneTag.label}】`;
-    }
+    // 把"操作类型"标签与状态 chip(设计风格 / 补图方式)作为上下文前缀一并发出
+    // (后端正文仍是可运行的 prompt)。状态 chip 只在首页设计场景可见，所以也只有
+    // 在那里才带上它——聊天页不该偷偷沿用上一次首页的设置。
+    const prefix = [sceneTag ? `【${sceneTag.label}】` : "", inDesignScene ? statusPrefix(designStyle, imageMode) : ""].join("");
+    if (prefix) body = body ? `${prefix}${body}` : prefix;
     const sentScope = draftKey;
     try {
       const result = attachments.length ? onSend(body, attachments.map(path => ({ path }))) : onSend(body);
@@ -297,7 +307,8 @@ export function Composer({
     const textToQueue = text.trim();
     if ((!textToQueue && attachments.length === 0) || disabled || !apiReady || queueBusy || !onEnqueue || bash.handle() || !validateAttachments()) return;
     setQueueBusy(true); setSendError("");
-    const body = sceneTag ? `【${sceneTag.label}】${textToQueue}` : textToQueue;
+    const prefix = [sceneTag ? `【${sceneTag.label}】` : "", inDesignScene ? statusPrefix(designStyle, imageMode) : ""].join("");
+    const body = prefix ? `${prefix}${textToQueue}` : textToQueue;
     try {
       await onEnqueue(body || "请查看附件", attachments.map(path => ({ path })), modeOverride ?? queueMode);
       updateText(""); setAttachments([]); onClearSceneTag?.();
@@ -305,33 +316,13 @@ export function Composer({
     finally { setQueueBusy(false); }
   };
 
-  const pickFiles = async () => {
-    try {
-      const selected = await openDialog({ multiple: true });
-      if (!selected) return;
-      const paths = Array.isArray(selected) ? selected : [selected];
-      setAttachments((prev) => {
-        const set = new Set(prev);
-        paths.forEach((p) => set.add(p));
-        return [...set];
-      });
-    } catch {
-    }
-  };
-
-  // DOM drop retains File objects; preload resolves their native paths.
-  const [dragActive, setDragActive] = useState(false);
-  const handleDrop = (event: React.DragEvent) => {
-    event.preventDefault();
-    setDragActive(false);
-    if (disabled || !apiReady || (streaming && !onEnqueue)) return;
-    try {
-      const incoming = collectDroppedPaths(Array.from(event.dataTransfer.files, getPathForFile));
-      setAttachments(prev => Array.from(new Set([...prev, ...incoming])));
-    } catch (error) {
-      onToast?.(`无法添加文件：${String(error)}`);
-    }
-  };
+  const { attachments, setAttachments, dragActive, setDragActive, pickFiles, handleDrop } = useComposerFiles({
+    disabled,
+    apiReady,
+    streaming,
+    canEnqueue: !!onEnqueue,
+    onToast,
+  });
 
   // Cursor tracking for slash-command autocomplete.
   const [cursorPos, setCursorPos] = useState(0);
@@ -372,6 +363,9 @@ export function Composer({
         "wb-composer-wrap" + (showMeta ? " wb-composer-wrap--home" : "")
       }
     >
+      {/* WorkBuddy 的招牌：输入卡片右上角探出的小机器人（从卡片后面探出，下半部被卡片挡住）。
+          实机里它只出现在首页的输入区，聊天页没有，故只在 showMeta（首页）时渲染。 */}
+      {showMeta && <img className="wb-composer__mascot" src={mascotUrl} alt="" aria-hidden="true" draggable={false} />}
       <section
         className={composerCls}
         onDragOver={event => { event.preventDefault(); if (apiReady && !disabled && (!streaming || onEnqueue)) setDragActive(true); }}
@@ -381,6 +375,7 @@ export function Composer({
           if (!apiReady) onOpenSettings?.();
         }}
       >
+        {/* WorkBuddy 的招牌：输入卡片右上角探出的小机器人。纯装饰，不拦截点击。 */}
         {!apiReady && (
           <button type="button" className="wb-composer__setup-hint" onClick={event => { event.stopPropagation(); onOpenSettings?.(); }}>
             请先配置 API Key 开始使用
@@ -466,6 +461,8 @@ export function Composer({
 
         <ConnectorNeededBar sessionId={usageSessionId} onToast={onToast} />
         <BangHint bang={bash.bang} risk={bash.risk} available={bash.available} />
+        {/* WorkBuddy 的 cr-input-box__main: 编辑区是一块独立的"输入槽"，不再用硬分隔线。 */}
+        <div className="wb-composer__main">
         <textarea
           ref={ref}
           className="wb-composer__input"
@@ -476,7 +473,7 @@ export function Composer({
             apiReady
               ? sceneTag
                 ? "" // 有操作类型标签时不显示占位文案(匹配 WorkBuddy)
-                : placeholder ?? (agentMode === "plan" ? t("composer.placeholder.plan") : agentMode === "ask" ? t("composer.placeholder.ask") : t("composer.placeholder.default"))
+                : placeholder ?? (agentMode === "plan" ? t("composer.placeholder.plan") : agentMode === "ask" ? t("composer.placeholder.ask") : t(showMeta ? "composer.placeholder.default" : "composer.placeholder.chat"))
               : ""
           }
           onChange={(e) => {
@@ -531,6 +528,7 @@ export function Composer({
             history.onKeyDown(e);
           }}
         />
+        </div>
         {/* `@` file mention (W1.3) */}
         <FileMentionPopover
           ref={mentionRef}
@@ -569,35 +567,24 @@ export function Composer({
               }
             }}
             onNavigateConnectors={onNavigateConnectors}
+            onReferenceFile={(path) => {
+              const rel = cwd && path.startsWith(cwd) ? path.slice(cwd.length).replace(/^[\\/]/, "") : path;
+              updateText((prev) => `${prev}${prev && !prev.endsWith(" ") ? " " : ""}\`${rel}\` `);
+              requestAnimationFrame(() => ref.current?.focus());
+            }}
+            workspaceCwd={cwd}
+            agentMode={agentMode}
+            onAgentModeChange={onAgentModeChange}
             sessionId={usageSessionId}
           />
           {activeExpertName && (<span className="wb-composer__expert-badge" title={`当前专家：${activeExpertName}`} data-testid="composer-expert"><ThumbImg name={activeExpertName} local={activeExpertAvatar} size={18} shape="circle" />{activeExpertName}
             {onClearExpert && <button type="button" className="wb-composer__expert-x" aria-label={`取消专家 ${activeExpertName}`} onClick={onClearExpert}>×</button>}</span>)}
-          {permissionInline && (
-            <PermissionPicker onToast={onToast} />
-          )}
-          {onAgentModeChange && (
-            <div className="composer-mode" role="radiogroup" aria-label="工作方式">
-              {AGENT_MODES.map(([mode, label, tip]) => (
-                <button
-                  key={mode}
-                  type="button"
-                  role="radio"
-                  aria-checked={(agentMode ?? "craft") === mode}
-                  className={"composer-mode__opt" + ((agentMode ?? "craft") === mode ? " composer-mode__opt--on" : "")}
-                  disabled={streaming}
-                  onClick={(e) => { e.stopPropagation(); onAgentModeChange(mode); }}
-                  data-tip={tip}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
           <div className="wb-composer__spacer" />
-          <VoiceInputButton text={text} onChange={updateText} lang={locale === "zh-CN" ? "zh-CN" : "en-US"} disabled={disabled || !apiReady} onToast={onToast} />
           {text.trim() && <span className="wb-composer__estimate" title="本地 token 估算，不是上游账单">{estimateSendCost(text).label}</span>}
           {usageSessionId && <ContextUsagePill sessionId={usageSessionId} onRefreshSignal={usageMsgCount} />}
+          <div className="wb-composer__sendgroup">
+          {/* WorkBuddy 聊天页：权限在卡片内右侧（模型之前），不在卡片下方。 */}
+          {permissionInline && !showMeta && <PermissionPicker onToast={onToast} />}
           {showModelPicker ? (
             <ModelSelector
               disabled={streaming || disabled}
@@ -606,6 +593,14 @@ export function Composer({
               onModelChange={onModelChange!}
             />
           ) : null /* pii W0.3: no toast-only "Auto" fallback without a model list */}
+          {/* G1-17 状态 chip: WorkBuddy 把它们放在模型选择器之后（AFTER_MODEL_SELECTOR），
+              且只出现在首页的设计创意场景里。 */}
+          <StatusChips
+            showDesignStyle={inDesignScene}
+            showImageMode={inDesignScene && imageCapable}
+          />
+          {/* WorkBuddy 底栏顺序：模型 → 麦克风 → 发送。 */}
+          <VoiceInputButton text={text} onChange={updateText} lang={locale === "zh-CN" ? "zh-CN" : "en-US"} disabled={disabled || !apiReady} onToast={onToast} />
           {streaming ? (
             <>
               {/* 流式时可加入待发送队列(对齐 WorkBuddy message-queue)。 */}
@@ -668,9 +663,11 @@ export function Composer({
               aria-label="发送"
               title={!apiReady ? "请先配置 API Key" : "发送消息"}
             >
-              <ArrowUp size={18} strokeWidth={2.25} />
+              {/* WorkBuddy 的 cr-send-button 是 32px 的纯箭头图标（无填充圆底）。 */}
+              <ArrowUp size={24} strokeWidth={2} />
             </button>
           )}
+          </div>
         </div>
       </section>
       {/* WB: meta 行在白卡外下方,透明背景,与卡片间距4px(仅首页) */}
@@ -683,6 +680,12 @@ export function Composer({
               onSelectWorkspace={onSelectWorkspace!}
             />
           ) : null /* pii W0.3: no toast-only workspace fallback without a workspace list */}
+          <PermissionPicker onToast={onToast} />
+        </div>
+      )}
+      {/* 聊天页：权限行放在卡片下方，卡片内只留 + / 模型 / 麦克风 / 发送（对齐 WorkBuddy）。 */}
+      {permissionBelow && !permissionInline && (
+        <div className="wb-composer-meta wb-composer-meta--permission">
           <PermissionPicker onToast={onToast} />
         </div>
       )}

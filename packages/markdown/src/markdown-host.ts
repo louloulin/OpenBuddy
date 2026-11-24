@@ -6,6 +6,8 @@ export type MarkdownHostOptions = {
   cwd?: string;
   sessionId?: string | null;
   onToast?: (msg: string) => void;
+  /** 表格块「添加到对话」：把表格 Markdown 放回输入框 (WorkBuddy 对齐)。 */
+  onAddTableToChat?: (markdown: string) => void;
 };
 
 function linePreview(code: string, maxLines = 8): string {
@@ -83,7 +85,7 @@ export async function openLocalPath(
 export function createMarkdownHostConfig(
   opts: MarkdownHostOptions,
 ): MarkdownConfig {
-  const { cwd, sessionId, onToast } = opts;
+  const { cwd, sessionId, onToast, onAddTableToChat } = opts;
   const toast = (msg: string) => onToast?.(msg);
 
   const pathClickHandler: MarkdownConfig["pathClickHandler"] = {
@@ -246,6 +248,9 @@ export function createMarkdownHostConfig(
     openCodeLink,
     onLinkClick,
     onApplyCode,
+    onTableAction: onAddTableToChat
+      ? (action, markdown) => { if (action === "add-to-chat") onAddTableToChat(markdown); }
+      : undefined,
   };
 }
 

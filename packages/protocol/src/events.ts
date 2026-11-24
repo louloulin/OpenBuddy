@@ -6,6 +6,8 @@ export const EVENTS = [
   'agent://model-state', 'agent://ui-request', 'agent://ui-dismiss', 'agent://ui-notification', 'agent://ui-state',
   'agent://session-status', 'agent://permission-dismiss', 'agent://artifacts', 'app://focus-session',
   'agent://plan', 'agent://connector-needed', 'agent://subagent', 'agent://automation',
+  // G2-7: a tool result was withheld for a possible prompt injection.
+  'agent://tool-content-risk',
   // 通知渠道 (pii W4.6): a turn finished that is not the session on screen — notify even in the foreground.
   'agent://background-notice',
   // 扩展包安装进度 (pii W2.6 P2): npm / git install / update progress.

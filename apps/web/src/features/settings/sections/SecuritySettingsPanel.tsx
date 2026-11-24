@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Lock, Plus, RotateCcw, Shield, Trash2 } from "lucide-react";
+import { Lock, Plus, RotateCcw, Shield, ShieldAlert, Trash2 } from "lucide-react";
 import {
   permissionList,
   permissionProtectedGet,
   permissionProtectedSet,
   permissionSave,
 } from "@openbuddy/client/agent-client";
-import type { PermissionRule } from "@openbuddy/protocol/dto";
+import { skillsList } from "@openbuddy/client/agent-client";
+import { readTextFile } from "@openbuddy/client/api/files";
+import type { PermissionRule, SkillInfo } from "@openbuddy/protocol/dto";
 import { useLocale } from "@/shared/i18n";
 import { SectionShell } from "./shared";
+import { scanSkillContent, skillManifestPath, type SkillScan } from "./skill-security";
+import { SecuritySandboxTab } from "./SecuritySandboxTab";
+import { SecurityAuditTab } from "./SecurityAuditTab";
+import { SecuritySystemTab } from "./SecuritySystemTab";
 
 /**
  * 安全中心 (20261116-pii W6.1 / W6.2)。
@@ -46,6 +52,16 @@ const ACTION_LABEL_KEY: Record<string, string> = {
 };
 const ACTIONS = ["allow", "ask", "deny"] as const;
 
+/** 安全中心 2.0 (G2-1)：与 WorkBuddy 一致的五个分区。 */
+type TabId = "tools" | "sandbox" | "skills" | "audit" | "system";
+const TABS: Array<{ id: TabId; labelKey: string }> = [
+  { id: "tools", labelKey: "security.tab.tools" },
+  { id: "sandbox", labelKey: "security.tab.sandbox" },
+  { id: "skills", labelKey: "security.tab.skills" },
+  { id: "audit", labelKey: "security.tab.audit" },
+  { id: "system", labelKey: "security.tab.system" },
+];
+
 export function SecuritySettingsPanel() {
   const { t } = useLocale();
   const [rules, setRules] = useState<PermissionRule[]>([]);
@@ -57,6 +73,13 @@ export function SecuritySettingsPanel() {
   const [newTool, setNewTool] = useState("write");
   const [newPattern, setNewPattern] = useState("");
   const [newPath, setNewPath] = useState("");
+  // G2-4 技能安全审查：按需读取已安装技能的 SKILL.md 做静态风险扫描。
+  const [skills, setSkills] = useState<SkillInfo[]>([]);
+  const [skillScans, setSkillScans] = useState<Record<string, SkillScan>>({});
+  const [scanningSkill, setScanningSkill] = useState<string | null>(null);
+  const [skillError, setSkillError] = useState<string | null>(null);
+  const [tab, setTab] = useState<TabId>("tools");
+  const tabRefs = useRef(new Map<TabId, HTMLButtonElement>());
   // W6.1: 审批卡「查看拦截规则」定位到对应分类（protected → 受保护路径卡片）。
   const [focus, setFocus] = useState<CategoryId | "protected" | null>(null);
   const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -101,6 +124,26 @@ export function SecuritySettingsPanel() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void skillsList()
+      .then((list) => setSkills(Array.isArray(list) ? list : []))
+      .catch(() => setSkills([]));
+  }, []);
+
+  const reviewSkill = useCallback(async (skill: SkillInfo) => {
+    if (!skill.path) return;
+    setScanningSkill(skill.name);
+    setSkillError(null);
+    try {
+      const content = await readTextFile(skillManifestPath(skill.path), 512 * 1024);
+      setSkillScans((prev) => ({ ...prev, [skill.name]: scanSkillContent(content) }));
+    } catch (error) {
+      setSkillError(t("security.skills.unreadable", { message: String(error).replace(/^Error:\s*/, "") }));
+    } finally {
+      setScanningSkill(null);
+    }
+  }, [t]);
 
   const grouped = useMemo(() => {
     const map = new Map<CategoryId, PermissionRule[]>();
@@ -155,6 +198,36 @@ export function SecuritySettingsPanel() {
     >
       {error && <div className="sec-error">{error}</div>}
 
+      {/* 五个分区 (G2-1)：与 WorkBuddy 安全中心一致，键盘左右键切换。 */}
+      <div className="sec-tabs" role="tablist" aria-label={t("security.title")}>
+        {TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            id={`security-tab-${item.id}`}
+            aria-selected={tab === item.id}
+            aria-controls={`security-panel-${item.id}`}
+            tabIndex={tab === item.id ? 0 : -1}
+            className={"sec-tabs__tab" + (tab === item.id ? " is-on" : "")}
+            ref={(node) => { if (node) tabRefs.current.set(item.id, node); else tabRefs.current.delete(item.id); }}
+            onClick={() => setTab(item.id)}
+            onKeyDown={(event) => {
+              const index = TABS.findIndex((one) => one.id === tab);
+              if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+                event.preventDefault();
+                const next = TABS[(index + (event.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length];
+                setTab(next.id);
+                tabRefs.current.get(next.id)?.focus();
+              }
+            }}
+          >
+            {t(item.labelKey)}
+          </button>
+        ))}
+      </div>
+
+      <div id="security-panel-tools" role="tabpanel" aria-labelledby="security-tab-tools" hidden={tab !== "tools"}>
       {/* 受保护路径 */}
       <div ref={protectedRef} className={"sec-card" + (focus === "protected" ? " is-focus" : "")}>
         <div className="sec-card__head">
@@ -315,6 +388,72 @@ export function SecuritySettingsPanel() {
         <p className="sec-footnote">
           {t("security.rules.note.head")}<code>mcp</code>{t("security.rules.note.mcp")}<code>mcp__</code>{t("security.rules.note.tail")}
         </p>
+      </div>
+      </div>
+
+      <div id="security-panel-sandbox" role="tabpanel" aria-labelledby="security-tab-sandbox" hidden={tab !== "sandbox"}>
+        {tab === "sandbox" && <SecuritySandboxTab />}
+      </div>
+
+      <div id="security-panel-skills" role="tabpanel" aria-labelledby="security-tab-skills" hidden={tab !== "skills"}>
+      {/* 技能安全审查 (G2-4) */}
+      <div className="sec-card">
+        <div className="sec-card__head">
+          <div className="sec-card__title">
+            <ShieldAlert size={15} />
+            <span>{t("security.skills.title")}</span>
+          </div>
+          <div className="sec-card__hint">{t("security.skills.hint")}</div>
+        </div>
+        {skillError && <div className="sec-error">{skillError}</div>}
+        {skills.length === 0 ? (
+          <div className="sec-muted">{t("security.skills.empty")}</div>
+        ) : (
+          <div className="sec-list">
+            {skills.map((skill) => {
+              const scan = skillScans[skill.name];
+              const level = scan?.level;
+              return (
+                <div className="sec-list__row" key={skill.name}>
+                  <span className="sec-list__name">{skill.displayName || skill.name}</span>
+                  <span className="sec-list__meta">{skill.scope ?? "local"}</span>
+                  {level && (
+                    <span className={"sec-badge sec-badge--" + level}>
+                      {t(level === "high" ? "security.skills.level.high" : level === "medium" ? "security.skills.level.medium" : "security.skills.level.low")}
+                    </span>
+                  )}
+                  {scan && scan.findings.length > 0 && (
+                    <span className="sec-list__meta">{t("security.skills.findings", { count: scan.findings.length })}</span>
+                  )}
+                  <button
+                    type="button"
+                    className="sec-btn"
+                    disabled={!skill.path || scanningSkill === skill.name}
+                    onClick={() => void reviewSkill(skill)}
+                  >
+                    {scanningSkill === skill.name ? t("security.skills.scanning") : t("security.skills.scan")}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {Object.entries(skillScans).flatMap(([name, scan]) =>
+          scan.findings.map((finding) => (
+            <p className="sec-footnote" key={`${name}-${finding.line}-${finding.rule}`}>
+              <strong>{name}</strong> · {t(`security.skills.rule.${finding.rule}`, { default: finding.rule })} · L{finding.line} · <code>{finding.text}</code>
+            </p>
+          )),
+        )}
+      </div>
+      </div>
+
+      <div id="security-panel-audit" role="tabpanel" aria-labelledby="security-tab-audit" hidden={tab !== "audit"}>
+        {tab === "audit" && <SecurityAuditTab />}
+      </div>
+
+      <div id="security-panel-system" role="tabpanel" aria-labelledby="security-tab-system" hidden={tab !== "system"}>
+        {tab === "system" && <SecuritySystemTab />}
       </div>
     </SectionShell>
   );

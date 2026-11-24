@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { InputAddMenu } from "../InputAddMenu";
-import { sessionMcpGet, sessionMcpSet } from "@openbuddy/client/agent-client";
+import { artifactsList, listDir, sessionMcpGet, sessionMcpSet } from "@openbuddy/client/agent-client";
 
 vi.mock("@openbuddy/client/agent-client", () => ({
+  artifactsList: vi.fn().mockResolvedValue([]),
   expertsLoad: vi.fn().mockResolvedValue({ experts: [] }),
+  listDir: vi.fn().mockResolvedValue([]),
   skillsList: vi.fn().mockResolvedValue([]),
   sessionMcpGet: vi.fn(),
   sessionMcpSet: vi.fn(),
@@ -56,5 +58,39 @@ describe("“+” 菜单 · 本任务连接器开关 (pii W2.4 P2)", () => {
     fireEvent.mouseEnter(screen.getByText("连接器").closest(".iam-item")!);
     await waitFor(() => expect(screen.getByText("打开任务后可切换本任务连接器")).toBeInTheDocument());
     expect(sessionMcpGet).not.toHaveBeenCalled();
+  });
+
+  it("inserts a file produced in this task as a reference (G1-15)", async () => {
+    vi.mocked(artifactsList).mockResolvedValue([{
+      path: "/workspace/report.md", status: "created", toolCallIds: ["t1"],
+      added: 10, removed: 0, firstAt: 1, lastAt: 2, exists: true, size: 120,
+    }]);
+    const onReferenceFile = vi.fn();
+    render(<InputAddMenu onPickFiles={vi.fn()} sessionId="s1" onReferenceFile={onReferenceFile} />);
+    fireEvent.click(screen.getByRole("button", { name: "添加" }));
+    fireEvent.mouseEnter(screen.getByText("引用对话中的文件").closest(".iam-item")!);
+    fireEvent.click(await screen.findByRole("button", { name: /report\.md/ }));
+    expect(onReferenceFile).toHaveBeenCalledWith("/workspace/report.md");
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("also offers top-level workspace files (G1-15)", async () => {
+    vi.mocked(listDir).mockResolvedValue([{ name: "notes.md", path: "/workspace/notes.md", kind: "file", size: 12 }]);
+    const onReferenceFile = vi.fn();
+    render(<InputAddMenu onPickFiles={vi.fn()} sessionId="s1" workspaceCwd="/workspace" onReferenceFile={onReferenceFile} />);
+    fireEvent.click(screen.getByRole("button", { name: "添加" }));
+    fireEvent.mouseEnter(screen.getByText("引用对话中的文件").closest(".iam-item")!);
+    fireEvent.click(await screen.findByRole("button", { name: /notes\.md/ }));
+    expect(onReferenceFile).toHaveBeenCalledWith("/workspace/notes.md");
+  });
+
+  it("offers 工作方式 in the menu instead of the footer (chat page)", async () => {
+    const onAgentModeChange = vi.fn();
+    render(<InputAddMenu onPickFiles={vi.fn()} agentMode="craft" onAgentModeChange={onAgentModeChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "添加" }));
+    expect(screen.queryByText("模式")).toBeNull();
+    fireEvent.mouseEnter(screen.getByText("工作方式").closest(".iam-item")!);
+    fireEvent.click(await screen.findByRole("button", { name: /想一想/ }));
+    expect(onAgentModeChange).toHaveBeenCalledWith("plan");
   });
 });

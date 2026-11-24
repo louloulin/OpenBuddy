@@ -11,7 +11,7 @@ export interface SourceLink {
 }
 
 const MARKDOWN_LINK = /\[([^\]]{1,120})\]\((https?:\/\/[^\s)]+)\)/g;
-const BARE_URL = /https?:\/\/[^\s<>"'`)\]]+/g;
+const BARE_URL = /https?:\/\/[^\s<>"'`)\]，。；：！？、）】]+/g;
 const TRAILING = /[.,;:!?，。；：！？、]+$/;
 
 function hostOf(url: string): string {

@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { useSessionStore, type ToolCallView } from "@/features/chat/state/session-store";
 import { useSessionsStore } from "@/features/sessions/state/sessions-store";
 import { createMarkdownHostConfig } from "@openbuddy/markdown/markdown-host";
-import { agentForkSession, agentRegenerate, rewindExecute, rewindPoints, agentSteer, agentFollowUp } from "@openbuddy/client/agent-client";
+import { agentCompact, agentContinue, agentDeleteMessage, agentForkSession, agentRegenerate, rewindExecute, rewindPoints, agentSteer, agentFollowUp, readTextFile, saveTextAs } from "@openbuddy/client/agent-client";
 import { findToolCall } from "@openbuddy/chat-core/session-artifacts";
 import type { ArtifactInfo } from "@openbuddy/client/agent-client";
 import { useArtifactsStore, selectArtifacts, selectArtifactsVersion } from "@/features/workbench/state/artifacts-store";
@@ -27,7 +27,11 @@ import { QueuePanel } from "../composer/QueuePanel";
 import { usePiQueueStore } from "@/features/composer/state/pi-queue-store";
 import { useAnnotationStore } from "@/shared/state/annotations-store";
 import { HandoffBanner } from "./chat-view/HandoffBanner";
-import { askEdit } from "./chat-view/annotation";
+import { askEdit, quoteLines } from "./chat-view/annotation";
+import { appendDraft, quotedAnswerBlock } from "./chat-view/selection";
+import { useAnswerSelection } from "./chat-view/use-answer-selection";
+import { SelectionToolbar } from "./chat-view/SelectionToolbar";
+import { QuickQaSheet } from "./QuickQaSheet";
 import { buildNodes } from "@openbuddy/chat-core/turns";
 import { openLightbox } from "@openbuddy/ui/ImageLightbox";
 import { matchShortcut } from "@/shared/lib/shortcuts";
@@ -36,6 +40,8 @@ import { ErrorCard } from "./ErrorCard";
 import { PlanPanel } from "./PlanPanel";
 import { SubagentCards } from "./SubagentCards";
 import { BackgroundTaskCapsule } from "./BackgroundTaskCapsule";
+import { ToolContentRiskCard } from "./ToolContentRiskCard";
+import { useToolContentRiskStore } from "./state/tool-content-risk-store";
 import { onTaskOverview } from "./task-overview-bus";
 import { ArrowDown } from "lucide-react";
 import type { ModelOption } from "../models/ModelSelector";
@@ -122,6 +128,7 @@ export function ChatView({
   // Text pushed into the composer (编辑重发 / extension setEditorText).
   const [resendText, setResendText] = useState<string | undefined>(undefined);
   const [resendNonce, setResendNonce] = useState(0);
+  const toolContentRisks = useToolContentRiskStore((state) => (sessionId ? state.risks[sessionId] ?? [] : []));
   const putInComposer = useCallback((text: string) => {
     setResendText(text);
     setResendNonce((n) => n + 1);
@@ -133,15 +140,31 @@ export function ChatView({
     putInComposer(editor.action === "paste" ? current + editor.text : editor.text);
   }, [extensionUi?.editor, sessionId, putInComposer]);
 
+  const insertComposerBlock = useStableCallback((block: string) => {
+    const current = sessionId ? useSessionsStore.getState().drafts[sessionId] ?? "" : "";
+    putInComposer(appendDraft(current, block));
+  });
+  const quoteTurnAnswer = useStableCallback((text: string) => insertComposerBlock(quotedAnswerBlock(text, quoteLines, "本轮回答")));
+
   // 重新生成: the engine branches before the last prompt and sends it again.
-  const handleRetry = useStableCallback(async () => {
+  const handleRetry = useStableCallback(async (modelId?: string) => {
     if (!sessionId || streaming) return;
     const lastUser = messages.map((m) => m.role).lastIndexOf("user");
     if (!(await maybeRevertAfter(lastUser, "重新生成这个回答？"))) return;
     try {
-      await agentRegenerate(sessionId);
+      await agentRegenerate(sessionId, modelId);
     } catch (e) {
       onToast?.(`重新生成失败：${friendlyError(e)}`);
+    }
+  });
+  // G1-28: a context-overflow error offers the same compaction as /compact.
+  const handleCompact = useStableCallback(async () => {
+    if (!sessionId || streaming || compacting) return;
+    try {
+      const result = await agentCompact(sessionId);
+      onToast?.(result.tokensAfter !== undefined ? `已压缩上下文：${result.tokensBefore} → ${result.tokensAfter} tokens` : "已压缩上下文");
+    } catch (e) {
+      onToast?.(`压缩失败：${friendlyError(e)}`);
     }
   });
 
@@ -164,13 +187,64 @@ export function ChatView({
     }
   });
 
+  // 回退到此消息前 (WorkBuddy 用户消息工具栏): Pi rewind 把对话与产物一起退回到这条提问之前。
+  const handleRewindFrom = useStableCallback(async (messageId: string) => {
+    if (!sessionId || streaming) return;
+    const ordinal = messages.filter((m) => m.role === "user" && !m.meta?.pending).findIndex((m) => m.id === messageId);
+    if (ordinal < 0) return;
+    if (!(await maybeRevertAfter(messages.findIndex((m) => m.id === messageId), "把对话与产物回退到这条消息之前？"))) return;
+    try {
+      const points = await rewindPoints(sessionId);
+      const point = points[ordinal];
+      if (!point) { onToast?.("找不到要回到的位置，对话可能已经变化"); return; }
+      await rewindExecute(sessionId, point.entryId);
+      await onRewound?.();
+      onToast?.("已回退到这条消息之前");
+    } catch (e) {
+      onToast?.(`回退失败：${friendlyError(e)}`);
+    }
+  });
+
+  // 删除该消息 (G1-27): Pi 的 context_edit 把这一轮问答从对话和模型上下文里一起摘掉。
+  const handleDeleteFrom = useStableCallback(async (messageId: string) => {
+    if (!sessionId || streaming) return;
+    const ordinal = messages.filter((m) => m.role === "user" && !m.meta?.pending).findIndex((m) => m.id === messageId);
+    if (ordinal < 0) return;
+    const ok = await appConfirm({
+      title: "删除这一轮问答？",
+      message: "这条提问和它的回答会从对话里移除，模型之后也不会再看到它们。",
+      confirmLabel: "删除",
+    });
+    if (!ok) return;
+    try {
+      const points = await rewindPoints(sessionId);
+      const point = points[ordinal];
+      if (!point) { onToast?.("找不到要删除的消息，对话可能已经变化"); return; }
+      await agentDeleteMessage(sessionId, point.entryId);
+      await onRewound?.();
+      onToast?.("已删除该消息");
+    } catch (e) {
+      onToast?.(`删除失败：${friendlyError(e)}`);
+    }
+  });
+
+  // 继续生成 (G1-27): 回答被输出上限截断时，从断点接着写。
+  const handleContinue = useStableCallback(async () => {
+    if (!sessionId || streaming) return;
+    try {
+      await agentContinue(sessionId);
+    } catch (e) {
+      onToast?.(`继续生成失败：${friendlyError(e)}`);
+    }
+  });
+
   const handleFork = useStableCallback(async () => {
     if (!sessionId) return;
     try {
       onForked?.(await agentForkSession(sessionId));
-      onToast?.("已分叉为新任务");
+      onToast?.("已复制为新任务");
     } catch (e) {
-      onToast?.(`分叉失败：${friendlyError(e)}`);
+      onToast?.(`复制失败：${friendlyError(e)}`);
     }
   });
 
@@ -260,25 +334,53 @@ export function ChatView({
     await onSend("按上面的计划执行。");
   });
 
-  const artifactsApi = useMemo<ArtifactsApi>(() => ({
-    all: artifacts,
-    open: (path) => showBench({ kind: "file", path }),
-    openChanges: (path) => showBench({ kind: "changes", path }),
-    openList: () => showBench({ kind: "list" }),
-    revert: (ids, files) => void revertTurn(ids, files),
-  }), [artifacts, showBench, revertTurn]);
   const relPath = useCallback((path: string) => (cwd && path.startsWith(cwd) ? path.slice(cwd.length).replace(/^[\\/]/, "") : path), [cwd]);
   const handleAddToChat = useStableCallback((path: string) => {
     const current = sessionId ? useSessionsStore.getState().drafts[sessionId] ?? "" : "";
     putInComposer(`${current}${current && !current.endsWith(" ") ? " " : ""}\`${relPath(path)}\` `);
   });
+  /** WorkBuddy 产物块「下载」：读出内容后经原生另存为写到用户选的位置。 */
+  const exportArtifact = useStableCallback(async (path: string) => {
+    try {
+      const text = await readTextFile(path);
+      const target = await saveTextAs(path.split(/[\\/]/).pop() || "artifact.txt", text);
+      if (target) toast("已导出");
+    } catch (e) {
+      toast(`导出失败：${friendlyError(e)}`);
+    }
+  });
+  const artifactsApi = useMemo<ArtifactsApi>(() => ({
+    all: artifacts,
+    open: (path) => showBench({ kind: "file", path }),
+    openChanges: (path) => showBench({ kind: "changes", path }),
+    openList: () => showBench({ kind: "list" }),
+    addToChat: (path) => handleAddToChat(path),
+    export: (path) => void exportArtifact(path),
+    revert: (ids, files) => void revertTurn(ids, files),
+  }), [artifacts, showBench, revertTurn, handleAddToChat, exportArtifact]);
   // 选中文字 → 让 Buddy 改这段 / 批注: 改这段 quotes into the composer; 批注 goes to the tray (pii W1.9).
   const handleAskEdit = useStableCallback((path: string, selected: string, mode: "edit" | "comment") => askEdit({ sessionId, relPath, draft: () => (sessionId ? useSessionsStore.getState().drafts[sessionId] ?? "" : ""), putInComposer, addAnnotation: (sid, rel, text) => useAnnotationStore.getState().add(sid, rel, text) }, path, selected, mode));
 
-  const markdownConfig = useMemo(() => createMarkdownHostConfig({ cwd, sessionId, onToast: toast }), [cwd, sessionId, toast]);
+  const markdownConfig = useMemo(() => createMarkdownHostConfig({
+    cwd,
+    sessionId,
+    onToast: toast,
+    // WorkBuddy 表格块「添加到对话」：把表格 Markdown 放回输入框。
+    onAddTableToChat: (markdown) => insertComposerBlock(markdown),
+  }), [cwd, sessionId, toast, insertComposerBlock]);
 
   // ---- scrolling: follow new content only while the reader is at the bottom ----
   const scrollRef = useRef<HTMLDivElement>(null);
+  // G1-22 正文划词：选中回答里的文字后在浮层里问这段 / 引用 / 复制。
+  // G1-31 快速问答：把选中的片段交给一次性会话，不占用当前对话的上下文。
+  const [quickQaQuote, setQuickQaQuote] = useState<string | null>(null);
+  const answerPick = useAnswerSelection({
+    root: scrollRef,
+    insertBlock: insertComposerBlock,
+    source: activeEntry?.title ? `「${activeEntry.title}」` : "当前回答",
+    onCopied: toast,
+    onQuickQa: setQuickQaQuote,
+  });
   const spacerRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
   /** A prompt was just sent: keep it at the top while its reply fills the view. */
@@ -507,7 +609,7 @@ export function ChatView({
               if (node.kind === "user") {
                 return (
                   <div key={node.key} className={"msg-wrap" + settledClass(index) + findClass([node.message.id])} data-msg-ids={node.message.id} data-role="user">
-                    <UserNode message={node.message} editable={!streaming} onEditFrom={handleEditFrom} onToast={toast} />
+                    <UserNode message={node.message} editable={!streaming} onEditFrom={handleEditFrom} onRewindFrom={handleRewindFrom} onDeleteFrom={handleDeleteFrom} onToast={toast} />
                   </div>
                 );
               }
@@ -529,8 +631,13 @@ export function ChatView({
                     error={isLast ? error : null}
                     onOpenTool={handleOpenTool}
                     onRetry={isLast && !streaming ? handleRetry : undefined}
+                    onCompact={isLast && !streaming ? handleCompact : undefined}
+                    onContinue={isLast && !streaming ? handleContinue : undefined}
+                    onDeleteTurn={!streaming ? handleDeleteFrom : undefined}
+                    models={models}
                     onFork={!streaming ? handleFork : undefined}
                     onInsertPrompt={putInComposer}
+                    onQuoteAnswer={quoteTurnAnswer}
                     onToast={toast}
                   />
                 </div>
@@ -544,7 +651,7 @@ export function ChatView({
             )}
             {/* Errors before any reply exists (send rejected, load failed). */}
             {error && !streaming && !lastNodeIsTurn && (
-              <div className="msg-wrap"><ErrorCard error={error} onToast={onToast} onRetry={nodes.some((n) => n.kind === "user") ? handleRetry : undefined} /></div>
+              <div className="msg-wrap"><ErrorCard error={error} onToast={onToast} onCompact={sessionId ? handleCompact : undefined} onRetry={nodes.some((n) => n.kind === "user") ? handleRetry : undefined} /></div>
             )}
             <div ref={spacerRef} className="chatview__spacer" aria-hidden="true" />
           </div>
@@ -573,6 +680,10 @@ export function ChatView({
           {sessionId && <QueuePanel key={sessionId} sessionId={sessionId} onEdit={putInComposer} />}
           {sessionId && <PlanPanel sessionId={sessionId} ready={planReady} running={streaming} onExecute={() => void runPlan()} onModify={putInComposer} onDismiss={() => setPlanDismissed(lastUserId)} />}
           <BackgroundTaskCapsule currentSessionId={sessionId ?? undefined} onOpenSession={onOpenSession} onToast={toast} />
+          {/* G2-7: tool outputs the engine withheld for a possible prompt injection. */}
+          {sessionId && toolContentRisks.map((risk) => (
+            <ToolContentRiskCard key={risk.toolCallId} risk={risk} onPutInComposer={putInComposer} />
+          ))}
           <Composer
             streaming={streaming}
             onSend={sendWithMode}
@@ -629,6 +740,26 @@ export function ChatView({
           onRefresh={refreshArtifacts}
           onAddToChat={handleAddToChat}
           onAskEdit={handleAskEdit}
+          onToast={toast}
+        />
+      )}
+      {answerPick.pick && createPortal(
+        <SelectionToolbar
+          selection={answerPick.pick}
+          onAsk={answerPick.ask}
+          onQuote={answerPick.quote}
+          onCopy={answerPick.copy}
+          onQuickQa={answerPick.quickQa}
+          onDismiss={answerPick.dismiss}
+        />,
+        document.body,
+      )}
+      {quickQaQuote && (
+        <QuickQaSheet
+          quote={quickQaQuote}
+          cwd={cwd}
+          modelId={modelId}
+          onClose={() => setQuickQaQuote(null)}
           onToast={toast}
         />
       )}

@@ -9,7 +9,7 @@ export function openSettings(section?: string) {
 }
 
 /** Inline error inside the turn that failed: one friendly sentence, raw detail on demand. */
-export function ErrorCard({ error, onRetry, onToast }: { error: string; onRetry?: () => void; onToast?: (msg: string) => void }) {
+export function ErrorCard({ error, onRetry, onCompact, onToast }: { error: string; onRetry?: () => void; onCompact?: () => void; onToast?: (msg: string) => void }) {
   const [open, setOpen] = useState(false);
   const d = describeError(error);
   return (
@@ -32,6 +32,9 @@ export function ErrorCard({ error, onRetry, onToast }: { error: string; onRetry?
         <button type="button" className="turn-error__btn" onClick={() => copyText(d.raw).then(() => onToast?.("已复制错误信息"), () => onToast?.("复制失败"))}>复制</button>
         {(d.action === "settings" || d.action === "model") && (
           <button type="button" className="turn-error__btn" onClick={() => openSettings("model")}>{d.action === "model" ? "切换模型" : "去设置"}</button>
+        )}
+        {d.action === "compact" && onCompact && (
+          <button type="button" className="turn-error__btn" onClick={onCompact}>压缩上下文</button>
         )}
         {onRetry && d.action !== "settings" && (
           <button type="button" className="turn-error__btn turn-error__btn--primary" onClick={onRetry}>重试</button>

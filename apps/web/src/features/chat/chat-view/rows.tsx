@@ -6,13 +6,21 @@ import { UserBubble } from "../UserBubble";
 import { BashRow } from "./BashRow";
 
 /** One prompt row; memoized so streaming elsewhere does not re-render it. */
-export const UserNode = memo(function UserNode({ message, editable, onEditFrom, onToast }: {
+export const UserNode = memo(function UserNode({ message, editable, onEditFrom, onRewindFrom, onDeleteFrom, onToast }: {
   message: ChatMessage;
   editable: boolean;
   onEditFrom: (messageId: string, text: string, resend: boolean) => Promise<void>;
+  onRewindFrom?: (messageId: string) => Promise<void>;
+  onDeleteFrom?: (messageId: string) => Promise<void>;
   onToast: (msg: string) => void;
 }) {
-  return <UserBubble message={message} onToast={onToast} onEdit={editable ? (text, resend) => onEditFrom(message.id, text, resend) : undefined} />;
+  return <UserBubble
+    message={message}
+    onToast={onToast}
+    onEdit={editable ? (text, resend) => onEditFrom(message.id, text, resend) : undefined}
+    onRewind={editable && onRewindFrom ? () => onRewindFrom(message.id) : undefined}
+    onDelete={editable && onDeleteFrom ? () => onDeleteFrom(message.id) : undefined}
+  />;
 });
 
 /**

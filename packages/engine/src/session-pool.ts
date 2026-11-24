@@ -34,6 +34,8 @@ export async function open(
   thinkingLevel?: ThinkingLevel,
   /** 子代理 (W3.4): tag the slot from the very first event, so it never becomes a sidebar row. */
   subagent?: { parentId: string; agentName?: string },
+  /** 快速问答 (G1-31): a throwaway session that never becomes a task. */
+  hidden?: boolean,
 ): Promise<Slot> {
   const savedContext = manager.buildSessionContext();
   const model = modelId
@@ -162,6 +164,7 @@ export async function open(
     lastActive: Date.now(),
     failed: false,
     ...(subagent ? { parentId: subagent.parentId, agentName: subagent.agentName, subagent: true } : {}),
+    ...(hidden ? { hidden: true } : {}),
   };
   // 做一做 / 想一想 / 问一问 of the branch being opened (W0.5; in-memory when the built-in is off).
   restoreMode(engine, slot);
@@ -183,7 +186,8 @@ export async function open(
   }
   engine.slots.set(slot.id, slot);
   engine.invalidateList();
-  engine.emit("agent://model-state", engine.modelState(slot.id));
+  // 快速问答 (G1-31) 是一次性会话：不向渲染层播报它的模型状态，免得看起来像一个任务。
+  if (!slot.hidden) engine.emit("agent://model-state", engine.modelState(slot.id));
   await engine.evictOverflow(slot.id);
   return slot;
 }
@@ -220,7 +224,7 @@ export async function newSession(
 export function running(engine: EngineContext) {
   const meta = engine.settings.config.read().sessions;
   return [...engine.slots.values()]
-    .filter((slot) => slot.busy || slot.userBash)
+    .filter((slot) => (slot.busy || slot.userBash) && !slot.hidden)
     .map((slot) => {
       const title = meta[slot.id]?.title ?? slot.session.sessionName ?? "新任务";
       return {

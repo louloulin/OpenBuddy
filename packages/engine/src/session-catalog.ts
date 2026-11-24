@@ -77,7 +77,7 @@ export async function list(engine: EngineContext, cwd: string, includeArchived =
   // Sessions created in this run are not on disk until their first exchange. 子代理 (W3.4) are
   // in-memory children owned by their parent: they never become sidebar entries.
   for (const slot of engine.slots.values()) {
-    if (slot.subagent) continue;
+    if (slot.subagent || slot.hidden) continue;
     if (slot.session.sessionManager.getCwd() !== cwd || result.some((s) => s.sessionId === slot.id)) continue;
     if (!slot.busy && !meta[slot.id]?.title) continue;
     const model = slot.session.model;

@@ -77,7 +77,7 @@ export interface EngineContext {
   toolArgProgress(slot: Slot, source: { contentIndex?: number; delta?: string; partial?: { content?: Array<{ arguments?: unknown }> } }): void;
   onEvent(slot: Slot, event: AgentSessionEvent): void;
   ensureTitle(slot: Slot, text: string): void;
-  open(manager: SessionManager, modelId?: string, providerId?: string, thinkingLevel?: ThinkingLevel, subagent?: { parentId: string; agentName?: string }): Promise<Slot>;
+  open(manager: SessionManager, modelId?: string, providerId?: string, thinkingLevel?: ThinkingLevel, subagent?: { parentId: string; agentName?: string }, hidden?: boolean): Promise<Slot>;
   /** Create a fresh session (W1.7 handoff, W4 automation); returns its id. */
   newSession(cwd: string, modelId?: string, providerId?: string, thinkingLevel?: ThinkingLevel, background?: boolean): Promise<string>;
   focus(id: string): void;
@@ -86,6 +86,8 @@ export interface EngineContext {
   savedModel(item: SessionInfo): { provider: string; modelId: string } | undefined;
   validateImages(session: AgentSession, images?: PromptImages): void;
   send(id: string, prompt: string, images?: PromptImages): Promise<void>;
+  /** 换模型（换模型重新生成用；见 features/rewind.ts）。 */
+  setModel(id: string, modelId: string, providerId?: string): Promise<SessionModelState>;
   navigateBefore(slot: Slot, entryId: string): Promise<string>;
   writablePath(id: string, path: string): string;
   queueState(id: string): { steering: string[]; followUp: string[] };

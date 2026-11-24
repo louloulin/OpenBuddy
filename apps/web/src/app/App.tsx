@@ -19,15 +19,18 @@ import { useExtensionUiStore } from "../features/approvals/state/extension-ui-st
 import { useAgentModelStore } from "../features/models/state/agent-model-store";
 import { useSessionStore } from "../features/chat/state/session-store";
 import { usePlanFeed } from "../features/chat/state/plan-store";
+import { useToolContentRiskFeed } from "../features/chat/state/tool-content-risk-store";
 import { useArtifactsStore } from "../features/workbench/state/artifacts-store";
 import { useConnectorNeededStore } from "../features/composer/state/connector-needed-store";
 import { useSubagentStore } from "../features/chat/state/subagent-store";
+import { useQuickQaStore } from "../features/chat/state/quick-qa-store";
 import { useSessionsStore } from "../features/sessions/state/sessions-store";
 import { usePermissionStore } from "../features/approvals/state/permission-store";
 import { useQuestionStore } from "../features/approvals/state/question-store";
 import { BoundExpertBadge } from "../features/experts";
 import { bindPendingExpert, clearSessionExpert, selectExpert, showLoadedExpert, showSessionExpert } from "./expert-session";
 import { TopbarTitle } from "./shell/TopbarTitle";
+import { TopbarBreadcrumb } from "./shell/TopbarBreadcrumb";
 import {
   agentInit,
   agentNewSession,
@@ -68,49 +71,12 @@ import { SearchPalette, ShortcutsPanel } from "./palette/ShortcutsPanel";
 import { matchShortcut } from "../shared/lib/shortcuts";
 import { copyText } from "@openbuddy/platform/clipboard";
 import { useUnseenStore } from "./state/unseen-store";
-import { parseUserText, baseName, EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END } from "@openbuddy/chat-core/user-text";
+import { EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END } from "@openbuddy/chat-core/user-text";
 import { featureView, useFeatureNav } from "./routing/use-feature-nav";
 import { openHubAt } from "./routing/ExpertsHub";
+import { COMPACT_COMMAND, clampThinking, deriveTitle, extractMarkdownBody, sessionStatusOf } from "./session-helpers";
 
 export { EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END };
-
-/** Optimistic sidebar title; the engine persists the authoritative one after the first turn. */
-function deriveTitle(text: string): string {
-  const display = parseUserText(text);
-  const clean = display.text.replace(/^【[^】]{1,12}】/, "").replace(/\s+/g, " ").trim();
-  if (!clean) return display.skill ? `技能：${display.skill}` : display.attachments[0] ? `查看 ${baseName(display.attachments[0])}` : "新任务";
-  return clean.length > 30 ? clean.slice(0, 30) + "…" : clean;
-}
-/** `/compact [instructions]` typed as the whole message. */
-const COMPACT_COMMAND = /^\/compact(?:\s+([\s\S]*))?$/;
-const sessionStatusOf = (status: "running" | "idle" | "failed") => status === "running" ? "working" as const : status === "failed" ? "failed" as const : "completed" as const;
-
-/**
- * Strip YAML frontmatter (`---\n...\n---`) from a markdown agent file and
- * return only the body (the system prompt content).
- */
-function extractMarkdownBody(raw: string): string {
-  const trimmed = raw.trimStart();
-  if (!trimmed.startsWith("---")) return raw.trim();
-  const afterOpen = trimmed.indexOf("\n");
-  if (afterOpen === -1) return raw.trim();
-  const rest = trimmed.slice(afterOpen + 1);
-  const closeIdx = rest.search(/\n---\s*(\n|$)/);
-  if (closeIdx === -1) return raw.trim();
-  return rest.slice(closeIdx + 1).replace(/^\n---\s*/, "").trim();
-}
-
-
-
-const LEVEL_ORDER = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
-/** What Pi will use for a requested level (unset = Pi's default "medium"): the next supported one up. */
-function clampThinking(requested: string | undefined, levels: string[]): string | undefined {
-  if (!levels.length) return undefined;
-  const want = requested ?? "medium";
-  if (levels.includes(want)) return want;
-  const i = LEVEL_ORDER.indexOf(want);
-  return levels.find(level => LEVEL_ORDER.indexOf(level) >= i) ?? levels[levels.length - 1];
-}
 
 export default function App() {
   return (
@@ -156,6 +122,7 @@ function Shell() {
   const resourceSessionRef = useRef<string | undefined>(undefined);
 
   usePlanFeed(); // agent://plan → plan store (PlanPanel, 任务概览; pii W3.2)
+  useToolContentRiskFeed(); // agent://tool-content-risk → 注入审查卡 (G2-7)
   const sessionStore = useSessionStore;
   const sessionsStore = useSessionsStore;
   const permissionStore = usePermissionStore;
@@ -254,6 +221,8 @@ function Shell() {
           onSessionStatus: (event) => {
             // 子代理 (W3.4) sessions are in-memory children, never sidebar rows.
             if (useSubagentStore.getState().isChild(event.sessionId)) return;
+            // 快速问答 (G1-31) 的一次性会话同样不是任务。
+            if (useQuickQaStore.getState().isQuickQa(event.sessionId)) return;
             sessionsStore.getState().upsert({ sessionId: event.sessionId, status: sessionStatusOf(event.status) });
           },
           // 即时连接卡 (pii W2.5): an MCP tool needs its server authorized; the composer shows 连接.
@@ -265,6 +234,8 @@ function Shell() {
           onComplete: (p) => {
             // 子代理 (W3.4): a child's settle belongs to its card, not the sidebar/transcript.
             if (useSubagentStore.getState().isChild(p.sessionId)) return;
+            // 快速问答 (G1-31): 一次性会话的完成不进侧栏，也不发通知。
+            if (useQuickQaStore.getState().isQuickQa(p.sessionId)) return;
             reportEvent("session_complete", "info", { sessionId: p.sessionId, stopReason: p.stopReason });
             // Ignore completes for side-channel sessions (inspiration generation)
             // — they're handled by their own listeners, not the main transcript.
@@ -293,6 +264,7 @@ function Shell() {
           },
           onSummary: ({ sessionId, title }) => {
             if (useSubagentStore.getState().isChild(sessionId)) return;
+            if (useQuickQaStore.getState().isQuickQa(sessionId)) return;
             // sidebar entry in place. This overrides the "新会话" placeholder
             // set optimistically in handleSendNew. Stamp updatedAt so the
             // sidebar can re-sort the freshly-active session to the top.
@@ -407,6 +379,10 @@ function Shell() {
     return undefined;
   });
   const currentTitle = currentEntry?.title || "";
+  // 面包屑的空间名 (WorkBuddy 的「📁 项目」)：会话所在目录的末段。
+  const currentSpaceName = currentEntry?.cwd
+    ? currentEntry.cwd.split(/[\\/]+/).filter(Boolean).at(-1) ?? ""
+    : "";
   const streaming = sessionStore((s) => s.streaming);
 
   const showToast = (message: string) => {
@@ -698,6 +674,14 @@ function Shell() {
     );
   };
 
+  // 清空上下文并新开 (G1-30): the task stays, the transcript and the draft start over.
+  const handleClearContext = async () => {
+    const id = sessionStore.getState().sessionId;
+    if (!id) return;
+    useSessionsStore.getState().setDraft(id, "");
+    await handleRewound();
+  };
+
   // 分叉 / 交接到新任务 (W1.7): the engine opened a new session; navigate and (for handoff) pre-fill the draft.
   const { handoffFrom, setHandoffFrom, openForked, openHandoff } = useSessionNavigation({
     getCwd: () => currentEntry?.cwd ?? cwdRef.current,
@@ -909,6 +893,7 @@ function Shell() {
                     </button>
                   </>
                 )}
+                <TopbarBreadcrumb space={currentSpaceName} />
                 <TopbarTitle title={currentTitle} onRename={handleRenameTitle} />
                 {currentEntry?.expertName && <BoundExpertBadge name={currentEntry.expertName} avatar={currentEntry.expertAvatar} onClear={() => void clearSessionExpert(currentSessionId).then(showToast)} />}
                 {currentSessionId && (
@@ -916,6 +901,7 @@ function Shell() {
                     sessionId={currentSessionId}
                     title={currentTitle}
                     onForked={openForked}
+                    onClearContext={handleClearContext}
                     onHandoffed={openHandoff}
                     pinned={currentEntry?.pinned}
                     cwd={currentEntry?.cwd ?? cwdRef.current}

@@ -30,31 +30,37 @@ export function BackgroundTaskCapsule({
   const [completed, setCompleted] = useState<Array<{ id: string; title: string; at: number }>>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const known = useRef(new Map<string, RunningTask>());
+  const mounted = useRef(true);
 
   const reload = useCallback(async () => {
     try {
       const list = await tasksList();
+      if (!mounted.current) return;
       const next = (Array.isArray(list) ? list : []).filter((task) => task.sessionId !== currentSessionId);
       const now = Date.now();
       setTasks(next);
       setCompleted((prev) => {
-        const alive = new Set(next.map((task) => task.id));
+        const aliveIds = new Set(next.map((task) => task.id));
         const finished = [...known.current.values()]
-          .filter((task) => !alive.has(task.id) && task.sessionId !== currentSessionId)
+          .filter((task) => !aliveIds.has(task.id) && task.sessionId !== currentSessionId)
           .map((task) => ({ id: task.id, title: task.description ?? task.title ?? task.id, at: now }));
         known.current = new Map(next.map((task) => [task.id, task]));
         return [...finished, ...prev].filter((item) => now - item.at < COMPLETED_TTL_MS).slice(0, 5);
       });
     } catch {
-      setTasks([]);
+      if (mounted.current) setTasks([]);
     }
   }, [currentSessionId]);
 
   useEffect(() => {
+    mounted.current = true;
     known.current = new Map();
     void reload();
     const timer = setInterval(() => void reload(), 5000);
-    return () => clearInterval(timer);
+    return () => {
+      mounted.current = false;
+      clearInterval(timer);
+    };
   }, [reload]);
 
   const kill = async (task: RunningTask) => {

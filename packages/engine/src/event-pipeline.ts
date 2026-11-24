@@ -249,12 +249,13 @@ export function onEvent(engine: EngineContext, slot: Slot, event: AgentSessionEv
   // An extension or /name renamed the session, or the thinking level moved (e.g. clamped after
   // a model switch): keep the sidebar title and the composer's thinking control in sync (C7/C8).
   // 子代理 (W3.4) are in-memory children: their name change must not create a sidebar row.
-  if (event.type === "session_info_changed" && event.name?.trim() && !slot.subagent) {
+  // 快速问答 (G1-31) 的一次性会话也不是任务：它的标题与模型状态不进侧栏。
+  if (event.type === "session_info_changed" && event.name?.trim() && !slot.subagent && !slot.hidden) {
     engine.metadata(sessionId, { title: event.name.trim() });
     engine.invalidateList();
     engine.emit("agent://summary", { sessionId, title: event.name.trim() });
   }
-  if (event.type === "thinking_level_changed") {
+  if (event.type === "thinking_level_changed" && !slot.hidden) {
     try { engine.emit("agent://model-state", engine.modelState(sessionId)); } catch { /* model not resolved yet */ }
   }
   const payload = slimEvent(event);

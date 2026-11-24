@@ -131,10 +131,21 @@ export interface TurnViewProps {
   /** Session-level error to show at the end of the last turn. */
   error?: string | null;
   onOpenTool?: (tc: ToolCallView) => void;
-  onRetry?: () => void;
+  /** 重新生成；给了模型就换成那个模型重新生成（G1-27）。 */
+  onRetry?: (modelId?: string) => void;
+  /** G1-28: context overflow errors can compact the session in place. */
+  onCompact?: () => void;
+  /** G1-27: 回答被输出上限截断时，从断点继续生成。 */
+  onContinue?: () => void;
+  /** G1-27: 删除本轮问答（连同这一轮的提问）。 */
+  onDeleteTurn?: (userMessageId: string) => void;
+  /** 换模型重新生成时可选的模型（只用到 id 和显示名，不依赖模型选择器这个 feature）。 */
+  models?: Array<{ id: string; label?: string; modelId?: string }>;
   onFork?: () => void;
   /** 逐条回答 (pii W1.8): put the questions found in this answer back into the composer. */
   onInsertPrompt?: (text: string) => void;
+  /** G1-27: quote this whole answer into the composer (appended to the draft). */
+  onQuoteAnswer?: (text: string) => void;
   onToast?: (msg: string) => void;
 }
 
@@ -152,7 +163,7 @@ export const TurnView = memo(TurnViewInner, (prev, next) => {
 });
 
 function TurnViewInner(props: TurnViewProps) {
-  const { messages, user, running, isLast, sessionId, cwd, markdownConfig, retry, compacting, turnStartedAt, error, onOpenTool, onRetry, onFork, onInsertPrompt, onToast } = props;
+  const { messages, user, running, isLast, sessionId, cwd, markdownConfig, retry, compacting, turnStartedAt, error, onOpenTool, onRetry, onCompact, onContinue, onDeleteTurn, models, onFork, onInsertPrompt, onQuoteAnswer, onToast } = props;
   const concise = useUiPrefs((s) => s.conciseMode);
   const [expanded, setExpanded] = useState(!concise);
   useEffect(() => setExpanded(!concise), [concise]);
@@ -180,6 +191,8 @@ function TurnViewInner(props: TurnViewProps) {
   const elapsed = started ? (running ? now : timing.end ?? started) - started : undefined;
   const failure = turnError(messages);
   const aborted = !running && failure.stopReason === "aborted";
+  // G1-27: 回答被输出上限截断（Pi 的 stopReason "length"）→ 可以从断点继续生成。
+  const truncated = !running && failure.stopReason === "length";
   const inlineError = (isLast ? error : null) ?? (failure.stopReason === "error" ? failure.errorMessage : undefined);
   const awaiting = running && (pending?.length ?? 0) > 0;
   // Thinking is live only while it is the newest step (a tool call or the answer ends it).
@@ -271,6 +284,10 @@ function TurnViewInner(props: TurnViewProps) {
         {running && retry && (
           <button type="button" className="turn__stop-retry" onClick={() => void agentAbortRetry(sessionId).catch(() => onToast?.("停止重试失败"))}>停止重试</button>
         )}
+        {/* WorkBuddy 消息头：完成后在同一行显示用时（`已完成 1m9s`）。 */}
+        {!running && elapsed !== undefined && elapsed >= 1000 && (
+          <span className="turn__done">已完成 {formatDuration(elapsed)}</span>
+        )}
       </div>
       <div className="turn__body">
         {!running && content.process.length > 0 && (
@@ -314,7 +331,7 @@ function TurnViewInner(props: TurnViewProps) {
         {running && !hasAnything && !retry && !compacting && <LoadingRow />}
         {aborted && !content.process.length && <div className="turn__stopped">已停止</div>}
         {!running && artifactsApi && turnArtifacts.length > 0 && <ArtifactCards items={turnArtifacts} total={artifactsApi.all.length} api={artifactsApi} />}
-        {inlineError && !running && <ErrorCard error={inlineError} onRetry={isLast ? onRetry : undefined} onToast={onToast} />}
+        {inlineError && !running && <ErrorCard error={inlineError} onRetry={isLast ? onRetry : undefined} onCompact={isLast ? onCompact : undefined} onToast={onToast} />}
         {!running && sources.length > 0 && (
           <details className="turn-sources">
             <summary>来源（{sources.length}）</summary>
@@ -339,15 +356,26 @@ function TurnViewInner(props: TurnViewProps) {
                 {speaking ? <Square size={13} strokeWidth={2.4} /> : <Volume2 size={15} strokeWidth={2} />}
               </button>
             )}
-            {isLast && onRetry && <button type="button" className="turn-action" onClick={onRetry} aria-label="重试" data-tip="重新生成"><RetryGlyph /></button>}
+            {isLast && onRetry && <button type="button" className="turn-action" onClick={() => onRetry()} aria-label="重试" data-tip="重新生成"><RetryGlyph /></button>}
+            {truncated && onContinue && <button type="button" className="turn-action turn-action--text" onClick={onContinue} aria-label="继续生成">继续生成</button>}
             <FeedbackButtons sessionId={sessionId} turnKey={turnKey} />
             <div className="turn-action__menu" ref={menuRef}>
               <button type="button" className="turn-action" onClick={() => setMenuOpen((v) => !v)} aria-label="更多" aria-expanded={menuOpen} data-tip="更多"><MoreGlyph /></button>
               {menuOpen && (
                 <div className="turn-menu" role="menu">
                   <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void copyText(turnMarkdown(messages)).then(() => onToast?.("已复制 Markdown"), () => onToast?.("复制失败")); }}>复制 Markdown</button>
-                  {onFork && <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onFork(); }}>分叉为新任务</button>}
+                  {onQuoteAnswer && answerText.trim() && <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onQuoteAnswer(answerText); }}>引用这条回答</button>}
+                  {onFork && <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onFork(); }}>复制为新任务</button>}
                   {onInsertPrompt && <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); askOneByOne(); }}>逐条回答</button>}
+                  {onDeleteTurn && user && <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onDeleteTurn(user.id); }}>删除本轮问答</button>}
+                  {onRetry && models && models.length > 1 && (
+                    <div className="turn-menu__group" role="group" aria-label="换模型重新生成">
+                      <span className="turn-menu__group-label">换模型重新生成</span>
+                      {models.slice(0, 8).map((model) => (
+                        <button key={model.id} type="button" role="menuitem" onClick={() => { setMenuOpen(false); onRetry(model.id); }}>{model.label || model.modelId || model.id}</button>
+                      ))}
+                    </div>
+                  )}
                   <BranchMenuItems sessionId={sessionId} userTimestamp={userTimestamp} onToast={onToast} onDone={() => setMenuOpen(false)} />
                   {artifactsApi && turnArtifacts.length > 0 && (
                     <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); artifactsApi.revert(turnToolIds, turnArtifacts); }}>撤销本轮的文件改动（{turnArtifacts.length}）</button>
@@ -364,7 +392,7 @@ function TurnViewInner(props: TurnViewProps) {
           <div className="turn-followups" aria-label="下一步建议">
             {suggestions.map((suggestion) => (
               <button key={suggestion.id} type="button" className="turn-followups__chip" onClick={() => onInsertPrompt(suggestion.prompt)}>
-                {suggestion.label}
+                {suggestion.label}<span className="turn-followups__arrow" aria-hidden>↗</span>
               </button>
             ))}
             <button type="button" className="turn-followups__close" aria-label="隐藏建议" onClick={() => setFollowUpsHidden(true)}>×</button>

@@ -60,7 +60,26 @@ export function sessionModule(ctx: HostContext): HostModule {
     tasks_list: () => engine.running(),
     rewind_points: (p) => engine.rewindPoints(text(p.sessionId)),
     rewind_execute: (p) => engine.rewind(text(p.sessionId), text(p.entryId)),
-    agent_regenerate: (p) => engine.regenerate(text(p.sessionId)),
+    agent_regenerate: (p) =>
+      engine.regenerate(
+        text(p.sessionId),
+        typeof p.modelId === "string" && p.modelId ? p.modelId : undefined,
+        typeof p.providerId === "string" && p.providerId ? p.providerId : undefined,
+      ),
+    // G1-27 消息级操作: 删除该消息（Pi 的 context_edit）/ 继续生成（回答被截断时）。
+    agent_delete_message: (p) => engine.deleteMessage(text(p.sessionId), text(p.entryId, "entryId")),
+    agent_continue: (p) => engine.continueAnswer(text(p.sessionId)),
+    // G1-30: 清空上下文并新开（任务本身留着）。
+    agent_clear_context: (p) => engine.clearContext(text(p.sessionId)),
+    // G1-31: 快速问答（一次性会话，不动当前任务的上下文）。
+    agent_quick_answer: (p) =>
+      engine.quickAnswer({
+        prompt: text(p.prompt, "prompt"),
+        context: typeof p.context === "string" ? p.context : undefined,
+        cwd: typeof p.cwd === "string" ? p.cwd : undefined,
+        modelId: typeof p.modelId === "string" && p.modelId ? p.modelId : undefined,
+        providerId: typeof p.providerId === "string" && p.providerId ? p.providerId : undefined,
+      }),
     // 20261116-pii W1.1: versions ‹1/2› of each user turn (null while the session is not loaded, like agent_session_info).
     agent_tree: (p) => (engine.has(text(p.sessionId)) ? engine.tree(text(p.sessionId)) : null),
     agent_navigate: (p) =>

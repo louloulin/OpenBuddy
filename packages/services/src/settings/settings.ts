@@ -222,6 +222,12 @@ export interface AppSettings {
   rules: Array<{ action: string; tool: string; pattern?: string }>;
   /** 受保护路径 (pii W6.2): write/edit/delete tools are always denied on these, in every mode. */
   protectedPaths?: string[];
+  /** 沙箱与网络策略 (G2-3): hard boundary checked before any rule; empty lists mean "not restricted". */
+  sandboxPolicy?: {
+    fileWriteAllow: string[];
+    commandAllow: string[];
+    networkAllow: string[];
+  };
   defaults: {
     defaultModel: string;
     defaultPermission: string;

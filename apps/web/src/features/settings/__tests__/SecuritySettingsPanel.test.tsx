@@ -2,17 +2,31 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { SecuritySettingsPanel } from "../sections/SecuritySettingsPanel";
 
-const { list, save, protectedGet, protectedSet } = vi.hoisted(() => ({
+const { list, save, protectedGet, protectedSet, skillsList, readTextFile, securityPolicyGet, securityPolicySet, securityAuditList } = vi.hoisted(() => ({
   list: vi.fn(),
   save: vi.fn(),
   protectedGet: vi.fn(),
   protectedSet: vi.fn(),
+  skillsList: vi.fn(),
+  readTextFile: vi.fn(),
+  securityPolicyGet: vi.fn(),
+  securityPolicySet: vi.fn(),
+  securityAuditList: vi.fn(),
 }));
 vi.mock("@openbuddy/client/agent-client", () => ({
   permissionList: list,
   permissionSave: save,
   permissionProtectedGet: protectedGet,
   permissionProtectedSet: protectedSet,
+  skillsList,
+}));
+vi.mock("@openbuddy/client/api/files", () => ({
+  readTextFile,
+}));
+vi.mock("@openbuddy/client/api/approvals", () => ({
+  securityPolicyGet: securityPolicyGet,
+  securityPolicySet: securityPolicySet,
+  securityAuditList: securityAuditList,
 }));
 
 beforeEach(() => {
@@ -20,6 +34,13 @@ beforeEach(() => {
   save.mockReset();
   protectedGet.mockReset();
   protectedSet.mockReset();
+  skillsList.mockReset();
+  readTextFile.mockReset();
+  skillsList.mockResolvedValue([]);
+  securityPolicyGet.mockResolvedValue({ fileWriteAllow: [], commandAllow: [], networkAllow: [] });
+  securityPolicySet.mockImplementation(async (policy: unknown) => policy);
+  securityAuditList.mockResolvedValue([]);
+  readTextFile.mockResolvedValue("");
   list.mockResolvedValue([
     { action: "allow", tool: "write", pattern: "/ws/report.md" },
     { action: "deny", tool: "bash", pattern: "rm -rf" },
@@ -88,5 +109,43 @@ describe("安全中心 (pii W6.1 / W6.2)", () => {
     await waitFor(() => expect(screen.getByText("恢复默认")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "恢复默认" }));
     await waitFor(() => expect(protectedSet).toHaveBeenCalledWith([".env", ".git", "*.pem"]));
+  });
+
+  it("安全中心 2.0 (G2-1)：五个分区可切换，沙箱分区能写白名单", async () => {
+    render(<SecuritySettingsPanel />);
+    const tabs = screen.getAllByRole("tab").map((tab) => tab.textContent);
+    expect(tabs).toEqual(["工具管控", "沙箱与网络", "技能审查", "审计日志", "系统授权"]);
+
+    fireEvent.click(screen.getByRole("tab", { name: "沙箱与网络" }));
+    await waitFor(() => expect(screen.getByText("文件写入白名单")).toBeInTheDocument());
+    const input = screen.getByPlaceholderText("允许写入的路径片段，例如 /work/output");
+    fireEvent.change(input, { target: { value: "/work/output" } });
+    const fileGroup = screen.getByText("文件写入白名单").closest(".sec-sandbox__group") as HTMLElement;
+    fireEvent.click(within(fileGroup).getByRole("button", { name: "添加" }));
+    await waitFor(() =>
+      expect(securityPolicySet).toHaveBeenCalledWith({
+        fileWriteAllow: ["/work/output"],
+        commandAllow: [],
+        networkAllow: [],
+      }),
+    );
+  });
+
+  it("审计日志分区列出事件", async () => {
+    securityAuditList.mockResolvedValue([
+      { ts: "2026-11-24T01:00:00.000Z", action: "policy-deny", tool: "write", target: "/etc/hosts" },
+    ]);
+    render(<SecuritySettingsPanel />);
+    fireEvent.click(screen.getByRole("tab", { name: "审计日志" }));
+    await waitFor(() => expect(screen.getByText("策略拦截")).toBeInTheDocument());
+    expect(screen.getByText("/etc/hosts")).toBeInTheDocument();
+  });
+
+  it("系统授权分区读真实授权状态", async () => {
+    render(<SecuritySettingsPanel />);
+    fireEvent.click(screen.getByRole("tab", { name: "系统授权" }));
+    await waitFor(() => expect(screen.getByText("麦克风")).toBeInTheDocument());
+    expect(screen.getByText("摄像头")).toBeInTheDocument();
+    expect(screen.getByText("通知")).toBeInTheDocument();
   });
 });

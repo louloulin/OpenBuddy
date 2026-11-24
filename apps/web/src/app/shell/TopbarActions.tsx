@@ -15,12 +15,13 @@ import {
   saveFileDialog,
   agentForkSession,
   agentHandoff,
+  agentClearContext,
   agentSetSessionPinned,
   agentSetSessionArchived,
   agentExportJsonl,
   openSessionWindow,
 } from "@openbuddy/client/agent-client";
-import { appPrompt } from "@/shared/ui/AppDialog";
+import { appConfirm, appPrompt } from "@/shared/ui/AppDialog";
 import { buildSessionMarkdown, sanitizeFilename } from "@openbuddy/chat-core/export-markdown";
 import type { Automation } from "@openbuddy/protocol/dto";
 import { TaskOverview } from "./TaskOverview";
@@ -32,6 +33,8 @@ interface TopbarActionsProps {
   cwd?: string;
   onToast?: (msg: string) => void;
   onForked?: (sessionId: string) => void | Promise<void>;
+  /** G1-30: 清空上下文并新开（任务留着，对话从头开始）。 */
+  onClearContext?: () => void | Promise<void>;
   /** 交接到新任务 (pii W1.7): navigate to the new session; the draft is pre-filled, never sent. */
   onHandoffed?: (sessionId: string, prompt: string) => void | Promise<void>;
   /** After archive/pin mutations, parent merges the patch into the sessions store. */
@@ -48,6 +51,7 @@ export function TopbarActions({
   onToast,
   onSessionsChanged,
   onForked,
+  onClearContext,
   onHandoffed,
   onSaveAsAutomation,
 }: TopbarActionsProps) {
@@ -155,8 +159,27 @@ export function TopbarActions({
   const handleFork = async () => {
     if (streaming || busy || !onForked) return;
     setBusy(true); setOpen(false);
-    try { const childId = await agentForkSession(sessionId); await onForked(childId); onToast?.("已创建分叉会话"); }
-    catch (error) { onToast?.(`分叉失败：${friendlyError(error)}`); }
+    try { const childId = await agentForkSession(sessionId); await onForked(childId); onToast?.("已复制会话"); }
+    catch (error) { onToast?.(`复制会话失败：${friendlyError(error)}`); }
+    finally { setBusy(false); }
+  };
+
+  /** G1-30 清空上下文并新开: the task stays, the conversation starts over. */
+  const handleClearContext = async () => {
+    if (streaming || busy) return;
+    setOpen(false);
+    const ok = await appConfirm({
+      title: "清空上下文并重新开始？",
+      message: "这个任务的对话会清空，任务本身保留。旧的对话仍能在历史版本里找到。",
+      confirmLabel: "清空并重新开始",
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await agentClearContext(sessionId);
+      await onClearContext?.();
+      onToast?.("已清空上下文");
+    } catch (error) { onToast?.(`清空失败：${friendlyError(error)}`); }
     finally { setBusy(false); }
   };
 
@@ -202,7 +225,8 @@ export function TopbarActions({
 
       {open && (
         <div className="topbar-actions__menu" onClick={(e) => e.stopPropagation()}>
-          {onForked && <button type="button" className="topbar-actions__item" disabled={streaming || busy} onClick={() => { void handleFork(); }}>分叉为新会话</button>}
+          {onForked && <button type="button" className="topbar-actions__item" disabled={streaming || busy} onClick={() => { void handleFork(); }}>复制会话</button>}
+          <button type="button" className="topbar-actions__item" disabled={streaming || busy} onClick={() => { void handleClearContext(); }}>清空上下文并新开</button>
           <button type="button" className="topbar-actions__item" onClick={() => { setOpen(false); void openSessionWindow(sessionId).catch(error => onToast?.(`打开窗口失败：${friendlyError(error)}`)); }}>在新窗口打开</button>
           {onHandoffed && <button type="button" className="topbar-actions__item" disabled={streaming || busy} onClick={() => { void handleHandoff(); }}>交接到新任务…</button>}
           {onSaveAsAutomation && (

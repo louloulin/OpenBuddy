@@ -68,6 +68,11 @@ export type MarkdownConfig = {
   }) => boolean | void;
   onDownloadMermaid?: (svg: string, code: string) => void;
   onPreviewMermaid?: (svg: string, code: string) => void;
+  /**
+   * 表格块操作 (WorkBuddy 对齐): "add-to-chat" 把表格的 Markdown 放回输入框。
+   * "expand" / "download" 由 markdown 包自己处理（放大 / 另存为）。
+   */
+  onTableAction?: (action: "add-to-chat", markdown: string) => void;
   expandThreshold?: number;
 };
 

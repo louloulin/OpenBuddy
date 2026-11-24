@@ -36,6 +36,62 @@ export interface ModelRuntimeControls {
 export const ModelRuntimeContext = createContext<ModelRuntimeControls>({ busy: false, thinkingLevels: [] });
 const LEVEL_LABELS = THINKING_LABELS;
 
+/**
+ * 思考等级 (WorkBuddy 输入区对齐): a borderless pill with a lightbulb, the current level
+ * and a chevron; the levels live in a popover. The native `<select>` looked nothing like
+ * WorkBuddy's `cr-input-footer-item`, so the whole control is one button now.
+ */
+function ThinkingPicker({ levels, value, disabled, onChange }: {
+  levels: string[];
+  value: string;
+  disabled?: boolean;
+  onChange: (level: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: MouseEvent) => { if (!ref.current?.contains(event.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", outside);
+    return () => document.removeEventListener("mousedown", outside);
+  }, [open]);
+  const label = LEVEL_LABELS[value] ?? value;
+  return (
+    <div className="model-thinking" ref={ref}>
+      <button
+        type="button"
+        className="wb-footer-item"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`思考等级：${label}`}
+        disabled={disabled}
+        onClick={() => setOpen(state => !state)}
+      >
+        <Lightbulb size={14} aria-hidden className="wb-footer-item__icon" />
+        <span className="wb-footer-item__label">{label}</span>
+        <ChevronDown size={14} aria-hidden className="wb-footer-item__chevron" />
+      </button>
+      {open && (
+        <div className="wb-footer-menu" role="listbox" aria-label="思考等级">
+          {levels.map(level => (
+            <button
+              key={level}
+              type="button"
+              role="option"
+              aria-selected={level === value}
+              className="wb-footer-menu__item"
+              onClick={() => { setOpen(false); onChange(level); }}
+            >
+              <span>{LEVEL_LABELS[level] ?? level}</span>
+              {level === value && <Check size={14} />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ModelSelector({ modelId, models, onModelChange, disabled = false }: {
   modelId?: string;
   models: ModelOption[];
@@ -164,15 +220,12 @@ export function ModelSelector({ modelId, models, onModelChange, disabled = false
         setPending(true); setError("");
         void controls.onThinkingChange!(level).catch(error => setError(`思考等级切换失败：${friendlyError(error)}`)).finally(() => setPending(false));
       };
-      // Few levels (what most models really support): one click, all visible. Many: a select.
-      return controls.thinkingLevels.length <= 4
-        ? <div className="model-thinking model-thinking--seg" role="radiogroup" aria-label="思考等级">
-            <span className="model-thinking__label" aria-hidden title="思考等级"><Lightbulb size={13} /></span>
-            {controls.thinkingLevels.map(level => <button key={level} type="button" role="radio" aria-checked={(controls.thinkingLevel ?? "off") === level} disabled={disabled || busy} className={"model-thinking__opt" + ((controls.thinkingLevel ?? "off") === level ? " model-thinking__opt--on" : "")} onClick={() => change(level)}>{LEVEL_LABELS[level] ?? level}</button>)}
-          </div>
-        : <label className="model-thinking">思考
-            <select aria-label="思考等级" value={controls.thinkingLevel ?? "off"} disabled={disabled || busy} onChange={event => change(event.target.value)}>{controls.thinkingLevels.map(level => <option key={level} value={level}>{LEVEL_LABELS[level] ?? level}</option>)}</select>
-          </label>;
+      return <ThinkingPicker
+        levels={controls.thinkingLevels}
+        value={controls.thinkingLevel ?? "off"}
+        disabled={disabled || busy}
+        onChange={change}
+      />;
     })()}
     {thinkingUnsupported && <span className="model-thinking model-thinking--unsupported" role="img" aria-label="当前模型不支持思考" aria-disabled="true" title="当前模型不支持思考，换一个支持思考的模型后可调整思考等级">
       <LightbulbOff size={14} aria-hidden />

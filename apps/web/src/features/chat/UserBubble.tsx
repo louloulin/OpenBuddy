@@ -3,7 +3,7 @@ import { openLightbox } from "@openbuddy/ui/ImageLightbox";
 import type { ChatMessage } from "@/features/chat/state/session-store";
 import { copyText } from "@openbuddy/platform/clipboard";
 import { baseName } from "@openbuddy/chat-core/user-text";
-import { CopyGlyph, EditGlyph, FileGlyph } from "../../shared/agent-ui/icons";
+import { CopyGlyph, EditGlyph, FileGlyph, RewindGlyph, TrashGlyph } from "../../shared/agent-ui/icons";
 
 /** Prompts longer than this fold to a few lines. */
 const LONG_PROMPT_CHARS = 800;
@@ -15,13 +15,17 @@ const FOLDED_RENDER_CHARS = 1200;
  * The user's prompt: own words plus attachment / skill chips; never injected context.
  * 编辑 opens the prompt in place; nothing is rewound until the edit is sent.
  */
-export function UserBubble({ message, onEdit, onToast }: {
+export function UserBubble({ message, onEdit, onRewind, onDelete, onToast }: {
   message: ChatMessage;
   /**
    * Restart from this prompt with new text: resend it, or (when the prompt had
    * files, which must be re-attached) put it back in the composer. Absent while a reply runs.
    */
   onEdit?: (text: string, resend: boolean) => void | Promise<void>;
+  /** 把对话与产物一起回退到这条提问之前（WorkBuddy 用户消息工具栏）。 */
+  onRewind?: () => void | Promise<void>;
+  /** 删除该消息（G1-27）：这一轮问答从对话和模型上下文里一起消失。 */
+  onDelete?: () => void | Promise<void>;
   onToast?: (msg: string) => void;
 }) {
   const text = message.parts.map((p) => (p.kind === "text" ? p.text : "")).join("\n");
@@ -118,6 +122,8 @@ export function UserBubble({ message, onEdit, onToast }: {
         {text && (
           <div className="msg__actions">
             <button type="button" className="turn-action" onClick={() => copyText(text).then(() => onToast?.("已复制"), () => onToast?.("复制失败"))} aria-label="复制" data-tip="复制"><CopyGlyph /></button>
+            {onRewind && !meta?.pending && <button type="button" className="turn-action" onClick={() => void onRewind()} aria-label="回退到此消息前" data-tip="把对话与产物回退到这条消息之前"><RewindGlyph /></button>}
+            {onDelete && !meta?.pending && <button type="button" className="turn-action turn-action--danger" onClick={() => void onDelete()} aria-label="删除该消息" data-tip="删除这一轮问答"><TrashGlyph /></button>}
             {onEdit && !meta?.pending && <button type="button" className="turn-action" onClick={startEdit} aria-label="编辑" data-tip="编辑"><EditGlyph /></button>}
           </div>
         )}

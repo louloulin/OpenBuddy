@@ -71,6 +71,39 @@ export function approvalsModule(ctx: HostContext): HostModule {
       });
       return { paths: paths.filter((path, i) => paths.indexOf(path) === i) };
     },
+    // 沙箱与网络策略 (G2-3): the hard boundary checked before every rule.
+    security_policy_get: () => settings.config.read().sandboxPolicy ?? { fileWriteAllow: [], commandAllow: [], networkAllow: [] },
+    security_policy_set: (p) => {
+      const read = (key: string) =>
+        (Array.isArray(p[key]) ? (p[key] as unknown[]) : []).map((raw) => text(raw, key).trim()).filter(Boolean);
+      const policy = {
+        fileWriteAllow: [...new Set(read("fileWriteAllow"))],
+        commandAllow: [...new Set(read("commandAllow"))],
+        networkAllow: [...new Set(read("networkAllow"))],
+      };
+      update((c) => {
+        c.sandboxPolicy = policy;
+      });
+      engine.audit.append({
+        ts: new Date().toISOString(),
+        action: "policy-change",
+        reason: `文件 ${policy.fileWriteAllow.length} 条 / 命令 ${policy.commandAllow.length} 条 / 网络 ${policy.networkAllow.length} 条`,
+        actor: "user",
+      });
+      return policy;
+    },
+    // G2-7: the user lets a withheld tool output through; the original comes back so the
+    // client can pass it on as user-provided context, and the decision is audited.
+    agent_allow_tool_content: (p) => {
+      const held = engine.permissions.allowToolContent(text(p.toolCallId));
+      if (!held) throw Error("没有待放行的工具输出");
+      return { text: held.text, toolName: held.toolName, risk: held.risk };
+    },
+    // 安全审计 (G2-5): the JSONL trail of tool calls and decisions.
+    security_audit_list: (p) => {
+      const limit = typeof p.limit === "number" && Number.isInteger(p.limit) ? p.limit : 200;
+      return { events: engine.audit.read(Math.min(Math.max(limit, 1), 1000)) };
+    },
     permission_mode_get: () => settings.config.read().permissionMode,
     permission_mode_set: (p) => {
       if (!["ask", "auto", "always-approve"].includes(String(p.mode)))

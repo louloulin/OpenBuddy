@@ -40,6 +40,7 @@ import { filterSessions, TaskFilterMenu } from "./sidebar-parts/TaskFilterMenu";
 import { SessionContextMenu } from "./sidebar-parts/SessionContextMenu";
 import { MoreDropdown } from "./sidebar-parts/MoreDropdown";
 import { useLocale } from "../../shared/i18n";
+import { ListChecks } from "lucide-react";
 import { TasksPanel } from "./TasksPanel";
 
 /** A sidebar / 更多 entry. The app builds the lists from its FeatureRegistry (pii W0.2): the former
@@ -156,6 +157,19 @@ export function Sidebar({
     isPinned: boolean;
   } | null>(null);
 
+  // G1-30 批量选择：归档/删除多个任务；删除需要一次确认。
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const exitSelection = useCallback(() => { setSelectionMode(false); setSelected(new Set()); }, []);
+  const toggleSelected = useCallback((sessionId: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) next.delete(sessionId); else next.add(sessionId);
+      return next;
+    });
+  }, []);
+
   // Flat view across both groups — used to look up a session's cwd for the
   // rename/delete/pin round-trips (the entries may live in either group).
   const allSessions = useMemo<SessionSummary[]>(
@@ -238,6 +252,47 @@ export function Sidebar({
     }
   }, [removeSession, onToast]);
 
+  /** G1-30: archive every selected task; one toast summarises partial failures. */
+  const handleBulkArchive = useCallback(async () => {
+    if (!selected.size || bulkBusy) return;
+    setBulkBusy(true);
+    const ids = [...selected];
+    let failed = 0;
+    for (const id of ids) {
+      try {
+        await agentSetSessionArchived(id, true);
+        removeSession(id);
+      } catch { failed++; }
+    }
+    setBulkBusy(false);
+    exitSelection();
+    onToast?.(failed ? `已归档 ${ids.length - failed} 个任务，${failed} 个失败` : `已归档 ${ids.length} 个任务`);
+  }, [selected, bulkBusy, removeSession, exitSelection, onToast]);
+
+  /** G1-30: delete every selected task after a single confirmation. */
+  const handleBulkDelete = useCallback(async () => {
+    if (!selected.size || bulkBusy) return;
+    const ids = [...selected];
+    const ok = await appConfirm({
+      title: `删除选中的 ${ids.length} 个任务？`,
+      message: "对话记录会从本机删除且无法恢复。如只是不想在列表中看到，可以选择归档。",
+      confirmLabel: "删除",
+      danger: true,
+    });
+    if (!ok) return;
+    setBulkBusy(true);
+    let failed = 0;
+    for (const id of ids) {
+      try {
+        await agentDeleteSession(id, allSessions.find((s) => s.sessionId === id)?.cwd);
+        removeSession(id);
+      } catch { failed++; }
+    }
+    setBulkBusy(false);
+    exitSelection();
+    onToast?.(failed ? `已删除 ${ids.length - failed} 个任务，${failed} 个失败` : `已删除 ${ids.length} 个任务`);
+  }, [selected, bulkBusy, allSessions, removeSession, exitSelection, onToast]);
+
   // Open the row's context menu anchored to its 更多 hover button.
   const openMenuFromButton = useCallback((e: React.MouseEvent, sessionId: string, sessionTitle: string, isPinned: boolean) => {
     e.preventDefault();
@@ -261,12 +316,22 @@ export function Sidebar({
         "sidebar__conv" +
         (s.sessionId === currentSessionId ? " sidebar__conv--active" : "") +
         (s.pinned ? " sidebar__conv--pinned" : "") +
+        (selectionMode ? " sidebar__conv--selecting" : "") +
+        (selected.has(s.sessionId) ? " sidebar__conv--selected" : "") +
         (working || awaiting ? " sidebar__conv--live" : "")
       }
-      onClick={() => onSelect(s.sessionId, s.cwd)}
+      onClick={() => (selectionMode ? toggleSelected(s.sessionId) : onSelect(s.sessionId, s.cwd))}
       onContextMenu={(e) => handleContextMenu(e, s.sessionId, s.title || "未命名会话", s.pinned || false)}
       title={s.title}
     >
+      {selectionMode && (
+        <span
+          className={"sidebar__conv-check" + (selected.has(s.sessionId) ? " sidebar__conv-check--on" : "")}
+          role="checkbox"
+          aria-checked={selected.has(s.sessionId)}
+          aria-label={`选择 ${s.title || "未命名会话"}`}
+        />
+      )}
       {awaiting ? (
         <span className="sidebar__conv-state sidebar__conv-state--awaiting" aria-label="待确认" />
       ) : working ? (
@@ -285,35 +350,37 @@ export function Sidebar({
       ) : (
         s.updatedAt && <span className="sidebar__conv-time">{relativeTime(s.updatedAt, locale)}</span>
       )}
-      <span className="sidebar__conv-actions" onClick={(e) => e.stopPropagation()}>
-        <span
-          role="button"
-          className="sidebar__conv-action"
-          aria-label="更多"
-          data-tip="更多"
-          onClick={(e) => openMenuFromButton(e, s.sessionId, s.title || "未命名会话", s.pinned || false)}
-        >
-          <MoreDotsIcon size="sm" />
+      {!selectionMode && (
+        <span className="sidebar__conv-actions" onClick={(e) => e.stopPropagation()}>
+          <span
+            role="button"
+            className="sidebar__conv-action"
+            aria-label="更多"
+            data-tip="更多"
+            onClick={(e) => openMenuFromButton(e, s.sessionId, s.title || "未命名会话", s.pinned || false)}
+          >
+            <MoreDotsIcon size="sm" />
+          </span>
+          <span
+            role="button"
+            className="sidebar__conv-action"
+            aria-label="归档"
+            data-tip="归档"
+            onClick={() => handleArchive(s.sessionId)}
+          >
+            <ArchiveIcon size="sm" />
+          </span>
+          <span
+            role="button"
+            className="sidebar__conv-action"
+            aria-label={s.pinned ? "取消置顶" : "置顶"}
+            data-tip={s.pinned ? "取消置顶" : "置顶"}
+            onClick={() => handlePin(s.sessionId, !s.pinned)}
+          >
+            {s.pinned ? <WbUnpinIcon size="sm" /> : <WbPinIcon size="sm" />}
+          </span>
         </span>
-        <span
-          role="button"
-          className="sidebar__conv-action"
-          aria-label="归档"
-          data-tip="归档"
-          onClick={() => handleArchive(s.sessionId)}
-        >
-          <ArchiveIcon size="sm" />
-        </span>
-        <span
-          role="button"
-          className="sidebar__conv-action"
-          aria-label={s.pinned ? "取消置顶" : "置顶"}
-          data-tip={s.pinned ? "取消置顶" : "置顶"}
-          onClick={() => handlePin(s.sessionId, !s.pinned)}
-        >
-          {s.pinned ? <WbUnpinIcon size="sm" /> : <WbPinIcon size="sm" />}
-        </span>
-      </span>
+      )}
     </button>
     );
   };
@@ -351,6 +418,15 @@ export function Sidebar({
         </button>
         <button className="sidebar__icon-btn" aria-label={t("sidebar.searchTasks")} data-tip={`${t("sidebar.searchTasks")} (${keyLabel("Mod")}+K)`} onClick={onOpenSearch}>
           <SearchIcon size="md" />
+        </button>
+        <button
+          className={"sidebar__icon-btn" + (selectionMode ? " sidebar__icon-btn--active" : "")}
+          aria-label={selectionMode ? "退出批量选择" : "批量选择任务"}
+          aria-pressed={selectionMode}
+          data-tip={selectionMode ? "退出批量选择" : "批量选择"}
+          onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
+        >
+          <ListChecks size={16} />
         </button>
         <div className="task-filter-wrap" ref={filterRef}>
           <button
@@ -550,6 +626,15 @@ export function Sidebar({
           </div>
         )}
       </div>
+
+      {selectionMode && (
+        <div className="sidebar-bulk" role="region" aria-label="批量操作">
+          <span className="sidebar-bulk__count">已选 {selected.size} 项</span>
+          <button type="button" className="sidebar-bulk__btn" disabled={!selected.size || bulkBusy} onClick={() => void handleBulkArchive()}>归档</button>
+          <button type="button" className="sidebar-bulk__btn sidebar-bulk__btn--danger" disabled={!selected.size || bulkBusy} onClick={() => void handleBulkDelete()}>删除</button>
+          <button type="button" className="sidebar-bulk__btn" onClick={exitSelection}>取消</button>
+        </div>
+      )}
 
       <div className="sidebar__footer">
         <button className="sidebar__user" onClick={() => onPlaceholder("用户中心")}>

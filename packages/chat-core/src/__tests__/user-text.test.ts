@@ -23,6 +23,12 @@ describe("parseUserText: replayed prompts show only what the user typed", () => 
     expect(parseUserText("[项目「官网」背景与规范]\n规范内容\n[用户消息]\n改首页")).toMatchObject({ text: "改首页" });
   });
 
+  it("strips the status chip prefix so the bubble shows only what the user typed", () => {
+    expect(parseUserText("【风格：专业严谨】做一张海报")).toEqual({ text: "做一张海报", attachments: [] });
+    expect(parseUserText("【风格：专业严谨 · 补图：AI 生图】做一张海报")).toEqual({ text: "做一张海报", attachments: [] });
+    expect(parseUserText("【风格：专业严谨】<openbuddy-plan-mode>\n先调研\n</openbuddy-plan-mode>\n做一张海报")).toMatchObject({ text: "做一张海报", mode: "plan" });
+  });
+
   it("leaves ordinary text untouched", () => {
     expect(parseUserText("  见 https://a.com/b 和 src/app  ")).toEqual({ text: "见 https://a.com/b 和 src/app", attachments: [] });
     expect(baseName("C:\\work\\a.txt")).toBe("a.txt");

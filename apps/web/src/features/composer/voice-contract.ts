@@ -111,7 +111,7 @@ interface SpeechRecognitionErrorEventLike {
 }
 interface SpeechSynthesisLike {
   cancel(): void;
-  speak(utter: { rate?: number; pitch?: number; lang?: string; onend?: () => void; onerror?: () => void }): void;
+  speak(utter: { rate?: number; pitch?: number; lang?: string; onend?: (() => void) | null; onerror?: (() => void) | null }): void;
 }
 
 /**

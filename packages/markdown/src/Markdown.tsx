@@ -27,6 +27,7 @@ import { rehypeCodeBlock } from "./plugins/rehype-code-block";
 import { rehypeInlineCode } from "./plugins/rehype-inline-code";
 import { rehypeFixAutolinkBoundary } from "./plugins/rehype-fix-autolink-boundary";
 import { MarkdownPre } from "./MarkdownPre";
+import { MarkdownTable } from "./TableActions";
 import { MarkdownPreMermaid } from "./MarkdownPreMermaid";
 import { MarkdownInlineCode } from "./MarkdownInlineCode";
 import type { MarkdownConfig, MarkdownProps } from "./types";
@@ -401,9 +402,11 @@ function MarkdownInner({
       }: React.TableHTMLAttributes<HTMLTableElement> & {
         children?: ReactNode;
       }) => (
-        <div className="md-table-wrapper">
+        <MarkdownTable
+          onAddToChat={config?.onTableAction ? (markdown) => config.onTableAction?.("add-to-chat", markdown) : undefined}
+        >
           <table {...tableProps}>{tableChildren}</table>
-        </div>
+        </MarkdownTable>
       ),
       code: ({
         children: codeChildren,

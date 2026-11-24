@@ -39,13 +39,13 @@ describe("actual session fork", () => {
   it("opens only the child acknowledged by Pi", async () => {
     fork.mockResolvedValue("child"); const opened = vi.fn();
     render(<TopbarActions sessionId="parent" title="Parent" onForked={opened} />);
-    fireEvent.click(screen.getByRole("button", { name: "更多操作" })); fireEvent.click(screen.getByRole("button", { name: "分叉为新会话" }));
+    fireEvent.click(screen.getByRole("button", { name: "更多操作" })); fireEvent.click(screen.getByRole("button", { name: "复制会话" }));
     await waitFor(() => expect(opened).toHaveBeenCalledWith("child")); expect(fork).toHaveBeenCalledWith("parent");
   });
   it("keeps the parent selected when Pi rejects a fork", async () => {
     fork.mockRejectedValue(new Error("session busy")); const opened = vi.fn(); const toast = vi.fn();
     render(<TopbarActions sessionId="parent" title="Parent" onForked={opened} onToast={toast} />);
-    fireEvent.click(screen.getByRole("button", { name: "更多操作" })); fireEvent.click(screen.getByRole("button", { name: "分叉为新会话" }));
-    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringContaining("分叉失败"))); expect(opened).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "更多操作" })); fireEvent.click(screen.getByRole("button", { name: "复制会话" }));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringContaining("复制会话失败"))); expect(opened).not.toHaveBeenCalled();
   });
 });

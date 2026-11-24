@@ -506,7 +506,8 @@ body { letter-spacing: -0.006em; background: var(--grok-surface); }
 .composer-annotations__chip { border-radius: var(--wb-radius-pill); border-color: var(--grok-line); background: var(--wb-bg-secondary); }
 
 /* ---------- chat ---------- */
-.chatview__inner { max-width: 780px; padding: 28px 24px 12px; }
+/* WorkBuddy 实机对齐：消息列与输入卡同宽，内容区居中。 */
+.chatview__inner { max-width: 54.5rem; padding: 28px 24px 12px; }
 .turn { padding: 0 8px; }
 .turn__head { margin-bottom: 8px; }
 .turn .msg__name { font-size: 13px; font-weight: 550; }

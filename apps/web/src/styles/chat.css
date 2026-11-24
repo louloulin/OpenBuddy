@@ -55,6 +55,8 @@
 .turn .msg__name { font-size: 13px; font-weight: 500; color: var(--wb-text-strong); }
 .turn__status { font-size: 12px; color: var(--wb-text-weak); }
 .turn__elapsed { font-variant-numeric: tabular-nums; }
+/* 完成后的用时与名称同行（WorkBuddy：已完成 1m9s）。 */
+.turn__done { font-size: 0.75rem; color: var(--wb-text-weak); font-variant-numeric: tabular-nums; }
 .turn__body { padding-left: 32px; font-size: 14px; line-height: 25px; color: var(--wb-text-strong); min-width: 0; }
 .turn__body code:not(pre code) { background: var(--wb-bg-tertiary); border-radius: 3px; padding: 0 4px; }
 
@@ -122,6 +124,8 @@
 }
 .turn-action:hover { background: var(--wb-bg-hover); color: var(--wb-text-strong); }
 .turn-action--active { color: var(--wb-color-text-brand-default); }
+.turn-action--danger:hover { color: var(--wb-text-error, #b42318); }
+.turn-action--text { width: auto; padding: 0 0.625rem; font-size: 0.8125rem; color: var(--wb-text-strong); }
 .turn-action__menu { position: relative; display: inline-flex; }
 .turn-menu {
   position: absolute; left: 0; bottom: 32px; z-index: 50; min-width: 148px; padding: 4px;
@@ -133,6 +137,8 @@
   color: var(--wb-text-strong); font-size: 13px; text-align: left; cursor: pointer;
 }
 .turn-menu button:hover { background: var(--wb-bg-hover); }
+.turn-menu__group { display: flex; flex-direction: column; margin-top: 0.25rem; padding-top: 0.25rem; border-top: var(--wb-hairline) solid var(--wb-border-default); }
+.turn-menu__group-label { padding: 0.25rem 0.625rem 0.125rem; font-size: 0.6875rem; color: var(--wb-text-weak); }
 .turn__meta { margin-left: 8px; font-size: 12px; color: var(--wb-text-weak); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- approval card ---------- */
@@ -457,14 +463,18 @@
 .turn-sources__link:hover { text-decoration: underline; }
 .turn-sources__host { color: var(--wb-text-tertiary); font-size: 0.7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.turn-followups { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-top: 0.35rem; }
+/* WorkBuddy 的「接下来做」：每条建议独占一行，左对齐纵向排列。 */
+.turn-followups { display: flex; flex-direction: column; align-items: flex-start; gap: 0.3rem; margin-top: 0.35rem; position: relative; width: fit-content; max-width: 100%; }
 .turn-followups__chip {
   border: 0.0625rem solid var(--grok-line, var(--wb-border-default));
-  border-radius: 999px; background: var(--wb-bg-secondary); color: var(--wb-text-medium);
+  border-radius: 62.4375rem; background: var(--wb-bg-secondary); color: var(--wb-text-medium);
   padding: 0.25rem 0.65rem; font-size: 0.76rem; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 0.25rem;
 }
+/* WorkBuddy 的建议 chip 末尾带一个小箭头，指向「下一步」。 */
+.turn-followups__arrow { font-size: 0.7rem; opacity: 0.6; }
 .turn-followups__chip:hover { background: var(--grok-hover, var(--wb-bg-hover)); color: var(--wb-text-strong); }
-.turn-followups__close { border: none; background: none; color: var(--wb-text-tertiary); cursor: pointer; padding: 0 0.25rem; font-size: 0.9rem; }
+.turn-followups__close { position: absolute; top: 0; left: calc(100% + 0.25rem); border: none; background: none; color: var(--wb-text-tertiary); cursor: pointer; padding: 0 0.25rem; font-size: 0.9rem; }
 
 .background-tasks {
   margin: 0 0 0.4rem; padding: 0.4rem 0.6rem;
@@ -481,3 +491,33 @@
 .background-tasks__stop { flex: none; border: none; background: none; color: var(--wb-text-tertiary); font-size: 0.72rem; cursor: pointer; }
 .background-tasks__stop:hover { color: #b42318; }
 .background-tasks__item--done .background-tasks__title { color: var(--wb-text-tertiary); }
+
+/* 工具内容注入审查卡 (G2-7)：引擎拦下工具输出时的提示。 */
+.tool-risk {
+  border: var(--wb-hairline) solid var(--wb-border-default);
+  border-radius: 0.75rem;
+  background: var(--wb-bg-secondary);
+  padding: 0.625rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.tool-risk--high { border-color: color-mix(in srgb, #b42318 34%, var(--wb-border-default)); }
+.tool-risk__head { display: flex; align-items: center; gap: 0.375rem; font-size: 0.75rem; color: var(--wb-text-strong); }
+.tool-risk__head svg { color: #b42318; }
+.tool-risk__tool { font-size: 0.6875rem; color: var(--wb-text-tertiary); }
+.tool-risk__reason { margin: 0; font-size: 0.75rem; color: var(--wb-text-medium); }
+.tool-risk__excerpt {
+  margin: 0; padding: 0.375rem 0.5rem; border-radius: 0.5rem; background: var(--wb-bg-tertiary);
+  color: var(--wb-text-tertiary); font-family: var(--wb-font-code-family, ui-monospace, monospace); font-size: 0.6875rem;
+  line-height: 1.5; word-break: break-word;
+}
+.tool-risk__actions { display: flex; gap: 0.375rem; }
+.tool-risk__btn {
+  height: 1.625rem; padding: 0 0.625rem; border: var(--wb-hairline) solid var(--wb-border-default); border-radius: var(--wb-radius-pill);
+  background: transparent; color: var(--wb-text-strong); font-size: 0.6875rem; cursor: pointer;
+}
+.tool-risk__btn:hover:not(:disabled) { background: var(--wb-bg-hover); }
+.tool-risk__btn--ghost { color: var(--wb-text-tertiary); }
+.tool-risk__btn:disabled { opacity: 0.45; cursor: default; }
+.tool-risk__error { margin: 0; font-size: 0.6875rem; color: var(--wb-text-error, #b42318); }

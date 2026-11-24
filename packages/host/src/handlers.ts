@@ -27,7 +27,7 @@ export async function createEngineHandlers(options: EngineOptions) {
     (url) => options.shell.openExternal(url),
     options.extensionFactories,
     undefined, // default pool limits
-    options.shell.trash ? (path) => options.shell.trash!(path) : undefined,
+    options.shell.trash ? (path: string) => options.shell.trash!(path) : undefined,
   );
   await engine.initialize();
   currentSessionId = () => engine.currentSessionId;

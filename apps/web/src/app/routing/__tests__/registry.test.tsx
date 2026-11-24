@@ -59,11 +59,11 @@ describe("FeatureRegistry (pii W0.2)", () => {
   });
 
   it("only mounts the settings sections the host can serve", () => {
-    // W6.3 order: 通用 → 模型 → 助理 → 智能体 → 安全 → 个性化 → 记忆 → 快捷键 → 邮箱 → 数据 → 手机接入 → 帮助 → 关于
+    // W6.3 order: 通用 → 模型 → 助理 → 智能体 → 安全 → 个性化 → 记忆 → 快捷键 → 对话流 → 邮箱 → 数据 → 手机接入 → 帮助 → 关于
     // (账户管理下线，D8). memory lights up since W5.1; 手机接入 needs the desktop pairing host.
-    expect(settingsSections(FEATURES, desktop).map((s) => s.id)).toEqual(["general", "model", "assistant", "agent-settings", "security", "personalize", "memory", "shortcuts", "agent-mail", "data", "mobile", "help", "about"]);
+    expect(settingsSections(FEATURES, desktop).map((s) => s.id)).toEqual(["general", "model", "assistant", "agent-settings", "security", "personalize", "memory", "shortcuts", "conversation", "agent-mail", "data", "mobile", "help", "about"]);
     // Browser-only preview: no host answer, only sections that need no command.
-    expect(settingsSections(FEATURES, snapshot([], [], "unavailable")).map((s) => s.id)).toEqual(["general", "personalize", "shortcuts", "data", "help", "about"]);
+    expect(settingsSections(FEATURES, snapshot([], [], "unavailable")).map((s) => s.id)).toEqual(["general", "personalize", "shortcuts", "conversation", "data", "help", "about"]);
   });
 
   it("returns false while loading and never shows offline entries", () => {
