@@ -5,6 +5,7 @@ import { friendlyError } from "@openbuddy/chat-core/error-format";
 import { codeLanguage } from "@/shared/lib/files/file-kind";
 import { Markdown } from "@openbuddy/markdown";
 import { FilePreview } from "./FilePreview";
+import { MermaidView } from "./MermaidView";
 import { useTheme } from "@openbuddy/ui/ThemeProvider";
 import { benchKind, fence, imageMime, isBinaryLoaded, isTextKind, KIND_LABEL, parseCsv, type BenchKind } from "./bench-kind";
 
@@ -64,7 +65,8 @@ export function ArtifactPreview({ path, version, mode, onModeChange, onSelectTex
     return loaded.text;
   }, [loaded?.text, kind, mode, name]);
 
-  const toolbar = (kind === "markdown" || kind === "html") && (
+  // 图表 (G3-1) 也和 markdown/html 一样可以在「预览 / 源码」之间切换。
+  const toolbar = (kind === "markdown" || kind === "html" || kind === "mermaid" || kind === "diagram") && (
     <div className="bench-preview__toolbar">
       <div className="bench-seg" role="tablist" aria-label="显示方式">
         <button type="button" role="tab" aria-selected={mode === "rendered"} className={"bench-seg__opt" + (mode === "rendered" ? " bench-seg__opt--on" : "")} onClick={() => onModeChange("rendered")}>预览</button>
@@ -132,6 +134,30 @@ export function ArtifactPreview({ path, version, mode, onModeChange, onSelectTex
   }
   if (kind === "docx" || kind === "pptx" || kind === "sheet") {
     return <div className="bench-preview bench-preview--doc"><FilePreview filename={name} content={loaded.base64 ?? ""} /></div>;
+  }
+  if (kind === "mermaid") {
+    return (
+      <div className="bench-preview bench-preview--diagram">
+        {mode === "source"
+          ? <pre className="bench-code">{loaded.text ?? ""}</pre>
+          : <MermaidView source={loaded.text ?? ""} />}
+      </div>
+    );
+  }
+  if (kind === "diagram") {
+    // drawio / excalidraw 是压缩或自定义结构，这里诚实说明：可直接打开、也可以看源码。
+    return (
+      <div className="bench-preview bench-preview--diagram">
+        {mode === "source"
+          ? <pre className="bench-code">{loaded.text ?? ""}</pre>
+          : (
+            <div className="bench-empty">
+              <div className="bench-empty__title">{KIND_LABEL[kind]}暂不支持内嵌预览</div>
+              <div className="bench-empty__hint">drawio / excalidraw 是结构化图表文件；可用默认应用打开编辑，或切到「源码」查看内容。</div>
+            </div>
+          )}
+      </div>
+    );
   }
   if (kind === "csv") {
     const rows = parseCsv(loaded.text ?? "");

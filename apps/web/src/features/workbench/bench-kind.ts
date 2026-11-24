@@ -1,7 +1,7 @@
 /** What the artifact panel can do with a file, by extension. */
 export type BenchKind =
   | "markdown" | "html" | "image" | "pdf" | "docx" | "pptx" | "sheet"
-  | "csv" | "json" | "code" | "text" | "audio" | "video" | "binary";
+  | "csv" | "json" | "code" | "text" | "audio" | "video" | "mermaid" | "diagram" | "binary";
 
 const EXT: Record<string, BenchKind> = {
   md: "markdown", markdown: "markdown", mdx: "markdown",
@@ -10,6 +10,8 @@ const EXT: Record<string, BenchKind> = {
   pdf: "pdf", docx: "docx", pptx: "pptx", xlsx: "sheet", xls: "sheet",
   csv: "csv", tsv: "csv", json: "json", jsonl: "text",
   txt: "text", log: "text", rst: "text", env: "text", ini: "text", conf: "text",
+  // 图表 (G3-1): mermaid 直接渲染，drawio/excalidraw 是结构化图表文件。
+  mmd: "mermaid", mermaid: "mermaid", drawio: "diagram", excalidraw: "diagram",
   mp3: "audio", wav: "audio", ogg: "audio", m4a: "audio", flac: "audio",
   mp4: "video", webm: "video", mov: "video",
 };
@@ -34,19 +36,21 @@ export function benchKind(path: string): BenchKind {
 }
 
 /** Text the user can edit in place (and the agent can be asked to change). */
-export const isTextKind = (kind: BenchKind) => ["markdown", "html", "csv", "json", "code", "text"].includes(kind);
+export const isTextKind = (kind: BenchKind) =>
+  ["markdown", "html", "csv", "json", "code", "text", "mermaid", "diagram"].includes(kind);
 /** Loaded as base64 bytes rather than text. */
 export const isBinaryLoaded = (kind: BenchKind) => ["image", "docx", "pptx", "sheet"].includes(kind);
 
 /** Short monogram for file icons. */
 export const KIND_GLYPH: Record<BenchKind, string> = {
   markdown: "MD", html: "</>", image: "IMG", pdf: "PDF", docx: "DOC", pptx: "PPT", sheet: "XLS",
-  csv: "CSV", json: "{ }", code: "</>", text: "TXT", audio: "♪", video: "▶", binary: "BIN",
+  csv: "CSV", json: "{ }", code: "</>", text: "TXT", audio: "♪", video: "▶", mermaid: "◇", diagram: "◇", binary: "BIN",
 };
 
 export const KIND_LABEL: Record<BenchKind, string> = {
   markdown: "Markdown", html: "网页", image: "图片", pdf: "PDF", docx: "Word", pptx: "PPT", sheet: "表格",
-  csv: "CSV", json: "JSON", code: "代码", text: "文本", audio: "音频", video: "视频", binary: "文件",
+  csv: "CSV", json: "JSON", code: "代码", text: "文本", audio: "音频", video: "视频",
+  mermaid: "Mermaid 图", diagram: "图表", binary: "文件",
 };
 
 const MIME: Record<string, string> = {

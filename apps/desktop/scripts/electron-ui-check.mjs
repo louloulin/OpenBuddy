@@ -358,6 +358,21 @@ try {
   await page.screenshot({ path: 'release/ui-reference-menu.png' });
   await page.keyboard.press('Escape');
   checkpoint('reference menu lists a workspace file', {});
+  // G3-1: a real .mmd file in the workspace renders as an SVG diagram in the workbench.
+  await writeFile(join(init.cwd, 'ui-diagram.mmd'), 'graph TD\n  A[开始] --> B{判断}\n  B -->|是| C[完成]\n  B -->|否| D[重试]\n');
+  await page.getByRole('button', { name: '展开右侧栏' }).click();
+  await page.getByRole('tab', { name: '文件' }).click();
+  await page.getByText('ui-diagram.mmd', { exact: true }).click();
+  await page.locator('.af-mermaid svg').waitFor({ timeout: 20000 });
+  const diagramSvg = await page.evaluate(() => {
+    const svg = document.querySelector('.af-mermaid svg');
+    return svg ? { tag: svg.tagName, bytes: Math.round((svg.outerHTML || '').length) } : null;
+  });
+  assert.ok(diagramSvg && diagramSvg.bytes > 200, 'the mermaid artifact renders an SVG');
+  await page.screenshot({ path: 'release/ui-mermaid.png' });
+  checkpoint('a mermaid artifact renders as an SVG diagram', diagramSvg);
+  await page.getByRole('button', { name: '收起右侧栏' }).click();
+
   const beforeFiles = await app.evaluate(() => globalThis.__ipcAudit.length);
   await writeFile(join(init.cwd, 'ui-local-marker.txt'), 'local listing fixture');
   const more = page.getByRole('button', { name: /更多.*文件/ });

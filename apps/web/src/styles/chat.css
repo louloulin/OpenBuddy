@@ -549,3 +549,15 @@
   position: absolute; top: 0; right: 0; bottom: 0; width: min(22rem, 80%); padding: 0.75rem; overflow: auto;
   border-left: var(--wb-hairline) solid var(--wb-border-default); background: var(--wb-bg-primary);
 }
+
+/* 图表产物预览 (G3-1)：mermaid 渲染与源码兜底。 */
+.bench-preview--diagram { padding: 1rem; overflow: auto; }
+.af-mermaid { display: flex; justify-content: center; padding: 1rem; overflow: auto; }
+.af-mermaid svg { max-width: 100%; height: auto; }
+.af-mermaid__hint { padding: 0.75rem; font-size: 0.8125rem; color: var(--wb-text-tertiary); }
+.af-mermaid--error { flex-direction: column; align-items: stretch; }
+.af-mermaid__source {
+  margin: 0.5rem 0 0; padding: 0.5rem; border-radius: 0.5rem; background: var(--wb-bg-secondary);
+  font-family: var(--wb-font-code-family, ui-monospace, monospace); font-size: 0.6875rem;
+  white-space: pre-wrap; max-height: 16rem; overflow: auto;
+}
