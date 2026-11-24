@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { CloseIcon } from "@openbuddy/ui/icon/icons/index";
 import { pathStat, type ArtifactInfo } from "@openbuddy/client/agent-client";
 import { ArtifactPreview, useFileContent, type PreviewMode } from "./ArtifactPreview";
+import { VersionHistoryPanel } from "./VersionHistoryPanel";
 import { ArtifactFallbackBody, useArtifactFallback } from "./ArtifactFallback";
 import { ArtifactShare } from "./ArtifactShare";
 import { benchKind, formatSize, isTextKind, KIND_LABEL } from "./bench-kind";
@@ -23,6 +24,8 @@ export function ArtifactReader({ path, sessionId, info, version, onClose, onToas
   const name = path.split(/[\\/]/).pop() ?? path;
   const [mode, setMode] = useState<PreviewMode>("rendered");
   const [shareOpen, setShareOpen] = useState(false);
+  /** 版本历史 (G3-2): the checkpoint timeline of this file. */
+  const [historyOpen, setHistoryOpen] = useState(false);
   /** Removed while the reader is open (B3d): switch to the checkpoint body live. */
   const [vanished, setVanished] = useState(false);
   const loaded = useFileContent(path, kind, version);
@@ -67,6 +70,7 @@ export function ArtifactReader({ path, sessionId, info, version, onClose, onToas
             <span className="bench-reader__meta">{meta}</span>
           </div>
           <div className="bench-reader__actions">
+            <button type="button" className="bench-btn" onClick={() => setHistoryOpen((open) => !open)}>版本历史</button>
             <button type="button" className="bench-btn" onClick={() => setShareOpen(true)}>分享</button>
             <button type="button" className="bench-icon" aria-label="关闭独立阅读" data-tip="关闭" onClick={onClose}>
               <CloseIcon size={16} />
@@ -87,6 +91,11 @@ export function ArtifactReader({ path, sessionId, info, version, onClose, onToas
           )}
         </div>
       </section>
+      {historyOpen && (
+        <aside className="bench-reader__history" aria-label="版本历史">
+          <VersionHistoryPanel sessionId={sessionId} path={path} onToast={onToast} />
+        </aside>
+      )}
       {shareOpen && <ArtifactShare path={path} available={!gone} onClose={() => setShareOpen(false)} onToast={onToast} />}
     </div>
   );

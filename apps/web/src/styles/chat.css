@@ -521,3 +521,31 @@
 .tool-risk__btn--ghost { color: var(--wb-text-tertiary); }
 .tool-risk__btn:disabled { opacity: 0.45; cursor: default; }
 .tool-risk__error { margin: 0; font-size: 0.6875rem; color: var(--wb-text-error, #b42318); }
+
+/* 产物版本历史 (G3-2)：checkpoint 时间线 + 预览 + 还原。 */
+.ver-history { display: flex; flex-direction: column; gap: 0.5rem; }
+.ver-history__empty { padding: 0.75rem; font-size: 0.75rem; color: var(--wb-text-tertiary); }
+.ver-history__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.ver-history__item { padding: 0.5rem 0; border-bottom: var(--wb-hairline) solid var(--wb-border-default); }
+.ver-history__meta { display: flex; align-items: center; gap: 0.375rem; font-size: 0.6875rem; color: var(--wb-text-tertiary); }
+.ver-history__source { padding: 0 0.375rem; border-radius: var(--wb-radius-pill); background: var(--wb-bg-secondary); }
+.ver-history__path { font-family: var(--wb-font-code-family, ui-monospace, monospace); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ver-history__actions { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.375rem; }
+.ver-history__btn {
+  height: 1.5rem; padding: 0 0.5rem; border: var(--wb-hairline) solid var(--wb-border-default); border-radius: var(--wb-radius-pill);
+  background: transparent; color: var(--wb-text-strong); font-size: 0.6875rem; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 0.25rem;
+}
+.ver-history__btn:hover:not(:disabled) { background: var(--wb-bg-hover); }
+.ver-history__btn--restore { color: var(--wb-text-strong); }
+.ver-history__btn:disabled { opacity: 0.45; cursor: default; }
+.ver-history__preview {
+  margin: 0; padding: 0.5rem; border-radius: 0.5rem; background: var(--wb-bg-secondary); color: var(--wb-text-medium);
+  font-family: var(--wb-font-code-family, ui-monospace, monospace); font-size: 0.6875rem; line-height: 1.5;
+  white-space: pre-wrap; word-break: break-word; max-height: 18rem; overflow: auto;
+}
+.ver-history__preview-head { display: flex; align-items: center; gap: 0.375rem; margin-bottom: 0.375rem; color: var(--wb-text-tertiary); }
+.bench-reader__history {
+  position: absolute; top: 0; right: 0; bottom: 0; width: min(22rem, 80%); padding: 0.75rem; overflow: auto;
+  border-left: var(--wb-hairline) solid var(--wb-border-default); background: var(--wb-bg-primary);
+}
