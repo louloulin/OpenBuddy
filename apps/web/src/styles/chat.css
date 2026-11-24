@@ -561,3 +561,13 @@
   font-family: var(--wb-font-code-family, ui-monospace, monospace); font-size: 0.6875rem;
   white-space: pre-wrap; max-height: 16rem; overflow: auto;
 }
+
+/* 产物重命名 (G3-7)：行内输入 + 冲突提示。 */
+.bench-rename { display: flex; align-items: center; gap: 0.375rem; flex: 1; min-width: 0; padding: 0 0.25rem; }
+.bench-rename__input {
+  flex: 1; min-width: 10rem; height: 1.75rem; padding: 0 0.5rem;
+  border: var(--wb-hairline) solid var(--wb-border-default); border-radius: 0.375rem;
+  background: var(--wb-bg-primary); color: var(--wb-text-strong); font: inherit; font-size: 0.8125rem;
+}
+.bench-rename__input:focus-visible { outline: var(--wb-outline-2) solid var(--wb-border-focus); outline-offset: 0.0625rem; }
+.bench-rename__error { font-size: 0.75rem; color: var(--wb-text-error, #b42318); }

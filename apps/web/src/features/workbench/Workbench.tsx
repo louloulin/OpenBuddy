@@ -245,7 +245,14 @@ export function Workbench({ sessionId, cwd, artifacts, version, toolCall, focus,
             sessionId={sessionId}
             info={byPath.get(activeFile)}
             version={version}
+            cwd={cwd}
             onChanged={onRefresh}
+            onRenamed={(next) => {
+              // G3-7: swap the tab (and the open preview) over to the new path.
+              setFiles((list) => list.map((item) => (item === activeFile ? next : item)));
+              setActive(`file:${next}`);
+              onRefresh();
+            }}
             onAddToChat={onAddToChat}
             onAskEdit={onAskEdit}
             onShowChanges={(p) => { setChangesPath(p); setActive("changes"); }}

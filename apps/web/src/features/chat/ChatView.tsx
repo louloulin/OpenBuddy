@@ -9,6 +9,7 @@ import { findToolCall } from "@openbuddy/chat-core/session-artifacts";
 import type { ArtifactInfo } from "@openbuddy/client/agent-client";
 import { useArtifactsStore, selectArtifacts, selectArtifactsVersion } from "@/features/workbench/state/artifacts-store";
 import { Workbench, type BenchTarget } from "../workbench/Workbench";
+import { takePendingArtifact } from "@/shared/state/artifact-window-route";
 import { filesTouchedBy, revertToolCalls } from "../workbench/revert";
 import { ArtifactsContext, type ArtifactsApi } from "./ArtifactCards";
 import { appConfirm, appConfirmWithOption } from "../../shared/ui/AppDialog";
@@ -282,6 +283,14 @@ export function ChatView({
     showBench({ kind: "tool" });
   }, [showBench]);
   const handleOpenArtifacts = useCallback(() => showBench({ kind: "list" }), [showBench]);
+  // G3-3: a window opened with `#/artifact/…` shows that file straight away.
+  useEffect(() => {
+    if (!sessionId) return;
+    const path = takePendingArtifact(sessionId);
+    if (!path) return;
+    setPanelOpen(true);
+    setBenchFocus({ kind: "file", path });
+  }, [sessionId]);
   // Ctrl/Cmd+\ toggles the panel (§5.10).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

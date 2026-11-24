@@ -12,6 +12,8 @@ export type NativeOptions = {
   mobileGateway?: MobileGateway;
   /** 窗口与唤起 (W7): main-process window factory + global quick-input shortcut. */
   openSessionWindow?: (sessionId: string) => void;
+  /** G3-3: an artifact in its own window (side-by-side reading). */
+  openArtifactWindow?: (sessionId: string, path: string) => void;
   openQuickWindow?: () => void;
   quickShortcut?: { get(): string; set(accelerator: string): boolean };
 };

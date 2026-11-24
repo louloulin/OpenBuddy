@@ -4,6 +4,7 @@ import {
   open,
   readdir,
   realpath,
+  rename,
   stat,
   writeFile,
 } from "node:fs/promises";
@@ -126,6 +127,25 @@ export function fileHandlers(shell: DesktopShell, getWorkspace: () => string) {
         mode: 0o600,
       });
       return path;
+    },
+    // 产物重命名 (G3-7): workspace-scoped, refuses to overwrite an existing file.
+    rename_path: async (p: Record<string, unknown>) => {
+      const root = text(p.workspaceRoot);
+      if (!isAbsolute(root)) throw Error("工作区必须为绝对路径");
+      if ((await realpath(root)) !== (await realpath(getWorkspace())))
+        throw Error("工作区不匹配当前会话");
+      const from = await workspacePath(root, text(p.from, "from"));
+      const to = await workspacePath(root, text(p.to, "to"));
+      if (from === to) return to;
+      try {
+        await stat(to);
+        throw Error("同名文件已存在，换个名字再试");
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+      await mkdir(dirname(to), { recursive: true });
+      await rename(from, to);
+      return to;
     },
     list_dir: async (p: Record<string, unknown>) => {
       const path = pathOf(p),

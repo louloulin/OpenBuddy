@@ -247,6 +247,9 @@ app.whenReady().then(async () => {
       ...(mobileGateway ? { mobileGateway } : {}),
       // 独立窗口 (W7.1) + 全局快速输入 (W7.2).
       openSessionWindow: (sessionId: string) => { void createWindow(`/session/${encodeURIComponent(sessionId)}`); },
+      openArtifactWindow: (sessionId: string, path: string) => {
+        void createWindow(`/artifact/${encodeURIComponent(sessionId)}?path=${encodeURIComponent(path)}`);
+      },
       openQuickWindow: () => { void openQuickWindow(); },
       quickShortcut: { get: () => readQuickShortcut(), set: accelerator => registerQuickShortcut(accelerator) },
     },

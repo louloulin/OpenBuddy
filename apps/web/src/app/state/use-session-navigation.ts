@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { parseArtifactRoute } from "@/shared/state/artifact-window-route";
 import { useSessionsStore } from "@/features/sessions/state/sessions-store";
 import { useSessionStore } from "@/features/chat/state/session-store";
 import { agentRenameSession } from "@openbuddy/client/agent-client";
@@ -47,6 +48,10 @@ export function useSessionNavigation(options: {
 export function useSessionRoute(ready: boolean, open: (sessionId: string) => void): void {
   useEffect(() => {
     if (!ready) return;
+    // G3-3: `#/artifact/<sessionId>?path=…` also names a session — the artifact window
+    // must load it before ChatView can show the file.
+    const artifact = parseArtifactRoute(window.location.hash);
+    if (artifact) { open(artifact.sessionId); return; }
     const match = window.location.hash.match(/^#\/session\/([^/?#]+)$/);
     if (match) open(decodeURIComponent(match[1]));
     // eslint-disable-next-line react-hooks/exhaustive-deps

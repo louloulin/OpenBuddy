@@ -21,6 +21,13 @@ export function windowCommands(ctx: NativeContext): CommandHandlers {
       if (!ctx.options.openSessionWindow) throw new Error('not_supported: window_open_session');
       ctx.options.openSessionWindow(sessionId);
     },
+    // 产物独立窗口 (G3-3): open the same artifact in its own window for side-by-side reading.
+    window_open_artifact: payload => {
+      const sessionId = String(payload.sessionId);
+      const path = String(payload.path);
+      if (!ctx.options.openArtifactWindow) throw new Error('not_supported: window_open_artifact');
+      ctx.options.openArtifactWindow(sessionId, path);
+    },
     window_open_quick: () => {
       if (!ctx.options.openQuickWindow) throw new Error('not_supported: window_open_quick');
       ctx.options.openQuickWindow();

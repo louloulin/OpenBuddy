@@ -3,6 +3,7 @@ import { MoreHorizontal, ExternalLink, Pencil, Save, X } from "lucide-react";
 import { invoke, save as saveDialog } from "@openbuddy/client/ipc";
 import { artifactSave, checkpointList, checkpointRead, checkpointRestore, exportTextFile, type ArtifactInfo, type CheckpointRecord } from "@openbuddy/client/agent-client";
 import { copyText } from "@openbuddy/platform/clipboard";
+import { renamePath } from "@openbuddy/client/api/files";
 import { friendlyError } from "@openbuddy/chat-core/error-format";
 import { appConfirm } from "../../shared/ui/AppDialog";
 import { ArtifactPreview, useFileContent, type PreviewMode } from "./ArtifactPreview";
@@ -19,10 +20,14 @@ function clock(ms: number): string {
 const SOURCE_LABEL: Record<CheckpointRecord["source"], string> = { tool: "Buddy 修改", user: "你的编辑", restore: "还原前", apply: "从回答应用" };
 
 /** One artifact tab: title bar with actions, then preview / editor / versions. */
-export function ArtifactViewer({ path, sessionId, info, version, onChanged, onAddToChat, onAskEdit, onShowChanges, onToast }: {
+export function ArtifactViewer({ path, sessionId, info, version, cwd, onChanged, onRenamed, onAddToChat, onAskEdit, onShowChanges, onToast }: {
   path: string;
   sessionId: string;
   info?: ArtifactInfo;
+  /** Task workspace root: rename is scoped to it (G3-7). */
+  cwd?: string;
+  /** The file was renamed: the workbench moves the tab to the new path. */
+  onRenamed?: (nextPath: string) => void;
   /** Bumped when the file changes (agent writes, restores). */
   version: number;
   onChanged: () => void;
@@ -38,6 +43,9 @@ export function ArtifactViewer({ path, sessionId, info, version, onChanged, onAd
   const [readerOpen, setReaderOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  /** G3-7: inline rename (name only, same folder) with a conflict message. */
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameError, setRenameError] = useState<string | null>(null);
   const [selected, setSelected] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
   // 外部修改检测 (U1.9): compare size + mtime from path_stat against the last loaded version.
@@ -115,6 +123,22 @@ export function ArtifactViewer({ path, sessionId, info, version, onChanged, onAd
       onToast("已另存");
     } catch (e) { onToast(`另存失败：${friendlyError(e)}`); }
   };
+  const commitRename = async () => {
+    if (!cwd || !renaming) return;
+    const next = renaming.trim();
+    if (!next || next === name) { setRenaming(null); setRenameError(null); return; }
+    const dir = path.slice(0, Math.max(0, path.length - name.length));
+    const target = `${dir}${next}`;
+    try {
+      await renamePath(cwd, path, target);
+      setRenaming(null);
+      setRenameError(null);
+      onToast("已重命名；版本历史仍按原路径记录");
+      onRenamed?.(target);
+    } catch (error) {
+      setRenameError(friendlyError(error));
+    }
+  };
   const status = info ? (info.exists ? (info.status === "created" ? "新建" : "修改") : "已删除") : "";
   /** Known to be gone (reverted / deleted / removed outside): don't try to read it. */
   const gone = info?.exists === false || vanished;
@@ -128,6 +152,7 @@ export function ArtifactViewer({ path, sessionId, info, version, onChanged, onAd
     { label: "加入对话", run: () => onAddToChat(path) },
     { label: kind === "markdown" ? "复制 Markdown" : "复制内容", run: () => void copyContent(), hidden: !isTextKind(kind) },
     { label: "另存为…", run: () => void saveAs(), hidden: !isTextKind(kind) },
+    { label: "重命名…", run: () => { setRenameError(null); setRenaming(name); }, hidden: !cwd },
     { label: "独立阅读", run: () => setReaderOpen(true) },
     { label: "分享…", run: () => setShareOpen(true) },
     { label: "版本历史", run: () => setView("versions") },
@@ -137,12 +162,31 @@ export function ArtifactViewer({ path, sessionId, info, version, onChanged, onAd
   return (
     <div className="bench-viewer">
       <div className="bench-viewer__bar">
-        <div className="bench-viewer__title" title={path}>
-          <span className="bench-viewer__name">{name}</span>
-          <span className="bench-viewer__meta">
-            {[status, stats, KIND_LABEL[kind], formatSize(info?.size)].filter(Boolean).join(" · ")}
-          </span>
-        </div>
+        {renaming !== null ? (
+          <form
+            className="bench-rename"
+            onSubmit={(event) => { event.preventDefault(); void commitRename(); }}
+          >
+            <input
+              className="bench-rename__input"
+              aria-label="新文件名"
+              value={renaming}
+              autoFocus
+              onChange={(event) => setRenaming(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Escape") { setRenaming(null); setRenameError(null); } }}
+            />
+            <button type="submit" className="bench-btn">确定</button>
+            <button type="button" className="bench-btn" onClick={() => { setRenaming(null); setRenameError(null); }}>取消</button>
+            {renameError && <span className="bench-rename__error" role="alert">{renameError}</span>}
+          </form>
+        ) : (
+          <div className="bench-viewer__title" title={path}>
+            <span className="bench-viewer__name">{name}</span>
+            <span className="bench-viewer__meta">
+              {[status, stats, KIND_LABEL[kind], formatSize(info?.size)].filter(Boolean).join(" · ")}
+            </span>
+          </div>
+        )}
         {view === "edit" ? null : (
           <>
             {isTextKind(kind) && !gone && (

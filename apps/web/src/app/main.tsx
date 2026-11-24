@@ -17,6 +17,7 @@ import { applyLocale } from "../shared/i18n";
 import { installTerminalBridge } from "../features/chat/state/terminal-bridge";
 import { installWebVoiceProviders } from "../features/composer/voice-web";
 import { QuickInput } from "./quick/QuickInput";
+import { rememberArtifactRoute } from "@/shared/state/artifact-window-route";
 
 applyUiPreferences();
 applyLocale();
@@ -29,6 +30,8 @@ installWebVoiceProviders();
 const container = document.getElementById("root")!;
 /** 全局快速输入窗口 (W7.2): only the small composer, never the full app. */
 const isQuickWindow = window.location.hash.startsWith("#/quick");
+// G3-3 产物独立窗口: remember `#/artifact/<sessionId>?path=…` before App mounts.
+rememberArtifactRoute(window.location.hash);
 
 /**
  * Boot order matters: the renderer's api calls run as soon as App mounts, so

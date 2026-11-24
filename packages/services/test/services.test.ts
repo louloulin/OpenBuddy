@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, expect, it } from "vitest";
-import { mkdtemp, mkdir, readFile, rm, symlink } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, rm, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createEngineHandlers } from "@openbuddy/host/handlers";
@@ -96,6 +96,29 @@ it("rejects parent traversal and symlink escapes before creating outside directo
     content: "alias-safe",
   });
   expect(await readFile(String(aliased), "utf8")).toBe("alias-safe");
+});
+it("renames inside the workspace, refusing overwrite and traversal (G3-7)", async () => {
+  const f = await setup();
+  const workspace = join(f.root, "workspace");
+  await mkdir(workspace);
+  await f.call("agent_init", { cwd: workspace });
+  await f.call("write_text_file", { workspaceRoot: workspace, path: "a.md", content: "one" });
+  await f.call("write_text_file", { workspaceRoot: workspace, path: "b.md", content: "two" });
+  const renamed = await f.call("rename_path", { workspaceRoot: workspace, from: "a.md", to: "c.md" });
+  expect(await realpath(String(renamed))).toBe(await realpath(join(workspace, "c.md")));
+  expect(await readFile(join(workspace, "c.md"), "utf8")).toBe("one");
+  // Refuses to clobber an existing file.
+  await expect(
+    f.call("rename_path", { workspaceRoot: workspace, from: "c.md", to: "b.md" }),
+  ).rejects.toThrow("同名文件已存在");
+  // Refuses paths outside the workspace.
+  await expect(
+    f.call("rename_path", { workspaceRoot: workspace, from: "c.md", to: "../escape.md" }),
+  ).rejects.toThrow();
+  // Refuses a different workspace root than the live session.
+  await expect(
+    f.call("rename_path", { workspaceRoot: "/", from: "c.md", to: "d.md" }),
+  ).rejects.toThrow("工作区不匹配");
 });
 it("bounds binary reads and preserves array return contracts", async () => {
   const f = await setup();

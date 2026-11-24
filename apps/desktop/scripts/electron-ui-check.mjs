@@ -88,6 +88,15 @@ async function send(text) {
   const input = page.locator('.wb-composer__input');
   await input.fill(text); await page.getByRole('button', { name: '发送', exact: true }).click();
 }
+// 菜单悬停在高负载的机器上偶尔会被判为“离开”，重试几次而不是直接失败。
+async function hoverUntil(trigger, target, tries = 6) {
+  for (let i = 0; i < tries; i += 1) {
+    if (await target.isVisible().catch(() => false)) return;
+    await trigger.hover();
+    await target.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+  }
+  await target.waitFor({ state: 'visible', timeout: 10000 });
+}
 async function waitForRequestCount(count) {
   const deadline = Date.now() + 15000;
   while (requests.length < count) {
@@ -146,7 +155,8 @@ try {
   // G1-16: `+ → 应用` lists what is really installed (here: nothing) and says so.
   await page.getByRole('button', { name: '添加', exact: true }).click();
   await page.getByRole('menuitem', { name: '应用', exact: true }).hover();
-  await page.getByText('还没有安装任何应用', { exact: true }).waitFor({ timeout: 10000 });
+  const appEmpty = page.getByText('还没有安装任何应用', { exact: true });
+  await hoverUntil(page.getByRole('menuitem', { name: '应用', exact: true }), appEmpty);
   await page.screenshot({ path: 'release/ui-app-picker.png' });
   await page.keyboard.press('Escape');
   checkpoint('the app picker lists the installed applications and has an empty state', {});
@@ -353,8 +363,9 @@ try {
   // G1-15: a workspace file shows up under + → 引用对话中的文件.
   await writeFile(join(init.cwd, 'ui-reference.md'), '# reference\n');
   await page.getByRole('button', { name: '添加', exact: true }).click();
-  await page.locator('.iam-item').filter({ hasText: '引用对话中的文件' }).hover();
-  await page.getByText('ui-reference.md', { exact: true }).waitFor();
+  const referenceRow = page.locator('.iam-item').filter({ hasText: '引用对话中的文件' });
+  await referenceRow.hover();
+  await hoverUntil(referenceRow, page.getByText('ui-reference.md', { exact: true }));
   await page.screenshot({ path: 'release/ui-reference-menu.png' });
   await page.keyboard.press('Escape');
   checkpoint('reference menu lists a workspace file', {});
@@ -371,6 +382,69 @@ try {
   assert.ok(diagramSvg && diagramSvg.bytes > 200, 'the mermaid artifact renders an SVG');
   await page.screenshot({ path: 'release/ui-mermaid.png' });
   checkpoint('a mermaid artifact renders as an SVG diagram', diagramSvg);
+
+  // G3-3: 独立窗口 — 「独立阅读」→「在新窗口打开」真的开出第二个 BrowserWindow，
+  // 且它的 hash 是 #/artifact/<sessionId>?path=…
+  const windowsBefore = app.windows().length;
+  await page.getByRole('button', { name: '更多操作' }).last().click();
+  await page.getByRole('menuitem', { name: '独立阅读', exact: true }).click();
+  const reader = page.getByRole('dialog', { name: /独立阅读/ });
+  await reader.waitFor();
+  await reader.getByRole('button', { name: '在新窗口打开' }).click();
+  await page.waitForFunction(() => true, undefined, { timeout: 3000 }).catch(() => {});
+  const deadline = Date.now() + 20000;
+  let artifactWindowUrl = '';
+  while (Date.now() < deadline) {
+    for (const w of app.windows()) {
+      if (w === page) continue;
+      const u = w.url();
+      if (u.includes('#/artifact/')) { artifactWindowUrl = u; break; }
+    }
+    if (artifactWindowUrl) break;
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  assert.ok(app.windows().length > windowsBefore, 'a second window opens');
+  assert.match(artifactWindowUrl, /#\/artifact\/[^/]+\?path=/);
+  // The new window really shows the artifact (its workbench panel opens on that file).
+  const artifactWindow = app.windows().find((w) => w !== page && w.url().includes('#/artifact/'));
+  await artifactWindow.locator('.bench-viewer__name').first().waitFor({ timeout: 25000 });
+  await artifactWindow.waitForFunction(
+    () => document.querySelectorAll('.af-mermaid svg').length > 0,
+    undefined,
+    { timeout: 25000 },
+  );
+  const artifactWindowName = await artifactWindow.locator('.bench-viewer__name').first().innerText();
+  assert.equal(artifactWindowName, 'ui-diagram.mmd');
+  // The artifact lives in the profile's Pi inbox: remember its folder for the rename check.
+  const artifactFilePath = decodeURIComponent(new URL(artifactWindowUrl).hash.split('path=')[1] ?? '');
+  await page.screenshot({ path: 'release/ui-artifact-window.png' });
+  checkpoint('an artifact opens in its own window', { windows: app.windows().length, artifact: artifactWindowName });
+  for (const w of app.windows()) if (w !== page) await w.close().catch(() => {});
+  await page.keyboard.press('Escape');
+
+  // G3-7: rename a workspace artifact in place; a taken name is refused with a message.
+  await page.getByRole('button', { name: '收起右侧栏' }).click();
+  await page.getByRole('button', { name: '展开右侧栏' }).click();
+  await page.getByRole('tab', { name: '文件' }).click();
+  await page.getByText('ui-diagram.mmd', { exact: true }).click();
+  await page.getByRole('button', { name: '更多操作' }).last().click();
+  await page.getByRole('menuitem', { name: '重命名…' }).click();
+  const renameInput = page.getByRole('textbox', { name: '新文件名' });
+  // A sibling file with the target name makes the conflict real.
+  await writeFile(join(artifactFilePath.slice(0, artifactFilePath.lastIndexOf('/')), 'ui-taken.mmd'), 'taken\n');
+  await renameInput.fill('ui-taken.mmd');
+  await page.getByRole('button', { name: '确定' }).click();
+  await page.getByRole('alert').filter({ hasText: '同名文件已存在' }).waitFor({ timeout: 10000 });
+  await page.screenshot({ path: 'release/ui-rename-conflict.png' });
+  await renameInput.fill('ui-diagram-renamed.mmd');
+  await page.getByRole('button', { name: '确定' }).click();
+  await page.waitForFunction(
+    () => [...document.querySelectorAll('.bench-viewer__name, .bench-tab__label')].some((el) => el.textContent === 'ui-diagram-renamed.mmd'),
+    undefined,
+    { timeout: 15000 },
+  );
+  await page.screenshot({ path: 'release/ui-renamed.png' });
+  checkpoint('an artifact renames in place and refuses a taken name', { renamed: 'ui-diagram-renamed.mmd' });
   await page.getByRole('button', { name: '收起右侧栏' }).click();
 
   const beforeFiles = await app.evaluate(() => globalThis.__ipcAudit.length);

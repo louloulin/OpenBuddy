@@ -85,6 +85,8 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'tray_set' && typeof payload.enabled !== 'boolean') throw new Error('invalid_payload: enabled');
   // 窗口与唤起 (W7).
   if (command === 'window_open_session') string('sessionId', 256);
+  if (command === 'window_open_artifact') { string('sessionId', 256); string('path', 4096); }
+  if (command === 'rename_path') { string('workspaceRoot', 4096); string('from', 4096); string('to', 4096); }
   if (command === 'quick_shortcut_set') {
     if (typeof payload.accelerator !== 'string' || !payload.accelerator.trim() || payload.accelerator.length > 100) throw new Error('invalid_payload: accelerator');
   }

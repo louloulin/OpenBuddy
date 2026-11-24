@@ -8,6 +8,7 @@ import { CloseIcon } from "@openbuddy/ui/icon/icons/index";
 import { pathStat, type ArtifactInfo } from "@openbuddy/client/agent-client";
 import { ArtifactPreview, useFileContent, type PreviewMode } from "./ArtifactPreview";
 import { VersionHistoryPanel } from "./VersionHistoryPanel";
+import { openArtifactWindow } from "@openbuddy/client/api/native";
 import { ArtifactFallbackBody, useArtifactFallback } from "./ArtifactFallback";
 import { ArtifactShare } from "./ArtifactShare";
 import { benchKind, formatSize, isTextKind, KIND_LABEL } from "./bench-kind";
@@ -71,6 +72,12 @@ export function ArtifactReader({ path, sessionId, info, version, onClose, onToas
           </div>
           <div className="bench-reader__actions">
             <button type="button" className="bench-btn" onClick={() => setHistoryOpen((open) => !open)}>版本历史</button>
+            {/* G3-3: 双屏阅读——把这个产物放到独立窗口。 */}
+            <button
+              type="button"
+              className="bench-btn"
+              onClick={() => void openArtifactWindow(sessionId, path).catch((error) => onToast(`无法打开独立窗口：${String(error).replace(/^Error:\s*/, "")}`))}
+            >在新窗口打开</button>
             <button type="button" className="bench-btn" onClick={() => setShareOpen(true)}>分享</button>
             <button type="button" className="bench-icon" aria-label="关闭独立阅读" data-tip="关闭" onClick={onClose}>
               <CloseIcon size={16} />

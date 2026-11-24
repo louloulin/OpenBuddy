@@ -17,6 +17,8 @@ export const COMMANDS = [
   'providers_local_get', 'providers_local_probe', 'providers_local_set',
   'read_text_file', 'write_text_file', 'read_file_base64', 'export_text_file', 'list_dir',
   'browse_directory', 'path_stat', 'open_path', 'open_url', 'reveal_in_folder',
+  // G3-7 产物重命名: workspace-scoped, never overwrites.
+  'rename_path',
   'mcp_list', 'mcp_upsert', 'mcp_toggle', 'mcp_delete', 'mcp_config_read', 'mcp_config_save',
   'mcp_config_path', 'mcp_test', 'mcp_auth_trigger', 'mcp_auth_status', 'mcp_deferred_get', 'mcp_deferred_set',
   // 授权尝试 (B3a): begin returns an attempt id/expiry; attempt/attempts read it; cancel aborts.
@@ -34,6 +36,8 @@ export const COMMANDS = [
   'window_minimize', 'window_toggle_maximize', 'window_close', 'window_is_maximized', 'window_edit', 'clipboard_write_text',
   // 窗口与唤起 (20261116-pii W7): independent session windows + global quick input.
   'window_open_session', 'window_open_quick', 'quick_shortcut_get', 'quick_shortcut_set',
+  // G3-3 产物独立窗口: 双屏阅读，关闭不影响主窗口。
+  'window_open_artifact',
   // 托盘常驻 (20261116-pii W4.4): desktop native, persisted in tray.json.
   'tray_get', 'tray_set',
   // 手机接入 (20261115-mobile.md §4.4): desktop-only pairing management.

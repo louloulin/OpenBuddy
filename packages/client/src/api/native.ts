@@ -52,6 +52,8 @@ export const traySet = (enabled: boolean) => invoke<{ enabled: boolean }>("tray_
 
 /** 在独立窗口打开一个会话（主进程按 `#/session/<id>` 路由新建窗口）。 */
 export const openSessionWindow = (sessionId: string) => invoke<void>("window_open_session", { sessionId });
+/** G3-3: open one artifact in its own window. */
+export const openArtifactWindow = (sessionId: string, path: string) => invoke<void>("window_open_artifact", { sessionId, path });
 
 /** 打开全局快速输入小窗。 */
 export const openQuickWindow = () => invoke<void>("window_open_quick", {});

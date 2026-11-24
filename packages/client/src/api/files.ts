@@ -65,6 +65,9 @@ export interface PathStat {
 
 /** Stat one path without reading it (artifact reader's live deletion probe). */
 export const pathStat = (path: string) => invoke<PathStat>("path_stat", { path });
+/** G3-7: rename inside the task workspace; the host refuses to overwrite. */
+export const renamePath = (workspaceRoot: string, from: string, to: string) =>
+  invoke<string>("rename_path", { workspaceRoot, from, to });
 
 /** Reveal one path in the OS file manager (desktop native). */
 export const revealInFolder = (path: string) => invoke<void>("reveal_in_folder", { path });

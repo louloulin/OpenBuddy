@@ -9,6 +9,7 @@ export const NATIVE_COMMANDS = [
   'window_minimize', 'window_toggle_maximize', 'window_close', 'window_is_maximized', 'window_edit',
   // 窗口与唤起 (20261116-pii W7.1 / W7.2).
   'window_open_session', 'window_open_quick', 'quick_shortcut_get', 'quick_shortcut_set',
+  'window_open_artifact',
   'dialog_open', 'dialog_save', 'dialog_ask',
   // 托盘常驻 (20261116-pii W4.4).
   'tray_get', 'tray_set',
