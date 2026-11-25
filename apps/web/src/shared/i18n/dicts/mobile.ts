@@ -29,6 +29,12 @@ export const mobileZh: Record<string, string> = {
   "mobile.daysAgo": "{n} 天前",
   "mobile.platformWeb": "浏览器",
   "mobile.platformMobile": "手机",
+  "mobile.pushTest": "发送测试通知",
+  "mobile.pushTesting": "发送中…",
+  "mobile.pushTestDone": "已在桌面弹出一条测试通知（若系统通知已开启）",
+  "mobile.remoteControl": "远程控制",
+  "mobile.remoteControlOff": "未开放",
+  "mobile.remoteControlHint": "远程控制需要系统辅助功能授权，桌面端暂未开放；手机端目前可以查看任务、审批与发送消息。",
 };
 
 export const mobileEn: Record<string, string> = {
@@ -61,4 +67,10 @@ export const mobileEn: Record<string, string> = {
   "mobile.daysAgo": "{n} days ago",
   "mobile.platformWeb": "Browser",
   "mobile.platformMobile": "Phone",
+  "mobile.pushTest": "Send test notification",
+  "mobile.pushTesting": "Sending…",
+  "mobile.pushTestDone": "A test notification was sent (when system notifications are on)",
+  "mobile.remoteControl": "Remote control",
+  "mobile.remoteControlOff": "Not available",
+  "mobile.remoteControlHint": "Remote control needs an OS accessibility grant and is not available on desktop yet; the phone can already view tasks, approve and send messages.",
 };

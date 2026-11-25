@@ -11,6 +11,9 @@ import {
 } from "@openbuddy/ui/icon/icons/index";
 import { FileText, FileSpreadsheet, FileImage, FileCode, Film, Music, Globe, File, FolderOpen } from "lucide-react";
 import { formatFileSize, inferFileTypeFromExt, relativeTime, type FileType, type LocalFileItem } from "@/shared/lib/files/file-utils";
+import { TaskArtifactsTab } from "./TaskArtifactsTab";
+import { FileQuickPreview } from "./FileQuickPreview";
+import { defaultOpenGet, type DefaultOpenMap } from "@openbuddy/client/api/files";
 
 function FileTypeIcon({ type, size = 16 }: { type: FileType; size?: number }) {
   switch (type) {
@@ -24,6 +27,16 @@ function FileTypeIcon({ type, size = 16 }: { type: FileType; size?: number }) {
     case "website": return <Globe size={size} />;
     default: return <File size={size} />;
   }
+}
+
+/** Office / PDF 需要按扩展名细分（设置里的默认打开方式按这些键存）。 */
+function extPrefKey(name: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "docx" || ext === "doc") return "docx";
+  if (ext === "pptx" || ext === "ppt") return "pptx";
+  if (ext === "xlsx" || ext === "xls") return "sheet";
+  if (ext === "pdf") return "pdf";
+  return "text";
 }
 
 const FILE_TYPE_FILTERS: { value: string; label: string }[] = [
@@ -60,11 +73,10 @@ export function MyFilesPanel({ cwd, onToast }: MyFilesPanelProps) {
       <div className="myfiles-tabs">
         <button
           className={`myfiles-tab ${tab === "artifacts" ? "myfiles-tab--active" : ""}`}
-          disabled
           aria-label="任务成果"
-          title="任务成果聚合暂未开放"
+          onClick={() => setTab("artifacts")}
         >
-          <BookIcon size="sm" /> 任务成果（暂缓）
+          <BookIcon size="sm" /> 任务成果
         </button>
         <button
           className={`myfiles-tab ${tab === "local" ? "myfiles-tab--active" : ""}`}
@@ -108,7 +120,9 @@ export function MyFilesPanel({ cwd, onToast }: MyFilesPanelProps) {
       </div>
 
       <div className="myfiles-body">
-        {tab === "artifacts" ? <p>任务成果聚合暂未开放。</p> : (
+        {tab === "artifacts" ? (
+          <TaskArtifactsTab cwd={cwd} searchQuery={searchQuery} typeFilter={typeFilter} onToast={onToast} />
+        ) : (
           <LocalFilesTab
             cwd={cwd}
             searchQuery={searchQuery}
@@ -135,6 +149,39 @@ function LocalFilesTab({
   const [files, setFiles] = useState<LocalFileItem[]>([]);
   const [breadcrumb, setBreadcrumb] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  // 默认打开方式 (G1-6 / G3-6)：system = 交给系统应用；embedded = 就地预览。
+  const [openPrefs, setOpenPrefs] = useState<DefaultOpenMap>({});
+  const [previewPath, setPreviewPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    void defaultOpenGet().then(setOpenPrefs).catch(() => setOpenPrefs({}));
+  }, []);
+
+  /** 文件类型 → 偏好键（与设置里的分组保持一致）。 */
+  const prefKey = (file: LocalFileItem): string => {
+    if (file.isDir) return "folder";
+    switch (file.type) {
+      case "markdown": return "markdown";
+      case "spreadsheet": return "sheet";
+      case "image": return "image";
+      case "code": return "code";
+      case "document": return extPrefKey(file.name);
+      case "website": return "html";
+      default: return "text";
+    }
+  };
+
+  const openFile = async (file: LocalFileItem) => {
+    // 每次都读一次偏好：在设置里改完，回到这里立即生效。
+    const prefs = await defaultOpenGet().catch(() => openPrefs);
+    const pref = prefs[prefKey(file)] ?? "embedded";
+    if (pref === "system") {
+      try { await invoke("open_path", { path: file.path }); }
+      catch { onToast?.("无法用系统应用打开这个文件"); }
+      return;
+    }
+    setPreviewPath(file.path);
+  };
   const currentDir = breadcrumb.length > 0 ? breadcrumb[breadcrumb.length - 1] : (cwd || "");
 
   const loadDir = useCallback(async (dir: string) => {
@@ -170,7 +217,7 @@ function LocalFilesTab({
   }, [onToast]);
 
   useEffect(() => {
-    if (currentDir) loadDir(currentDir);
+    if (currentDir) void loadDir(currentDir);
   }, [currentDir, loadDir]);
 
   const handleEnterFolder = (path: string) => {
@@ -211,7 +258,7 @@ function LocalFilesTab({
   });
 
   return (
-    <div className="myfiles-local">
+    <div className={"myfiles-local" + (previewPath ? " myfiles-local--split" : "")}>
       <div className="myfiles-local-toolbar">
         <button className="myfiles-action-btn" onClick={handlePickFile} title="选择后在系统默认应用中打开">选择本地文件</button>
         <button className="myfiles-action-btn" onClick={handlePickDirectory}>
@@ -263,6 +310,19 @@ function LocalFilesTab({
         </div>
       )}
 
+      {previewPath && (
+        <aside className="myfiles-preview" aria-label="文件预览">
+          <div className="myfiles-preview__bar">
+            <span className="myfiles-preview__name" title={previewPath}>{previewPath.split(/[\\/]/).pop()}</span>
+            <button type="button" className="myfiles-link myfiles-link--quiet" onClick={() => void invoke("open_path", { path: previewPath })}>用系统应用打开</button>
+            <button type="button" className="myfiles-link myfiles-link--quiet" onClick={() => setPreviewPath(null)}>关闭预览</button>
+          </div>
+          <div className="myfiles-preview__body">
+            <FileQuickPreview path={previewPath} />
+          </div>
+        </aside>
+      )}
+
       {!loading && filtered.length > 0 && (
         <div className="myfiles-table">
           <div className="myfiles-table-head">
@@ -274,8 +334,16 @@ function LocalFilesTab({
           {filtered.map((file) => (
             <div
               key={file.path}
-              className={`myfiles-row ${file.isDir ? "myfiles-row--folder" : ""}`}
-              onClick={() => file.isDir && handleEnterFolder(file.path)}
+              className={`myfiles-row ${file.isDir ? "myfiles-row--folder" : ""}${previewPath === file.path ? " myfiles-row--active" : ""}`}
+              onClick={() => (file.isDir ? handleEnterFolder(file.path) : void openFile(file))}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                if (file.isDir) handleEnterFolder(file.path);
+                else void openFile(file);
+              }}
             >
               <span className="myfiles-col-name">
                 <FileTypeIcon type={file.type} size={18} />

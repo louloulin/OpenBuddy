@@ -7,6 +7,7 @@ import { saveTextAs } from "@openbuddy/client/api/native";
 import { dataExport, dataRestore, dataSnapshots, dataSnapshotRestore, type DataBundle, type DataSnapshot } from "@openbuddy/client/api/data";
 import { useLocale } from "../../../shared/i18n";
 import { SectionShell } from "./shared";
+import { ImportConversationsCard } from "./ImportConversationsCard";
 
 // ---------- 数据管理 ----------
 
@@ -204,6 +205,8 @@ export function DataSettingsPanel() {
           ))
         )}
       </div>
+
+      <ImportConversationsCard onToast={(message) => setStatus(message)} />
 
       <p className="sec-footnote">{t("data.footnote")}</p>
     </SectionShell>

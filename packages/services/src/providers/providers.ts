@@ -208,9 +208,12 @@ export class Providers {
       }),
       providers: data.providers.map((p) => ({
         ...p,
+        // magpie 的本机网关不需要 Key，界面按「已配置」显示（占位值，不落盘）。
         apiKey: this.settings.secrets.has(`provider:${p.id}`)
           ? "••••"
-          : undefined,
+          : p.providerKind === "magpie"
+            ? "••••"
+            : undefined,
       })),
     };
   }
@@ -267,7 +270,9 @@ export class Providers {
           }),
       });
       const key = this.settings.secrets.get(`provider:${p.id}`);
-      if (key) await this.runtime.setRuntimeApiKey(p.id, key);
+      // magpie 的本机网关不鉴权；Pi 仍要求一个凭据才会把厂商当成已配置。
+      const effective = key ?? (p.providerKind === "magpie" ? "magpie-local" : undefined);
+      if (effective) await this.runtime.setRuntimeApiKey(p.id, effective);
       else await this.runtime.removeRuntimeApiKey(p.id);
     }
   }
@@ -509,7 +514,10 @@ export class Providers {
     const apiBackend = typeof p.apiBackend === "string" ? p.apiBackend : saved?.apiBackend ?? (kind.includes("anthropic") ? "messages" : "chat_completions");
     const base = endpoint(text(p.baseUrl || saved?.baseUrl || presets[kind]?.baseUrl, "baseUrl"));
     const typed = typeof p.apiKey === "string" && p.apiKey && p.apiKey !== "••••" ? p.apiKey : undefined;
-    const key = typed ?? (saved ? this.settings.secrets.get(`provider:${saved.id}`) : undefined);
+    // magpie (yetone) 是本机回环网关：它不做鉴权，Key 可以留空，用一个占位值走请求头。
+    const keyless = kind === "magpie";
+    const key = typed ?? (saved ? this.settings.secrets.get(`provider:${saved.id}`) : undefined)
+      ?? (keyless ? "magpie-local" : undefined);
     if (!key) throw new Error("请填写 API Key");
     const anthropic = apiBackend === "messages";
     const headers: Record<string, string> = anthropic
@@ -558,7 +566,9 @@ export class Providers {
     if (providerId && modelId) {
       const model = this.runtime.getModel(providerId, modelId);
       if (!model) throw new Error("model_not_found: 模型不存在");
-      if (!this.settings.secrets.has(`provider:${providerId}`)) throw new Error("该厂商还没有保存 API Key");
+      const savedKind = this.catalog.read().providers.find((x) => x.id === providerId)?.providerKind;
+      if (!this.settings.secrets.has(`provider:${providerId}`) && savedKind !== "magpie")
+        throw new Error("该厂商还没有保存 API Key");
       const reply = await this.runtime.completeSimple(
         model,
         { messages: [{ role: "user", content: "Reply with: OK", timestamp: Date.now() }] },

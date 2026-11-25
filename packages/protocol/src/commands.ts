@@ -19,6 +19,10 @@ export const COMMANDS = [
   'browse_directory', 'path_stat', 'open_path', 'open_url', 'reveal_in_folder',
   // G3-7 产物重命名: workspace-scoped, never overwrites.
   'rename_path',
+  // 默认打开方式 (G1-6): 按文件类型选择应用内预览或系统应用。
+  'default_open_get', 'default_open_set',
+  // Git worktree (G4-5): 为代码任务创建隔离工作树。
+  'worktree_list', 'worktree_create', 'worktree_remove',
   'mcp_list', 'mcp_upsert', 'mcp_toggle', 'mcp_delete', 'mcp_config_read', 'mcp_config_save',
   'mcp_config_path', 'mcp_test', 'mcp_auth_trigger', 'mcp_auth_status', 'mcp_deferred_get', 'mcp_deferred_set',
   // 授权尝试 (B3a): begin returns an attempt id/expiry; attempt/attempts read it; cancel aborts.
@@ -63,8 +67,12 @@ export const COMMANDS = [
   // G2-7 工具内容注入审查: 用户明确放行被拦下的工具输出。
   'agent_allow_tool_content',
   'artifacts_list', 'checkpoint_list', 'checkpoint_read', 'checkpoint_restore', 'turn_revert', 'artifact_save',
+  // G3-5 任务成果聚合: 跨会话汇总磁盘上的产物（不要求会话已加载）。
+  'artifacts_workspace_list',
   'agent_export_html', 'agent_export_jsonl', 'agent_import_jsonl', 'agent_set_mode', 'agent_abort_retry', 'clipboard_save_image',
   'notification_prefs_get', 'notification_prefs_set', 'agent_set_queue',
+  // G4-3 外部会话导入 (WorkBuddy / ChatGPT / Claude → 工作区 Markdown).
+  'data_import_scan', 'data_import_apply',
   'host_capabilities', 'session_search',
   // 反馈诊断 (20261116-pii W6.5): local preview only, never uploaded.
   'agent_diagnose',

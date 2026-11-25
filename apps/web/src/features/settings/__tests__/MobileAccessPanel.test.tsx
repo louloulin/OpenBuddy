@@ -101,4 +101,28 @@ describe("MobileAccessPanel (20261115-mobile.md §4.4)", () => {
     await waitFor(() => expect(screen.getByText(/还没有配置网关/)).toBeTruthy());
     expect(screen.getByText(/OPENBUDDY_GATEWAY_ADMIN_TOKEN/)).toBeTruthy();
   });
+
+  it("sends a real test notification and keeps remote control honestly disabled (G4-4)", async () => {
+    grantCapability();
+    invoke.mockImplementation(async (command: string) => {
+      if (command === "mobile_devices_list") return { configured: true, gatewayUrl: "https://gw.test", devices: [] };
+      if (command === "notification_append") return undefined;
+      throw new Error(`unexpected ${command}`);
+    });
+    const user = userEvent.setup();
+    render(<ThemeProvider><MobileAccessPanel /></ThemeProvider>);
+
+    const push = await screen.findByRole("button", { name: "发送测试通知" });
+    await user.click(push);
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        "notification_append",
+        expect.objectContaining({ kind: "mobile", title: "发送测试通知" }),
+      ),
+    );
+
+    const remote = screen.getByRole("button", { name: "未开放" });
+    expect(remote).toBeDisabled();
+    expect(screen.getByText(/远程控制需要系统辅助功能授权/)).toBeTruthy();
+  });
 });

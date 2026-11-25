@@ -61,6 +61,8 @@ export function MobileAccessPanel() {
   const [qr, setQr] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushNote, setPushNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -105,6 +107,24 @@ export function MobileAccessPanel() {
       setError(failure instanceof Error ? failure.message : String(failure));
     } finally {
       setBusy(false);
+    }
+  };
+
+  /** 推送测试 (G4-4)：走桌面通知渠道，真的弹一条系统通知（若用户已启用）。 */
+  const sendTestPush = async () => {
+    setPushBusy(true);
+    setPushNote(null);
+    try {
+      await invoke("notification_append", {
+        kind: "mobile",
+        title: t("mobile.pushTest"),
+        body: t("mobile.pushTestDone"),
+      });
+      setPushNote(t("mobile.pushTestDone"));
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    } finally {
+      setPushBusy(false);
     }
   };
 
@@ -159,6 +179,27 @@ export function MobileAccessPanel() {
             ) : (
               <p className="settings-hint">{t("mobile.codeOneTime")}</p>
             )}
+          </div>
+
+          <div className="mobile-access__extras">
+            <div className="mobile-access__extra">
+              <div className="mobile-access__extra-main">
+                <strong>{t("mobile.pushTest")}</strong>
+                <span className="mobile-access__meta">{pushNote ?? t("mobile.pushTestDone")}</span>
+              </div>
+              <button className="settings-btn" onClick={() => void sendTestPush()} disabled={pushBusy}>
+                {pushBusy ? t("mobile.pushTesting") : t("mobile.pushTest")}
+              </button>
+            </div>
+            <div className="mobile-access__extra">
+              <div className="mobile-access__extra-main">
+                <strong>{t("mobile.remoteControl")}</strong>
+                <span className="mobile-access__meta">{t("mobile.remoteControlHint")}</span>
+              </div>
+              <button className="settings-btn" disabled title={t("mobile.remoteControlHint")}>
+                {t("mobile.remoteControlOff")}
+              </button>
+            </div>
           </div>
 
           <h3 className="settings-subtitle">{t("mobile.connectedPhones")}</h3>

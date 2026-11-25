@@ -10,6 +10,7 @@ import {
   HelpCircle,
   SlidersHorizontal,
   Smartphone,
+  FolderOpen,
   Search,
   X,
   type LucideIcon,
@@ -23,6 +24,7 @@ import {
   AssistantSettingsPanel,
   DataSettingsPanel,
   GeneralPreferencesPanel,
+  DefaultOpenPanel,
   HelpSettingsPanel,
   MemorySettingsPanel,
   PersonalizeSettingsPanel,
@@ -38,6 +40,7 @@ type SectionId =
   | "about"
   | "agent-mail"
   | "general"
+  | "default-open"
   | "agent-settings"
   | "shortcuts"
   | "memory"
@@ -95,6 +98,7 @@ const SECTION_META: Record<string, { group: SettingsGroup; keywords: string[] }>
 
 const NAV: NavItem[] = [
   { id: "general", label: "通用", icon: SlidersHorizontal },
+  { id: "default-open", label: "默认打开方式", icon: FolderOpen },
   { id: "agent-mail", label: "智能体邮箱", icon: Mail },
   { id: "shortcuts", label: "快捷键", icon: Keyboard },
   { id: "model", label: "模型", icon: Cpu },
@@ -254,6 +258,8 @@ export function SettingsPanel({
               <MobileAccessPanel />
             ) : active === "security" ? (
               <SecuritySettingsPanel />
+            ) : active === "default-open" ? (
+              <DefaultOpenPanel />
             ) : active === "data" ? (
               <DataSettingsPanel />
             ) : active === "general" ? (

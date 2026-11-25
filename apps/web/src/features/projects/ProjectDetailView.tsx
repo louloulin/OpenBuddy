@@ -16,7 +16,7 @@ import {
   FolderIcon,
 } from "@openbuddy/ui/icon/icons/index";
 
-type TabKey = "activity" | "plan" | "task" | "asset";
+type TabKey = "activity" | "plan" | "task" | "asset" | "worktree";
 type DrawerKey = "instruction" | "connectors" | "experts" | "skills" | "automation";
 
 const TABS: { key: TabKey; label: string }[] = [
@@ -24,6 +24,8 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "plan", label: "计划" },
   { key: "task", label: "任务" },
   { key: "asset", label: "资产" },
+  // G4-5: git 项目才有意义；非 git 项目里这一页会直说不可用。
+  { key: "worktree", label: "工作树" },
 ];
 
 const CONFIG_CARDS: { key: DrawerKey; title: string; desc: string }[] = [
@@ -93,6 +95,7 @@ export function ProjectDetailView({
             {tab === "plan" && <PlanTab projectId={live.id} />}
             {tab === "task" && <TaskTab projectId={live.id} />}
             {tab === "asset" && <AssetsTab projectId={live.id} />}
+            {tab === "worktree" && <WorktreeTab cwd={live.cwd} onToast={onToast} />}
           </div>
 
           <ProjectComposer onSend={handleComposerSend} disabled={!onStartConversation} />

@@ -189,3 +189,40 @@ describe("AutomationPanel（有任务/有记录）", () => {
     expect(screen.getByText("成功")).toBeInTheDocument();
   });
 });
+
+describe("运行记录分组与失败原因聚合 (G4-1)", () => {
+  const withRecords: AutomationSnapshot = {
+    automations: [
+      { id: "a1", name: "每日新闻", status: "ACTIVE" } as never,
+      { id: "a2", name: "周报生成", status: "ACTIVE" } as never,
+    ],
+    records: [
+      { id: "r1", automationId: "a1", automationName: "每日新闻", status: "failed", startedAt: new Date().toISOString(), error: "automation_timeout", archived: false },
+      { id: "r2", automationId: "a1", automationName: "每日新闻", status: "failed", startedAt: new Date().toISOString(), error: "automation_timeout", archived: false },
+      { id: "r3", automationId: "a2", automationName: "周报生成", status: "success", startedAt: new Date().toISOString(), archived: false },
+    ],
+  };
+
+  it("可切换「按任务」分组，并聚合失败原因", async () => {
+    snapshot = withRecords;
+    render(<AutomationPanel />);
+    fireEvent.click(screen.getByText("运行记录"));
+    await waitFor(() => expect(screen.getByRole("group", { name: "失败原因" })).toBeInTheDocument());
+    // 同一错误文本归并成一条，计数 2。
+    const chip = screen.getByRole("button", { name: /automation_timeout/ });
+    expect(chip.textContent).toContain("2");
+
+    fireEvent.click(screen.getByRole("tab", { name: "按任务" }));
+    await waitFor(() => expect(screen.getAllByText("每日新闻").length).toBeGreaterThan(0));
+    expect(screen.getAllByText("周报生成").length).toBeGreaterThan(0);
+  });
+
+  it("点失败原因只保留该原因的记录", async () => {
+    snapshot = withRecords;
+    render(<AutomationPanel />);
+    fireEvent.click(screen.getByText("运行记录"));
+    const chip = await screen.findByRole("button", { name: /automation_timeout/ });
+    fireEvent.click(chip);
+    await waitFor(() => expect(screen.queryAllByText("周报生成")).toHaveLength(0));
+  });
+});

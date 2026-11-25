@@ -16,6 +16,7 @@ export type ProviderKind =
   | "deepseek"
   | "qwen"
   | "vercel"
+  | "magpie"
   | "custom"
   | "custom_anthropic";
 

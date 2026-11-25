@@ -1,12 +1,16 @@
 import { _electron as electron } from 'playwright-core';
 import { createServer } from 'node:http';
-import { mkdtemp, mkdir, writeFile, readFile, realpath } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, readdir, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { runArtifactFlows } from './lib/artifact-flows.mjs';
+import { startFakeGateway } from './lib/fake-gateway.mjs';
+import { runAutomationFlows } from './lib/automation-flows.mjs';
+import { runSettingsFlows } from './lib/settings-flows.mjs';
 
 // Functional automation in a real Electron process importing the exact supplied
 // main module. The temporary bootstrap selects an isolated profile and packaged
@@ -55,11 +59,20 @@ const server = createServer(async (req, res) => {
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const port = server.address().port;
+
+const gatewayFixture = await startFakeGateway();
+const gatewayPort = gatewayFixture.port;
 let app, page;
 const call = (command, payload = {}) => page.evaluate(({ command, payload }) => window.openbuddy.invoke(command, payload), { command, payload });
 const checkpoint = (name, evidence) => { checks.push({ name, evidence }); console.log('UI_CHECK', name, JSON.stringify(evidence)); };
 async function launch() {
-  app = await electron.launch({ executablePath: require('electron'), args: [harness], env: { ...process.env, OPENBUDDY_SMOKE_TEST: '0' }, timeout: 30000 });
+  app = await electron.launch({ executablePath: require('electron'), args: [harness], env: {
+      ...process.env,
+      OPENBUDDY_SMOKE_TEST: '0',
+      OPENBUDDY_GATEWAY_URL: `http://127.0.0.1:${gatewayPort}`,
+      OPENBUDDY_GATEWAY_ADMIN_TOKEN: 'ui-check-admin',
+      OPENBUDDY_GATEWAY_AGENT_TOKEN: 'ui-check-agent',
+    }, timeout: 30000 });
   page = await app.firstWindow();
   page.on('pageerror', error => consoleErrors.push(error.message));
   await page.locator('.wb-composer__input').waitFor({ state: 'visible', timeout: 30000 });
@@ -369,95 +382,9 @@ try {
   await page.screenshot({ path: 'release/ui-reference-menu.png' });
   await page.keyboard.press('Escape');
   checkpoint('reference menu lists a workspace file', {});
-  // G3-1: a real .mmd file in the workspace renders as an SVG diagram in the workbench.
-  await writeFile(join(init.cwd, 'ui-diagram.mmd'), 'graph TD\n  A[开始] --> B{判断}\n  B -->|是| C[完成]\n  B -->|否| D[重试]\n');
-  await page.getByRole('button', { name: '展开右侧栏' }).click();
-  await page.getByRole('tab', { name: '文件' }).click();
-  await page.getByText('ui-diagram.mmd', { exact: true }).click();
-  await page.locator('.af-mermaid svg').waitFor({ timeout: 20000 });
-  const diagramSvg = await page.evaluate(() => {
-    const svg = document.querySelector('.af-mermaid svg');
-    return svg ? { tag: svg.tagName, bytes: Math.round((svg.outerHTML || '').length) } : null;
-  });
-  assert.ok(diagramSvg && diagramSvg.bytes > 200, 'the mermaid artifact renders an SVG');
-  await page.screenshot({ path: 'release/ui-mermaid.png' });
-  checkpoint('a mermaid artifact renders as an SVG diagram', diagramSvg);
-
-  // G3-3: 独立窗口 — 「独立阅读」→「在新窗口打开」真的开出第二个 BrowserWindow，
-  // 且它的 hash 是 #/artifact/<sessionId>?path=…
-  const windowsBefore = app.windows().length;
-  await page.getByRole('button', { name: '更多操作' }).last().click();
-  await page.getByRole('menuitem', { name: '独立阅读', exact: true }).click();
-  const reader = page.getByRole('dialog', { name: /独立阅读/ });
-  await reader.waitFor();
-  await reader.getByRole('button', { name: '在新窗口打开' }).click();
-  await page.waitForFunction(() => true, undefined, { timeout: 3000 }).catch(() => {});
-  const deadline = Date.now() + 20000;
-  let artifactWindowUrl = '';
-  while (Date.now() < deadline) {
-    for (const w of app.windows()) {
-      if (w === page) continue;
-      const u = w.url();
-      if (u.includes('#/artifact/')) { artifactWindowUrl = u; break; }
-    }
-    if (artifactWindowUrl) break;
-    await new Promise((r) => setTimeout(r, 400));
-  }
-  assert.ok(app.windows().length > windowsBefore, 'a second window opens');
-  assert.match(artifactWindowUrl, /#\/artifact\/[^/]+\?path=/);
-  // The new window really shows the artifact (its workbench panel opens on that file).
-  const artifactWindow = app.windows().find((w) => w !== page && w.url().includes('#/artifact/'));
-  await artifactWindow.locator('.bench-viewer__name').first().waitFor({ timeout: 25000 });
-  await artifactWindow.waitForFunction(
-    () => document.querySelectorAll('.af-mermaid svg').length > 0,
-    undefined,
-    { timeout: 25000 },
-  );
-  const artifactWindowName = await artifactWindow.locator('.bench-viewer__name').first().innerText();
-  assert.equal(artifactWindowName, 'ui-diagram.mmd');
-  // The artifact lives in the profile's Pi inbox: remember its folder for the rename check.
-  const artifactFilePath = decodeURIComponent(new URL(artifactWindowUrl).hash.split('path=')[1] ?? '');
-  await page.screenshot({ path: 'release/ui-artifact-window.png' });
-  checkpoint('an artifact opens in its own window', { windows: app.windows().length, artifact: artifactWindowName });
-  for (const w of app.windows()) if (w !== page) await w.close().catch(() => {});
-  await page.keyboard.press('Escape');
-
-  // G3-7: rename a workspace artifact in place; a taken name is refused with a message.
-  await page.getByRole('button', { name: '收起右侧栏' }).click();
-  await page.getByRole('button', { name: '展开右侧栏' }).click();
-  await page.getByRole('tab', { name: '文件' }).click();
-  await page.getByText('ui-diagram.mmd', { exact: true }).click();
-  await page.getByRole('button', { name: '更多操作' }).last().click();
-  await page.getByRole('menuitem', { name: '重命名…' }).click();
-  const renameInput = page.getByRole('textbox', { name: '新文件名' });
-  // A sibling file with the target name makes the conflict real.
-  await writeFile(join(artifactFilePath.slice(0, artifactFilePath.lastIndexOf('/')), 'ui-taken.mmd'), 'taken\n');
-  await renameInput.fill('ui-taken.mmd');
-  await page.getByRole('button', { name: '确定' }).click();
-  await page.getByRole('alert').filter({ hasText: '同名文件已存在' }).waitFor({ timeout: 10000 });
-  await page.screenshot({ path: 'release/ui-rename-conflict.png' });
-  await renameInput.fill('ui-diagram-renamed.mmd');
-  await page.getByRole('button', { name: '确定' }).click();
-  await page.waitForFunction(
-    () => [...document.querySelectorAll('.bench-viewer__name, .bench-tab__label')].some((el) => el.textContent === 'ui-diagram-renamed.mmd'),
-    undefined,
-    { timeout: 15000 },
-  );
-  await page.screenshot({ path: 'release/ui-renamed.png' });
-  checkpoint('an artifact renames in place and refuses a taken name', { renamed: 'ui-diagram-renamed.mmd' });
-  await page.getByRole('button', { name: '收起右侧栏' }).click();
-
-  const beforeFiles = await app.evaluate(() => globalThis.__ipcAudit.length);
-  await writeFile(join(init.cwd, 'ui-local-marker.txt'), 'local listing fixture');
+  await runArtifactFlows({ page, app, call, checkpoint, writeFile, join, init, persisted, assert });
+  // 后续的「更多」菜单步骤复用同一个触发器。
   const more = page.getByRole('button', { name: /更多.*文件/ });
-  await more.hover(); await page.getByRole('menuitem', { name: '我的文件', exact: true }).click();
-  await page.locator('.myfiles-tab--active').filter({ hasText: '本地文件' }).waitFor();
-  await page.getByText('ui-local-marker.txt', { exact: true }).waitFor();
-  const fileCommands = await app.evaluate(start => globalThis.__ipcAudit.slice(start), beforeFiles);
-  assert.equal(fileCommands.some(item => ['memory_list', 'browse_directory'].includes(item.command)), false);
-  assert.ok(fileCommands.some(item => item.command === 'list_dir' && item.status === 'resolved'));
-  await page.screenshot({ path: 'release/electron-ui-files.png', fullPage: true });
-  checkpoint('MyFiles defaults to real list_dir and never invokes unsupported memory artifacts', { commands: fileCommands });
   await more.hover(); await page.getByRole('menuitem', { name: '策略设置', exact: true }).click();
   await page.getByText('本地策略预览，尚未强制执行', { exact: true }).waitFor();
   checkpoint('policy clearly states local preview without enforcement', {});
@@ -468,6 +395,36 @@ try {
   await page.getByText('渠道由主进程发送：审批请求、后台任务完成与失败都会推送到已启用的渠道。', { exact: true }).waitFor();
   checkpoint('notification channels state host-side delivery for enabled channels', {});
 
+  await runAutomationFlows({ page, call, checkpoint, assert, init });
+
+  // G4-3: 外部会话导入向导 —— 扫描真实草稿文件，预览后导入成工作区 Markdown。
+  const chatgptExport = join(temp, 'chatgpt-export.json');
+  await writeFile(chatgptExport, JSON.stringify([{
+    id: 'c1', title: '季度复盘', update_time: 1700000000,
+    mapping: {
+      a: { message: { author: { role: 'user' }, content: { content_type: 'text', parts: ['帮我看下进度'] } } },
+      b: { message: { author: { role: 'assistant' }, content: { content_type: 'text', parts: ['进度如下…'] } } },
+    },
+  }]));
+  const settingsBtn = page.getByRole('button', { name: '设置', exact: true }).first();
+  await settingsBtn.click();
+  await page.getByText('数据管理', { exact: true }).first().click();
+  await page.getByText('导入外部会话', { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByRole('textbox', { name: '会话导出文件路径' }).fill(chatgptExport);
+  await page.getByRole('button', { name: '读取', exact: true }).click();
+  await page.getByText('季度复盘', { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByText('ChatGPT 导出', { exact: true }).waitFor();
+  await page.screenshot({ path: 'release/ui-import-conversations.png' });
+  await page.getByRole('button', { name: /导入 1 个会话/ }).click();
+  await page.getByText(/已导入 1 个会话到工作区/).waitFor({ timeout: 20000 });
+  const imported = await readdir(init.cwd).catch(() => []);
+  const importedFile = imported.find((name) => name.startsWith('季度复盘') && name.endsWith('.md'));
+  assert.ok(importedFile, 'the imported conversation is written as markdown');
+  const importedText = await readFile(join(init.cwd, importedFile), 'utf8');
+  assert.match(importedText, /## 用户/);
+  checkpoint('an external conversation imports as workspace markdown', { file: importedFile });
+  await page.getByRole('button', { name: '关闭' }).first().click().catch(() => {});
+
   // G2-4: the security centre lists the installed skills and can review them statically.
   await page.getByRole('button', { name: '设置', exact: true }).first().click();
   await page.getByText('安全中心', { exact: true }).first().click();
@@ -476,20 +433,24 @@ try {
   await page.getByText('技能安全审查', { exact: true }).waitFor({ timeout: 15000 });
   await page.screenshot({ path: 'release/ui-security-skills.png' });
   checkpoint('the security centre shows the tool rules and the skill review card', {});
+
+  await runSettingsFlows({ page, assert, checkpoint });
   // G2-1: five sections, keyboard reachable; the sandbox policy is editable for real.
-  const tabNames = await page.getByRole('tab').allInnerTexts();
+  // 只看安全中心自己的 tablist（页面上可能还挂着别的页签）。
+  const secTabs = page.locator('.sec-tabs').getByRole('tab');
+  const tabNames = await secTabs.allInnerTexts();
   assert.deepEqual(tabNames, ['工具管控', '沙箱与网络', '技能审查', '审计日志', '系统授权']);
-  await page.getByRole('tab', { name: '沙箱与网络' }).click();
+  await secTabs.filter({ hasText: '沙箱与网络' }).click();
   await page.getByText('沙箱与网络策略', { exact: true }).waitFor();
   const fileInput = page.getByPlaceholder('允许写入的路径片段，例如 /work/output');
   await fileInput.fill('/work/output');
   const fileGroup = page.locator('.sec-sandbox__group').first();
   await fileGroup.getByRole('button', { name: '添加' }).click();
   await page.waitForFunction(() => document.body.innerText.includes('/work/output'), undefined, { timeout: 10000 });
-  await page.getByRole('tab', { name: '审计日志' }).click();
+  await secTabs.filter({ hasText: '审计日志' }).click();
   await page.getByText('审计日志', { exact: true }).first().waitFor();
   await page.screenshot({ path: 'release/ui-security-audit.png' });
-  await page.getByRole('tab', { name: '系统授权' }).click();
+  await secTabs.filter({ hasText: '系统授权' }).click();
   await page.getByText('麦克风', { exact: true }).waitFor();
   checkpoint('the security centre exposes the sandbox policy and the audit log', { tabs: tabNames });
   await page.getByRole('button', { name: '关闭' }).first().click().catch(() => {});
@@ -593,4 +554,5 @@ try {
 } finally {
   await app?.close().catch(() => {});
   server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
+  await gatewayFixture.close();
 }

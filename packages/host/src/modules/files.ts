@@ -9,6 +9,18 @@ export function filesModule(ctx: HostContext): HostModule {
   const { options, engine } = ctx;
   const commands: Record<string, Handler> = {
     ...fileHandlers(options.shell, () => engine.currentCwd),
+    // 默认打开方式 (G1-6 / G3-6)：按文件类型记住「应用内预览 / 系统应用」。
+    default_open_get: () => ctx.settings.config.read().defaultOpen ?? {},
+    default_open_set: (p) => {
+      const input = p.defaultOpen && typeof p.defaultOpen === "object" ? (p.defaultOpen as Record<string, unknown>) : {};
+      const next: Record<string, "embedded" | "system"> = {};
+      for (const [key, value] of Object.entries(input)) {
+        if (value === "embedded" || value === "system") next[text(key, "type").slice(0, 32)] = value;
+      }
+      const config = ctx.settings.config.read();
+      ctx.settings.config.write({ ...config, defaultOpen: next });
+      return next;
+    },
     // 20261116-pii W1.3 `@` mention. Only the workspace of a live task (or the inbox) can be listed;
     // the desktop IPC layer also requires a native workspace grant for `cwd`.
     files_search: async (p) => {

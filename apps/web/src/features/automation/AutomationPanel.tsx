@@ -509,6 +509,10 @@ export function AutomationPanel({ onToast, onNavigate, onOpenSession }: Automati
     return { completedItems: completed, archivedItems: archived };
   }, [snapshot]);
 
+  // G4-1 运行记录：按日期或按任务分组，并可只保留某个失败原因。
+  const [recordGroup, setRecordGroup] = useState<"date" | "task">("date");
+  const [reasonFilter, setReasonFilter] = useState<string | null>(null);
+
   const query = searchQuery.trim().toLowerCase();
   const filteredScheduled = useMemo(
     () => (query ? scheduledAutomations.filter((a) => a.name.toLowerCase().includes(query)) : scheduledAutomations),
@@ -524,16 +528,41 @@ export function AutomationPanel({ onToast, onNavigate, onOpenSession }: Automati
     else if (filterStatus === "failed") items = items.filter((i) => i.status === "failed" && !i.archived);
     else if (filterStatus === "running") items = items.filter((i) => i.status === "running" && !i.archived);
     else if (filterStatus === "archived") items = items.filter((i) => i.archived);
+    if (reasonFilter) items = items.filter((i) => (i.error ?? "") === reasonFilter);
     if (query) {
       items = items.filter((i) =>
         (automationById.get(i.automationId)?.name || i.automationName || "").toLowerCase().includes(query),
       );
     }
     return items;
-  }, [completedItems, archivedItems, filterStatus, query, automationById]);
+  }, [completedItems, archivedItems, filterStatus, reasonFilter, query, automationById]);
+
+  /** 失败原因聚合 (G4-1)：同一条错误文本归并计数，按次数降序。 */
+  const failureReasons = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of [...completedItems, ...archivedItems]) {
+      if (item.status !== "failed" || item.archived) continue;
+      const reason = (item.error ?? "").trim() || "未记录原因";
+      counts.set(reason, (counts.get(reason) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [completedItems, archivedItems]);
 
   const groupedRecords = useMemo(() => {
     const groups: { label: string; items: AutomationRunRecord[] }[] = [];
+    if (recordGroup === "task") {
+      const byTask = new Map<string, AutomationRunRecord[]>();
+      for (const item of filteredRecords) {
+        if (item.archived) continue;
+        const name = automationById.get(item.automationId)?.name || item.automationName || "未知任务";
+        if (!byTask.has(name)) byTask.set(name, []);
+        byTask.get(name)!.push(item);
+      }
+      for (const [label, items] of byTask) {
+        groups.push({ label, items: [...items].sort((a, b) => Date.parse(b.finishedAt || b.startedAt) - Date.parse(a.finishedAt || a.startedAt)) });
+      }
+      return groups;
+    }
     const groupMap = new Map<string, AutomationRunRecord[]>();
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -555,7 +584,7 @@ export function AutomationPanel({ onToast, onNavigate, onOpenSession }: Automati
     }
     for (const [label, items] of groupMap) groups.push({ label, items });
     return groups;
-  }, [filteredRecords]);
+  }, [filteredRecords, recordGroup, automationById]);
 
   const archivedRecords = useMemo(() => filteredRecords.filter((i) => i.archived), [filteredRecords]);
 
@@ -855,6 +884,40 @@ export function AutomationPanel({ onToast, onNavigate, onOpenSession }: Automati
       ) : (
         /* 运行记录列表 */
         <div className="atm-records-list">
+          {/* G4-1: 分组方式 + 失败原因聚合 */}
+          <div className="atm-records-tools">
+            <div className="atm-seg" role="tablist" aria-label="运行记录分组">
+              {(["date", "task"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  role="tab"
+                  aria-selected={recordGroup === mode}
+                  className={"atm-seg__opt" + (recordGroup === mode ? " atm-seg__opt--on" : "")}
+                  onClick={() => { setRecordGroup(mode); setCollapsedGroups(new Set()); }}
+                >
+                  {mode === "date" ? "按日期" : "按任务"}
+                </button>
+              ))}
+            </div>
+            {failureReasons.length > 0 && (
+              <div className="atm-failure-summary" role="group" aria-label="失败原因">
+                <span className="atm-failure-summary__title">失败原因</span>
+                {failureReasons.slice(0, 4).map(([reason, count]) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    className={"atm-failure-chip" + (reasonFilter === reason ? " atm-failure-chip--on" : "")}
+                    title={reason}
+                    onClick={() => setReasonFilter(reasonFilter === reason ? null : reason)}
+                  >
+                    <span className="atm-failure-chip__text">{reason}</span>
+                    <span className="atm-failure-chip__count">{count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {groupedRecords.map((group) => {
             const isCollapsed = collapsedGroups.has(group.label);
             return (

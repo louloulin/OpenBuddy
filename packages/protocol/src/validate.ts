@@ -87,6 +87,12 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'window_open_session') string('sessionId', 256);
   if (command === 'window_open_artifact') { string('sessionId', 256); string('path', 4096); }
   if (command === 'rename_path') { string('workspaceRoot', 4096); string('from', 4096); string('to', 4096); }
+  if (command === 'artifacts_workspace_list' && payload.cwd !== undefined && payload.cwd !== null) string('cwd', 4096);
+  if (command === 'worktree_list') string('cwd', 4096);
+  if (command === 'worktree_create') { string('cwd', 4096); string('name', 64); }
+  if (command === 'worktree_remove') { string('cwd', 4096); string('path', 4096); }
+  if (command === 'data_import_scan') string('path', 4096);
+  if (command === 'data_import_apply') { string('path', 4096); string('outputDir', 4096); }
   if (command === 'quick_shortcut_set') {
     if (typeof payload.accelerator !== 'string' || !payload.accelerator.trim() || payload.accelerator.length > 100) throw new Error('invalid_payload: accelerator');
   }

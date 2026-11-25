@@ -6,6 +6,7 @@ import { UsageQuotaPanel } from "../../settings/UsageQuotaPanel";
 import { invoke, open } from "@openbuddy/client/ipc";
 import { memoryList } from "@openbuddy/client/agent-client";
 vi.mock("@openbuddy/client/ipc", () => ({ invoke: vi.fn(async () => [{ name: "local.md", path: "/workspace/local.md", kind: "file", size: 12 }]), open: vi.fn() }));
+vi.mock("@openbuddy/client/api/files", () => ({ defaultOpenGet: vi.fn(async () => ({})), renamePath: vi.fn() }));
 vi.mock("@openbuddy/client/agent-client", () => ({ memoryList: vi.fn(async () => []) }));
 beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); });
 describe("visible capability boundaries", () => {
@@ -16,8 +17,10 @@ describe("visible capability boundaries", () => {
     expect(memoryList).not.toHaveBeenCalled();
     expect(vi.mocked(invoke).mock.calls.some(([command]) => command === "browse_directory")).toBe(false);
     expect(screen.getByText("—")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "任务成果" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "任务成果" }));
+    // G3-5 之后「任务成果」可用：它只读本机 checkpoint，同样不碰 memory_* 命令。
+    const artifactsTab = screen.getByRole("button", { name: "任务成果" });
+    expect(artifactsTab).not.toBeDisabled();
+    fireEvent.click(artifactsTab);
     await waitFor(() => expect(memoryList).not.toHaveBeenCalled());
     expect(screen.getByText(/本地文件.*不提供网络上传/)).toBeInTheDocument();
   });

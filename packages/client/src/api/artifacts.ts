@@ -36,6 +36,17 @@ export interface RevertResult {
 }
 
 export const artifactsList = (sessionId: string) => invoke<ArtifactInfo[]>("artifacts_list", { sessionId });
+/** G3-5: artifacts across every task in a workspace, read from disk (no session load needed). */
+export interface WorkspaceArtifact {
+  sessionId: string;
+  sessionTitle: string;
+  path: string;
+  lastAt: number;
+  size?: number;
+  exists: boolean;
+}
+export const artifactsWorkspaceList = (cwd: string) =>
+  invoke<WorkspaceArtifact[]>("artifacts_workspace_list", { cwd });
 export const checkpointList = (sessionId: string, path?: string) => invoke<CheckpointRecord[]>("checkpoint_list", path ? { sessionId, path } : { sessionId });
 export const checkpointRead = (sessionId: string, hash: string) => invoke<{ text?: string; binary: boolean; size: number }>("checkpoint_read", { sessionId, hash });
 export const checkpointRestore = (sessionId: string, path: string, hash: string | null) => invoke<void>("checkpoint_restore", { sessionId, path, hash });

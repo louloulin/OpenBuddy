@@ -180,6 +180,7 @@ export const modelsZh: Record<string, string> = {
   "models.preset.qwen": "通义千问",
   "models.preset.grok": "xAI Grok",
   "models.preset.vercel": "Vercel AI Gateway",
+  "models.preset.magpie": "magpie（本机网关）",
 
   "models.thinkingFormat.auto": "自动（按 Base URL 判断）",
   "models.thinkingFormat.openai": "reasoning_effort（OpenAI）",
@@ -401,6 +402,7 @@ export const modelsEn: Record<string, string> = {
   "models.preset.qwen": "Qwen",
   "models.preset.grok": "xAI Grok",
   "models.preset.vercel": "Vercel AI Gateway",
+  "models.preset.magpie": "magpie (local gateway)",
 
   "models.thinkingFormat.auto": "Automatic (detected from the Base URL)",
   "models.thinkingFormat.openai": "reasoning_effort (OpenAI)",

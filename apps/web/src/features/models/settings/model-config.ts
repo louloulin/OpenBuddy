@@ -18,7 +18,7 @@ export interface Preset {
   helpUrl?: string;
 }
 
-export const PRESET_ORDER: ProviderKind[] = ["custom", "custom_anthropic", "openai", "anthropic", "deepseek", "qwen", "grok", "vercel"];
+export const PRESET_ORDER: ProviderKind[] = ["custom", "custom_anthropic", "openai", "anthropic", "deepseek", "qwen", "grok", "vercel", "magpie"];
 
 export const PRESETS: Record<ProviderKind, Preset> = {
   anthropic: {
@@ -54,6 +54,15 @@ export const PRESETS: Record<ProviderKind, Preset> = {
     models: ["anthropic/claude-sonnet-5", "anthropic/claude-haiku-4.5", "openai/gpt-4.1", "google/gemini-2.5-pro"],
     placeholderKey: "AI_GATEWAY_API_KEY…",
     helpUrl: "vercel.com/docs/ai-gateway",
+  },
+  // magpie：本机网关，模型 id 形如 `anthropic/claude-sonnet-5` 或 `auto/glm-5.3-flash`。
+  magpie: {
+    label: "magpie（本机网关）",
+    baseUrl: "http://127.0.0.1:3425/v1",
+    apiBackend: "chat_completions",
+    models: ["auto/glm-5.3-flash"],
+    placeholderKey: "回环地址可留空",
+    helpUrl: "yetone/magpie-releases",
   },
   deepseek: {
     label: "DeepSeek",

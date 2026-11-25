@@ -17,6 +17,9 @@ const baseUrl = process.env.ANTHROPIC_BASE_URL;
 const apiKey = process.env.ANTHROPIC_API_KEY;
 const modelId = process.env.ANTHROPIC_MODEL;
 const enabled = process.env.OPENBUDDY_REAL_MODEL === "1" && !!baseUrl && !!apiKey && !!modelId;
+/** magpie 是 yetone 的本机模型网关（默认 127.0.0.1:3425），不需要 Key。 */
+const magpieUrl = process.env.MAGPIE_URL ?? "http://127.0.0.1:3425/v1";
+const magpieEnabled = process.env.OPENBUDDY_MAGPIE === "1";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -127,7 +130,8 @@ describe.skipIf(!enabled)("真实模型运行 (B3d smoke)", () => {
       const blocked = (audit.events ?? []).find(
         (event) => (event as { action?: string }).action === "tool-content-blocked",
       ) as { tool?: string; reason?: string } | undefined;
-      expect(blocked?.tool).toBe("read");
+      // 模型可能用 read、也可能用 bash(cat) 读文件：两者都要被拦。
+      expect(["read", "bash", "grep"]).toContain(blocked?.tool);
       expect(blocked?.reason).toContain("忽略既有指令");
     } finally {
       app.dispose();
@@ -300,6 +304,55 @@ describe.skipIf(!enabled)("真实模型运行 (B3d smoke)", () => {
       // 主对话的上下文一点没变。
       const after = await app.handlers.agent_load_session({ sessionId, cwd: root });
       expect(JSON.stringify(after.messages)).toBe(JSON.stringify(before.messages));
+    } finally {
+      app.dispose();
+    }
+  }, 300_000);
+});
+
+describe.skipIf(!magpieEnabled)("magpie 本机网关 (真实模型)", () => {
+  it("按 magpie 预设拉取模型，并用其中一个真实跑一轮对话", async () => {
+    const root = mkdtempSync(join(tmpdir(), "openbuddy-magpie-"));
+    dirs.push(root);
+    const safe = {
+      isEncryptionAvailable: () => true,
+      encryptString: (value: string) => Buffer.from(value.split("").reverse().join("")),
+      decryptString: (buffer: Buffer) => buffer.toString().split("").reverse().join(""),
+    };
+    const app = await createEngineHandlers({
+      userDataDir: root,
+      safeStorage: safe,
+      emit: () => {},
+      shell: { openPath: async () => "", showItemInFolder: () => {}, openExternal: async () => {} },
+    });
+    try {
+      // 不传 apiKey：magpie 是本机回环网关，OpenBuddy 按预设走免 Key 路径。
+      await app.handlers.providers_save_provider({
+        provider: {
+          id: "magpie",
+          providerKind: "magpie",
+          label: "magpie",
+          baseUrl: magpieUrl,
+          apiBackend: "chat_completions",
+          authScheme: "bearer",
+        },
+      });
+      const fetched = (await app.handlers.providers_fetch_models({ providerId: "magpie" })) as Array<{ id: string }>;
+      expect(fetched.length).toBeGreaterThan(0);
+      // 优先用 auto 路由组，其次第一项。
+      const chosen = fetched.find((m) => m.id.startsWith("auto/")) ?? fetched[0];
+      await app.handlers.providers_save_model({
+        model: { modelId: chosen.id, providerId: "magpie", displayName: chosen.id },
+      });
+      await app.handlers.permission_mode_set({ mode: "always-approve" });
+      const sessionId = await app.handlers.agent_new_session({ cwd: root, modelId: chosen.id });
+      await app.handlers.agent_send({
+        sessionId,
+        text: "调用 write 工具在当前工作目录创建 magpie-check.md，内容只有一行 MAGPIE_OK。完成后回复 DONE。",
+      });
+      const target = join(root, "magpie-check.md");
+      await until(() => existsSync(target) && readFileSync(target, "utf8").includes("MAGPIE_OK"), 240_000);
+      expect(readFileSync(target, "utf8")).toContain("MAGPIE_OK");
     } finally {
       app.dispose();
     }

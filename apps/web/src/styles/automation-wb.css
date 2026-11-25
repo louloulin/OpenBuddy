@@ -727,6 +727,25 @@
   margin-top: 8px;
 }
 .atm-records-group { display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; }
+/* G4-1 运行记录：分组切换与失败原因聚合。 */
+.atm-records-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.375rem 0 0.625rem; }
+.atm-seg { display: inline-flex; padding: 0.125rem; border-radius: var(--wb-radius-pill); background: var(--wb-bg-secondary); }
+.atm-seg__opt {
+  height: 1.5rem; padding: 0 0.625rem; border: 0; border-radius: var(--wb-radius-pill); background: transparent;
+  color: var(--wb-text-medium); font: inherit; font-size: 0.75rem; cursor: pointer;
+}
+.atm-seg__opt--on { background: var(--wb-bg-primary); color: var(--wb-text-strong); box-shadow: 0 0.0625rem 0.125rem rgb(0 0 0 / 0.08); }
+.atm-failure-summary { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; min-width: 0; }
+.atm-failure-summary__title { font-size: 0.6875rem; color: var(--wb-text-tertiary); }
+.atm-failure-chip {
+  display: inline-flex; align-items: center; gap: 0.25rem; max-width: 16rem; height: 1.5rem; padding: 0 0.5rem;
+  border: var(--wb-hairline) solid var(--wb-border-default); border-radius: var(--wb-radius-pill);
+  background: transparent; color: var(--wb-text-medium); font: inherit; font-size: 0.6875rem; cursor: pointer;
+}
+.atm-failure-chip:hover { background: var(--wb-bg-hover); }
+.atm-failure-chip--on { border-color: transparent; background: color-mix(in srgb, #b42318 12%, transparent); color: #b42318; }
+.atm-failure-chip__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.atm-failure-chip__count { flex: none; padding: 0 0.3125rem; border-radius: var(--wb-radius-pill); background: var(--wb-bg-secondary); font-size: 0.625rem; }
 .atm-records-group-label {
   padding: 4px 8px;
   font-size: 12px;

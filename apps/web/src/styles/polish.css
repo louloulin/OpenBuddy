@@ -1506,3 +1506,34 @@ html[data-density="compact"] .pref-row { padding-top: 7px; padding-bottom: 7px; 
   font-size: 0.8125rem;
   white-space: pre-wrap;
 }
+
+/* 外部会话导入向导 (G4-3)。 */
+.sec-input {
+  flex: 1 1 14rem; min-width: 0; height: 2rem; padding: 0 0.625rem;
+  border: var(--wb-hairline) solid var(--ob-card-border); border-radius: 0.625rem;
+  background: var(--ob-card); color: var(--wb-text-strong); font: inherit; font-size: 0.75rem;
+}
+.sec-input:focus-visible { outline: none; border-color: transparent; box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--ob-focus) 30%, transparent); }
+.import-conv { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem 1.125rem 0.875rem; }
+.import-conv__head { display: flex; align-items: center; gap: 0.5rem; }
+.import-conv__list { list-style: none; margin: 0; padding: 0; max-height: 16rem; overflow: auto; display: flex; flex-direction: column; }
+.import-conv__item { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.375rem 0; }
+.import-conv__item + .import-conv__item { border-top: var(--wb-hairline) solid var(--ob-card-border); }
+.import-conv__label { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; cursor: pointer; }
+.import-conv__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; color: var(--wb-text-strong); }
+.import-conv__label input { accent-color: var(--ob-ink); }
+
+/* 默认打开方式 (G1-6)：按文件类型的二选一分段。 */
+.open-pref { margin-bottom: 0.75rem; }
+.open-pref__title { margin: 0 0 0.375rem; font-size: 0.75rem; font-weight: 600; color: var(--wb-text-tertiary); letter-spacing: 0.04em; }
+.open-pref__row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.375rem 0; }
+.open-pref__label { font-size: 0.8125rem; color: var(--wb-text-strong); }
+.open-pref__seg { display: inline-flex; padding: 0.125rem; border-radius: var(--wb-radius-pill); background: var(--wb-bg-secondary); }
+.open-pref__opt {
+  height: 1.625rem; padding: 0 0.75rem; border: 0; border-radius: var(--wb-radius-pill); background: transparent;
+  color: var(--wb-text-medium); font: inherit; font-size: 0.75rem; cursor: pointer;
+}
+.open-pref__opt--on { background: var(--wb-bg-primary); color: var(--wb-text-strong); box-shadow: 0 0.0625rem 0.125rem rgb(0 0 0 / 0.08); }
+.open-pref__opt:disabled { opacity: 0.5; cursor: default; }
+.open-pref__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+.open-pref__hint { font-size: 0.6875rem; color: var(--wb-text-tertiary); }

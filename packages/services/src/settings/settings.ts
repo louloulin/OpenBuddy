@@ -264,6 +264,8 @@ export interface AppSettings {
     maxTokens: number;
     setDefault: boolean;
   };
+  /** 默认打开方式 (G1-6): per file type, "embedded" (预览面板) or "system" (系统关联应用). */
+  defaultOpen?: Record<string, "embedded" | "system">;
   /** System notifications while the window is in the background (20261115-ui U6.1); on by default. */
   notifyPrefs?: { system?: boolean };
   /** 通知渠道 (pii W4.6): webhook / mail / desktop, sent by the host. */

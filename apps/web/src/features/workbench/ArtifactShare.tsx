@@ -1,8 +1,10 @@
 /**
- * 分享前态 (B3d): local-only export. Cloud links arrive with the C2 collaboration service, so the
- * entry is present but disabled instead of silently missing or pretending to work.
+ * 分享前态 (B3d / G3-4): local-only export plus a read-only visibility row. Cloud links arrive with
+ * the C2 collaboration service, so the entry is present but disabled instead of silently missing or
+ * pretending to work. Visibility is shown as it really is — this file only exists on this machine.
  */
 import { useEffect, useRef } from "react";
+import { invoke } from "@openbuddy/client/ipc";
 import { readTextFile, saveTextAs } from "@openbuddy/client/agent-client";
 import { copyText } from "@openbuddy/platform/clipboard";
 import { friendlyError } from "@openbuddy/chat-core/error-format";
@@ -52,6 +54,24 @@ export function ArtifactShare({ path, available, onClose, onToast }: {
     void copyText(path).then(() => { onToast("已复制路径"); onClose(); }, () => onToast("复制失败"));
   };
 
+  const openDefault = async () => {
+    try {
+      await invoke("open_path", { path });
+      onClose();
+    } catch (error) {
+      onToast(`无法打开：${friendlyError(error)}`);
+    }
+  };
+
+  const reveal = async () => {
+    try {
+      await invoke("reveal_in_folder", { path });
+      onClose();
+    } catch {
+      onToast("无法在文件夹中定位这个文件");
+    }
+  };
+
   return (
     <div className="ec-modal-overlay" onClick={(event) => { if (event.target === ref.current) onClose(); }} ref={ref}>
       <div className="ec-modal bench-share" ref={dialogRef} role="dialog" aria-modal="true" aria-label="分享产物">
@@ -69,12 +89,24 @@ export function ArtifactShare({ path, available, onClose, onToast }: {
           <button type="button" className="bench-share__item" disabled={!available} onClick={() => void saveAs()}>
             <span>另存为…</span><span className="bench-share__hint">保存到本机</span>
           </button>
+          <button type="button" className="bench-share__item" disabled={!available} onClick={() => void openDefault()}>
+            <span>用默认应用打开</span><span className="bench-share__hint">本机程序</span>
+          </button>
+          <button type="button" className="bench-share__item" disabled={!available} onClick={() => void reveal()}>
+            <span>在文件夹中显示</span><span className="bench-share__hint">Finder / 资源管理器</span>
+          </button>
           <button type="button" className="bench-share__item" onClick={copyPath}>
             <span>复制路径</span><span className="bench-share__hint">{path}</span>
           </button>
           <button type="button" className="bench-share__item bench-share__item--disabled" disabled aria-disabled="true" title="协作服务尚未接入（C2）">
             <span>云端链接</span><span className="bench-share__hint">C2 协作服务接入后提供</span>
           </button>
+        </div>
+        {/* 可见性 (G3-4)：只读展示真实状态，不提供假的「公开 / 私有」开关。 */}
+        <div className="bench-share__visibility" role="note">
+          <span className="bench-share__visibility-label">可见性</span>
+          <span className="bench-share__visibility-value">仅本机</span>
+          <span className="bench-share__hint">文件只在这台电脑的工作区里，不随账号同步；云端协作接入后再提供共享链接。</span>
         </div>
       </div>
     </div>

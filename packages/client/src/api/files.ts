@@ -65,6 +65,20 @@ export interface PathStat {
 
 /** Stat one path without reading it (artifact reader's live deletion probe). */
 export const pathStat = (path: string) => invoke<PathStat>("path_stat", { path });
+/** 默认打开方式 (G1-6)：按文件类型记住「应用内预览 / 系统应用」。 */
+export type DefaultOpenMap = Record<string, "embedded" | "system">;
+export const defaultOpenGet = () => invoke<DefaultOpenMap>("default_open_get");
+export const defaultOpenSet = (map: DefaultOpenMap) => invoke<DefaultOpenMap>("default_open_set", { defaultOpen: map });
+
+/** Git worktree (G4-5): isolated checkouts for code tasks. */
+export interface WorktreeRow { path: string; head?: string; branch?: string; bare: boolean; main: boolean }
+export const worktreeList = (cwd: string) =>
+  invoke<{ gitRepo: boolean; root?: string; worktrees: WorktreeRow[] }>("worktree_list", { cwd });
+export const worktreeCreate = (cwd: string, name: string) =>
+  invoke<{ gitRepo: boolean; root: string; path: string; branch: string }>("worktree_create", { cwd, name });
+export const worktreeRemove = (cwd: string, path: string) =>
+  invoke<{ removed: string }>("worktree_remove", { cwd, path });
+
 /** G3-7: rename inside the task workspace; the host refuses to overwrite. */
 export const renamePath = (workspaceRoot: string, from: string, to: string) =>
   invoke<string>("rename_path", { workspaceRoot, from, to });
@@ -73,5 +87,7 @@ export const renamePath = (workspaceRoot: string, from: string, to: string) =>
 export const revealInFolder = (path: string) => invoke<void>("reveal_in_folder", { path });
 
 /** Read a text file with a byte cap; the host enforces the cap and the workspace grant. */
+export const readFileBase64 = (path: string, maxBytes?: number) =>
+  invoke<string>("read_file_base64", { path, ...(maxBytes ? { maxBytes } : {}) });
 export const readTextFile = (path: string, maxBytes?: number) =>
   invoke<string>("read_text_file", { path, ...(maxBytes ? { maxBytes } : {}) });

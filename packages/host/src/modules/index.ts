@@ -10,6 +10,7 @@ import { mcpModule } from "./mcp.js";
 import { notificationsModule } from "./notifications.js";
 import { artifactsModule } from "./artifacts.js";
 import { filesModule } from "./files.js";
+import { worktreeCommands } from "./worktrees.js";
 import { hostModule } from "./host.js";
 import { expertsModule } from "./experts.js";
 import { memoryModule } from "./memory.js";
@@ -44,4 +45,5 @@ export const HOST_MODULES: readonly HostModuleFactory[] = [
   logsModule,
   hostModule,
   filesModule,
+  worktreeCommands,
 ];

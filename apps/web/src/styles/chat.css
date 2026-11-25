@@ -571,3 +571,12 @@
 }
 .bench-rename__input:focus-visible { outline: var(--wb-outline-2) solid var(--wb-border-focus); outline-offset: 0.0625rem; }
 .bench-rename__error { font-size: 0.75rem; color: var(--wb-text-error, #b42318); }
+
+/* 分享面板的可见性只读行 (G3-4)。 */
+.bench-share__visibility {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem;
+  margin: 0.75rem 1rem 0; padding: 0.625rem 0.75rem;
+  border: var(--wb-hairline) solid var(--wb-border-default); border-radius: 0.625rem; background: var(--wb-bg-secondary);
+}
+.bench-share__visibility-label { font-size: 0.75rem; color: var(--wb-text-tertiary); }
+.bench-share__visibility-value { padding: 0 0.5rem; border-radius: var(--wb-radius-pill); background: var(--wb-bg-primary); font-size: 0.75rem; color: var(--wb-text-strong); }
