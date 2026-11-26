@@ -107,6 +107,10 @@ export const appsUpdate = (packageSource: string) =>
 export const appsUninstall = (packageSource: string) =>
   invoke<{ packageSource: string; packages: unknown[] }>("apps_uninstall", { packageSource });
 
+/** 应用图标（data URI；缺失或过大时 dataUri 为 null）。 */
+export const appsIcon = (packageSource: string, icon: string) =>
+  invoke<{ dataUri: string | null }>("apps_icon", { packageSource, icon });
+
 /** 整体启停一个应用（Pi 包的全部资源）。 */
 export const appsSetEnabled = (packageSource: string, enabled: boolean) =>
   invoke<{ packageSource: string; enabled: boolean }>("apps_set_enabled", { packageSource, enabled });

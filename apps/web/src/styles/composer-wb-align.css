@@ -144,8 +144,9 @@
   user-select: none;
   filter: drop-shadow(0 0.25rem 0.5rem rgb(0 0 0 / 0.12));
 }
-/* 卡片盖住机器人的下半身，形成「探出」的层次。 */
-.wb-composer { position: relative; z-index: 1; }
+/* 卡片盖住机器人的下半身，形成「探出」的层次。
+   z-index 必须高于首页 chip / 消息流，否则 `+` 菜单与子菜单会被后绘制的内容盖住。 */
+.wb-composer { position: relative; z-index: 20; }
 
 /* 聊天页权限行：与卡片内容左对齐，卡内不再放权限控件（对齐 WorkBuddy 聊天页）。 */
 .wb-composer-meta--permission { padding: 0; }

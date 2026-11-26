@@ -23,6 +23,7 @@ vi.mock("@openbuddy/client/agent-client", () => ({
 vi.mock("@openbuddy/client/api/files", () => ({
   readTextFile,
   appsToolPolicyGet: vi.fn(async () => ({ platformDenied: ["(^|_)(place_trade_order|cancel_trade_order)$"], denied: [], readonly: ["get_astock_price"] })),
+  appsToolPolicySet: vi.fn(async (next: { denied?: string[]; readonly?: string[] }) => ({ platformDenied: [], denied: next.denied ?? [], readonly: next.readonly ?? [] })),
 }));
 vi.mock("@openbuddy/client/api/approvals", () => ({
   securityPolicyGet: securityPolicyGet,

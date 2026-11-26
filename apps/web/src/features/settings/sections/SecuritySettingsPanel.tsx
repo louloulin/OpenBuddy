@@ -7,7 +7,7 @@ import {
   permissionSave,
 } from "@openbuddy/client/agent-client";
 import { skillsList } from "@openbuddy/client/agent-client";
-import { appsToolPolicyGet, type ToolPolicy } from "@openbuddy/client/api/files";
+import { appsToolPolicyGet, appsToolPolicySet, type ToolPolicy } from "@openbuddy/client/api/files";
 import { readTextFile } from "@openbuddy/client/api/files";
 import type { PermissionRule, SkillInfo } from "@openbuddy/protocol/dto";
 import { useLocale } from "@/shared/i18n";
@@ -81,6 +81,8 @@ export function SecuritySettingsPanel() {
   const [skillError, setSkillError] = useState<string | null>(null);
   // 工具策略 (UP-3.2)：平台红线只读展示；用户/应用声明的 deny 与只读也在这里。
   const [policy, setPolicy] = useState<ToolPolicy | null>(null);
+  const [newDeniedTool, setNewDeniedTool] = useState("");
+  const [newReadonlyTool, setNewReadonlyTool] = useState("");
   const [tab, setTab] = useState<TabId>("tools");
   const tabRefs = useRef(new Map<TabId, HTMLButtonElement>());
   // W6.1: 审批卡「查看拦截规则」定位到对应分类（protected → 受保护路径卡片）。
@@ -137,6 +139,26 @@ export function SecuritySettingsPanel() {
       .then((list) => setSkills(Array.isArray(list) ? list : []))
       .catch(() => setSkills([]));
   }, []);
+
+  const commitPolicy = async (next: { denied?: string[]; readonly?: string[] }) => {
+    setBusy(true);
+    try {
+      setPolicy(await appsToolPolicySet(next));
+    } catch (e) {
+      setError(String(e).replace(/^Error:\s*/, ""));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addTool = async (kind: "denied" | "readonly") => {
+    if (!policy) return;
+    const name = (kind === "denied" ? newDeniedTool : newReadonlyTool).trim();
+    if (!name) return;
+    const next = { denied: policy.denied, readonly: policy.readonly, [kind]: [...(kind === "denied" ? policy.denied : policy.readonly), name] };
+    await commitPolicy(next);
+    if (kind === "denied") setNewDeniedTool(""); else setNewReadonlyTool("");
+  };
 
   const reviewSkill = useCallback(async (skill: SkillInfo) => {
     if (!skill.path) return;
@@ -420,11 +442,39 @@ export function SecuritySettingsPanel() {
             </div>
             <div className="sec-list__row">
               <span className="sec-list__name">额外禁用</span>
-              <span className="sec-list__meta">{policy.denied.length ? policy.denied.join("、") : "无"}</span>
+              <span className="sec-list__meta">
+                {policy.denied.length ? policy.denied.map((name) => (
+                  <button key={name} type="button" className="sec-chip" disabled={busy}
+                    aria-label={`恢复工具 ${name}`} onClick={() => void commitPolicy({ denied: policy.denied.filter((item) => item !== name) })}>
+                    <code>{name}</code><span className="sec-chip__x" aria-hidden>×</span>
+                  </button>
+                )) : "无"}
+              </span>
             </div>
             <div className="sec-list__row">
               <span className="sec-list__name">只读（auto 模式免审）</span>
-              <span className="sec-list__meta">{policy.readonly.length ? policy.readonly.join("、") : "无"}</span>
+              <span className="sec-list__meta">
+                {policy.readonly.length ? policy.readonly.map((name) => (
+                  <button key={name} type="button" className="sec-chip" disabled={busy}
+                    aria-label={`取消只读 ${name}`} onClick={() => void commitPolicy({ readonly: policy.readonly.filter((item) => item !== name) })}>
+                    <code>{name}</code><span className="sec-chip__x" aria-hidden>×</span>
+                  </button>
+                )) : "无"}
+              </span>
+            </div>
+            <div className="sec-add">
+              <input type="text" aria-label="额外禁用的工具名" placeholder="禁用某工具，例如 custom_danger"
+                value={newDeniedTool} onChange={(e) => setNewDeniedTool(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && newDeniedTool.trim()) void addTool("denied"); }} />
+              <button type="button" className="sec-btn" disabled={busy || !newDeniedTool.trim()} onClick={() => void addTool("denied")}>
+                <Plus size={14} /> 禁用
+              </button>
+              <input type="text" aria-label="只读工具名" placeholder="登记只读工具，例如 get_astock_price"
+                value={newReadonlyTool} onChange={(e) => setNewReadonlyTool(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && newReadonlyTool.trim()) void addTool("readonly"); }} />
+              <button type="button" className="sec-btn" disabled={busy || !newReadonlyTool.trim()} onClick={() => void addTool("readonly")}>
+                <Plus size={14} /> 只读
+              </button>
             </div>
           </div>
         </div>

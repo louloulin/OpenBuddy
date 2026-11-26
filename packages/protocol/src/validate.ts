@@ -95,6 +95,7 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'agent_check_tool') { string('sessionId', 256); string('toolName', 128); }
   if (command === 'apps_list' && payload.cwd !== undefined && payload.cwd !== null) string('cwd', 4096);
   if (command === 'apps_set_enabled') { string('packageSource', 4096); if (typeof payload.enabled !== 'boolean') throw new Error('invalid_payload: enabled'); }
+  if (command === 'apps_icon') { string('packageSource', 4096); string('icon', 512); }
   if (command === 'apps_update') string('packageSource', 4096);
   if (command === 'apps_uninstall') string('packageSource', 4096);
   if (command === 'data_import_scan') string('path', 4096);

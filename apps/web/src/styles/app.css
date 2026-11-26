@@ -13568,3 +13568,6 @@ button.diff__path {
 }
 .iam-scene:hover { background: var(--wb-bg-hover); }
 .iam-scene__app { color: var(--wb-text-tertiary); font-size: 0.6875rem; }
+
+/* 应用卡图标 (UP-2.4)。 */
+.iam-app-icon { width: 1rem; height: 1rem; margin-right: 0.375rem; border-radius: 0.25rem; object-fit: contain; vertical-align: -0.1875rem; }

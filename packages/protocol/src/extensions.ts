@@ -220,6 +220,10 @@ export function validExtensionSource(value: unknown): value is string {
   if (!source || source.length > 2048 || /[\0\r\n]/.test(source)) return false;
   if (/^(npm|git|github|ssh):.+/i.test(source)) return true;
   if (/^(https:\/\/|git@)/i.test(source)) return true;
+  // 本地 checkout（绝对路径 / ~ 开头 / Windows 盘符）：UpUp 这类 monorepo 只能这样装。
+  // 目录由文件选择器给出；扩展加载仍受「总开关 + 目录信任」两道门控。
+  if (source.startsWith("/") || source.startsWith("~/")) return true;
+  if (/^[A-Za-z]:[\\/]/.test(source)) return true;
   // owner/repo shorthand (no scheme, no spaces, exactly one slash)
   return /^[\w.-]+\/[\w.-]+$/.test(source);
 }

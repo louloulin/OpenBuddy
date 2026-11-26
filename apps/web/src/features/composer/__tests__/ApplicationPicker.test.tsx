@@ -11,6 +11,7 @@ import { ApplicationPicker } from "../ApplicationPicker";
 
 vi.mock("@openbuddy/client/api/files", () => ({
   appsList: vi.fn(async () => []),
+  appsIcon: vi.fn(async () => ({ dataUri: null })),
   appsSetEnabled: vi.fn(async () => ({ packageSource: "", enabled: false })),
 }));
 vi.mock("@openbuddy/client/agent-client", () => ({

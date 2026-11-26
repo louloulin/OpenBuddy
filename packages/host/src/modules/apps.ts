@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { readUpupPlugins, writeUpupPlugins } from "@openbuddy/services/apps/upup-settings";
 import { PLATFORM_DENIED_PATTERNS } from "@openbuddy/engine/permissions/permissions";
 import { readAppEntry, type AppEntry } from "@openbuddy/services/apps/manifest";
@@ -51,6 +53,19 @@ export function appsModule(ctx: HostContext): HostModule {
       const packages = await ctx.engine.removeExtensionPackage(source);
       const cleared = writeUpupPlugins(agentDir, { disabled: [], enabled: [] });
       return { packageSource: source, packages, upup: cleared };
+    },
+    // 应用图标 (UP-2.4)：读包内的 icon，返回 data URI；只允许包目录内的图片，≤512KB。
+    apps_icon: async (p) => {
+      const pkgRoot = text(p.packageSource, "packageSource");
+      const icon = text(p.icon, "icon");
+      const target = resolve(pkgRoot, icon);
+      const rel = relative(resolve(pkgRoot), target);
+      if (rel.startsWith("..") || isAbsolute(rel)) throw new Error("invalid_payload: icon");
+      const ext = icon.split(".").pop()?.toLowerCase() ?? "";
+      const mime = ext === "svg" ? "image/svg+xml" : ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "webp" ? "image/webp" : ext === "gif" ? "image/gif" : "image/png";
+      const bytes = await readFile(target).catch(() => null);
+      if (!bytes || bytes.length > 512 * 1024) return { dataUri: null };
+      return { dataUri: `data:${mime};base64,${bytes.toString("base64")}` };
     },
     // 工具策略 (UP-3.2)：红线永远在前，配置只能加不能减。
     apps_tool_policy_get: () => {

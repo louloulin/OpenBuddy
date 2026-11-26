@@ -5,7 +5,7 @@ import {
   capabilityPackSetEnabled,
   capabilityPacksList,
 } from "@openbuddy/client/agent-client";
-import { appsList, appsSetEnabled, type AppEntry } from "@openbuddy/client/api/files";
+import { appsIcon, appsList, appsSetEnabled, type AppEntry } from "@openbuddy/client/api/files";
 import type { CapabilityPack } from "@openbuddy/protocol/experts";
 import type { ExtensionPackage } from "@openbuddy/protocol/extensions";
 
@@ -35,6 +35,8 @@ export function ApplicationPicker({
   const [packages, setPackages] = useState<ExtensionPackage[]>([]);
   // 应用卡 (UP-2.4)：有 pi.app 的包显示名称/定位/分类，整体启停走 apps_set_enabled。
   const [apps, setApps] = useState<AppEntry[]>([]);
+  // 应用图标 (UP-2.4)：按 packageSource 缓存 data URI。
+  const [icons, setIcons] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState("");
   const [loaded, setLoaded] = useState(false);
 
@@ -48,6 +50,13 @@ export function ApplicationPicker({
     setPackages(k);
     setApps(a);
     setLoaded(true);
+    // 有 icon 的应用异步取一次图标；失败就只是没有图标，不影响列表。
+    for (const app of a) {
+      if (!app.icon || !app.packageSource) continue;
+      void appsIcon(app.packageSource, app.icon).then(({ dataUri }) => {
+        if (dataUri) setIcons((prev) => ({ ...prev, [app.packageSource!]: dataUri }));
+      }).catch(() => {});
+    }
   }, [cwd]);
 
   useEffect(() => { void load(); }, [load]);
@@ -115,7 +124,12 @@ export function ApplicationPicker({
                 aria-label={`应用 ${app.name}`}
               >
                 <span className="iam-sub-text">
-                  <span className="iam-sub-name">{app.name}</span>
+                  <span className="iam-sub-name">
+                    {icons[app.packageSource ?? ""] && (
+                      <img className="iam-app-icon" src={icons[app.packageSource ?? ""]} alt="" aria-hidden />
+                    )}
+                    {app.name}
+                  </span>
                   <span className="iam-sub-desc">
                     {app.tagline ?? (app.kind === "skill-pack" ? "技能包" : app.kind === "connector" ? "连接器" : "应用")}
                     {app.category ? ` · ${app.category}` : ""}
@@ -191,7 +205,12 @@ export function ApplicationPicker({
               aria-pressed={!entry.filtered}
             >
               <span className="iam-sub-text">
-                <span className="iam-sub-name">{entry.source.replace(/^npm:/, "")}</span>
+                <span className="iam-sub-name" title={entry.installedPath ?? entry.source}>
+                  {/* 本地 checkout 的 source 可能是相对路径，显示最后一段（包目录名）。 */}
+                  {/^[\w.-]+\/[\w.-]+$|^[a-z]+:/i.test(entry.source)
+                    ? entry.source.replace(/^npm:/, "")
+                    : entry.source.split(/[\\/]/).filter(Boolean).pop() ?? entry.source}
+                </span>
                 <span className="iam-sub-desc">{entry.scope === "user" ? "用户级" : "项目级"}{entry.filtered ? " · 已停用" : ""}</span>
               </span>
               <span className={"iam-switch" + (!entry.filtered ? " iam-switch--on" : "")} aria-hidden="true">

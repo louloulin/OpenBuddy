@@ -11,8 +11,15 @@ describe("扩展包来源 (pii W2.6 P2 / S14)", () => {
     }
   });
 
-  it("rejects local paths, schemes and hostile input", () => {
-    for (const source of ["/etc/passwd", "C:\\temp\\x", "file:///tmp/x", "ftp://x/y", "a/b/c", "npm:", "x".repeat(2049), "npm:foo\nbar"]) {
+  it("accepts local checkout paths (UpUp monorepo needs them)", () => {
+    for (const source of ["/Users/me/stock/upup", "~/stock/upup", "C:\\work\\upup", "/tmp/x"]) {
+      expect(validExtensionSource(source)).toBe(true);
+      expect(() => validateCommandPayload("agent_extensions_install_package", { source })).not.toThrow();
+    }
+  });
+
+  it("rejects schemes and hostile input", () => {
+    for (const source of ["file:///tmp/x", "ftp://x/y", "a/b/c", "npm:", "x".repeat(2049), "npm:foo\nbar", "/tmp/a\u0000b"]) {
       expect(validExtensionSource(source)).toBe(false);
       expect(() => validateCommandPayload("agent_extensions_install_package", { source })).toThrow(/invalid_payload/);
     }
@@ -21,7 +28,9 @@ describe("扩展包来源 (pii W2.6 P2 / S14)", () => {
   it("update accepts an optional source", () => {
     expect(() => validateCommandPayload("agent_extensions_update_packages", {})).not.toThrow();
     expect(() => validateCommandPayload("agent_extensions_update_packages", { source: "owner/repo" })).not.toThrow();
-    expect(() => validateCommandPayload("agent_extensions_update_packages", { source: "/local" })).toThrow(/invalid_payload/);
+    // 本地 checkout 也是合法来源（UpUp 走这条）。
+    expect(() => validateCommandPayload("agent_extensions_update_packages", { source: "/local" })).not.toThrow();
+    expect(() => validateCommandPayload("agent_extensions_update_packages", { source: "ftp://x/y" })).toThrow(/invalid_payload/);
   });
 });
 
@@ -60,7 +69,8 @@ describe("Pi 包市场与包资源 (S15)", () => {
     for (const resources of [null, [], "skills", { skills: "no" }, { unknown: false }]) {
       expect(() => validateCommandPayload("agent_extensions_set_package_resources", { source: "npm:a", resources })).toThrow(/invalid_payload/);
     }
-    expect(() => validateCommandPayload("agent_extensions_set_package_resources", { source: "/local", resources: {} })).toThrow(/invalid_payload/);
+    // 本地 checkout 也可设置资源开关（UpUp 走这条）。
+    expect(() => validateCommandPayload("agent_extensions_set_package_resources", { source: "/local", resources: {} })).not.toThrow();
   });
 
   it("accepts Pi glob patterns and refuses escaping ones (E1)", () => {
