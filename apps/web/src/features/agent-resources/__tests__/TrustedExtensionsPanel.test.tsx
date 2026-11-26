@@ -23,6 +23,9 @@ vi.mock("@openbuddy/client/agent-client", () => ({
   agentExtensionsCheckUpdates: vi.fn(async () => []),
   agentExtensionsResources: vi.fn(async () => ({ extensions: [], skills: [], prompts: [], themes: [], failures: [] })),
   agentExtensionsSetPackageResources: vi.fn(),
+  agentSessionTools: vi.fn(async () => []),
+  upupPluginsGet: vi.fn(async () => ({ disabled: [], enabled: [], settingsPath: "/tmp/settings.json", defaults: [], settingsExists: false })),
+  upupPluginsSet: vi.fn(),
   agentExtensionsSearchRegistry: vi.fn(async () => ({ query: "", source: "npm", total: 0, fetchedAt: 0, packages: [] })),
   agentExtensionsAdd: vi.fn(),
   agentExtensionsRemove: vi.fn(),
@@ -104,5 +107,17 @@ describe("扩展中心 · npm / git 安装 (pii W2.6 P2)", () => {
     expect(toggle).toBeChecked();
     fireEvent.click(toggle);
     await waitFor(() => expect(agentExtensionsSetPackageResources).toHaveBeenCalledWith("owner/repo", { skills: false }));
+  });
+
+  it("健康检查显示本会话工具数与示例（UP-1.4）", async () => {
+    const { agentSessionTools } = await import("@openbuddy/client/agent-client");
+    (agentSessionTools as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue([
+      "read", "write", "get_astock_price", "get_market_data",
+    ]);
+    render(<TrustedExtensionsPanel sessionId="s1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "检查本会话工具" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("共 4 个工具"));
+    expect(screen.getByRole("status")).toHaveTextContent("应用/行情类 2 个");
+    expect(agentSessionTools).toHaveBeenCalledWith("s1");
   });
 });

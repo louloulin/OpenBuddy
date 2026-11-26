@@ -22,6 +22,7 @@ vi.mock("@openbuddy/client/agent-client", () => ({
 }));
 vi.mock("@openbuddy/client/api/files", () => ({
   readTextFile,
+  appsToolPolicyGet: vi.fn(async () => ({ platformDenied: ["(^|_)(place_trade_order|cancel_trade_order)$"], denied: [], readonly: ["get_astock_price"] })),
 }));
 vi.mock("@openbuddy/client/api/approvals", () => ({
   securityPolicyGet: securityPolicyGet,
@@ -147,5 +148,13 @@ describe("安全中心 (pii W6.1 / W6.2)", () => {
     await waitFor(() => expect(screen.getByText("麦克风")).toBeInTheDocument());
     expect(screen.getByText("摄像头")).toBeInTheDocument();
     expect(screen.getByText("通知")).toBeInTheDocument();
+  });
+
+  it("展示平台工具策略与只读清单（UP-3.2）", async () => {
+    render(<SecuritySettingsPanel />);
+    const card = await screen.findByRole("region", { name: "平台工具策略" }).catch(() => screen.findByLabelText("平台工具策略"));
+    expect(card).toBeTruthy();
+    await waitFor(() => expect(screen.getByText(/真实交易（始终拒绝）/)).toBeInTheDocument());
+    expect(screen.getByText(/get_astock_price/)).toBeInTheDocument();
   });
 });

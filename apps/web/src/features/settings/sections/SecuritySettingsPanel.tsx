@@ -7,6 +7,7 @@ import {
   permissionSave,
 } from "@openbuddy/client/agent-client";
 import { skillsList } from "@openbuddy/client/agent-client";
+import { appsToolPolicyGet, type ToolPolicy } from "@openbuddy/client/api/files";
 import { readTextFile } from "@openbuddy/client/api/files";
 import type { PermissionRule, SkillInfo } from "@openbuddy/protocol/dto";
 import { useLocale } from "@/shared/i18n";
@@ -78,6 +79,8 @@ export function SecuritySettingsPanel() {
   const [skillScans, setSkillScans] = useState<Record<string, SkillScan>>({});
   const [scanningSkill, setScanningSkill] = useState<string | null>(null);
   const [skillError, setSkillError] = useState<string | null>(null);
+  // 工具策略 (UP-3.2)：平台红线只读展示；用户/应用声明的 deny 与只读也在这里。
+  const [policy, setPolicy] = useState<ToolPolicy | null>(null);
   const [tab, setTab] = useState<TabId>("tools");
   const tabRefs = useRef(new Map<TabId, HTMLButtonElement>());
   // W6.1: 审批卡「查看拦截规则」定位到对应分类（protected → 受保护路径卡片）。
@@ -124,6 +127,10 @@ export function SecuritySettingsPanel() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void appsToolPolicyGet().then(setPolicy).catch(() => setPolicy(null));
+  }, []);
 
   useEffect(() => {
     void skillsList()
@@ -396,6 +403,33 @@ export function SecuritySettingsPanel() {
       </div>
 
       <div id="security-panel-skills" role="tabpanel" aria-labelledby="security-tab-skills" hidden={tab !== "skills"}>
+      {/* 平台工具策略 (20261126-upup UP-3.2) */}
+      {policy && (
+        <div className="sec-card" aria-label="平台工具策略">
+          <div className="sec-card__head">
+            <div className="sec-card__title">
+              <ShieldAlert size={15} />
+              <span>平台工具策略</span>
+            </div>
+            <div className="sec-card__hint">真实交易类工具始终被拒绝（规则、模式与「始终允许」都不能放行）。应用可再声明自己的禁用与只读工具。</div>
+          </div>
+          <div className="sec-list">
+            <div className="sec-list__row">
+              <span className="sec-list__name">真实交易（始终拒绝）</span>
+              <span className="sec-list__meta">place_trade_order / cancel_trade_order（含 upup_ 前缀）</span>
+            </div>
+            <div className="sec-list__row">
+              <span className="sec-list__name">额外禁用</span>
+              <span className="sec-list__meta">{policy.denied.length ? policy.denied.join("、") : "无"}</span>
+            </div>
+            <div className="sec-list__row">
+              <span className="sec-list__name">只读（auto 模式免审）</span>
+              <span className="sec-list__meta">{policy.readonly.length ? policy.readonly.join("、") : "无"}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 技能安全审查 (G2-4) */}
       <div className="sec-card">
         <div className="sec-card__head">

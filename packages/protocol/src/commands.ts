@@ -23,6 +23,8 @@ export const COMMANDS = [
   'default_open_get', 'default_open_set',
   // Git worktree (G4-5): 为代码任务创建隔离工作树。
   'worktree_list', 'worktree_create', 'worktree_remove',
+  // 应用平台 (20261126-upup): UpUp 插件开关 + 会话工具清单（健康检查）。
+  'apps_list', 'apps_set_enabled', 'apps_update', 'apps_uninstall', 'upup_plugins_get', 'upup_plugins_set', 'agent_session_tools', 'agent_check_tool', 'apps_tool_policy_get', 'apps_tool_policy_set',
   'mcp_list', 'mcp_upsert', 'mcp_toggle', 'mcp_delete', 'mcp_config_read', 'mcp_config_save',
   'mcp_config_path', 'mcp_test', 'mcp_auth_trigger', 'mcp_auth_status', 'mcp_deferred_get', 'mcp_deferred_set',
   // 授权尝试 (B3a): begin returns an attempt id/expiry; attempt/attempts read it; cancel aborts.

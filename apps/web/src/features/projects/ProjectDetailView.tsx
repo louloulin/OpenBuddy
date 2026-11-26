@@ -12,6 +12,7 @@ import {
   type ProjectMeta,
 } from "@/features/projects/state/projects-store";
 import { ActivityTab, PlanTab, TaskTab, AssetsTab } from "./project-tabs";
+import { WorktreeTab } from "./WorktreeTab";
 import {
   FolderIcon,
 } from "@openbuddy/ui/icon/icons/index";

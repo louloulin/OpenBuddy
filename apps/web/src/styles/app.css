@@ -13553,3 +13553,18 @@ button.diff__path {
   cursor: pointer;
 }
 .artifact-card__op:hover { background: var(--wb-bg-hover); color: var(--wb-text-strong); }
+
+/* UpUp 子包开关 (20261126-upup UP-1.3)。 */
+.upup-plugins { list-style: none; margin: 0.5rem 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.upup-plugins__row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.25rem 0; }
+.upup-plugins__hint { font-size: 0.6875rem; color: var(--wb-text-tertiary); }
+
+/* 应用自带场景 (UP-4.1)：菜单里的一行场景 chip。 */
+.iam-scenes { display: flex; flex-wrap: wrap; gap: 0.375rem; padding: 0.25rem 0.5rem 0.5rem; }
+.iam-scene {
+  display: inline-flex; align-items: baseline; gap: 0.375rem; height: 1.75rem; padding: 0 0.625rem;
+  border: var(--wb-hairline) solid var(--wb-border-default); border-radius: var(--wb-radius-pill);
+  background: transparent; color: var(--wb-text-strong); font: inherit; font-size: 0.75rem; cursor: pointer;
+}
+.iam-scene:hover { background: var(--wb-bg-hover); }
+.iam-scene__app { color: var(--wb-text-tertiary); font-size: 0.6875rem; }

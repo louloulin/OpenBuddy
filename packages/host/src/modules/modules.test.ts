@@ -9,7 +9,7 @@ const ctx = { options: { shell: {} }, settings: {}, emit: () => {}, engine: {}, 
 describe("host modules (20261115-md §5.3)", () => {
   it("are the §5.3 modules and no two of them define the same command", () => {
     const modules = HOST_MODULES.map((create) => create(ctx));
-    expect(modules.map((m) => m.id)).toEqual(["session", "turn", "model", "providers", "approvals", "extensions", "skills", "mcp", "notifications", "artifacts", "experts", "memory", "library", "automation", "projects", "data", "update", "logs", "host", "files"]);
+    expect(modules.map((m) => m.id)).toEqual(["session", "turn", "model", "providers", "approvals", "extensions", "skills", "mcp", "notifications", "artifacts", "experts", "memory", "library", "automation", "projects", "data", "update", "logs", "host", "files", "worktrees", "apps"]);
     const owner = new Map<string, string>();
     const clashes: string[] = [];
     for (const { id, commands } of modules)
@@ -19,7 +19,7 @@ describe("host modules (20261115-md §5.3)", () => {
       }
     expect(clashes).toEqual([]);
     // 92 + 15 experts commands (experts module, pii W2.1–W2.3) + settings_agent_get / settings_agent_set / agent_cycle_model (model, pii W0.4/W1.6) + session_search (session, pii W1.4) + agent_tree / agent_navigate (session), agent_bash / agent_bash_abort (turn), files_search (files) — 20261116-pii W1.1–W1.3.
-    expect(owner.size).toBe(224); // +2 默认打开方式 (G1-6) +2 外部会话导入 (G4-3) +1 任务成果聚合 (G3-5) +1 产物重命名 (G3-7) +3 沙箱策略与安全审计 (G2-3/G2-5) +1 注入审查放行 (G2-7) // ... +1 package resource filters (S17) +1 WorkBuddy import (S18) +4 capability pack lifecycle (B1a) +2 skill market install/export (B1c) +1 automation retry (B3c) +2 expert link preview/import (B3b) +4 MCP auth attempts (B3a) +4 data export/restore/snapshots (A2) +1 update check (A3) +3 pending-card recovery (§2.4 path 3) +2 run-log viewer (O1) +1 update download (A3) +1 package details (E1) +3 compute use（余额读数 + 预算：usage_provider_quota / usage_budgets / usage_budget_save，20261122-cu）
+    expect(owner.size).toBe(237); // +10 应用平台 (20261126-upup) +3 git worktree (G4-5) +2 默认打开方式 (G1-6) +2 外部会话导入 (G4-3) +1 任务成果聚合 (G3-5) +1 产物重命名 (G3-7) +3 沙箱策略与安全审计 (G2-3/G2-5) +1 注入审查放行 (G2-7) // ... +1 package resource filters (S17) +1 WorkBuddy import (S18) +4 capability pack lifecycle (B1a) +2 skill market install/export (B1c) +1 automation retry (B3c) +2 expert link preview/import (B3b) +4 MCP auth attempts (B3a) +4 data export/restore/snapshots (A2) +1 update check (A3) +3 pending-card recovery (§2.4 path 3) +2 run-log viewer (O1) +1 update download (A3) +1 package details (E1) +3 compute use（余额读数 + 预算：usage_provider_quota / usage_budgets / usage_budget_save，20261122-cu）
     expect([owner.get("agent_tree"), owner.get("agent_navigate"), owner.get("agent_handoff"), owner.get("agent_bash"), owner.get("agent_bash_abort"), owner.get("files_search")]).toEqual(["session", "session", "session", "turn", "turn", "files"]);
   });
 

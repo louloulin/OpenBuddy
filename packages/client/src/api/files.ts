@@ -70,6 +70,57 @@ export type DefaultOpenMap = Record<string, "embedded" | "system">;
 export const defaultOpenGet = () => invoke<DefaultOpenMap>("default_open_get");
 export const defaultOpenSet = (map: DefaultOpenMap) => invoke<DefaultOpenMap>("default_open_set", { defaultOpen: map });
 
+/** 应用平台 (20261126-upup): UpUp 插件开关。 */
+export interface UpupPluginsState {
+  disabled: string[];
+  enabled: string[];
+  settingsPath: string;
+  defaults: string[];
+  settingsExists: boolean;
+}
+export const upupPluginsGet = () => invoke<UpupPluginsState>("upup_plugins_get");
+export const upupPluginsSet = (next: { disabled?: string[]; enabled?: string[] }) =>
+  invoke<UpupPluginsState>("upup_plugins_set", next);
+
+/** 应用列表 (UP-2.2)：Pi 包读 `pi.app`；没有 manifest 的记为普通扩展包。 */
+export interface AppEntry {
+  id: string;
+  name: string;
+  version?: string;
+  kind: "app" | "connector" | "skill-pack" | "extension";
+  source: "pi" | "pack";
+  installedPath?: string;
+  packageSource?: string;
+  tagline?: string;
+  category?: string;
+  icon?: string;
+  toolPolicy?: { readonly?: string[]; deny?: string[] };
+  scenes?: string;
+  sceneList?: Array<{ id: string; name: string; group?: string; prompt: string }>;
+}
+export const appsList = (cwd?: string) =>
+  invoke<AppEntry[]>("apps_list", cwd ? { cwd } : {});
+/** 升级一个应用（走 Pi 包管理器；本地路径通常无更新）。 */
+export const appsUpdate = (packageSource: string) =>
+  invoke<{ packageSource: string; packages: unknown[] }>("apps_update", { packageSource });
+/** 卸载一个应用，并清掉 UpUp 子包开关。 */
+export const appsUninstall = (packageSource: string) =>
+  invoke<{ packageSource: string; packages: unknown[] }>("apps_uninstall", { packageSource });
+
+/** 整体启停一个应用（Pi 包的全部资源）。 */
+export const appsSetEnabled = (packageSource: string, enabled: boolean) =>
+  invoke<{ packageSource: string; enabled: boolean }>("apps_set_enabled", { packageSource, enabled });
+
+/** 工具策略 (UP-3.2)：平台红线 + 用户/应用声明的 deny / readonly。 */
+export interface ToolPolicy {
+  platformDenied: string[];
+  denied: string[];
+  readonly: string[];
+}
+export const appsToolPolicyGet = () => invoke<ToolPolicy>("apps_tool_policy_get");
+export const appsToolPolicySet = (next: { denied?: string[]; readonly?: string[] }) =>
+  invoke<ToolPolicy>("apps_tool_policy_set", next);
+
 /** Git worktree (G4-5): isolated checkouts for code tasks. */
 export interface WorktreeRow { path: string; head?: string; branch?: string; bare: boolean; main: boolean }
 export const worktreeList = (cwd: string) =>

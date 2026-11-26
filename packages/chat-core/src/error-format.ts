@@ -258,6 +258,10 @@ const CODE_COPY: Record<ProtocolErrorCode, Copy> & Record<string, Copy | undefin
   team_not_found: ["找不到这个专家团", "刷新专家中心后重试"],
   registry_unreachable: ["无法连接 npm 包市场", "检查网络或代理后重试", "retry"],
   registry_invalid_response: ["包市场返回了无法识别的数据", "稍后重试；如果持续出现，请在「帮助与反馈」中反馈", "retry"],
+  // G4-5: git worktree.
+  not_a_git_repo: ["这个任务不在 git 仓库里", "工作树只对 git 项目可用；先在项目目录里 git init", "retry"],
+  branch_exists: ["同名分支已存在", "换一个工作树名字再试", "retry"],
+  worktree_main: ["主工作区不能这样移除", "只能移除额外创建的工作树", "retry"],
   // Legacy `code: detail` messages thrown before ProtocolError existed.
   path_outside_workspace: ["路径不在当前工作空间内", "只能访问工作空间里的文件", "retry"],
   rewind_point_not_found: ["找不到要回到的位置", "对话可能已经变化，刷新后重试", "retry"],

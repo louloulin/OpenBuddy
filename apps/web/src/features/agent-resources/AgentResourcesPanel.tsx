@@ -8,7 +8,7 @@ import { McpConfigEditor } from "../experts/connectors/McpConfigEditor";
 import { McpServersPanel } from "../experts/connectors/McpServersPanel";
 
 /** MVP resources use installed Pi skills and the actual MCP configuration. */
-export function AgentResourcesPanel({ cwd, onToast, section, header }: {
+export function AgentResourcesPanel({ cwd, onToast, sessionId, section, header }: {
   cwd?: string; onToast?: (message: string) => void;
   /** Accepted for API compatibility (MCP sign-in no longer needs a session, W2.4). */
   sessionId?: string;
@@ -40,7 +40,7 @@ export function AgentResourcesPanel({ cwd, onToast, section, header }: {
   );
   const body = <>
     {error && <p className="res-panel__error" role="alert">{error}</p>}
-    {tab === "extensions" ? <div className="res-panel__body"><CapabilityPacksPanel onToast={onToast} /><TrustedExtensionsPanel /></div> : tab === "mcp" ? <div className="res-panel__body">
+    {tab === "extensions" ? <div className="res-panel__body"><CapabilityPacksPanel onToast={onToast} /><TrustedExtensionsPanel sessionId={sessionId} /></div> : tab === "mcp" ? <div className="res-panel__body">
       <McpServersPanel onToast={onToast} />
       <p className="res-panel__muted">高级模式：直接编辑 mcp.json，保存后会自动重载会话。</p>
       <McpConfigEditor onToast={onToast} />

@@ -339,8 +339,14 @@ describe.skipIf(!magpieEnabled)("magpie 本机网关 (真实模型)", () => {
       });
       const fetched = (await app.handlers.providers_fetch_models({ providerId: "magpie" })) as Array<{ id: string }>;
       expect(fetched.length).toBeGreaterThan(0);
-      // 优先用 auto 路由组，其次第一项。
-      const chosen = fetched.find((m) => m.id.startsWith("auto/")) ?? fetched[0];
+      // 优先挑一个**明确的服务商/模型**（比 auto 路由组更确定、也更快），
+      // 没有的话再退回 auto 路由组，最后才用第一项。
+      const chosen =
+        fetched.find((m) => /MiniMax-M3\.1-Flash$/i.test(m.id)) ??
+        fetched.find((m) => !m.id.startsWith("auto/") && /Flash/i.test(m.id)) ??
+        fetched.find((m) => !m.id.startsWith("auto/")) ??
+        fetched.find((m) => m.id.startsWith("auto/")) ??
+        fetched[0];
       await app.handlers.providers_save_model({
         model: { modelId: chosen.id, providerId: "magpie", displayName: chosen.id },
       });

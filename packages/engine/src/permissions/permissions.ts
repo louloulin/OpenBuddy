@@ -10,6 +10,20 @@ import { scanToolContent, toolContentText, withheldNotice, type ToolContentRisk 
 export type { Emit };
 type Reason = "resolved" | "cancelled" | "timeout";
 type Decision = { allow: boolean; note?: string; kind?: "user" | "protected" | "policy" };
+
+/**
+ * 平台红线 (20261126-upup UP-3.2)：不接入真实交易。带前缀的变体
+ * （UpUp 在 stock Pi 下注册的 `upup_place_trade_order`）一并拦下——
+ * 不能靠"少装一个包"来回避，规则、模式、always-approve 都不能放行。
+ */
+export const PLATFORM_DENIED_PATTERNS: ReadonlyArray<RegExp> = [
+  /(^|_)(place_trade_order|cancel_trade_order)$/i,
+];
+
+export function deniedByPlatform(toolName: string, extra: readonly string[] = []): boolean {
+  if (extra.includes(toolName)) return true;
+  return PLATFORM_DENIED_PATTERNS.some((pattern) => pattern.test(toolName));
+}
 /** The `agent://permission` payload; `permission_pending` returns these verbatim so a reconnecting client sees the same card. */
 export type PermissionRequestPayload = {
   requestId: string;
@@ -161,11 +175,30 @@ export class Permissions {
         );
         if (decision.allow) return undefined;
         // A reason lets the agent try another way instead of retrying the same call.
-        if (decision.kind === "protected") return { block: true, reason: decision.note };
+        if (decision.kind === "protected" || decision.kind === "policy") return { block: true, reason: decision.note };
         return { block: true, reason: decision.note ? `用户拒绝：${decision.note}` : "用户拒绝或权限请求已取消" };
       });
     };
   }
+  /**
+   * 预演一次工具调用会得到什么结论 (UP-3.3)：不创建待决审批卡，只回答 allow / ask / deny / policy / protected。
+   * 用于「装完应用后，交易工具是不是真的被拦」这类端到端验证。
+   */
+  preview(
+    sessionId: string,
+    toolName: string,
+    input: unknown,
+  ): { allow: boolean; kind: "allow" | "ask" | "deny" | "policy" | "protected"; note?: string } {
+    const config = this.settings.config.read();
+    if (deniedByPlatform(toolName, config.deniedTools))
+      return { allow: false, kind: "policy", note: `平台策略：该工具被禁用（${toolName}）` };
+    const guard = protectedPathOf(config.protectedPaths ?? DEFAULT_PROTECTED_PATHS, toolName, input);
+    if (guard) return { allow: false, kind: "protected", note: `受保护路径（${guard}）` };
+    const decided = this.decide(sessionId, toolName, input);
+    if (decided === undefined) return { allow: false, kind: "ask" };
+    return { allow: decided, kind: decided ? "allow" : "deny" };
+  }
+
   /** Whether a rule, mode or session grant decides the call without asking. */
   decide(sessionId: string, toolName: string, input: unknown): boolean | undefined {
     const config = this.settings.config.read();
@@ -175,7 +208,8 @@ export class Permissions {
       return true;
     if (SESSION_ONLY_TOOLS.includes(toolName) && this.builtinTool(sessionId, toolName)) return true;
     if (this.sessionAllow.get(sessionId)?.has(toolName)) return true;
-    if (config.permissionMode === "auto" && READ_ONLY.includes(toolName))
+    const readonly = (name: string) => READ_ONLY.includes(name) || (config.readonlyTools ?? []).includes(name);
+    if (config.permissionMode === "auto" && readonly(toolName))
       return true;
     return undefined;
   }
@@ -188,6 +222,15 @@ export class Permissions {
     toolName: string,
     input: unknown,
   ): Promise<Decision> {
+    // 红线最先判：规则、模式、always-approve 都不能放行（UP-3.2）。
+    const policyConfig = this.settings.config.read();
+    if (deniedByPlatform(toolName, policyConfig.deniedTools)) {
+      return {
+        allow: false,
+        kind: "policy",
+        note: `平台策略：该工具被禁用（${toolName}）。OpenBuddy 不接入真实交易，可在 设置 · 安全中心 查看策略。`,
+      };
+    }
     // 受保护路径 (W6.2/W6.4): a hard boundary — allow rules, always-approve and a full-access
     // automation grant do not bypass it. The model gets a reason it can act on.
     const guard = protectedPathOf(

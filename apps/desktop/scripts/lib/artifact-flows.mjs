@@ -143,4 +143,26 @@ export async function runArtifactFlows({ page, app, call, checkpoint, writeFile,
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '收起右侧栏' }).click();
   checkpoint('share shows local-only visibility with real local actions (G3-4)', { visibility: visibilityText.slice(0, 40) });
+
+  // G4-5: 工作树——在真实 git 仓库里创建隔离检出，创建后出现在列表里。
+  await writeFile(join(init.cwd, 'wt-seed.txt'), 'seed\n');
+  const seed = (args) => new Promise((resolve, reject) => {
+    import('node:child_process').then(({ execFile }) => execFile('git', args, { cwd: init.cwd }, (error, stdout) => (error ? reject(error) : resolve(stdout))));
+  });
+  await seed(['init', '-q']).catch(() => {});
+  await seed(['add', '-A']).catch(() => {});
+  await seed(['-c', 'user.email=ui@example.com', '-c', 'user.name=ui', 'commit', '-qm', 'ui seed']).catch(() => {});
+  await call('projects_save', {
+    project: { id: 'ui-worktree-project', name: '工作树项目', cwd: init.cwd, createdAt: new Date().toISOString() },
+  });
+  await page.getByRole('button', { name: '项目', exact: true }).first().click();
+  await page.getByText('工作树项目', { exact: true }).first().click();
+  await page.getByRole('button', { name: '工作树', exact: true }).click();
+  await page.getByRole('textbox', { name: '工作树名字' }).fill('ui-feature');
+  await page.getByRole('button', { name: '新建工作树' }).click();
+  await page.getByText('ui-feature', { exact: true }).waitFor({ timeout: 30000 });
+  await page.screenshot({ path: 'release/ui-worktree.png' });
+  const worktreeRows = await page.locator('.pd-worktree__row').count();
+  assert.ok(worktreeRows >= 2, 'a real worktree was created next to the main checkout');
+  checkpoint('a git worktree is created and listed for the project (G4-5)', { rows: worktreeRows });
 }

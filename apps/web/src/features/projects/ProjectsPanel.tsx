@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { appConfirm, appPrompt } from "../../shared/ui/AppDialog";
 import { AddIcon, SearchIcon, MoreDotsIcon, ChevronDownIcon, PinFilledIcon } from "@openbuddy/ui/icon/icons/index";
 import heroImg from "@/assets/landing-hero.png";
-import { useProjectsStore, type ProjectMeta, type RefItem } from "@/features/projects/state/projects-store";
+import { hydrateProjects, useProjectsStore, type ProjectMeta, type RefItem } from "@/features/projects/state/projects-store";
 import {
   TEMPLATE_OPTIONS,
   getTemplate,
@@ -38,6 +38,10 @@ export function ProjectsPanel({ cwd, onToast, onStartProjectConversation }: Proj
   const rename = useProjectsStore((s) => s.rename);
   const remove = useProjectsStore((s) => s.remove);
   const setPinned = useProjectsStore((s) => s.setPinned);
+  // 打开面板时从 host 刷新一次：项目可能在别的窗口/任务里刚被创建。
+  useEffect(() => {
+    void hydrateProjects();
+  }, []);
   const activeProjectId = useProjectsStore((s) => s.activeProjectId);
   const setActiveProjectId = useProjectsStore((s) => s.setActiveProjectId);
   const [query, setQuery] = useState("");

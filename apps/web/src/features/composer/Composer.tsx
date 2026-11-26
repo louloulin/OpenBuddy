@@ -567,6 +567,11 @@ export function Composer({
               }
             }}
             onNavigateConnectors={onNavigateConnectors}
+            onPickPrompt={(prompt) => {
+              // UP-4.1: 应用场景只填入输入框，由用户确认后发送。
+              updateText((prev) => (prev.trim() ? `${prev.trimEnd()}\n${prompt}` : prompt));
+              requestAnimationFrame(() => ref.current?.focus());
+            }}
             onReferenceFile={(path) => {
               const rel = cwd && path.startsWith(cwd) ? path.slice(cwd.length).replace(/^[\\/]/, "") : path;
               updateText((prev) => `${prev}${prev && !prev.endsWith(" ") ? " " : ""}\`${rel}\` `);

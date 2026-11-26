@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { appsList, appsSetEnabled } from "@openbuddy/client/api/files";
 import {
   agentExtensionsPackages,
   agentExtensionsSetPackageResources,
@@ -8,6 +9,10 @@ import {
 } from "@openbuddy/client/agent-client";
 import { ApplicationPicker } from "../ApplicationPicker";
 
+vi.mock("@openbuddy/client/api/files", () => ({
+  appsList: vi.fn(async () => []),
+  appsSetEnabled: vi.fn(async () => ({ packageSource: "", enabled: false })),
+}));
 vi.mock("@openbuddy/client/agent-client", () => ({
   capabilityPacksList: vi.fn(),
   capabilityPackSetEnabled: vi.fn(),
@@ -49,5 +54,39 @@ describe("应用选择器 (G1-16)", () => {
       { extensions: false, skills: false, prompts: false, themes: false },
       "/ws",
     ));
+  });
+
+  it("有 pi.app 的包装成「应用」卡：显示定位并按应用整体启停（UP-2.4）", async () => {
+    vi.mocked(capabilityPacksList).mockResolvedValue([] as never);
+    vi.mocked(agentExtensionsPackages).mockResolvedValue([
+      { source: "/repo/upup", scope: "user", filtered: false, installedPath: "/repo/upup" },
+    ] as never);
+    vi.mocked(appsList).mockResolvedValue([
+      { id: "upup", name: "upup", kind: "app", source: "pi", packageSource: "/repo/upup", installedPath: "/repo/upup", tagline: "证券智能投研助手", category: "finance" },
+    ]);
+    vi.mocked(appsSetEnabled).mockResolvedValue({ packageSource: "/repo/upup", enabled: false });
+
+    render(<ApplicationPicker />);
+    expect(await screen.findByText("应用")).toBeInTheDocument();
+    expect(screen.getByText(/证券智能投研助手/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "应用 upup" }));
+    await waitFor(() => expect(appsSetEnabled).toHaveBeenCalledWith("/repo/upup", false));
+  });
+
+  it("应用带场景时渲染「应用场景」chip，点击把 prompt 交给回调（UP-4.1）", async () => {
+    vi.mocked(capabilityPacksList).mockResolvedValue([] as never);
+    vi.mocked(agentExtensionsPackages).mockResolvedValue([
+      { source: "/repo/upup", scope: "user", filtered: false, installedPath: "/repo/upup" },
+    ] as never);
+    vi.mocked(appsList).mockResolvedValue([
+      {
+        id: "upup", name: "upup", kind: "app", source: "pi", packageSource: "/repo/upup",
+        sceneList: [{ id: "deep", name: "个股深研", group: "投研", prompt: "/invest 600519.SH" }],
+      },
+    ]);
+    const onPick = vi.fn();
+    render(<ApplicationPicker onPickPrompt={onPick} />);
+    fireEvent.click(await screen.findByRole("button", { name: "场景 个股深研" }));
+    expect(onPick).toHaveBeenCalledWith("/invest 600519.SH");
   });
 });

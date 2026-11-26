@@ -431,6 +431,13 @@ try {
   await page.getByText('受保护路径', { exact: true }).waitFor({ timeout: 15000 });
   await page.getByRole('tab', { name: '技能审查' }).click();
   await page.getByText('技能安全审查', { exact: true }).waitFor({ timeout: 15000 });
+  // 平台工具策略 (UP-3.2)：真实交易类工具始终被拒绝，安全中心只读展示。
+  const policyCard = page.getByLabel('平台工具策略');
+  await policyCard.waitFor({ timeout: 15000 });
+  const policyText = (await policyCard.innerText()).replace(/\s+/g, ' ');
+  assert.ok(policyText.includes('真实交易'), 'platform deny is shown in the security centre');
+  await page.screenshot({ path: 'release/ui-tool-policy.png' });
+  checkpoint('the security centre shows the platform tool policy (UP-3.2)', { text: policyText.slice(0, 60) });
   await page.screenshot({ path: 'release/ui-security-skills.png' });
   checkpoint('the security centre shows the tool rules and the skill review card', {});
 

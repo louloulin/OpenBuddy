@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { access } from "node:fs/promises";
+import { access, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { protocolError } from "@openbuddy/protocol/errors";
@@ -72,7 +72,7 @@ export function worktreeCommands(_ctx: HostContext): HostModule {
       const target = join(root, ".openbuddy", "worktrees", name);
       try {
         await access(target);
-        throw protocolError("worktree_exists", `工作树目录已存在：${target}`);
+        throw protocolError("already_exists", `工作树目录已存在：${target}`);
       } catch (error) {
         if ((error as { code?: string }).code !== "ENOENT") throw error;
       }
@@ -81,9 +81,11 @@ export function worktreeCommands(_ctx: HostContext): HostModule {
       } catch (error) {
         const message = String((error as { stderr?: string }).stderr ?? error);
         if (/already exists/i.test(message)) throw protocolError("branch_exists", `分支 ${name} 已存在，换个名字`);
-        throw protocolError("worktree_failed", message.trim().slice(0, 400));
+        throw protocolError("invalid_payload", message.trim().slice(0, 400));
       }
-      return { gitRepo: true, root, path: target, branch: name };
+      // 返回真实路径（macOS 上 /var → /private/var），与 `git worktree list` 的输出一致。
+      const canonical = await realpath(target).catch(() => target);
+      return { gitRepo: true, root, path: canonical, branch: name };
     },
 
     worktree_remove: async (p) => {
@@ -92,11 +94,13 @@ export function worktreeCommands(_ctx: HostContext): HostModule {
       const root = await repoRoot(cwd);
       if (!root) throw protocolError("not_a_git_repo", "这个任务不在 git 仓库里");
       const { stdout } = await run("git", ["-C", root, "worktree", "list", "--porcelain"], { timeout: 10_000 });
-      const row = parseWorktreePorcelain(stdout).find((item) => item.path === path);
-      if (!row) throw protocolError("worktree_not_found", "这不是这个仓库的工作树");
+      // 两侧都取真实路径再比：git 报的是规范化后的路径，界面可能拿到 /var 形式。
+      const wanted = await realpath(path).catch(() => path);
+      const row = parseWorktreePorcelain(stdout).find((item) => item.path === path || item.path === wanted);
+      if (!row) throw protocolError("not_found", "这不是这个仓库的工作树");
       if (row.main) throw protocolError("worktree_main", "主工作区不能这样移除");
-      await run("git", ["-C", root, "worktree", "remove", "--force", path], { timeout: 60_000 });
-      return { removed: path };
+      await run("git", ["-C", root, "worktree", "remove", "--force", row.path], { timeout: 60_000 });
+      return { removed: row.path };
     },
   };
   return { id: "worktrees", commands };

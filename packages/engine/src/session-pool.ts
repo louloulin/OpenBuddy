@@ -125,6 +125,7 @@ export async function open(
     extensionsOverride: reserveBuiltinToolNames,
   });
   await loader.reload();
+
   // Pi keeps a process-wide extension-module cache and only clears it when a *loaded* loader reloads.
   // A config change (added / removed / toggled path) must pick up new file contents, so reload once
   // more to invalidate that cache (W2.6).
@@ -137,6 +138,16 @@ export async function open(
   engine.extensionErrors = loader.getExtensions().errors.slice();
   for (const entry of engine.extensionErrors)
     engine.emit("agent://error", { message: `扩展加载失败：${entry.path}: ${entry.error}` });
+  // 扩展工具要进会话，必须出现在 `tools` 允许列表里——否则 Pi 的 allowedTools 会把它们全部过滤掉
+  // （20261126-upup UP-0 实测：扩展已加载、工具已注册，会话里却只剩内建 13 个）。
+  // 扩展本身已受两道门控：extensionsEnabled 且目录可信；`ob_*` 仍由 extensionsOverride 保护。
+  const extensionToolNames = [
+    ...new Set(
+      ((loader as unknown as { extensionsResult?: { extensions?: Array<{ tools?: Map<string, unknown> }> } })
+        .extensionsResult?.extensions ?? []).flatMap((extension) => [...(extension.tools?.keys() ?? [])]),
+    ),
+  ].filter((name) => !name.startsWith("ob_"));
+
   const { session } = await createAgentSession({
     cwd,
     agentDir: engine.settings.dir,
@@ -146,7 +157,7 @@ export async function open(
     settingsManager: sdkSettings,
     model,
     // The enabled built-ins' tools by name (not `ob_*`): a switched-off built-in's name stays unused.
-    tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "mcp__*", ...builtinToolNames(builtinEnabled)],
+    tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "mcp__*", ...builtinToolNames(builtinEnabled), ...extensionToolNames],
     thinkingLevel: requestedThinking,
     // Favourite models, cycled with Ctrl/Cmd+P (W1.6).
     scopedModels: favoriteScope(engine),

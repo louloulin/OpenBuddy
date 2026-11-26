@@ -5,6 +5,7 @@ import {
   capabilityPackSetEnabled,
   capabilityPacksList,
 } from "@openbuddy/client/agent-client";
+import { appsList, appsSetEnabled, type AppEntry } from "@openbuddy/client/api/files";
 import type { CapabilityPack } from "@openbuddy/protocol/experts";
 import type { ExtensionPackage } from "@openbuddy/protocol/extensions";
 
@@ -21,24 +22,31 @@ import type { ExtensionPackage } from "@openbuddy/protocol/extensions";
 export function ApplicationPicker({
   cwd,
   onManage,
+  onPickPrompt,
 }: {
   /** Working directory: Pi packages are installed per project or per user. */
   cwd?: string;
+  /** UP-4.1: 应用自带场景 → 把 prompt 填进输入框。 */
+  onPickPrompt?: (prompt: string) => void;
   /** Open the resource panel where packages are installed and removed. */
   onManage?: () => void;
 }) {
   const [packs, setPacks] = useState<CapabilityPack[]>([]);
   const [packages, setPackages] = useState<ExtensionPackage[]>([]);
+  // 应用卡 (UP-2.4)：有 pi.app 的包显示名称/定位/分类，整体启停走 apps_set_enabled。
+  const [apps, setApps] = useState<AppEntry[]>([]);
   const [busy, setBusy] = useState("");
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
-    const [p, k] = await Promise.all([
+    const [p, k, a] = await Promise.all([
       capabilityPacksList().catch(() => [] as CapabilityPack[]),
       agentExtensionsPackages(cwd).catch(() => [] as ExtensionPackage[]),
+      appsList(cwd).catch(() => [] as AppEntry[]),
     ]);
     setPacks(p);
     setPackages(k);
+    setApps(a);
     setLoaded(true);
   }, [cwd]);
 
@@ -64,8 +72,22 @@ export function ApplicationPicker({
     finally { setBusy(""); }
   };
 
+  /** 应用卡开关：整体启停该 Pi 包的全部资源。 */
+  const toggleApp = async (app: AppEntry) => {
+    if (busy || !app.packageSource) return;
+    setBusy(app.packageSource);
+    try {
+      // `filtered === true` 表示该包被资源过滤关掉了（见 togglePackage）。
+      const on = packages.find((entry) => entry.source === app.packageSource)?.filtered === false;
+      await appsSetEnabled(app.packageSource, !on);
+      setPackages(await agentExtensionsPackages(cwd));
+      setApps(await appsList(cwd).catch(() => apps));
+    } catch { /* keep the previous state */ }
+    finally { setBusy(""); }
+  };
+
   if (!loaded) return <div className="iam-sub-empty">正在读取已安装的应用…</div>;
-  if (!packs.length && !packages.length) {
+  if (!packs.length && !packages.length && !apps.length) {
     return (
       <>
         <div className="iam-sub-empty">还没有安装任何应用</div>
@@ -76,6 +98,60 @@ export function ApplicationPicker({
 
   return (
     <>
+      {apps.some((app) => app.kind !== "extension") && (
+        <>
+          <div className="iam-sub-heading">应用</div>
+          {apps.filter((app) => app.kind !== "extension").map((app) => {
+            const entry = packages.find((item) => item.source === app.packageSource);
+            const on = entry ? entry.filtered === false : true;
+            return (
+              <button
+                key={`${app.id}@${app.packageSource ?? app.installedPath}`}
+                type="button"
+                className="iam-sub-item"
+                disabled={busy === app.packageSource || !app.packageSource}
+                onClick={() => { void toggleApp(app); }}
+                aria-pressed={on}
+                aria-label={`应用 ${app.name}`}
+              >
+                <span className="iam-sub-text">
+                  <span className="iam-sub-name">{app.name}</span>
+                  <span className="iam-sub-desc">
+                    {app.tagline ?? (app.kind === "skill-pack" ? "技能包" : app.kind === "connector" ? "连接器" : "应用")}
+                    {app.category ? ` · ${app.category}` : ""}
+                    {on ? "" : " · 已停用"}
+                  </span>
+                </span>
+                <span className={"iam-switch" + (on ? " iam-switch--on" : "")} aria-hidden="true">
+                  <span className="iam-switch__dot" />
+                </span>
+              </button>
+            );
+          })}
+        </>
+      )}
+      {onPickPrompt && apps.some((app) => (app.sceneList?.length ?? 0) > 0) && (
+        <>
+          <div className="iam-sub-heading">应用场景</div>
+          <div className="iam-scenes">
+            {apps.flatMap((app) =>
+              (app.sceneList ?? []).map((scene) => (
+                <button
+                  key={`${app.id}:${scene.id}`}
+                  type="button"
+                  className="iam-scene"
+                  title={scene.prompt}
+                  aria-label={`场景 ${scene.name}`}
+                  onClick={() => onPickPrompt(scene.prompt)}
+                >
+                  <span className="iam-scene__name">{scene.name}</span>
+                  <span className="iam-scene__app">{app.name}</span>
+                </button>
+              )),
+            )}
+          </div>
+        </>
+      )}
       {packs.length > 0 && (
         <>
           <div className="iam-sub-heading">能力包</div>

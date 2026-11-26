@@ -122,6 +122,11 @@ export function sessionModule(ctx: HostContext): HostModule {
     // A session that is not loaded yet (just picked in the sidebar) has nothing to report: null,
     // not an error, so opening a task does not leave failed calls behind.
     agent_session_info: (p) => (engine.has(text(p.sessionId)) ? engine.info(text(p.sessionId)) : null),
+    // 会话工具清单 (20261126-upup UP-1.4): 装完应用后对账实际注册的工具。
+    agent_session_tools: (p) => (engine.has(text(p.sessionId)) ? engine.toolNames(text(p.sessionId)) : null),
+    // 工具策略预演 (UP-3.3): 不创建审批卡，只回答 allow/ask/deny/policy/protected。
+    agent_check_tool: (p) =>
+      engine.checkTool(text(p.sessionId), text(p.toolName, "toolName"), (p.input as Record<string, unknown>) ?? {}),
     agent_session_usage: (p) => (engine.has(text(p.sessionId)) ? engine.usage(text(p.sessionId)) : null),
   };
   return { id: "session", commands };

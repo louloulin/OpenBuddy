@@ -91,6 +91,12 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'worktree_list') string('cwd', 4096);
   if (command === 'worktree_create') { string('cwd', 4096); string('name', 64); }
   if (command === 'worktree_remove') { string('cwd', 4096); string('path', 4096); }
+  if (command === 'agent_session_tools') string('sessionId', 256);
+  if (command === 'agent_check_tool') { string('sessionId', 256); string('toolName', 128); }
+  if (command === 'apps_list' && payload.cwd !== undefined && payload.cwd !== null) string('cwd', 4096);
+  if (command === 'apps_set_enabled') { string('packageSource', 4096); if (typeof payload.enabled !== 'boolean') throw new Error('invalid_payload: enabled'); }
+  if (command === 'apps_update') string('packageSource', 4096);
+  if (command === 'apps_uninstall') string('packageSource', 4096);
   if (command === 'data_import_scan') string('path', 4096);
   if (command === 'data_import_apply') { string('path', 4096); string('outputDir', 4096); }
   if (command === 'quick_shortcut_set') {

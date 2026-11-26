@@ -264,6 +264,10 @@ export interface AppSettings {
     maxTokens: number;
     setDefault: boolean;
   };
+  /** 工具策略 (20261126-upup UP-3.2): 应用/用户显式禁用的工具名（平台红线另有一条硬规则）。 */
+  deniedTools?: string[];
+  /** 只读工具 (UP-3.2): auto 模式下与内建只读工具一样免审。 */
+  readonlyTools?: string[];
   /** 默认打开方式 (G1-6): per file type, "embedded" (预览面板) or "system" (系统关联应用). */
   defaultOpen?: Record<string, "embedded" | "system">;
   /** System notifications while the window is in the background (20261115-ui U6.1); on by default. */

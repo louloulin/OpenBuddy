@@ -7,7 +7,7 @@ import {
   type ExtensionFactory,
 } from "@earendil-works/pi-coding-agent";
 import { mkdir, realpath, rename } from "node:fs/promises";
-import { basename, dirname, join, isAbsolute } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { Providers, modelKey } from "@openbuddy/services/providers/providers";
 import { ExtensionUiBridge } from "./extension-ui/bridge.js";
 import { SkillsService } from "@openbuddy/services/skills/skills";
@@ -106,6 +106,11 @@ export class PiEngine {
       }
       emit(name, payload);
     };
+    // UpUp 插件 (20261126-upup UP-1.2): its dispatcher resolves <agentDir> from
+    // UPUP_CODING_AGENT_DIR / PI_CODING_AGENT_DIR / ~/.pi/agent. Point it at our own
+    // settings dir so `settings.json#upupPlugins` lives where the app can manage it,
+    // instead of silently landing in ~/.pi/agent.
+    process.env.UPUP_CODING_AGENT_DIR = settings.dir;
     this.cwd = this.inbox = join(settings.dir, "inbox");
     // 安全审计 (G2-5): JSONL under the settings dir, append-only.
     this.audit = new AuditLog(join(settings.dir, "security", "audit.jsonl"));
@@ -374,6 +379,17 @@ export class PiEngine {
     this.emit("agent://model-state", state);
     return state;
   }
+  /** 预演一次工具调用的结论（UP-3.3）：不弹审批卡。 */
+  checkTool(id: string, toolName: string, input: unknown) {
+    if (!this.has(id)) throw new Error("session_not_loaded: 会话未加载");
+    return this.permissions.preview(id, toolName, input);
+  }
+
+  /** 会话当前可用工具名（UP-1.4 健康检查 / 冲突检测用）。 */
+  toolNames(id: string): string[] {
+    return this.live(id).getAllTools().map((tool) => tool.name).sort();
+  }
+
   info(id: string) {
     const session = this.live(id),
       stats = session.getSessionStats(),
@@ -485,7 +501,34 @@ export class PiEngine {
     return this.extensionPackages(cwd);
   }
   async installExtensionPackage(source: string, cwd?: string) {
-    await this.packageManager(cwd).installAndPersist(source);
+    // 本地路径统一成绝对路径再入库：Pi 会把相对路径按当时 cwd 记下来，换个目录就解析不到，
+    // 包装上了却不加载（20261126-upup UP-0 实测）。npm: / git: 这类来源原样保留。
+    const raw = source.trim();
+    // `file://` 也当本地路径：Pi 的包记录只认路径，不认 URL。
+    const normalized = /^file:\/\//i.test(raw)
+      ? resolve(decodeURIComponent(raw.replace(/^file:\/\/+/i, "/")))
+      : /^(npm:|git:|https?:|ssh:|github:)/i.test(raw)
+        ? raw
+        : resolve(raw);
+    await this.packageManager(cwd).installAndPersist(normalized);
+    // Pi 把本地包按"安装时的 cwd"记成相对路径，换一个会话 cwd 就解析不到，
+    // 于是包记录在、扩展永远不加载（20261126-upup UP-0 实测：packages 里是
+    // `../../../../../..//Users/...`）。这里把这一条改回绝对路径后重载。
+    try {
+      const manager = this.settings.pi.manager(this.trusted(cwd ?? this.currentCwd));
+      const entries = manager.getPackages() as Array<string | { source: string }>;
+      const isLocal = (entry: string | { source: string }) =>
+        !/^(npm:|git:|https?:|ssh:|github:|file:)/i.test(typeof entry === "string" ? entry : entry.source);
+      const absolute = normalized;
+      const next = entries.map((entry) => {
+        const source = typeof entry === "string" ? entry : entry.source;
+        if (!isLocal(entry)) return entry;
+        // 同一个包的相对写法：以 packages/<name> 结尾就认作它。
+        const tail = absolute.split(/[\\/]/).slice(-2).join("/");
+        return source.endsWith(tail) ? absolute : entry;
+      });
+      manager.setPackages(next as never);
+    } catch { /* 兼容性兜底：改不动就按 Pi 原样，至少记录存在 */ }
     this.extensionsDirty = true;
     await this.reload();
     return this.extensionPackages(cwd);

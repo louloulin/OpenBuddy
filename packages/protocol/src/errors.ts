@@ -33,6 +33,10 @@ export const PROTOCOL_ERROR_CODES = [
   // S15: Pi package marketplace (npm registry search).
   'registry_unreachable',
   'registry_invalid_response',
+  // G4-5: git worktree.
+  'not_a_git_repo',
+  'branch_exists',
+  'worktree_main',
 ] as const;
 export type ProtocolErrorCode = typeof PROTOCOL_ERROR_CODES[number];
 

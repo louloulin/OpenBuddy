@@ -19,6 +19,8 @@ interface InputAddMenuProps {
   onNavigateConnectors?: (tab?: "experts" | "connectors") => void;
   /** G1-15: insert a file produced in this task as a composer reference. */
   onReferenceFile?: (path: string) => void;
+  /** UP-4.1: 应用自带场景把 prompt 填进输入框（不直接发送）。 */
+  onPickPrompt?: (prompt: string) => void;
   /** Workspace root, so 引用对话中的文件 can also offer top-level workspace files. */
   workspaceCwd?: string;
   /** Chat page: 做一做 / 想一想 / 问一问 lives in the menu instead of the footer (WorkBuddy layout). */
@@ -58,6 +60,7 @@ export function InputAddMenu({
   onSelectSkill,
   onNavigateConnectors,
   onReferenceFile,
+  onPickPrompt,
   workspaceCwd,
   agentMode,
   onAgentModeChange,
@@ -364,6 +367,7 @@ export function InputAddMenu({
         <ApplicationPicker
           cwd={workspaceCwd}
           onManage={handleOpenAppCenter}
+          {...(onPickPrompt ? { onPickPrompt } : {})}
         />
       );
     }

@@ -24,6 +24,8 @@ import {
 } from "@openbuddy/protocol/extensions";
 import { dialog } from "@openbuddy/client/ipc";
 import { PackagePatternEditor } from "./PackagePatternEditor";
+import { UpupPluginsCard } from "./UpupPluginsCard";
+import { SessionToolHealthCard } from "./SessionToolHealthCard";
 import { readTextFile } from "@openbuddy/client/api/files";
 import { friendlyError } from "@openbuddy/chat-core/error-format";
 import { PuzzlePieceIcon, AddCircleIcon, DeleteIcon, FolderOpenIcon } from "@openbuddy/ui/icon/icons/index";
@@ -60,7 +62,7 @@ function packageResources(source: string, resources: ExtensionResources | null) 
  * isolated loader, so the user sees what it would do *before* it is trusted; a broken extension is
  * refused there and can never fail a session (engine records per-path errors instead of throwing).
  */
-export function TrustedExtensionsPanel() {
+export function TrustedExtensionsPanel({ sessionId }: { sessionId?: string } = {}) {
   const [config, setConfig] = useState<ExtensionsConfig>();
   const [packages, setPackages] = useState<ExtensionPackage[]>([]);
   const [resources, setResources] = useState<ExtensionResources | null>(null);
@@ -202,6 +204,15 @@ export function TrustedExtensionsPanel() {
     const patterns = Array.isArray(current) ? current : [];
     void setPackageResources(entry.source, { [kind]: enabled ? (patterns.length ? patterns : true) : false });
   };
+  /** 选本地 Pi 包目录（UpUp 这类 checkout），填进来源并立刻预演。 */
+  const pickPackageSource = async () => {
+    try {
+      const path = await dialog.open({ directory: true, multiple: false, title: "选择本地 Pi 包目录" });
+      if (typeof path !== "string") return;
+      setSource(path);
+      await previewPackage(path);
+    } catch (error) { setError(friendlyError(error)); }
+  };
   const previewPackage = async (value = source.trim()) => {
     if (!value || busy) return;
     setBusy(true); setError(""); setProgress("正在解析包…");
@@ -310,6 +321,7 @@ export function TrustedExtensionsPanel() {
           onChange={(event) => setSource(event.target.value)}
           onKeyDown={(event) => { if (event.key === "Enter") void installPackage(); }}
         />
+        <button type="button" className="res-panel__btn" disabled={busy} onClick={() => void pickPackageSource()}>本地目录…</button>
         <button type="button" className="res-panel__btn" disabled={busy || !source.trim()} onClick={() => void previewPackage()}>检查</button>
         <button type="button" className="res-panel__btn res-panel__btn--primary" disabled={busy || !source.trim()} onClick={() => void installPackage()}>安装</button>
         <button type="button" className="res-panel__btn" disabled={busy || packages.length === 0} onClick={() => void updatePackages()}>全部更新</button>
@@ -559,5 +571,8 @@ export function TrustedExtensionsPanel() {
         </div>
       </div>
     </div>}
-  </section>;
+      {sessionId && <SessionToolHealthCard sessionId={sessionId} />}
+
+    <UpupPluginsCard hasUpup={packages.some((entry) => /upup/i.test(entry.source))} />
+</section>;
 }

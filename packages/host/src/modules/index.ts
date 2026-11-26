@@ -11,6 +11,7 @@ import { notificationsModule } from "./notifications.js";
 import { artifactsModule } from "./artifacts.js";
 import { filesModule } from "./files.js";
 import { worktreeCommands } from "./worktrees.js";
+import { appsModule } from "./apps.js";
 import { hostModule } from "./host.js";
 import { expertsModule } from "./experts.js";
 import { memoryModule } from "./memory.js";
@@ -46,4 +47,5 @@ export const HOST_MODULES: readonly HostModuleFactory[] = [
   hostModule,
   filesModule,
   worktreeCommands,
+  appsModule,
 ];

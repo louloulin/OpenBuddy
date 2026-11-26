@@ -71,6 +71,20 @@ export async function agentLoadSession(sessionId: string, cwd: string): Promise<
   return invoke<SessionSnapshot>("agent_load_session", { sessionId, cwd });
 }
 
+/** 预演一次工具调用结论（UP-3.3）：不会创建审批卡。 */
+export async function agentCheckTool(
+  sessionId: string,
+  toolName: string,
+  input: Record<string, unknown> = {},
+): Promise<{ allow: boolean; kind: "allow" | "ask" | "deny" | "policy" | "protected"; note?: string }> {
+  return invoke("agent_check_tool", { sessionId, toolName, input });
+}
+
+/** 会话当前的工具名（20261126-upup UP-1.4）：装完应用后对账实际注册了什么。 */
+export async function agentSessionTools(sessionId: string): Promise<string[]> {
+  return invoke<string[]>("agent_session_tools", { sessionId });
+}
+
 export async function agentListSessions(cwd: string, includeArchived = false): Promise<SessionSummary[]> {
   return invoke<SessionSummary[]>("agent_list_sessions", { cwd, ...(includeArchived ? { includeArchived } : {}) });
 }
