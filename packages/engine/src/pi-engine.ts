@@ -18,9 +18,9 @@ import { PromptsService } from "@openbuddy/services/prompts/prompts";
 import { UsageService } from "@openbuddy/services/usage/usage";
 import { BudgetService } from "@openbuddy/services/usage/budgets";
 import { ProjectsService } from "@openbuddy/services/projects/projects";
-import { builtinApp } from "@openbuddy/services/apps/builtin";
 import { buildAppPrompt } from "@openbuddy/services/apps/prompt";
-import { readAppEntry } from "@openbuddy/services/apps/manifest";
+import { collectApps, type InstalledPackage } from "@openbuddy/services/apps/catalog";
+import { AppUsageStore, usageKey } from "@openbuddy/services/apps/usage";
 import type { Settings } from "@openbuddy/services/settings/settings";
 import { Permissions, type Emit } from "./permissions/permissions.js";
 import { AuditLog } from "./permissions/audit-log.js";
@@ -505,14 +505,40 @@ export class PiEngine {
   appPrompt(cwd?: string): string | undefined {
     const id = this.settings.config.read().currentAppId;
     if (!id) return undefined;
-    const builtin = builtinApp();
-    if (id === builtin.id) return buildAppPrompt(builtin);
-    for (const pkg of this.extensionPackages(cwd) as Array<{ source: string; installedPath?: string }>) {
-      if (!pkg.installedPath) continue;
-      const entry = readAppEntry(pkg.installedPath, "pi", pkg.source);
-      if (entry?.id === id) return buildAppPrompt(entry);
+    const entry = this.appCatalog(cwd).apps.find((app) => app.id === id);
+    return entry ? buildAppPrompt(entry) : undefined;
+  }
+  /** 已安装应用 (U5)：与宿主 `apps_list` 同一份 `collectApps()`。 */
+  appCatalog(cwd?: string) {
+    const packages = this.extensionPackages(cwd) as InstalledPackage[];
+    return { apps: collectApps(packages), packages };
+  }
+  private appUsage?: AppUsageStore;
+  /**
+   * 应用使用统计 (U5 / UP-6.4)：按工具的来源包（Pi `ToolInfo.sourceInfo.source`）记最近使用日。
+   * 内置工具与本地扩展没有包来源，不记；任何异常都吞掉（统计绝不影响一次工具调用）。
+   */
+  recordToolUse(slot: Slot, toolName: string): void {
+    try {
+      const cache = (slot.toolSources ??= new Map<string, string | null>());
+      let source = cache.get(toolName);
+      if (source === undefined) {
+        const info = slot.session.getAllTools().find((tool) => tool.name === toolName);
+        const packages = this.extensionPackages(slot.session.sessionManager.getCwd()) as InstalledPackage[];
+        const where = info?.sourceInfo;
+        // 先按 Pi 记的包来源匹配；本地/改写过的来源再按扩展文件是否在包目录里匹配。
+        const inside = (path: string | undefined, dir: string | undefined) => !!path && !!dir && (path === dir || path.startsWith(`${dir}/`));
+        const pkg = where
+          ? packages.find((item) => item.source === where.source) ??
+            packages.find((item) => inside(where.path, item.installedPath) || inside(where.baseDir, item.installedPath))
+          : undefined;
+        source = pkg ? usageKey(pkg) : null;
+        cache.set(toolName, source);
+      }
+      if (source) (this.appUsage ??= new AppUsageStore(this.settings.dir)).touch(source);
+    } catch {
+      /* 统计失败不影响工具调用 */
     }
-    return undefined;
   }
   /** 包资源开关 (S17): write Pi's object-form filters, then rebuild sessions so loading changes apply. */
   async setExtensionPackageResources(source: string, resources: ExtensionPackageFilters, cwd?: string) {

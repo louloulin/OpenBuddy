@@ -1,7 +1,7 @@
 import { mkdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, extname, isAbsolute, relative, resolve } from "node:path";
 import type { ExtensionFactory, ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { buildDocx, buildPptx, buildXlsx, deckSpecToXlsx } from "@openbuddy/services/office/index";
+import { buildDocx, buildPptx, buildXlsx, deckSpecToDocx, deckSpecToXlsx } from "@openbuddy/services/office/index";
 import type { EngineContext } from "../engine-context.js";
 
 /**
@@ -44,8 +44,12 @@ const DOCX_PARAMETERS = {
         additionalProperties: false,
       },
     },
+    deck: {
+      type: "object",
+      description: "Optional UpUp DeckSpec (run_industry_analysis.deckSpec). Rendered as a Word report (headings, tables, chart data, labelled notes) after any explicit blocks.",
+    },
   },
-  required: ["path", "blocks"],
+  required: ["path"],
   additionalProperties: false,
 } as unknown as ToolDefinition["parameters"];
 
@@ -206,15 +210,18 @@ export function createOfficeExtension({ engine, sessionId, cwd }: OfficeBuiltinC
       promptGuidelines: [
         "Use ob_docx when the user wants a Word document, report, contract or formatted write-up.",
         "Put the complete content in blocks; do not write a script or ask for Microsoft Word.",
+        "To turn an industry analysis into a Word report, pass run_industry_analysis.deckSpec as deck; add your own narrative as blocks.",
       ],
       parameters: DOCX_PARAMETERS,
       executionMode: "sequential",
       async execute(toolCallId: string, params: unknown) {
         const value = (params ?? {}) as Record<string, unknown>;
         const path = targetPath(cwd, value.path, ".docx");
+        const deck = value.deck && typeof value.deck === "object" ? deckSpecToDocx(value.deck as never) : null;
+        const title = typeof value.title === "string" ? value.title : deck?.title;
         const bytes = await buildDocx({
-          ...(typeof value.title === "string" ? { title: value.title } : {}),
-          blocks: (Array.isArray(value.blocks) ? value.blocks : []) as never,
+          ...(title ? { title } : {}),
+          blocks: [...(Array.isArray(value.blocks) ? value.blocks : []), ...(deck?.blocks ?? [])] as never,
         });
         return write(toolCallId, path, bytes, "docx");
       },

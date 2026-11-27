@@ -18,6 +18,7 @@ import { extractToolCallText } from "@openbuddy/chat-core/extract-text";
 import { extractSources } from "@openbuddy/chat-core/extract-sources";
 import { financeCardsOf } from "@openbuddy/chat-core/finance-card";
 import { FinanceDataCards } from "./FinanceDataCards";
+import { AppRecommendCard, recommendationOf } from "./AppRecommendCard";
 import { suggestFollowUps } from "@openbuddy/chat-core/follow-up-suggestions";
 import { estimateConversationTokens } from "@openbuddy/chat-core/token-estimate";
 import { selectFindFocus, useFindFocusStore } from "./state/find-focus-store";
@@ -253,11 +254,11 @@ function TurnViewInner(props: TurnViewProps) {
   );
   const sources = extractSources(sourceTexts);
   const toolKinds = content.process.flatMap((item) => (item.part.kind === "tool_call" ? [item.part.toolCall.kind] : []));
-  // 投研数据卡 (U5 / UP-5.2)：只认带来源信封的工具结果，回答完成后在答案下方展示。
-  const financeCards = useMemo(
-    () => (running ? [] : financeCardsOf(messages.flatMap((m) => m.parts).flatMap((p) => (p.kind === "tool_call" ? [p.toolCall] : [])))),
-    [messages, running],
-  );
+  // 投研数据卡 (U5 / UP-5.2)：只认带来源信封的工具结果；推荐卡 (UP-6.2) 来自 ob_app_recommend 的 details。
+  // 都在回答完成后展示；随会话记录保存，重开/分叉后仍在。
+  const turnToolCalls = useMemo(() => messages.flatMap((m) => m.parts).flatMap((p) => (p.kind === "tool_call" ? [p.toolCall] : [])), [messages]);
+  const financeCards = useMemo(() => (running ? [] : financeCardsOf(turnToolCalls)), [turnToolCalls, running]);
+  const recommendation = useMemo(() => (running ? null : recommendationOf(turnToolCalls)), [turnToolCalls, running]);
   const suggestions = !running && isLast && !inlineError
     ? suggestFollowUps({ answer: answerText, artifactCount: turnArtifacts.length, toolKinds, hadError: !!inlineError })
     : [];
@@ -336,6 +337,7 @@ function TurnViewInner(props: TurnViewProps) {
           </div>
         )}
         {financeCards.length > 0 && <FinanceDataCards cards={financeCards} onInsertPrompt={onInsertPrompt} onToast={onToast} />}
+        {recommendation && <AppRecommendCard key={recommendation.toolCallId} rec={recommendation.rec} onInsertPrompt={onInsertPrompt} onToast={onToast} />}
         {running && !hasAnything && !retry && !compacting && <LoadingRow />}
         {aborted && !content.process.length && <div className="turn__stopped">已停止</div>}
         {!running && artifactsApi && turnArtifacts.length > 0 && <ArtifactCards items={turnArtifacts} total={artifactsApi.all.length} api={artifactsApi} />}

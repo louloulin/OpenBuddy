@@ -1,6 +1,7 @@
 import type { ExpertCategoryInfo, ExpertDraft, ExpertSceneInfo } from "@openbuddy/protocol/experts";
 import { WORK_SEEDS } from "./seeds-work.js";
 import { KNOWLEDGE_SEEDS } from "./seeds-knowledge.js";
+import { FINANCE_SEEDS } from "./seeds-finance.js";
 
 /**
  * The built-in expert catalog (20261116-pii W2.1, §9-D2): self-written seeds shipped as code, so
@@ -16,6 +17,7 @@ export const EXPERT_CATEGORIES: ExpertCategoryInfo[] = [
   { id: "language", label: "语言翻译", emoji: "🌐" },
   { id: "product", label: "产品方案", emoji: "🧭" },
   { id: "learning", label: "学习成长", emoji: "🎓" },
+  { id: "finance", label: "金融投研", emoji: "📈" },
   { id: "custom", label: "其他", emoji: "✨" },
 ];
 
@@ -52,7 +54,15 @@ export const EXPERT_SCENES: ExpertSceneInfo[] = [
     from: "#e6e1f8",
     to: "#f1eefb",
   },
+  {
+    id: "invest",
+    title: "投研分析",
+    description: "基于 UpUp 真实数据的基本面、风险与研究报告",
+    expertIds: ["fundamental-analyst", "risk-analyst", "investment-researcher"],
+    from: "#ffe4dc",
+    to: "#fff3ee",
+  },
 ];
 
 /** Every built-in expert, ids included. */
-export const SEED_EXPERTS: ExpertDraft[] = [...WORK_SEEDS, ...KNOWLEDGE_SEEDS];
+export const SEED_EXPERTS: ExpertDraft[] = [...WORK_SEEDS, ...KNOWLEDGE_SEEDS, ...FINANCE_SEEDS];

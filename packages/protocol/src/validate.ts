@@ -100,6 +100,9 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'apps_uninstall') string('packageSource', 4096);
   if (command === 'apps_set_current') string('appId', 256);
   if (command === 'apps_rollback') string('packageSource', 4096);
+  if (command === 'apps_recommend_dismiss') string('appId', 256);
+  if (command === 'apps_hygiene' && payload.cwd !== undefined && payload.cwd !== null) string('cwd', 4096);
+  if (command === 'apps_hygiene_keep') string('packageSource', 4096);
   if (command === 'data_import_scan') string('path', 4096);
   if (command === 'data_import_apply') { string('path', 4096); string('outputDir', 4096); }
   if (command === 'quick_shortcut_set') {

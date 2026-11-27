@@ -9,6 +9,7 @@ import { appsSetCurrent } from "@openbuddy/client/api/files";
  */
 const CURRENT_APP_KEY = "openbuddy.current-app.v1";
 const RECENT_APPS_KEY = "openbuddy.recent-apps.v1";
+const DISMISSED_RECS_KEY = "openbuddy.dismissed-app-recs.v1";
 const MAX_RECENT = 6;
 
 function readString(key: string): string | null {
@@ -41,6 +42,9 @@ interface AppsState {
   currentAppId: string | null;
   recentAppIds: string[];
   setCurrentApp: (id: string | null) => void;
+  /** 推荐卡点过「不用了」的应用 (U5 / UP-6.2)：宿主那边也记了，这里让历史会话里的旧卡片同样收起。 */
+  dismissedRecommendations: string[];
+  dismissRecommendation: (id: string) => void;
 }
 
 export const useAppsStore = create<AppsState>((set, get) => ({
@@ -54,5 +58,11 @@ export const useAppsStore = create<AppsState>((set, get) => ({
     // 宿主侧持久化 (U4)：新会话的 system prompt 要跟随当前应用。
     // 没有宿主桥（单测/浏览器预览）时 invoke 会抛错，异步吞掉，不影响 UI。
     if (id) void Promise.resolve().then(() => appsSetCurrent(id)).catch(() => {});
+  },
+  dismissedRecommendations: readList(DISMISSED_RECS_KEY),
+  dismissRecommendation: (id) => {
+    const next = [...new Set([...get().dismissedRecommendations, id])];
+    write(DISMISSED_RECS_KEY, JSON.stringify(next));
+    set({ dismissedRecommendations: next });
   },
 }));

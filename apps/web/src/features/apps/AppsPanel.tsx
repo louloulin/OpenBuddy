@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { ArrowUpCircle, Blocks, Download, History, RefreshCw } from "lucide-react";
 import {
   appsEnsureDefault,
+  appsHygiene,
+  appsHygieneKeep,
   appsIcon,
   appsInstallState,
   appsList,
@@ -10,7 +12,9 @@ import {
   appsUpdate,
   type AppEntry,
   type AppInstallHistory,
+  type IdleApp,
 } from "@openbuddy/client/api/files";
+import { ContextHygieneCard } from "./ContextHygieneCard";
 import {
   agentExtensionsCheckUpdates,
   agentExtensionsList,
@@ -59,15 +63,19 @@ export function AppsPanel({
   const [checking, setChecking] = useState(false);
   // U6：{source → {current, previous}}，卡片据此显示版本与「回滚」入口。
   const [installs, setInstalls] = useState<Record<string, AppInstallHistory>>({});
+  // U5 / UP-6.4：≥14 天未用的已启用应用。
+  const [idle, setIdle] = useState<IdleApp[]>([]);
 
   const load = useCallback(async () => {
-    const [list, pkgs, config, history] = await Promise.all([
+    const [list, pkgs, config, history, hygiene] = await Promise.all([
       appsList(cwd).catch(() => [] as AppEntry[]),
       agentExtensionsPackages(cwd).catch(() => [] as ExtensionPackage[]),
       agentExtensionsList(cwd).catch(() => null),
       appsInstallState().catch(() => ({} as Record<string, AppInstallHistory>)),
+      appsHygiene(cwd).catch(() => ({ idle: [] as IdleApp[] })),
     ]);
     setApps(list);
+    setIdle(hygiene.idle);
     setPackages(pkgs);
     setInstalls(history);
     if (config) {
@@ -272,6 +280,25 @@ export function AppsPanel({
             </button>
           )}
         </div>
+      )}
+
+      {loaded && (
+        <ContextHygieneCard
+          idle={idle}
+          onDisable={async (app) => {
+            try {
+              await appsSetEnabled(app.packageSource, false);
+              await load();
+              onToast?.(`${app.name} 已停用；需要时在卡片上重新打开`);
+            } catch (error) {
+              onToast?.(describeAppInstallError(error));
+            }
+          }}
+          onKeep={async (app) => {
+            await appsHygieneKeep(app.packageSource).catch(() => undefined);
+            setIdle((prev) => prev.filter((item) => item.packageSource !== app.packageSource));
+          }}
+        />
       )}
 
       {!loaded ? (

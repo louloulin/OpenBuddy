@@ -4,7 +4,7 @@ import { readWorkBuddyZip } from "../src/agents/workbuddy";
 import { readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildDocx, buildPptx, buildXlsx, deckSpecToXlsx, type PptxSpec } from "../src/office/index";
+import { buildDocx, buildPptx, buildXlsx, deckSpecToDocx, deckSpecToXlsx, type PptxSpec } from "../src/office/index";
 
 // Same DeckSpec the UpUp industry pipeline produces (upup: packages/pi-investment-analysis/test/fixtures/industry-deck.json).
 const industryDeck = JSON.parse(readFileSync(join(__dirname, "fixtures", "industry-deck.json"), "utf8")) as PptxSpec;
@@ -137,7 +137,11 @@ describe("PPTX 版式块 (P2-1)", () => {
     expect(slideNames(files).length).toBe(5);
     expect(all).toContain("长表（续）");
     expect(all).toContain("行30");
-    expect(all).toContain("b · 走势");
+    // Line charts are native c:lineChart parts, not columns relabelled as a trend.
+    const chartXml = [...files.keys()].filter((name) => /^ppt\/charts\/chart\d+\.xml$/.test(name)).map((name) => text(files, name));
+    expect(chartXml.filter((xml) => xml.includes("<c:lineChart"))).toHaveLength(1);
+    expect(chartXml.filter((xml) => xml.includes("<c:barChart"))).toHaveLength(1);
+    expect(all).not.toContain("b · 走势");
   });
 
   it("skips charts without data and images outside the workspace instead of inventing content", async () => {
@@ -185,5 +189,20 @@ describe("PPTX 版式块 (P2-1)", () => {
     const files = readWorkBuddyZip(Buffer.from(await buildXlsx(spec)));
     expect(text(files, "xl/workbook.xml")).toContain("来源");
     expect(() => deckSpecToXlsx({ slides: [{ title: "空", blocks: [{ kind: "paragraph", text: "x" }] }] })).toThrow("没有可导出");
+  });
+
+  it("exports the same DeckSpec as a Word report with merged tables and labelled notes", async () => {
+    const spec = deckSpecToDocx(industryDeck);
+    expect(spec.title).toBe(industryDeck.title);
+    const headings = spec.blocks.filter((block) => block.type === "heading").map((block) => (block.type === "heading" ? block.text : ""));
+    expect(headings).toContain("一、产业事实与数据");
+    expect(headings.some((text) => /续/.test(text))).toBe(false);
+    const paragraphs = spec.blocks.flatMap((block) => (block.type === "paragraph" ? [block.text] : []));
+    expect(paragraphs.some((text) => text.startsWith("【假设】"))).toBe(true);
+    expect(paragraphs.some((text) => text.startsWith("图："))).toBe(true);
+    const files = readWorkBuddyZip(Buffer.from(await buildDocx(spec)));
+    const xml = text(files, "word/document.xml");
+    expect(new DOMParser().parseFromString(xml, "application/xml").getElementsByTagName("parsererror").length).toBe(0);
+    expect(xml).toContain("政策矩阵");
   });
 });

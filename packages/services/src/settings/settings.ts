@@ -273,6 +273,8 @@ export interface AppSettings {
   currentAppId?: string;
   /** 应用安装来源与回滚 (U6): key = 去掉 `#ref` 的安装源。 */
   appInstalls?: Record<string, AppInstallHistory>;
+  /** 会话内应用推荐 (U5 / UP-6.2)：用户点过「不用了」的应用 id，不再推荐。 */
+  dismissedAppRecommendations?: string[];
   /** 默认打开方式 (G1-6): per file type, "embedded" (预览面板) or "system" (系统关联应用). */
   defaultOpen?: Record<string, "embedded" | "system">;
   /** System notifications while the window is in the background (20261115-ui U6.1); on by default. */

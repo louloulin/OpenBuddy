@@ -13753,3 +13753,29 @@ button.diff__path {
 .finance-card__foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.25rem 0.75rem; padding: 0.375rem 0.75rem; background: var(--wb-bg-secondary); color: var(--wb-text-tertiary); font-size: 0.6875rem; }
 .finance-cards__report { align-self: flex-start; display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.625rem; border: 0.0625rem solid var(--wb-border-default); border-radius: var(--wb-radius-pill); background: var(--wb-bg-primary); color: var(--wb-text-medium); font-size: 0.75rem; cursor: pointer; }
 .finance-cards__report:hover { color: var(--wb-text-strong); background: var(--wb-bg-hover); }
+
+/* 会话内应用推荐卡 (20261127-upup U5 / UP-6.2)：单卡，对齐 WorkBuddy 的推荐卡层级。 */
+.app-rec { display: flex; align-items: center; gap: 0.625rem; margin-top: 0.75rem; padding: 0.625rem 0.75rem; border: 0.0625rem solid var(--wb-border-default); border-radius: 0.75rem; background: var(--wb-bg-primary); }
+.app-rec__icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: 0.5rem; background: var(--wb-bg-secondary); color: var(--wb-text-medium); }
+.app-rec__text { display: flex; flex-direction: column; gap: 0.125rem; min-width: 0; flex: 1; }
+.app-rec__name { font-size: 0.8125rem; color: var(--wb-text-strong); }
+.app-rec__tagline, .app-rec__why { font-size: 0.6875rem; color: var(--wb-text-tertiary); }
+.app-rec__actions { display: flex; flex-wrap: wrap; gap: 0.375rem; justify-content: flex-end; }
+.app-rec__btn { padding: 0.25rem 0.625rem; border: 0.0625rem solid var(--wb-border-default); border-radius: var(--wb-radius-pill); background: var(--wb-bg-primary); color: var(--wb-text-medium); font-size: 0.75rem; cursor: pointer; }
+.app-rec__btn:hover:not(:disabled) { background: var(--wb-bg-hover); color: var(--wb-text-strong); }
+.app-rec__btn:disabled { opacity: 0.6; cursor: default; }
+.app-rec__btn--primary { border-color: transparent; background: var(--wb-text-strong); color: var(--wb-bg-primary); }
+.app-rec__btn--primary:hover:not(:disabled) { background: var(--wb-text-strong); color: var(--wb-bg-primary); opacity: 0.9; }
+.app-rec__btn--ghost { border-color: transparent; color: var(--wb-text-tertiary); }
+
+/* 上下文治理 (20261127-upup U5 / UP-6.4)：≥14 天未用的应用一键停用。 */
+.apps-hygiene { border: 0.0625rem dashed var(--wb-border-default); border-radius: 0.75rem; padding: 0.625rem 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.apps-hygiene__head { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; font-size: 0.8125rem; color: var(--wb-text-strong); }
+.apps-hygiene__desc { font-size: 0.6875rem; color: var(--wb-text-tertiary); }
+.apps-hygiene__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.375rem; }
+.apps-hygiene__item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; }
+.apps-hygiene__name { color: var(--wb-text-strong); }
+.apps-hygiene__meta { flex: 1; color: var(--wb-text-tertiary); }
+.apps-hygiene__btn { padding: 0.1875rem 0.625rem; border: 0.0625rem solid var(--wb-border-default); border-radius: var(--wb-radius-pill); background: var(--wb-bg-primary); color: var(--wb-text-medium); font-size: 0.75rem; cursor: pointer; }
+.apps-hygiene__btn:hover:not(:disabled) { background: var(--wb-bg-hover); color: var(--wb-text-strong); }
+.apps-hygiene__btn--ghost { border-color: transparent; color: var(--wb-text-tertiary); }

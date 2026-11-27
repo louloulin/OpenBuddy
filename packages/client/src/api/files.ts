@@ -138,6 +138,19 @@ export const appsRollback = (packageSource: string) =>
   invoke<{ packageSource: string; rolledBackTo: string; packages: unknown[] }>("apps_rollback", { packageSource });
 
 /** 应用图标（data URI；缺失或过大时 dataUri 为 null）。 */
+/** 推荐卡「不用了」(U5 / UP-6.2)：之后不再推荐这个应用。 */
+export const appsRecommendDismiss = (appId: string) =>
+  invoke<{ dismissed: string[] }>("apps_recommend_dismiss", { appId });
+/** ≥14 天未用的已启用应用 (U5 / UP-6.4)。 */
+export interface IdleApp {
+  appId: string;
+  name: string;
+  packageSource: string;
+  lastUsedAt: string | null;
+  idleDays: number;
+}
+export const appsHygiene = (cwd?: string) => invoke<{ idle: IdleApp[] }>("apps_hygiene", cwd ? { cwd } : {});
+export const appsHygieneKeep = (packageSource: string) => invoke<{ kept: true }>("apps_hygiene_keep", { packageSource });
 export const appsIcon = (packageSource: string, icon: string) =>
   invoke<{ dataUri: string | null }>("apps_icon", { packageSource, icon });
 

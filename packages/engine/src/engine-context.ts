@@ -21,6 +21,8 @@ import type { SessionSearchIndex } from "./session-search.js";
 import type { Emit, Permissions } from "./permissions/permissions.js";
 import type { AgentMode, PoolLimits, PromptImages, SessionRunStatus, Slot, ThinkingLevel } from "./types.js";
 import type { SessionModelState } from "@openbuddy/protocol/agent-settings";
+import type { AppEntry } from "@openbuddy/services/apps/manifest";
+import type { InstalledPackage } from "@openbuddy/services/apps/catalog";
 
 /**
  * The PiEngine members used by the modules split out of pi-engine.ts (event pipeline,
@@ -69,6 +71,10 @@ export interface EngineContext {
   trusted(cwd: string): boolean;
   /** 当前应用的身份/边界 (U4)，会话打开时并入 system prompt。 */
   appPrompt(cwd?: string): string | undefined;
+  /** 已安装应用与包 (U5)：与宿主 `apps_list` 同一份 `collectApps()`，供应用推荐使用。 */
+  appCatalog(cwd?: string): { apps: AppEntry[]; packages: InstalledPackage[] };
+  /** 应用使用统计 (U5 / UP-6.4)：工具调用结束时按来源包记一次最近使用日。 */
+  recordToolUse(slot: Slot, toolName: string): void;
   slot(id: string): Slot;
   live(id: string): AgentSession;
   emitEvent(slot: Slot, event: unknown): void;

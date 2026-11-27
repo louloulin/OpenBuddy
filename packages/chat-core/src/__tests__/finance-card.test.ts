@@ -48,6 +48,12 @@ describe("UpUp 数据卡识别 (UP-5.1)", () => {
     expect(detectFinanceCard(quote({ content: [{ type: "text", text: "Market quote request aborted" }] }))).toBeNull();
   });
 
+  it("JSON 后面附加说明文字时仍能识别（实测 UpUp 会追加弃用提示）", () => {
+    const tc = quote();
+    const card = detectFinanceCard({ ...tc, content: [...tc.content, { type: "text", text: "Deprecated: use market_data_snapshot" }] });
+    expect(card?.title).toBe("600519.SH");
+  });
+
   it("evidence 数组里的 asOf 也认（契约第 2 分支）", () => {
     expect(provenanceOf({ auditId: "a", evidence: [{ asOf: "2026-11-01", source: "tushare" }] })).toEqual({ asOf: "2026-11-01", source: "tushare" });
   });

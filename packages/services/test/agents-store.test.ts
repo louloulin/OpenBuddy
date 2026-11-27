@@ -61,9 +61,10 @@ describe("expert files (pii W2.1)", () => {
     expect(() => parseExpertMarkdown("---\nname: ok\nexamples: {a: 1}\n---\nbody", "x")).toThrow(/expert_invalid/);
   });
 
-  it("ships 8–12 self-written seeds with valid ids, categories and scenes", () => {
+  // 12 通用专家 + 3 投研专家（20261127-upup U5 / UP-5.3）。
+  it("ships 8–15 self-written seeds with valid ids, categories and scenes", () => {
     expect(SEED_EXPERTS.length).toBeGreaterThanOrEqual(8);
-    expect(SEED_EXPERTS.length).toBeLessThanOrEqual(12);
+    expect(SEED_EXPERTS.length).toBeLessThanOrEqual(15);
     const categories = new Set(EXPERT_CATEGORIES.map((c) => c.id));
     const ids = new Set<string>();
     for (const seed of SEED_EXPERTS) {

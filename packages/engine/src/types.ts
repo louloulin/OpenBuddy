@@ -39,6 +39,8 @@ export type SessionRunStatus = "running" | "idle" | "failed";
 export interface Slot {
   /** Streaming tool-call arguments per content index (summarized for the renderer). */
   toolArgs?: Map<number, { bytes: number; head: string; at: number }>;
+  /** 工具名 → 来源 Pi 包（null = 内置/本地，不计入应用使用统计；U5 / UP-6.4）。重建会话时随 slot 丢弃。 */
+  toolSources?: Map<string, string | null>;
   /** Text/thinking delta waiting to be merged with the next ones (see emitEvent). */
   pendingDelta?: { type: string; contentIndex?: number; delta: string; timer?: ReturnType<typeof setTimeout> };
   lastDeltaAt?: number;

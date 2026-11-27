@@ -153,14 +153,22 @@ export function provenanceOf(details: unknown): { asOf: string; source: string; 
   return { asOf, source, ...(freshness ? { freshness } : {}) };
 }
 
+/**
+ * 取第一段能解析成 JSON 的文本。实测 UpUp 会在 JSON 之后再附一段说明文字
+ * （如弃用提示），所以不能把所有文本拼起来再解析。
+ */
 function parsePayload(tc: ToolCallView): unknown {
-  const text = tc.content.flatMap((c) => (c.type === "text" ? [c.text] : [])).join("").trim();
-  if (!text || !/^[[{]/.test(text)) return undefined;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
+  for (const c of tc.content) {
+    if (c.type !== "text") continue;
+    const text = c.text.trim();
+    if (!/^[[{]/.test(text)) continue;
+    try {
+      return JSON.parse(text);
+    } catch {
+      /* 试下一段 */
+    }
   }
+  return undefined;
 }
 
 function rowsOf(value: Record<string, unknown>): FinanceCardRow[] {

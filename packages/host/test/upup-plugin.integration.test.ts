@@ -16,6 +16,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createEngineHandlers } from "@openbuddy/host/handlers";
+import { detectFinanceCard } from "@openbuddy/chat-core/finance-card";
 
 const repo = process.env.UPUP_REPO ?? join(process.env.HOME ?? "", "stock", "upup");
 const enabled = process.env.OPENBUDDY_UPUP === "1";
@@ -315,6 +316,45 @@ describe.skipIf(!enabled)("UpUp 作为 Pi 插件 (20261126-upup)", () => {
       const refused = /(不能|无法|不会|拒绝|风险)/.test(transcript);
       expect(blocked || refused).toBe(true);
       expect(blocked).toBe(true); // 装机后确实带到模型侧，并且被我们的策略拦下
+    } finally {
+      app.dispose();
+    }
+  }, 300_000);
+
+  it.skipIf(!realModel)("真实模型用 UpUp 只读工具跑一轮，结果能出数据卡（UP-7.3）", async () => {
+    const { root, app } = await host();
+    try {
+      await app.handlers.agent_extensions_install_package({ source: repo });
+      await app.handlers.agent_extensions_set_enabled({ enabled: true });
+      await app.handlers.folder_trust_respond({ cwd: root, trusted: true });
+      const modelId = await configureMagpie(app);
+      const sessionId = (await app.handlers.agent_new_session({ cwd: root, modelId })) as string;
+      await app.handlers.agent_send({
+        sessionId,
+        text: "请调用 market_data_quote 工具查询贵州茅台（symbol=600519，market=cn）的最新行情，然后用一句话告诉我价格和数据截至时间。",
+      });
+
+      type Part = { type?: string; toolCallId?: string; toolName?: string; content?: Array<{ type: string; text?: string }>; details?: unknown; isError?: boolean };
+      const deadline = Date.now() + 60_000;
+      let result: Part | undefined;
+      while (Date.now() < deadline && !result) {
+        const loaded = (await app.handlers.agent_load_session({ sessionId, cwd: root })) as { messages?: Array<Part & { role?: string }> };
+        result = (loaded.messages ?? []).find((m) => m.role === "toolResult" && m.toolName === "market_data_quote" && !m.isError);
+        if (!result) await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+      if (!result) {
+        const loaded = (await app.handlers.agent_load_session({ sessionId, cwd: root })) as { messages?: unknown[] };
+        console.log("UPUP_REAL_READONLY_DEBUG", JSON.stringify(loaded.messages ?? []).slice(0, 3000));
+      }
+      expect(result, "真实模型调用了 market_data_quote 且成功").toBeTruthy();
+      const card = detectFinanceCard({
+        toolCallId: result!.toolCallId ?? "x", title: "market_data_quote", kind: "market_data_quote", status: "completed",
+        content: (result!.content ?? []).filter((c): c is { type: "text"; text: string } => c.type === "text" && typeof c.text === "string"),
+        details: result!.details,
+      });
+      console.log("UPUP_REAL_READONLY", JSON.stringify({ modelId, card: card && { kind: card.kind, title: card.title, source: card.source, asOf: card.asOf, price: card.rows.find((r) => r.key === "price")?.value } }));
+      expect(card).toMatchObject({ kind: "quote" });
+      expect(card!.asOf).toBeTruthy();
     } finally {
       app.dispose();
     }

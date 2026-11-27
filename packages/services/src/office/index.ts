@@ -260,6 +260,72 @@ export function deckSpecToXlsx(spec: PptxSpec): XlsxSpec {
   return { sheets: all.slice(0, LIMITS.sheets) };
 }
 
+const NOTE_PREFIX = { assumption: "【假设】", inference: "【推断】", disclaimer: "【声明】" } as const;
+
+/**
+ * Same-source Word report for a deck: section slides become level-1 headings, other slides level-2
+ * headings; tables keep their rows (continuation pages merged), charts become data tables, notes keep
+ * their 假设/推断/声明 label, and speaker notes follow as paragraphs. Nothing is added that the deck
+ * does not already contain.
+ */
+export function deckSpecToDocx(spec: PptxSpec): DocxSpec {
+  const blocks: DocxBlock[] = [];
+  const sources = new Map((spec.sources ?? []).map((source) => [source.id, source]));
+  const sourceLine = (id: string | undefined) => {
+    const source = id ? sources.get(id) : undefined;
+    return source ? `来源：${source.name}（${source.asOf}）` : "";
+  };
+  if (spec.subtitle) blocks.push({ type: "paragraph", text: stringOf(spec.subtitle, 400) });
+  if (spec.asOf) blocks.push({ type: "paragraph", text: `数据截止：${stringOf(spec.asOf, 20)}` });
+  let lastTable: { title: string; block: Extract<DocxBlock, { type: "table" }> } | null = null;
+  for (const slide of Array.isArray(spec.slides) ? spec.slides : []) {
+    if (slide?.layout === "cover") continue;
+    const title = stringOf(slide?.title, 200);
+    const base = title.replace(CONTINUED, "").trim();
+    const continued = base !== title;
+    if (!continued) {
+      blocks.push({ type: "heading", text: base || "（无标题）", level: slide?.layout === "section" ? 1 : 2 });
+      lastTable = null;
+    }
+    if (Array.isArray(slide?.bullets) && slide.bullets.length) blocks.push({ type: "bullets", items: slide.bullets.map((item) => stringOf(item, 600)) });
+    for (const block of Array.isArray(slide?.blocks) ? slide.blocks : []) {
+      switch (block?.kind) {
+        case "bullets": if (block.items?.length) blocks.push({ type: "bullets", items: block.items.map((item) => stringOf(item, 600)) }); break;
+        case "paragraph": if (block.text) blocks.push({ type: "paragraph", text: stringOf(block.text, 4000) }); break;
+        case "note": if (block.text) blocks.push({ type: "paragraph", text: `${NOTE_PREFIX[block.tone] ?? NOTE_PREFIX.disclaimer}${stringOf(block.text, 4000)}` }); break;
+        case "kpi": if (block.items?.length) blocks.push({ type: "bullets", items: block.items.map((item) => `${stringOf(item.label, 60)}：${stringOf(item.value, 40) || "—"}${item.delta ? `（${stringOf(item.delta, 80)}）` : ""}`) }); break;
+        case "table": {
+          if (!Array.isArray(block.rows) || !block.rows.length) break;
+          if (continued && lastTable && lastTable.title === base && JSON.stringify(lastTable.block.headers) === JSON.stringify(block.headers)) {
+            lastTable.block.rows.push(...block.rows);
+            break;
+          }
+          const table: Extract<DocxBlock, { type: "table" }> = { type: "table", headers: [...(block.headers ?? [])], rows: [...block.rows] };
+          blocks.push(table);
+          lastTable = { title: base, block: table };
+          const caption = [block.caption, sourceLine(block.sourceId)].filter(Boolean).join(" ｜ ");
+          if (caption) blocks.push({ type: "paragraph", text: caption });
+          break;
+        }
+        case "chart": {
+          if (!Array.isArray(block.categories) || !block.categories.length || !Array.isArray(block.series) || !block.series.length) break;
+          blocks.push({ type: "paragraph", text: `图：${stringOf(block.title, 120)}${block.unit ? `（${block.unit}）` : ""}` });
+          blocks.push({ type: "table", headers: ["类别", ...block.series.map((series) => stringOf(series.name, 60))], rows: block.categories.map((category, index) => [category, ...block.series.map((series) => series.values[index] ?? "")]) });
+          const source = sourceLine(block.sourceId);
+          if (source) blocks.push({ type: "paragraph", text: source });
+          break;
+        }
+        case "mermaid": blocks.push({ type: "paragraph", text: `图示：${stringOf(block.caption, 200) || "流程图"}（Word 中不渲染，见报告预览）` }); break;
+        case "image": blocks.push({ type: "paragraph", text: `图片：${stringOf(block.alt ?? block.path, 200)}` }); break;
+        default: break;
+      }
+    }
+    if (slide?.speakerNotes) blocks.push({ type: "paragraph", text: stringOf(slide.speakerNotes, 8000) });
+  }
+  if (blocks.length > LIMITS.docxBlocks) bad(`docx: 报告规格展开后超过 ${LIMITS.docxBlocks} 个内容块`);
+  return { ...(spec.title ? { title: stringOf(spec.title, 200) } : {}), blocks };
+}
+
 // ---------------------------------------------------------------------------
 // PowerPoint
 // ---------------------------------------------------------------------------
@@ -465,9 +531,9 @@ class SlideCursor {
     if (this.charted) this.close();
     const { slide, y, height } = this.reserve(blockHeight(block), true);
     this.charted = true;
-    // officegen only renders column and pie frames; a line chart is exported as columns and labelled as such.
-    const renderType = block.chartType === "pie" ? "pie" : "column";
-    const title = `${stringOf(block.title, 120)}${block.unit ? `（${stringOf(block.unit, 16)}）` : ""}${block.chartType === "line" ? " · 走势" : ""}`;
+    // officegen 0.6.5 ships native column / line / pie chart frames (lib/pptx/charts.js).
+    const renderType = block.chartType === "pie" ? "pie" : block.chartType === "line" ? "line" : "column";
+    const title = `${stringOf(block.title, 120)}${block.unit ? `（${stringOf(block.unit, 16)}）` : ""}`;
     // officegen swallows workbook.save errors (e.g. ENOSPC) without calling back: fail instead of hanging.
     this.state.charts.push(new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error("pptx: 图表数据写入临时目录失败（超时）")), 15_000);

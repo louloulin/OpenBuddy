@@ -266,6 +266,8 @@ export function onEvent(engine: EngineContext, slot: Slot, event: AgentSessionEv
     if (state) emitPlan(engine, sessionId, state.items);
   }
   if (event.type === "tool_execution_end") {
+    // 应用使用统计 (U5 / UP-6.4)：只记成功的调用，按来源包聚合到「最近使用日」。
+    if (!event.isError) engine.recordToolUse(slot, event.toolName);
     // 即时连接卡 (pii W2.5): an MCP tool that failed because its server is not authorized asks the
     // composer for a 连接 X card; the user's sign-in then continues the turn.
     if (event.isError && event.toolName.startsWith("mcp__")) notifyConnectorNeeded(engine, sessionId, event);

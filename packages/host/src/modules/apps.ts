@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { readUpupPlugins, writeUpupPlugins } from "@openbuddy/services/apps/upup-settings";
-import { BUILTIN_APP_ID, builtinApp } from "@openbuddy/services/apps/builtin";
+import { appEnabled, collectApps, type InstalledPackage } from "@openbuddy/services/apps/catalog";
+import { AppUsageStore, idleApps, usageKey } from "@openbuddy/services/apps/usage";
 import { DEFAULT_APP_SOURCE } from "@openbuddy/services/apps/standard";
 import { buildAppPrompt } from "@openbuddy/services/apps/prompt";
 import {
@@ -18,7 +19,7 @@ import {
 } from "@openbuddy/services/apps/install-state";
 import { describeAppInstallError } from "@openbuddy/protocol/apps";
 import { PLATFORM_DENIED_PATTERNS } from "@openbuddy/engine/permissions/permissions";
-import { readAppEntry, type AppEntry } from "@openbuddy/services/apps/manifest";
+import type { AppEntry } from "@openbuddy/services/apps/manifest";
 import { text } from "@openbuddy/services/settings/settings";
 import type { Handler, HostContext, HostModule } from "../module.js";
 
@@ -31,20 +32,11 @@ import type { Handler, HostContext, HostModule } from "../module.js";
 export function appsModule(ctx: HostContext): HostModule {
   const agentDir = ctx.settings.dir;
   /** 全部应用：内置永远第一，其后是 pi.app 的 Pi 包，没有 manifest 的记为扩展包。 */
-  const collect = (cwd?: string): AppEntry[] => {
-    const entries: AppEntry[] = [builtinApp()];
-    for (const pkg of ctx.engine.extensionPackages(cwd) as Array<{ source: string; installedPath?: string }>) {
-      if (!pkg.installedPath) continue;
-      const entry = readAppEntry(pkg.installedPath, "pi", pkg.source);
-      if (entry) entries.push(entry);
-    }
-    // 内置 → 应用 → 扩展包；同 id@路径 只留一条。
-    const rank = (entry: AppEntry) => (entry.id === BUILTIN_APP_ID ? 0 : entry.kind === "extension" ? 2 : 1);
-    const seen = new Set<string>();
-    return entries
-      .sort((a, b) => rank(a) - rank(b))
-      .filter((entry) => (seen.has(`${entry.id}@${entry.installedPath ?? entry.source}`) ? false : (seen.add(`${entry.id}@${entry.installedPath ?? entry.source}`), true)));
-  };
+  const installed = (cwd?: string) => ctx.engine.extensionPackages(cwd) as InstalledPackage[];
+  const collect = (cwd?: string): AppEntry[] => collectApps(installed(cwd));
+  // U5 / UP-6.4：使用统计文件（引擎写，宿主读）；第一次用到才创建（modules.test.ts 要求工厂不碰上下文）。
+  let usage: AppUsageStore | undefined;
+  const usageStore = () => (usage ??= new AppUsageStore(agentDir));
   const run = promisify(execFile);
   /** 读 Git HEAD；非 Git 目录或缺少 git 时返回 undefined（不阻塞安装/更新）。 */
   const gitCommit = async (dir: string): Promise<string | undefined> => {
@@ -122,6 +114,7 @@ export function appsModule(ctx: HostContext): HostModule {
     },
     apps_uninstall: async (p) => {
       const source = text(p.packageSource, "packageSource");
+      const key = usageKey({ packageSource: source, installedPath: packageFor(source)?.installedPath });
       const packages = await ctx.engine.removeExtensionPackage(source);
       const cleared = writeUpupPlugins(agentDir, { disabled: [], enabled: [] });
       ctx.update((config) => {
@@ -129,6 +122,7 @@ export function appsModule(ctx: HostContext): HostModule {
         delete next[installKey(source)];
         config.appInstalls = next;
       });
+      usageStore().forget(key);
       return { packageSource: source, packages, upup: cleared };
     },
     // 安装来源与回滚 (U6)：UI 据此显示「回滚到上一版本」。
@@ -206,6 +200,30 @@ export function appsModule(ctx: HostContext): HostModule {
       } catch (error) {
         return { installed: false, source, packages: [], extensionsEnabled: ctx.settings.config.read().extensionsEnabled === true, error: describeAppInstallError(error) };
       }
+    },
+    // 推荐卡「不用了」(U5 / UP-6.2)：记下应用 id，`ob_app_recommend` 之后不再推它。
+    apps_recommend_dismiss: (p) => {
+      const id = text(p.appId, "appId");
+      ctx.update((config) => {
+        config.dismissedAppRecommendations = [...new Set([...(config.dismissedAppRecommendations ?? []), id])];
+      });
+      return { dismissed: ctx.settings.config.read().dismissedAppRecommendations ?? [] };
+    },
+    // 上下文治理 (U5 / UP-6.4)：≥14 天没用过的已启用应用，UI 给「停用 / 保留」。
+    apps_hygiene: (p) => {
+      const packages = installed(typeof p.cwd === "string" && p.cwd ? p.cwd : undefined);
+      const installs = ctx.settings.config.read().appInstalls ?? {};
+      return {
+        idle: idleApps(collectApps(packages), usageStore().read(), new Date(), {
+          installedAt: (source) => installs[installKey(source)]?.current.at,
+          enabled: (app) => appEnabled(app, packages),
+        }),
+      };
+    },
+    apps_hygiene_keep: (p) => {
+      const source = text(p.packageSource, "packageSource");
+      usageStore().keep(usageKey({ packageSource: source, installedPath: packageFor(source)?.installedPath }));
+      return { kept: true };
     },
     upup_plugins_get: () => readUpupPlugins(agentDir),
     upup_plugins_set: (p) => {

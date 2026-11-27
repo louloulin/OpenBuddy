@@ -9,6 +9,8 @@ const appsInstallState = vi.fn();
 const appsUpdate = vi.fn();
 const appsRollback = vi.fn();
 const appsEnsureDefault = vi.fn();
+const appsHygiene = vi.fn();
+const appsHygieneKeep = vi.fn();
 const agentExtensionsPackages = vi.fn();
 const agentExtensionsPreviewPackage = vi.fn();
 const agentExtensionsList = vi.fn();
@@ -22,6 +24,8 @@ vi.mock("@openbuddy/client/api/files", () => ({
   appsUpdate: (...args: unknown[]) => appsUpdate(...args),
   appsRollback: (...args: unknown[]) => appsRollback(...args),
   appsEnsureDefault: (...args: unknown[]) => appsEnsureDefault(...args),
+  appsHygiene: (...args: unknown[]) => appsHygiene(...args),
+  appsHygieneKeep: (...args: unknown[]) => appsHygieneKeep(...args),
 }));
 vi.mock("@openbuddy/client/agent-client", () => ({
   agentExtensionsPackages: (...args: unknown[]) => agentExtensionsPackages(...args),
@@ -57,6 +61,8 @@ beforeEach(() => {
   appsInstallState.mockReset().mockResolvedValue({});
   appsUpdate.mockReset().mockResolvedValue({ packageSource: "/repo/upup", packages: [], install: null, canRollback: false });
   appsRollback.mockReset().mockResolvedValue({ packageSource: "/repo/upup", rolledBackTo: "/repo/upup", packages: [] });
+  appsHygiene.mockReset().mockResolvedValue({ idle: [] });
+  appsHygieneKeep.mockReset().mockResolvedValue({ kept: true });
   appsEnsureDefault.mockReset().mockResolvedValue({ installed: true, source: "https://gitcode.com/lumosaigroup/upup.git", packages: [], extensionsEnabled: true });
   agentExtensionsPackages.mockReset().mockResolvedValue([
     { source: "/repo/upup", scope: "user", filtered: false, installedPath: "/repo/upup" },
@@ -168,5 +174,31 @@ describe("安装来源与回滚 (U6)", () => {
     render(<AppsPanel />);
     expect(await screen.findByText("当前版本 2026.11.27")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "回滚 upup" })).toBeNull();
+  });
+});
+
+describe("上下文治理 (U5 / UP-6.4)", () => {
+  const idle = [{ appId: "upup", name: "upup", packageSource: "/repo/upup", lastUsedAt: "2026-10-01", idleDays: 57 }];
+
+  it("≥14 天未用的应用显示提醒，「停用」调用 apps_set_enabled(false)", async () => {
+    appsHygiene.mockResolvedValue({ idle });
+    render(<AppsPanel />);
+    expect(await screen.findByText("57 天未使用（最近 2026-10-01）")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "停用 upup" }));
+    await waitFor(() => expect(appsSetEnabled).toHaveBeenCalledWith("/repo/upup", false));
+  });
+
+  it("「保留」记下并立即收起提醒", async () => {
+    appsHygiene.mockResolvedValue({ idle });
+    render(<AppsPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "保留" }));
+    await waitFor(() => expect(appsHygieneKeep).toHaveBeenCalledWith("/repo/upup"));
+    await waitFor(() => expect(screen.queryByRole("region", { name: "长期未使用的应用" })).toBeNull());
+  });
+
+  it("没有长期未用的应用时不显示", async () => {
+    render(<AppsPanel />);
+    await screen.findByText("证券智能投研助手");
+    expect(screen.queryByRole("region", { name: "长期未使用的应用" })).toBeNull();
   });
 });

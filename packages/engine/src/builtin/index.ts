@@ -6,6 +6,7 @@ import { persona } from "./persona.js";
 import { memoryBuiltin } from "./memory.js";
 import { subagentBuiltin } from "./subagent.js";
 import { officeBuiltin } from "./office.js";
+import { appRecommendBuiltin } from "./app-recommend.js";
 import { trackBuiltinTools } from "./reserved-tools.js";
 
 /**
@@ -58,6 +59,8 @@ BUILTIN_EXTENSIONS.push(memoryBuiltin);
 BUILTIN_EXTENSIONS.push(subagentBuiltin);
 // B2b office artifacts (`ob_docx` / `ob_xlsx` / `ob_pptx`): real OOXML through officegen.
 BUILTIN_EXTENSIONS.push(officeBuiltin);
+// U5 / UP-6.1 应用推荐 (`ob_app_recommend`)：只读，结果驱动聊天里的推荐卡。
+BUILTIN_EXTENSIONS.push(appRecommendBuiltin);
 
 /**
  * Factories for one session, in registration order, skipping the ones switched off. Their tool

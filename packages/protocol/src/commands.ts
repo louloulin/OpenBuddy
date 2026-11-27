@@ -31,6 +31,8 @@ export const COMMANDS = [
   'apps_set_current',
   // 安装来源与回滚 (2026-11-27 U6)：读 {source,version,commit} 记录；按上一份记录重装。
   'apps_install_state', 'apps_rollback',
+  // 推荐卡「不用了」与上下文治理 (2026-11-27 U5 / UP-6.2/6.4)。
+  'apps_recommend_dismiss', 'apps_hygiene', 'apps_hygiene_keep',
   'mcp_list', 'mcp_upsert', 'mcp_toggle', 'mcp_delete', 'mcp_config_read', 'mcp_config_save',
   'mcp_config_path', 'mcp_test', 'mcp_auth_trigger', 'mcp_auth_status', 'mcp_deferred_get', 'mcp_deferred_set',
   // 授权尝试 (B3a): begin returns an attempt id/expiry; attempt/attempts read it; cancel aborts.

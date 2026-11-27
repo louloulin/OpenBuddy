@@ -11,6 +11,7 @@ import { runArtifactFlows } from './lib/artifact-flows.mjs';
 import { startFakeGateway } from './lib/fake-gateway.mjs';
 import { runAutomationFlows } from './lib/automation-flows.mjs';
 import { runSettingsFlows } from './lib/settings-flows.mjs';
+import { appFlowReply, runAppFlows } from './lib/app-flows.mjs';
 
 // Functional automation in a real Electron process importing the exact supplied
 // main module. The temporary bootstrap selects an isolated profile and packaged
@@ -48,6 +49,13 @@ const server = createServer(async (req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/event-stream' });
   const chunk = (delta, finish_reason = null) => res.write(`data: ${JSON.stringify({ id: 'ui-fixture', object: 'chat.completion.chunk', created: 1, model: input.model, choices: [{ index: 0, delta, finish_reason }] })}\n\n`);
   chunk({ role: 'assistant' });
+  // 应用平台流程 (UP-7.1)：推荐 → 行情工具 → 回答。
+  const appStep = appFlowReply(input);
+  if (appStep?.tool) {
+    chunk({ tool_calls: [{ index: 0, id: `app-${requests.length}`, type: 'function', function: { name: appStep.tool, arguments: JSON.stringify(appStep.args) } }] });
+    chunk({}, 'tool_calls'); res.end('data: [DONE]\n\n'); return;
+  }
+  if (appStep?.text) { chunk({ content: appStep.text }); chunk({}, 'stop'); res.end('data: [DONE]\n\n'); return; }
   const lastUser = input.messages.findLast(message => message.role === 'user')?.content;
   const lastUserText = typeof lastUser === 'string' ? lastUser : Array.isArray(lastUser) ? lastUser.filter(part => part.type === 'text').map(part => part.text).join('\n') : '';
   if (lastUserText.includes('__HOLD_FIXTURE__')) {
@@ -554,6 +562,8 @@ try {
   assert.match(homeSkin.gradient, /linear-gradient/);
   await page.screenshot({ path: 'release/ui-composer-home.png' });
   checkpoint('the home composer keeps the WorkBuddy gradient input slot', homeSkin);
+  // 应用平台 (UP-7.1)：本地 fixture 应用 → 应用卡/场景 → 数据卡 + 推荐卡 → 不用了 → 治理提醒。
+  await runAppFlows({ page, call, checkpoint, assert, profile });
   const ipcAudit = await app.evaluate(() => globalThis.__ipcAudit);
   assert.deepEqual(consoleErrors, []);
   await writeFile('release/electron-ui-check.json', JSON.stringify({ mode: 'Electron bootstrap imports supplied main in isolated profile; not installation verification', main, artifact, artifactSha256, profile, checks, ipcAudit, requestSummary: requests.map(({ provider, model, input }) => ({ provider, model, reasoningEffort: input.reasoning_effort, imageCount: input.messages.flatMap(message => Array.isArray(message.content) ? message.content : []).filter(part => part.type === 'image_url').length })), screenshot: 'release/electron-ui-check.png', consoleErrors }, null, 2));

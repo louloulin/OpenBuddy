@@ -206,3 +206,39 @@ describe("安装来源记录与回滚 (U6)", () => {
   });
 });
 
+
+describe("推荐与上下文治理 (U5 / UP-6.2/6.4)", () => {
+  it("apps_recommend_dismiss 去重写入设置", () => {
+    const ctx = context();
+    const app = appsModule(ctx);
+    app.commands.apps_recommend_dismiss({ appId: "upup" });
+    const result = app.commands.apps_recommend_dismiss({ appId: "upup" }) as { dismissed: string[] };
+    expect(result.dismissed).toEqual(["upup"]);
+    expect(ctx.state.dismissedAppRecommendations).toEqual(["upup"]);
+  });
+
+  it("apps_hygiene 按安装时间提醒从没用过的应用；停用的应用不提醒", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ob-apps-"));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "upup", pi: { app: { kind: "app" } } }));
+    const installs = { [dir]: { current: { source: dir, at: "2026-01-01T00:00:00.000Z" } } };
+    const on = context([{ source: dir, installedPath: dir }], {}, { appInstalls: installs });
+    on.settings.dir = mkdtempSync(join(tmpdir(), "ob-agent-"));
+    const idle = (appsModule(on).commands.apps_hygiene({}) as { idle: Array<{ appId: string; lastUsedAt: string | null }> }).idle;
+    expect(idle).toHaveLength(1);
+    expect(idle[0]).toMatchObject({ appId: "upup", lastUsedAt: null });
+
+    const off = context([{ source: dir, installedPath: dir, filters: { extensions: false } } as never], {}, { appInstalls: installs });
+    off.settings.dir = mkdtempSync(join(tmpdir(), "ob-agent-"));
+    expect((appsModule(off).commands.apps_hygiene({}) as { idle: unknown[] }).idle).toEqual([]);
+  });
+
+  it("apps_hygiene_keep 之后不再提醒", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ob-apps-"));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "upup", pi: { app: { kind: "app" } } }));
+    const ctx = context([{ source: dir, installedPath: dir }], {}, { appInstalls: { [dir]: { current: { source: dir, at: "2026-01-01T00:00:00.000Z" } } } });
+    ctx.settings.dir = mkdtempSync(join(tmpdir(), "ob-agent-"));
+    const app = appsModule(ctx);
+    app.commands.apps_hygiene_keep({ packageSource: dir });
+    expect((app.commands.apps_hygiene({}) as { idle: unknown[] }).idle).toEqual([]);
+  });
+});
