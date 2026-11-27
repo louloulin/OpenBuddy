@@ -61,5 +61,7 @@ declare module "officegen" {
   function officegen(type: "docx", options?: Record<string, unknown>): Docx;
   function officegen(type: "xlsx", options?: Record<string, unknown>): Xlsx;
   function officegen(type: "pptx", options?: Record<string, unknown>): Pptx;
+  /** The options-object form is the only one that honours settings such as `tempDir`. */
+  function officegen(options: { type: "pptx"; tempDir?: string }): Pptx;
   export = officegen;
 }

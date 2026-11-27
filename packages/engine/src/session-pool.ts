@@ -75,11 +75,14 @@ export async function open(
   // 项目说明 (W5.4): a project bound to this cwd appends its instructions to the system prompt.
   // Read at session open; edits apply to the next open (the live session keeps its prompt).
   const projectPrompt = engine.projects.instructionsFor(cwd);
+  // 当前应用 (20261127-upup U4): 应用身份/边界也是稳定的系统级上下文。
+  const appPrompt = engine.appPrompt(cwd);
+  const appendedPrompts = [projectPrompt, appPrompt].filter((item): item is string => !!item);
   const loader = new DefaultResourceLoader({
     cwd,
     agentDir: engine.settings.dir,
     settingsManager: sdkSettings,
-    ...(projectPrompt ? { appendSystemPrompt: [projectPrompt] } : {}),
+    ...(appendedPrompts.length ? { appendSystemPrompt: appendedPrompts } : {}),
     noExtensions: !(config.extensionsEnabled && trusted),
     additionalExtensionPaths: config.extensionsEnabled
       ? (config.extensionPaths ?? []).filter((p) => !(config.extensionDisabled ?? []).includes(p))

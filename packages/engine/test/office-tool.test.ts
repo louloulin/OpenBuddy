@@ -52,4 +52,25 @@ describe("办公产物工具 (B2b)", () => {
     expect(artifacts.find((artifact) => realpathSync(artifact.path) === expected)).toMatchObject({ status: "created" });
     expect(JSON.stringify(f.events)).toContain("表格已生成");
   });
+
+  it("exports a DeckSpec's tables and sources to xlsx without explicit sheets", async () => {
+    const deck = JSON.parse(readFileSync(join(__dirname, "../../services/test/fixtures/industry-deck.json"), "utf8"));
+    const f = await sdkFixture((request) => {
+      if (hasToolResult(request)) return { text: "数据表已导出" };
+      if (!lastUser(request).includes("导出数据")) return { text: "ok" };
+      return { toolCalls: [{ id: "office-2", name: "ob_xlsx", arguments: { path: "reports/industry-data", deck } }] };
+    }, cleanups);
+
+    const turn = f.call("agent_send", { sessionId: f.sid, text: "导出数据" });
+    await until(() => f.events.some((event) => event.name === "agent://permission" && event.payload.toolKind === "ob_xlsx"));
+    const request = f.events.find((event) => event.name === "agent://permission" && event.payload.toolKind === "ob_xlsx")!.payload;
+    await f.call("agent_resolve_permission", { requestId: request.requestId, optionId: "allow" });
+    await turn;
+
+    const file = join(f.root, "reports", "industry-data.xlsx");
+    expect(existsSync(file)).toBe(true);
+    expect(readFileSync(file).subarray(0, 2).toString()).toBe("PK");
+    expect(JSON.stringify(f.events)).toContain("数据表已导出");
+  });
 });
+

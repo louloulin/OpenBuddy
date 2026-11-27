@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { appsSetCurrent } from "@openbuddy/client/api/files";
 
 /**
  * 当前应用 (20261126-upup / WorkBuddy 对齐)。
@@ -50,5 +51,8 @@ export const useAppsStore = create<AppsState>((set, get) => ({
     const recent = [id, ...get().recentAppIds.filter((x) => x !== id)].filter((x): x is string => !!x).slice(0, MAX_RECENT);
     write(RECENT_APPS_KEY, JSON.stringify(recent));
     set({ currentAppId: id, recentAppIds: recent });
+    // 宿主侧持久化 (U4)：新会话的 system prompt 要跟随当前应用。
+    // 没有宿主桥（单测/浏览器预览）时 invoke 会抛错，异步吞掉，不影响 UI。
+    if (id) void Promise.resolve().then(() => appsSetCurrent(id)).catch(() => {});
   },
 }));

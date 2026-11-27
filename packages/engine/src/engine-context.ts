@@ -67,6 +67,8 @@ export interface EngineContext {
   evictTimer?: ReturnType<typeof setInterval>;
   validCwd(path: string): Promise<string>;
   trusted(cwd: string): boolean;
+  /** 当前应用的身份/边界 (U4)，会话打开时并入 system prompt。 */
+  appPrompt(cwd?: string): string | undefined;
   slot(id: string): Slot;
   live(id: string): AgentSession;
   emitEvent(slot: Slot, event: unknown): void;

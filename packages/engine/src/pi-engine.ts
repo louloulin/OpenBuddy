@@ -18,6 +18,9 @@ import { PromptsService } from "@openbuddy/services/prompts/prompts";
 import { UsageService } from "@openbuddy/services/usage/usage";
 import { BudgetService } from "@openbuddy/services/usage/budgets";
 import { ProjectsService } from "@openbuddy/services/projects/projects";
+import { builtinApp } from "@openbuddy/services/apps/builtin";
+import { buildAppPrompt } from "@openbuddy/services/apps/prompt";
+import { readAppEntry } from "@openbuddy/services/apps/manifest";
 import type { Settings } from "@openbuddy/services/settings/settings";
 import { Permissions, type Emit } from "./permissions/permissions.js";
 import { AuditLog } from "./permissions/audit-log.js";
@@ -492,6 +495,24 @@ export class PiEngine {
   extensionPackages(cwd?: string) {
     const configured = this.settings.pi.manager(this.trusted(cwd ?? this.currentCwd)).getPackages();
     return features.withPackageFilters(this.packageManager(cwd).listConfiguredPackages(), configured);
+  }
+  /**
+   * 当前应用的根 prompt (20261127-upup U4)。
+   *
+   * 应用身份与边界比单次场景更稳定，放在 system prompt 里而不是每条用户消息里。
+   * 只读配置与包 manifest；没有选择应用 / 包已卸载时返回 undefined（不注入）。
+   */
+  appPrompt(cwd?: string): string | undefined {
+    const id = this.settings.config.read().currentAppId;
+    if (!id) return undefined;
+    const builtin = builtinApp();
+    if (id === builtin.id) return buildAppPrompt(builtin);
+    for (const pkg of this.extensionPackages(cwd) as Array<{ source: string; installedPath?: string }>) {
+      if (!pkg.installedPath) continue;
+      const entry = readAppEntry(pkg.installedPath, "pi", pkg.source);
+      if (entry?.id === id) return buildAppPrompt(entry);
+    }
+    return undefined;
   }
   /** 包资源开关 (S17): write Pi's object-form filters, then rebuild sessions so loading changes apply. */
   async setExtensionPackageResources(source: string, resources: ExtensionPackageFilters, cwd?: string) {

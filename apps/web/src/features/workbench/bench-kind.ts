@@ -1,7 +1,7 @@
 /** What the artifact panel can do with a file, by extension. */
 export type BenchKind =
   | "markdown" | "html" | "image" | "pdf" | "docx" | "pptx" | "sheet"
-  | "csv" | "json" | "code" | "text" | "audio" | "video" | "mermaid" | "diagram" | "binary";
+  | "csv" | "json" | "code" | "text" | "audio" | "video" | "mermaid" | "diagram" | "deck" | "binary";
 
 const EXT: Record<string, BenchKind> = {
   md: "markdown", markdown: "markdown", mdx: "markdown",
@@ -26,7 +26,12 @@ export function extOf(path: string): string {
   return dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
 }
 
+/** UpUp report specs (DeckSpec) — the same file `ob_pptx` exports — get a slide preview. */
+const DECK_SUFFIXES = [".deck.json", ".obdeck.json"];
+
 export function benchKind(path: string): BenchKind {
+  const lower = (path.split(/[\\/]/).pop() ?? path).toLowerCase();
+  if (DECK_SUFFIXES.some((suffix) => lower.endsWith(suffix))) return "deck";
   const ext = extOf(path);
   if (EXT[ext]) return EXT[ext];
   if (CODE.has(ext)) return "code";
@@ -37,20 +42,20 @@ export function benchKind(path: string): BenchKind {
 
 /** Text the user can edit in place (and the agent can be asked to change). */
 export const isTextKind = (kind: BenchKind) =>
-  ["markdown", "html", "csv", "json", "code", "text", "mermaid", "diagram"].includes(kind);
+  ["markdown", "html", "csv", "json", "code", "text", "mermaid", "diagram", "deck"].includes(kind);
 /** Loaded as base64 bytes rather than text. */
 export const isBinaryLoaded = (kind: BenchKind) => ["image", "docx", "pptx", "sheet"].includes(kind);
 
 /** Short monogram for file icons. */
 export const KIND_GLYPH: Record<BenchKind, string> = {
   markdown: "MD", html: "</>", image: "IMG", pdf: "PDF", docx: "DOC", pptx: "PPT", sheet: "XLS",
-  csv: "CSV", json: "{ }", code: "</>", text: "TXT", audio: "♪", video: "▶", mermaid: "◇", diagram: "◇", binary: "BIN",
+  csv: "CSV", json: "{ }", code: "</>", text: "TXT", audio: "♪", video: "▶", mermaid: "◇", diagram: "◇", deck: "PPT", binary: "BIN",
 };
 
 export const KIND_LABEL: Record<BenchKind, string> = {
   markdown: "Markdown", html: "网页", image: "图片", pdf: "PDF", docx: "Word", pptx: "PPT", sheet: "表格",
   csv: "CSV", json: "JSON", code: "代码", text: "文本", audio: "音频", video: "视频",
-  mermaid: "Mermaid 图", diagram: "图表", binary: "文件",
+  mermaid: "Mermaid 图", diagram: "图表", deck: "报告规格", binary: "文件",
 };
 
 const MIME: Record<string, string> = {

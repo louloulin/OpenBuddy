@@ -203,10 +203,6 @@ app.whenReady().then(async () => {
     fetchImpl: ((input: string | URL | Request, init?: RequestInit) => net.fetch(input as string, init)) as typeof fetch,
     platform: { kind: 'desktop', commands: NATIVE_COMMANDS, events: DESKTOP_EVENTS },
     appVersion: app.getVersion(),
-    // 内置应用源 (2026-11-27)：打包后在 resources/upup，开发态用仓库里的 vendor/upup。
-    bundledAppsDir: app.isPackaged
-      ? join(process.resourcesPath, 'upup')
-      : join(root, '../../vendor/upup'),
     ...(process.env.OPENBUDDY_UPDATE_FEED ? { updateFeed: process.env.OPENBUDDY_UPDATE_FEED } : {}),
     emit: (event: string, payload: unknown) => {
       events.emit(event, payload);
@@ -223,6 +219,18 @@ app.whenReady().then(async () => {
   notificationsEnabled = engine.notificationsEnabled;
   cleanup = undefined;
   shutdown = async () => { await engine!.shutdown(); };
+  // 默认应用 (2026-11-27)：首次启动从官方 Git 源装 UpUp（幂等，后台执行）。
+  // `OPENBUDDY_DEFAULT_APPS=off` 可关闭（走查/测试需要"未安装"空态时用）。
+  if (process.env.OPENBUDDY_DEFAULT_APPS !== 'off') {
+    void (async () => {
+      try {
+        const result = await engine!.handlers.apps_ensure_default({});
+        log().info('main', 'default-app', result as Record<string, unknown>);
+      } catch (error) {
+        log().warn('main', 'default-app-failed', { message: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+  }
   runningTasks = async () => { try { return await engine!.handlers.tasks_list({}) as unknown[]; } catch { return []; } };
   const workspaceAccess = await WorkspaceAccess.create(app.getPath('userData'));
   // 托盘常驻 (W4.4): closing the main window only hides it; automations keep running.

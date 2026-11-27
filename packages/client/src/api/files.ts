@@ -101,27 +101,41 @@ export interface AppEntry {
 }
 export const appsList = (cwd?: string) =>
   invoke<AppEntry[]>("apps_list", cwd ? { cwd } : {});
-
-/** 内置应用源 (2026-11-27)：安装包内随附的 UpUp 目录（`resources/upup`）。 */
-export interface BundledAppSource {
-  /** 可安装的目录；不存在时为 null。 */
-  source: string | null;
-  exists: boolean;
-  /** 该目录是否已经在 Pi 包记录里。 */
-  installed: boolean;
-  name?: string;
-  version?: string;
-}
-export const appsBundledSource = () => invoke<BundledAppSource>("apps_bundled_source");
-/** 一键安装随附应用（装进 agentDir 的包记录并打开资源）。 */
-export const appsInstallBundled = () =>
-  invoke<{ source: string; packages: unknown[] }>("apps_install_bundled");
+/** 默认应用 (2026-11-27)：首次启动从官方 Git 源安装 UpUp（幂等，失败返回 error 不抛）。 */
+export const appsEnsureDefault = (source?: string) =>
+  invoke<{ installed: boolean; source: string; packages: unknown[]; error?: string; extensionsEnabled?: boolean; hint?: string }>(
+    "apps_ensure_default",
+    source ? { source } : {},
+  );
+/** 当前应用 (2026-11-27 U4)：宿主持久化；会话打开时把应用身份/边界注入 system prompt。 */
+export const appsSetCurrent = (appId: string, cwd?: string) =>
+  invoke<{ appId: string; prompt: string }>("apps_set_current", { appId, ...(cwd ? { cwd } : {}) });
 /** 升级一个应用（走 Pi 包管理器；本地路径通常无更新）。 */
 export const appsUpdate = (packageSource: string) =>
-  invoke<{ packageSource: string; packages: unknown[] }>("apps_update", { packageSource });
+  invoke<{ packageSource: string; packages: unknown[]; install: AppInstallRecord | null; canRollback: boolean }>(
+    "apps_update",
+    { packageSource },
+  );
 /** 卸载一个应用，并清掉 UpUp 子包开关。 */
 export const appsUninstall = (packageSource: string) =>
   invoke<{ packageSource: string; packages: unknown[] }>("apps_uninstall", { packageSource });
+
+/** 安装来源记录 (U6)：key = 去掉 `#ref` 的安装源。 */
+export interface AppInstallRecord {
+  source: string;
+  version?: string;
+  commit?: string;
+  at: string;
+}
+export interface AppInstallHistory {
+  current: AppInstallRecord;
+  previous?: AppInstallRecord;
+}
+export const appsInstallState = () =>
+  invoke<Record<string, AppInstallHistory>>("apps_install_state");
+/** 回滚到上一版本 (U6)：Git 源按记录的 commit 固定重装。 */
+export const appsRollback = (packageSource: string) =>
+  invoke<{ packageSource: string; rolledBackTo: string; packages: unknown[] }>("apps_rollback", { packageSource });
 
 /** 应用图标（data URI；缺失或过大时 dataUri 为 null）。 */
 export const appsIcon = (packageSource: string, icon: string) =>

@@ -35,7 +35,7 @@ import(${JSON.stringify(pathToFileURL(main).href)}).catch(e=>{console.error(e);a
 const app = await electron.launch({
   executablePath: require('electron'),
   args: [harness],
-  env: { ...process.env, OPENBUDDY_SMOKE_TEST: '0' },
+  env: { ...process.env, OPENBUDDY_SMOKE_TEST: '0', OPENBUDDY_DEFAULT_APPS: 'off' },
   timeout: 30000,
 });
 const page = await app.firstWindow();
@@ -53,6 +53,17 @@ const chosen = (fetched ?? []).find((m) => /MiniMax-M3\.1-Flash$/i.test(m.id)) ?
 if (chosen) {
   await call('providers_save_model', { model: { modelId: chosen.id, providerId: 'magpie', displayName: chosen.id } }).catch(() => {});
 }
+
+// 0a) 装之前：应用页的「从 Git 安装 UpUp」入口（等价 pi install）
+await page.getByRole('button', { name: /更多.*文件/ }).hover();
+await page.getByRole('menuitem', { name: '应用', exact: true }).click();
+await page.getByRole('region', { name: '安装 UpUp' }).waitFor({ timeout: 20000 });
+await page.waitForTimeout(500);
+await page.screenshot({ path: 'release/ui-upup-apps-install.png' });
+console.log('SHOT apps-install');
+await page.getByRole('button', { name: '新建任务' }).first().click();
+await page.locator('.wb-composer__input').waitFor({ state: 'visible', timeout: 30000 });
+
 await call('agent_extensions_install_package', { source: repo });
 await call('agent_extensions_set_enabled', { enabled: true });
 const init = await call('agent_init');
@@ -71,6 +82,18 @@ await page.getByRole('dialog', { name: 'Buddy 应用' }).waitFor({ timeout: 1500
 await page.waitForTimeout(500);
 await page.screenshot({ path: 'release/ui-upup-app-switcher.png' });
 console.log('SHOT app-switcher');
+
+// 0c) 切到 upup：标题跟随当前应用（WorkBuddy 1:1 的关键行为）
+const switcher = page.getByRole('dialog', { name: 'Buddy 应用' });
+await switcher.getByText('upup', { exact: true }).click();
+await page.getByRole('heading', { name: /upup · 证券智能投研助手/ }).waitFor({ timeout: 15000 });
+await page.waitForTimeout(600);
+await page.screenshot({ path: 'release/ui-upup-home-switched.png' });
+console.log('SHOT home-switched');
+// 切回默认的通用应用，后续截图保持与文档一致。
+await page.getByRole('button', { name: /当前应用/ }).first().click();
+await page.getByRole('dialog', { name: 'Buddy 应用' }).getByText('OpenBuddy', { exact: false }).first().click();
+await page.getByRole('heading', { name: /OpenBuddy · 通用智能助手/ }).waitFor({ timeout: 15000 });
 await page.keyboard.press('Escape');
 await page.locator('body').click({ position: { x: 700, y: 400 } }).catch(() => {});
 

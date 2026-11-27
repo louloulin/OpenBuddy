@@ -13617,6 +13617,8 @@ button.diff__path {
   color: var(--wb-text-strong); font: inherit; font-size: 0.75rem; cursor: pointer;
 }
 .app-card__scene:hover { background: var(--wb-bg-hover); }
+.app-card__scene--muted { color: var(--wb-text-medium); border-style: dashed; }
+.app-card__version { font-size: 0.6875rem; color: var(--wb-text-tertiary); }
 .app-card__policy { margin: 0; font-size: 0.6875rem; color: var(--wb-text-tertiary); }
 .apps-page__list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .apps-page__list li { padding: 0.25rem 0.625rem; border-radius: 0.5rem; background: var(--wb-bg-secondary); font-size: 0.75rem; color: var(--wb-text-medium); }
@@ -13674,14 +13676,14 @@ button.diff__path {
 .app-switcher__group { padding: 0.375rem 0.25rem; }
 .app-switcher__group-title { display: block; padding: 0 0.25rem 0.375rem; font-size: 0.6875rem; color: var(--wb-text-tertiary); }
 .app-switcher__recent { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-.app-switcher__recent-item { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; width: 3.75rem; border: 0; background: transparent; cursor: pointer; font: inherit; }
+.app-switcher__recent-item { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; width: 4.5rem; border: 0; background: transparent; cursor: pointer; font: inherit; }
 .app-switcher__recent-icon {
   position: relative; display: inline-flex; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem;
   border-radius: 0.75rem; background: var(--wb-bg-secondary); color: var(--wb-text-medium); overflow: hidden;
 }
 .app-switcher__recent-icon img { width: 100%; height: 100%; object-fit: cover; }
 .app-switcher__recent-dot { position: absolute; right: -0.0625rem; bottom: -0.0625rem; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: #22c55e; border: 0.125rem solid var(--wb-bg-primary); }
-.app-switcher__recent-name { font-size: 0.6875rem; color: var(--wb-text-medium); max-width: 3.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-switcher__recent-name { font-size: 0.6875rem; color: var(--wb-text-medium); max-width: 4.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-switcher__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.125rem; }
 .app-switcher__row { display: flex; align-items: center; gap: 0.625rem; width: 100%; padding: 0.5rem; border: 0; border-radius: 0.5rem; background: transparent; cursor: pointer; font: inherit; text-align: left; }
 .app-switcher__row:hover { background: var(--wb-bg-hover); }
@@ -13727,3 +13729,27 @@ button.diff__path {
   flex: none; padding: 0 0.5rem; border-radius: 62.4375rem; background: var(--wb-bg-secondary);
   color: var(--wb-text-tertiary); font-size: 0.6875rem; line-height: 1.5;
 }
+
+/* 投研数据卡 (20261127-upup U5 / UP-5.2)：红涨绿跌（A 股习惯）、来源徽标、as-of、固定免责声明。 */
+.finance-cards { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; }
+.finance-card { border: 0.0625rem solid var(--wb-border-default); border-radius: 0.75rem; background: var(--wb-bg-primary); overflow: hidden; }
+.finance-card__head { display: flex; align-items: center; gap: 0.375rem; padding: 0.5rem 0.75rem; border-bottom: 0.0625rem solid var(--wb-hairline); color: var(--wb-text-medium); font-size: 0.75rem; }
+.finance-card__kind { color: var(--wb-text-tertiary); }
+.finance-card__title { color: var(--wb-text-strong); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+.finance-card__source { margin-left: auto; padding: 0 0.375rem; border-radius: var(--wb-radius-pill); background: var(--wb-bg-secondary); color: var(--wb-text-medium); font-size: 0.6875rem; line-height: 1.6; }
+.finance-card__copy { display: inline-flex; align-items: center; gap: 0.25rem; border: none; background: none; padding: 0.125rem; color: var(--wb-text-tertiary); font-size: 0.6875rem; cursor: pointer; }
+.finance-card__copy:hover { color: var(--wb-text-strong); }
+.finance-card__rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 0.25rem 1rem; margin: 0; padding: 0.625rem 0.75rem; }
+.finance-card__row { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.75rem; }
+.finance-card__row dt { color: var(--wb-text-tertiary); }
+.finance-card__row dd { margin: 0; color: var(--wb-text-strong); font-variant-numeric: tabular-nums; }
+.finance-card__value--up { color: var(--wb-status-error); }
+.finance-card__value--down { color: var(--wb-status-success); }
+.finance-card__table-wrap { overflow-x: auto; padding: 0.25rem 0.75rem 0.5rem; }
+.finance-card__table { width: 100%; border-collapse: collapse; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.finance-card__table th { text-align: left; font-weight: 500; color: var(--wb-text-tertiary); padding: 0.25rem 0.5rem 0.25rem 0; border-bottom: 0.0625rem solid var(--wb-hairline); }
+.finance-card__table td { padding: 0.25rem 0.5rem 0.25rem 0; color: var(--wb-text-strong); border-bottom: 0.0625rem solid var(--wb-hairline); }
+.finance-card__more { margin: 0.25rem 0 0; font-size: 0.6875rem; color: var(--wb-text-tertiary); }
+.finance-card__foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.25rem 0.75rem; padding: 0.375rem 0.75rem; background: var(--wb-bg-secondary); color: var(--wb-text-tertiary); font-size: 0.6875rem; }
+.finance-cards__report { align-self: flex-start; display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.625rem; border: 0.0625rem solid var(--wb-border-default); border-radius: var(--wb-radius-pill); background: var(--wb-bg-primary); color: var(--wb-text-medium); font-size: 0.75rem; cursor: pointer; }
+.finance-cards__report:hover { color: var(--wb-text-strong); background: var(--wb-bg-hover); }

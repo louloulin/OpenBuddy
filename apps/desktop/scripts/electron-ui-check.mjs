@@ -69,6 +69,8 @@ async function launch() {
   app = await electron.launch({ executablePath: require('electron'), args: [harness], env: {
       ...process.env,
       OPENBUDDY_SMOKE_TEST: '0',
+      // 默认应用自动安装会联网克隆 UpUp，走查里显式关掉（保持"未安装"空态断言）。
+      OPENBUDDY_DEFAULT_APPS: 'off',
       OPENBUDDY_GATEWAY_URL: `http://127.0.0.1:${gatewayPort}`,
       OPENBUDDY_GATEWAY_ADMIN_TOKEN: 'ui-check-admin',
       OPENBUDDY_GATEWAY_AGENT_TOKEN: 'ui-check-agent',

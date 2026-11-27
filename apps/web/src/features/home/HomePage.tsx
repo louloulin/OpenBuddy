@@ -9,7 +9,7 @@ import { LightbulbIcon, MoreIcon } from "@openbuddy/ui/icon/icons/index";
 import { useHorizontalScroll } from "../../shared/hooks/use-horizontal-scroll";
 import { useLocale } from "../../shared/i18n";
 import { useSessionsStore, HOME_DRAFT_KEY } from "@/features/sessions/state/sessions-store";
-import { appsList } from "@openbuddy/client/api/files";
+import { appsList, appsSetCurrent } from "@openbuddy/client/api/files";
 import { useAppsStore } from "@/features/apps";
 import { relativeTime } from "@/shared/lib/files/file-utils";
 import { usePendingExpertStore } from "@/features/experts/state/pending-expert-store";
@@ -120,7 +120,15 @@ export function HomePage({
           (app.sceneList ?? []).map((scene) => ({ key: `${app.id}:${scene.id}`, app: app.name, name: scene.name, prompt: scene.prompt })),
         );
         setAppScenes(scenes.slice(0, 8));
+        // 内置通用应用（OpenBuddy 自己）保留原有「日常办公 / 代码开发 / 设计创意」模式 tab；
+        // 只有第三方应用（如 upup）才用它自己的场景行替换模式 tab。
+        setAppMode(primary && primary.source !== "builtin" ? "scenes" : "modes");
         setCurrentApp(primary ? { name: primary.name, tagline: primary.tagline ?? "" } : null);
+        // 升级/首次启动：本地可能已有选择但宿主设置还没记过（U4）。
+        if (primary && syncedAppRef.current !== primary.id) {
+          syncedAppRef.current = primary.id;
+          void Promise.resolve().then(() => appsSetCurrent(primary.id)).catch(() => {});
+        }
       })();
     };
     load();
@@ -136,6 +144,10 @@ export function HomePage({
   const [appScenes, setAppScenes] = useState<Array<{ key: string; app: string; name: string; prompt: string }>>([]);
   // 当前应用 (WorkBuddy 对齐)：标题显示「应用名 · 一句话定位」，不再固定「你的职场超能力」。
   const [currentApp, setCurrentApp] = useState<{ name: string; tagline: string } | null>(null);
+  // U4：把当前应用同步给宿主，只在一个应用首次被选中时写一次（会话 system prompt 用）。
+  const syncedAppRef = useRef<string | null>(null);
+  // 首页场景行展示什么：内置通用应用 → 模式 tab；第三方应用 → 它自己的场景。
+  const [appMode, setAppMode] = useState<"modes" | "scenes">("modes");
   // 受控填充 Composer 的内容 + nonce(点模板时写入 prompt)。
   const [externalText, setExternalText] = useState("");
   const [externalTextNonce, setExternalTextNonce] = useState(0);
@@ -265,7 +277,7 @@ export function HomePage({
           </section>
         )}
 
-        {appScenes.length > 0 ? (
+        {appMode === "scenes" && appScenes.length > 0 ? (
           <div className="home__scenes" role="tablist" aria-label="应用场景">
             {appScenes.map((scene, index) => (
               <button

@@ -6,6 +6,7 @@ import { codeLanguage } from "@/shared/lib/files/file-kind";
 import { Markdown } from "@openbuddy/markdown";
 import { FilePreview } from "./FilePreview";
 import { MermaidView } from "./MermaidView";
+import { DeckPreview } from "./DeckPreview";
 import { useTheme } from "@openbuddy/ui/ThemeProvider";
 import { benchKind, fence, imageMime, isBinaryLoaded, isTextKind, KIND_LABEL, parseCsv, type BenchKind } from "./bench-kind";
 
@@ -66,7 +67,7 @@ export function ArtifactPreview({ path, version, mode, onModeChange, onSelectTex
   }, [loaded?.text, kind, mode, name]);
 
   // 图表 (G3-1) 也和 markdown/html 一样可以在「预览 / 源码」之间切换。
-  const toolbar = (kind === "markdown" || kind === "html" || kind === "mermaid" || kind === "diagram") && (
+  const toolbar = (kind === "markdown" || kind === "html" || kind === "mermaid" || kind === "diagram" || kind === "deck") && (
     <div className="bench-preview__toolbar">
       <div className="bench-seg" role="tablist" aria-label="显示方式">
         <button type="button" role="tab" aria-selected={mode === "rendered"} className={"bench-seg__opt" + (mode === "rendered" ? " bench-seg__opt--on" : "")} onClick={() => onModeChange("rendered")}>预览</button>
@@ -141,6 +142,16 @@ export function ArtifactPreview({ path, version, mode, onModeChange, onSelectTex
         {mode === "source"
           ? <pre className="bench-code">{loaded.text ?? ""}</pre>
           : <MermaidView source={loaded.text ?? ""} />}
+      </div>
+    );
+  }
+  if (kind === "deck") {
+    return (
+      <div className="bench-preview bench-preview--deck">
+        {toolbar}
+        {mode === "source"
+          ? <div className="bench-code"><Markdown complete theme={theme}>{fence(loaded.text ?? "", "json")}</Markdown></div>
+          : <DeckPreview text={loaded.text ?? ""} />}
       </div>
     );
   }

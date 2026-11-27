@@ -1,7 +1,7 @@
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, extname, isAbsolute, resolve } from "node:path";
+import { mkdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { dirname, extname, isAbsolute, relative, resolve } from "node:path";
 import type { ExtensionFactory, ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { buildDocx, buildPptx, buildXlsx } from "@openbuddy/services/office/index";
+import { buildDocx, buildPptx, buildXlsx, deckSpecToXlsx } from "@openbuddy/services/office/index";
 import type { EngineContext } from "../engine-context.js";
 
 /**
@@ -66,16 +66,54 @@ const XLSX_PARAMETERS = {
         additionalProperties: false,
       },
     },
+    deck: {
+      type: "object",
+      description: "Optional UpUp DeckSpec (run_industry_analysis.deckSpec). Its tables (continuation pages merged), chart data and sources become sheets, appended after any explicit sheets.",
+    },
   },
-  required: ["path", "sheets"],
+  required: ["path"],
   additionalProperties: false,
 } as unknown as ToolDefinition["parameters"];
+
+const PPTX_BLOCK_SCHEMA = {
+  type: "object",
+  description:
+    "Typed slide block: bullets {items}, paragraph {text}, table {headers,rows,caption?,sourceId?}, chart {chartType:column|line|pie,title,categories,series:[{name,values}],unit?,sourceId?}, kpi {items:[{label,value,delta?}]}, note {text,tone:assumption|inference|disclaimer}, image {path (workspace-relative),alt?}, mermaid {source,caption?}.",
+  properties: {
+    kind: { type: "string", enum: ["bullets", "paragraph", "table", "chart", "kpi", "note", "image", "mermaid"] },
+    items: { type: "array" },
+    text: { type: "string" },
+    headers: { type: "array", items: { type: "string" } },
+    rows: { type: "array", items: { type: "array", items: { type: ["string", "number"] } } },
+    caption: { type: "string" },
+    sourceId: { type: "string" },
+    chartType: { type: "string", enum: ["column", "line", "pie"] },
+    title: { type: "string" },
+    categories: { type: "array", items: { type: "string" } },
+    series: { type: "array", items: { type: "object", properties: { name: { type: "string" }, values: { type: "array", items: { type: "number" } } }, required: ["name", "values"] } },
+    unit: { type: "string" },
+    tone: { type: "string", enum: ["assumption", "inference", "disclaimer"] },
+    path: { type: "string" },
+    alt: { type: "string" },
+    source: { type: "string" },
+  },
+  required: ["kind"],
+  additionalProperties: false,
+};
 
 const PPTX_PARAMETERS = {
   type: "object",
   properties: {
     path: pathSchema,
-    title: { type: "string", description: "Optional cover slide title." },
+    title: { type: "string", description: "Optional cover slide title (skipped when the first slide has layout=cover)." },
+    subtitle: { type: "string" },
+    asOf: { type: "string", description: "Data cut-off date shown on the cover (YYYY-MM-DD)." },
+    schemaVersion: { type: "number", description: "Accepted so an UpUp DeckSpec can be passed through unchanged." },
+    sources: {
+      type: "array",
+      description: "Sources referenced by table/chart sourceId; printed as a footer on the slide that uses them.",
+      items: { type: "object", properties: { id: { type: "string" }, name: { type: "string" }, url: { type: "string" }, asOf: { type: "string" } }, required: ["id", "name", "asOf"], additionalProperties: false },
+    },
     slides: {
       type: "array",
       items: {
@@ -83,6 +121,11 @@ const PPTX_PARAMETERS = {
         properties: {
           title: { type: "string" },
           bullets: { type: "array", items: { type: "string" } },
+          kicker: { type: "string" },
+          layout: { type: "string", enum: ["cover", "section", "content", "comparison", "table", "chart", "kpi"] },
+          blocks: { type: "array", items: PPTX_BLOCK_SCHEMA },
+          speakerNotes: { type: "string" },
+          evidenceIds: { type: "array", items: { type: "string" } },
         },
         required: ["title"],
         additionalProperties: false,
@@ -92,6 +135,24 @@ const PPTX_PARAMETERS = {
   required: ["path", "slides"],
   additionalProperties: false,
 } as unknown as ToolDefinition["parameters"];
+
+const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif"]);
+const IMAGE_MAX = 10 * 1024 * 1024;
+
+/** Image blocks may only point inside the task workspace (after resolving symlinks). */
+const workspaceImage = (cwd: string, raw: string): string | null => {
+  if (!raw || raw.length > PATH_MAX || isAbsolute(raw) || !IMAGE_EXTENSIONS.has(extname(raw).toLowerCase())) return null;
+  try {
+    const root = realpathSync(cwd);
+    const file = realpathSync(resolve(root, raw));
+    const inside = relative(root, file);
+    if (!inside || inside.startsWith("..") || isAbsolute(inside)) return null;
+    const info = statSync(file);
+    return info.isFile() && info.size <= IMAGE_MAX ? file : null;
+  } catch {
+    return null;
+  }
+};
 
 const targetPath = (cwd: string, raw: unknown, extension: string): string => {
   if (typeof raw !== "string" || !raw.trim()) throw new Error("path 必须是非空字符串");
@@ -167,13 +228,17 @@ export function createOfficeExtension({ engine, sessionId, cwd }: OfficeBuiltinC
       promptGuidelines: [
         "Use ob_xlsx for spreadsheets, data tables, budgets and exports; numbers stay numeric.",
         "Give every sheet a short name and put the header row in columns.",
+        "To export an industry report's data, pass its DeckSpec as deck instead of re-typing the tables.",
       ],
       parameters: XLSX_PARAMETERS,
       executionMode: "sequential",
       async execute(toolCallId: string, params: unknown) {
         const value = (params ?? {}) as Record<string, unknown>;
         const path = targetPath(cwd, value.path, ".xlsx");
-        const bytes = await buildXlsx({ sheets: (Array.isArray(value.sheets) ? value.sheets : []) as never });
+        const sheets = (Array.isArray(value.sheets) ? value.sheets : []) as never[];
+        const deck = value.deck && typeof value.deck === "object" ? deckSpecToXlsx(value.deck as never).sheets : [];
+        // buildXlsx caps a workbook at 20 sheets; deck sheets fill whatever room the explicit sheets leave.
+        const bytes = await buildXlsx({ sheets: [...sheets, ...deck.slice(0, Math.max(0, 20 - sheets.length))] as never });
         return write(toolCallId, path, bytes, "xlsx");
       },
     });
@@ -181,21 +246,28 @@ export function createOfficeExtension({ engine, sessionId, cwd }: OfficeBuiltinC
     pi.registerTool({
       name: PPTX_TOOL,
       label: "PowerPoint 演示",
-      description: "Create a real .pptx deck: an optional cover plus title + bullets per slide.",
-      promptSnippet: "Create a PowerPoint .pptx deck with a cover and bullet slides",
+      description: "Create a real 16:9 .pptx deck. Each slide has a title plus bullets or typed blocks: tables, native column/pie charts, KPI cards, notes and workspace images. Accepts an UpUp DeckSpec (run_industry_analysis.deckSpec) unchanged.",
+      promptSnippet: "Create a PowerPoint .pptx deck with tables, charts, KPI cards and bullet slides",
       promptGuidelines: [
-        "Use ob_pptx for decks, pitches and readouts.",
-        "One idea per slide: a short title and 3–6 bullets.",
+        "Use ob_pptx for decks, pitches and readouts. One idea per slide: a short title and 3–6 bullets or one table/chart.",
+        "Only chart numbers that came from the user or a tool result; give tables/charts a sourceId listed in sources, or add a note block with tone=assumption.",
+        "To export an industry analysis, pass run_industry_analysis.deckSpec fields (title, subtitle, asOf, sources, slides) as they are.",
       ],
       parameters: PPTX_PARAMETERS,
       executionMode: "sequential",
       async execute(toolCallId: string, params: unknown) {
         const value = (params ?? {}) as Record<string, unknown>;
         const path = targetPath(cwd, value.path, ".pptx");
-        const bytes = await buildPptx({
-          ...(typeof value.title === "string" ? { title: value.title } : {}),
-          slides: (Array.isArray(value.slides) ? value.slides : []) as never,
-        });
+        const bytes = await buildPptx(
+          {
+            ...(typeof value.title === "string" ? { title: value.title } : {}),
+            ...(typeof value.subtitle === "string" ? { subtitle: value.subtitle } : {}),
+            ...(typeof value.asOf === "string" ? { asOf: value.asOf } : {}),
+            ...(Array.isArray(value.sources) ? { sources: value.sources as never } : {}),
+            slides: (Array.isArray(value.slides) ? value.slides : []) as never,
+          },
+          { resolveImage: (raw) => workspaceImage(cwd, raw) },
+        );
         return write(toolCallId, path, bytes, "pptx");
       },
     });

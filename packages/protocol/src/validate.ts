@@ -98,6 +98,8 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
   if (command === 'apps_icon') { string('packageSource', 4096); string('icon', 512); }
   if (command === 'apps_update') string('packageSource', 4096);
   if (command === 'apps_uninstall') string('packageSource', 4096);
+  if (command === 'apps_set_current') string('appId', 256);
+  if (command === 'apps_rollback') string('packageSource', 4096);
   if (command === 'data_import_scan') string('path', 4096);
   if (command === 'data_import_apply') { string('path', 4096); string('outputDir', 4096); }
   if (command === 'quick_shortcut_set') {

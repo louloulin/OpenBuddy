@@ -5,6 +5,7 @@ import type { NotifyChannel } from "@openbuddy/protocol/notifications";
 import { PiSettingsStore } from "./pi-settings.js";
 import { migrate, SCHEMA_VERSION, type Migration } from "../persistence/schema.js";
 import { SnapshotStore, storeName, writeAtomic } from "../persistence/snapshots.js";
+import type { AppInstallHistory } from "../apps/install-state.js";
 
 /**
  * 受保护路径 (pii W6.2)：写入类工具默认拒绝触碰的文件。规则是用户可编辑的
@@ -268,6 +269,10 @@ export interface AppSettings {
   deniedTools?: string[];
   /** 只读工具 (UP-3.2): auto 模式下与内建只读工具一样免审。 */
   readonlyTools?: string[];
+  /** 当前应用 (20261127-upup U4): 会话打开时把该应用的身份/边界注入 system prompt。 */
+  currentAppId?: string;
+  /** 应用安装来源与回滚 (U6): key = 去掉 `#ref` 的安装源。 */
+  appInstalls?: Record<string, AppInstallHistory>;
   /** 默认打开方式 (G1-6): per file type, "embedded" (预览面板) or "system" (系统关联应用). */
   defaultOpen?: Record<string, "embedded" | "system">;
   /** System notifications while the window is in the background (20261115-ui U6.1); on by default. */
