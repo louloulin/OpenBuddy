@@ -12,12 +12,14 @@ export function describeAppInstallError(error: unknown): string {
   let friendly: string;
   if (/enotfound|eai_again|network unreachable|econnrefused|econnreset|etimedout|timeout|socket hang up/.test(lower)) {
     friendly = "无法连接安装源（网络不可达或代理未配置）。请检查网络/代理后重试，或改用本地目录安装。";
-  } else if (/authentication failed|could not read username|permission denied|403|401|repository not found|not authorized/.test(lower)) {
+  } else if (/terminal prompts disabled|authentication failed|could not read username|permission denied|403|401|repository not found|not authorized/.test(lower)) {
     friendly = "安装源需要认证或仓库不存在。请确认地址、分支与访问权限。";
   } else if (/enospc|no space left/.test(lower)) {
     friendly = "磁盘空间不足。请清理后重试。";
   } else if (/spawn git enoent|git: command not found|git not found/.test(lower)) {
     friendly = "缺少 Git。请先安装 Git 再重试。";
+  } else if (/spawn (npm|npx|node|pnpm|yarn|bun)(\.cmd)? enoent|npm: command not found/.test(lower)) {
+    friendly = "找不到 Node.js / npm（应用依赖需要它安装）。请先安装 Node.js（含 npm）后重启 OpenBuddy 再试。";
   } else {
     friendly = "安装失败。请查看原始信息后重试。";
   }

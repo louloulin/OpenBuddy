@@ -491,6 +491,8 @@ export class PiEngine {
         cwd,
         agentDir: this.settings.dir,
         settingsManager: this.settings.pi.manager(this.trusted(cwd)),
+        // 桌面没有终端：git/npm 输出收进错误信息、git 不弹凭据提示（否则只剩 "failed with code 128"，§1.14）。
+        commandOutput: "capture",
       });
       manager.setProgressCallback((event) => this.emit("agent://extension-progress", event));
       this.packageManagers.set(cwd, manager);

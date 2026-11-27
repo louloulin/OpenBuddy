@@ -375,9 +375,8 @@ describe.skipIf(!enabled)("UpUp 作为 Pi 插件 (20261126-upup)", () => {
       const apps = (await app.handlers.apps_list({ cwd: root })) as Array<{ id: string; installedPath?: string }>;
       const upup = apps.find((entry) => entry.id === "upup")!;
       expect(upup).toBeTruthy();
-      // U4：选中 UpUp → 新会话的 system prompt 带上应用身份与禁用工具。
-      const current = (await app.handlers.apps_set_current({ appId: "upup", cwd: root })) as { prompt: string };
-      expect(current.prompt).toContain("place_trade_order");
+      // 先停在内置通用应用：推荐只推「当前应用以外」的已安装应用。
+      await app.handlers.apps_set_current({ appId: "openbuddy", cwd: root });
 
       type Part = { role?: string; type?: string; toolCallId?: string; toolName?: string; content?: Array<{ type: string; text?: string }>; details?: any; isError?: boolean };
       const results = async (sessionId: string) =>
@@ -394,17 +393,27 @@ describe.skipIf(!enabled)("UpUp 作为 Pi 插件 (20261126-upup)", () => {
       };
       const isQuote = (m: Part) => /^(upup_)?market_data_quote$/.test(m.toolName ?? "") && !m.isError;
 
+      const general = (await app.handlers.agent_new_session({ cwd: root, modelId })) as string;
+      await app.handlers.agent_send({
+        sessionId: general,
+        text: "我想看看北向资金和贵州茅台的股价。先调用 ob_app_recommend 看看有没有更合适的应用，然后简单告诉我结果即可。",
+      });
+      const recCalls = await waitFor(general, (rs) => rs.some((m) => m.toolName === "ob_app_recommend"));
+      const rec = recCalls.find((m) => m.toolName === "ob_app_recommend");
+      const recs = (rec?.details?.recommendations ?? []) as Array<{ appId: string; matched: string[] }>;
+      console.log("UPUP_REAL_E2E_RECOMMEND", JSON.stringify({ query: rec?.details?.query, recs: recs.map((r) => ({ appId: r.appId, matched: r.matched })) }));
+      expect(recs[0]?.appId).toBe("upup");
+
+      // U4：用户接受推荐、切到 UpUp → 新会话 system prompt 带应用身份与禁用工具。
+      const current = (await app.handlers.apps_set_current({ appId: "upup", cwd: root })) as { prompt: string };
+      expect(current.prompt).toContain("place_trade_order");
       const sessionId = (await app.handlers.agent_new_session({ cwd: root, modelId })) as string;
       await app.handlers.agent_send({
         sessionId,
-        text: "我想看看北向资金和贵州茅台的股价。先调用 ob_app_recommend 看看有没有合适的应用，再用 upup_market_data_quote（symbol=600519，market=cn）查行情，最后一句话告诉我价格和截至时间。",
+        text: "用 upup_market_data_quote（symbol=600519，market=cn）查贵州茅台的行情，一句话告诉我价格和截至时间。",
       });
-      const first = await waitFor(sessionId, (rs) => rs.some((m) => m.toolName === "ob_app_recommend") && rs.some(isQuote));
+      const first = await waitFor(sessionId, (rs) => rs.some(isQuote));
       console.log("UPUP_REAL_E2E_CALLS", JSON.stringify(first.map((m) => ({ tool: m.toolName, isError: m.isError }))));
-      const rec = first.find((m) => m.toolName === "ob_app_recommend");
-      const recs = (rec?.details?.recommendations ?? []) as Array<{ appId: string; matched: string[] }>;
-      console.log("UPUP_REAL_E2E_RECOMMEND", JSON.stringify(recs));
-      expect(recs[0]?.appId).toBe("upup");
 
       const quote = first.find(isQuote);
       expect(quote, "真实模型调用了行情工具且成功").toBeTruthy();
@@ -423,8 +432,9 @@ describe.skipIf(!enabled)("UpUp 作为 Pi 插件 (20261126-upup)", () => {
 
       // UP-5.3：绑定基本面分析师后，真实模型能调用的只有白名单工具。
       const before = ((await app.handlers.agent_session_tools({ sessionId })) as string[]).length;
-      await app.handlers.agent_set_session_expert({ sessionId, expertId: "fundamental-analyst" });
-      const narrowed = (await app.handlers.agent_session_tools({ sessionId })) as string[];
+      // 绑定结果里的 applied.tools 是真正生效的工具（agent_session_tools 列的是已注册的全部工具）。
+      const bound = (await app.handlers.agent_set_session_expert({ sessionId, expertId: "fundamental-analyst" })) as { applied: { tools?: string[] } };
+      const narrowed = bound.applied.tools ?? [];
       console.log("UPUP_REAL_E2E_EXPERT_TOOLS", JSON.stringify({ before, after: narrowed.length }));
       expect(narrowed.length).toBeLessThan(before);
       for (const banned of ["place_trade_order", "upup_place_trade_order", "add_to_watchlist", "upup_add_to_watchlist", "bash"]) expect(narrowed).not.toContain(banned);

@@ -174,11 +174,260 @@ describe("PPTX 版式块 (P2-1)", () => {
     expect(all).toContain("<a:tbl>");
     expect(all).toContain("1284639.23");
     expect(all).toContain("首店；融资");
-    expect(all).toContain("PPTX 以数据表呈现");
+    // PPTX draws the sankey and keeps its exact figures in a following table.
+    expect(all).toContain("桑基图数据");
     for (const name of xmlNames(files)) expect(new DOMParser().parseFromString(text(files, name), "application/xml").getElementsByTagName("parsererror").length, name).toBe(0);
     const docx = deckSpecToDocx(spec);
     expect(docx.blocks.some((block) => block.type === "table" && block.headers?.[0] === "来源")).toBe(true);
     expect(deckSpecToXlsx(spec).sheets.map((sheet) => sheet.name)).toEqual(["图-利润流向（2024）", "图-发展历程"]);
+  });
+
+  const slideXml = (files: Map<string, Uint8Array>) => slideNames(files).sort((a, b) => Number(a.match(/\d+/)![0]) - Number(b.match(/\d+/)![0])).map((name) => text(files, name));
+  const wellFormed = (files: Map<string, Uint8Array>) => {
+    for (const name of xmlNames(files)) expect(new DOMParser().parseFromString(text(files, name), "application/xml").getElementsByTagName("parsererror").length, name).toBe(0);
+  };
+  const shapes = (xml: string, prst: string) => xml.split(`prst="${prst}"`).length - 1;
+  /** Positions (EMU) of every shape on a slide, in drawing order. */
+  const boxes = (xml: string) => [...xml.matchAll(/<a:off x="(\d+)" y="(\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"\/>/g)].map((m) => ({ x: Number(m[1]), y: Number(m[2]), cx: Number(m[3]), cy: Number(m[4]) }));
+
+  it("draws a mermaid timeline as a native axis with rounded milestones, dates above and events below", async () => {
+    const timeline = "timeline\n  title 发展历程\n  2019 : 成立\n  2021 : 首店 : 融资\n  2023 : 出海 & <扩张>\n  · : 未注明时间";
+    const files = readWorkBuddyZip(Buffer.from(await buildPptx({ slides: [{ title: "历程", blocks: [{ kind: "paragraph", text: "导语" }, { kind: "mermaid", source: timeline, caption: "里程碑" }] }] })));
+    const [xml] = slideXml(files);
+    expect(xml).toContain("<p:sp>");
+    expect(shapes(xml!, "line")).toBe(1);
+    expect(shapes(xml!, "roundRect")).toBe(4);
+    for (const value of ["2019", "成立", "2021", "首店；融资", "出海 &amp; &lt;扩张&gt;", "未注明时间", "里程碑；图形在工作台预览中可交互"]) expect(xml).toContain(value);
+    expect(xml).not.toContain("<a:tbl>");
+    // Title, paragraph, then the diagram below the paragraph.
+    const [, paragraph, ...diagram] = boxes(xml!);
+    expect(Math.min(...diagram.map((box) => box.y))).toBeGreaterThanOrEqual(paragraph!.y + paragraph!.cy);
+    wellFormed(files);
+  });
+
+  it("keeps the first 8 milestones as shapes and continues the rest as a table", async () => {
+    const timeline = `timeline\n${Array.from({ length: 11 }, (_, index) => `  ${2010 + index} : 事件${index + 1}`).join("\n")}`;
+    const files = readWorkBuddyZip(Buffer.from(await buildPptx({ slides: [{ title: "长历程", blocks: [{ kind: "mermaid", source: timeline }] }] })));
+    const all = slideXml(files).join("\n");
+    expect(shapes(all, "roundRect")).toBe(8);
+    expect(all).toContain("事件8");
+    expect(all).toContain("<a:tbl>");
+    expect(all).toContain("事件11");
+    expect(all).toContain("时间轴其余 3 项");
+    wellFormed(files);
+  });
+
+  it("draws a left-to-right chain flowchart as boxes and right arrows, with <br/> as line breaks", async () => {
+    const flowchart = 'flowchart LR\n  S0["上游<br/>材料"]\n  S1["中游<br/>制造"]\n  S2["下游"]\n  S0 --> S1\n  S1 --> S2';
+    const files = readWorkBuddyZip(Buffer.from(await buildPptx({ slides: [{ title: "产业链", blocks: [{ kind: "mermaid", source: flowchart, caption: "上中下游" }, { kind: "paragraph", text: "结尾说明" }] }] })));
+    const [xml] = slideXml(files);
+    expect(xml).toContain("<p:sp>");
+    expect(shapes(xml!, "roundRect")).toBe(3);
+    expect(shapes(xml!, "rightArrow")).toBe(2);
+    expect(xml).not.toContain("<a:tbl>");
+    // `<br/>` splits a label into paragraphs.
+    expect(xml).toMatch(/上游<\/a:t>[\s\S]*?<\/a:p><a:p>[\s\S]*?材料<\/a:t>/);
+    for (const value of ["中游", "制造", "下游", "上中下游；图形在工作台预览中可交互", "结尾说明"]) expect(xml).toContain(value);
+    expect(xml).not.toContain("&lt;br");
+    // Boxes stay inside the margins and the following paragraph starts below the diagram.
+    const [, ...rest] = boxes(xml!);
+    const after = rest.pop()!;
+    expect(after.y).toBeGreaterThanOrEqual(Math.max(...rest.map((box) => box.y + box.cy)));
+    expect(Math.max(...rest.map((box) => box.x + box.cx))).toBeLessThanOrEqual(12_192_000 - 457_200);
+    wellFormed(files);
+  });
+
+  /** Every drawn object on a slide: preset geometry, box and, for lines, the start / end implied by the flips. */
+  const drawn = (xml: string) => {
+    const chunks = [...xml.matchAll(/<p:sp>[\s\S]*?<\/p:sp>|<p:graphicFrame>[\s\S]*?<\/p:graphicFrame>/g)].map((match) => match[0]);
+    return chunks.map((chunk) => {
+      const m = chunk.match(/<(?:a|p):xfrm([^>]*)>\s*<a:off x="(\d+)" y="(\d+)"\s*\/>\s*<a:ext cx="(\d+)" cy="(\d+)"\s*\/>/)!;
+      const [x, y, cx, cy] = [Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5])];
+      const flipH = m[1]!.includes('flipH="1"');
+      const flipV = m[1]!.includes('flipV="1"');
+      const prst = chunk.match(/prst="(\w+)"/)?.[1] ?? (chunk.includes("<a:tbl>") ? "table" : "frame");
+      const text = [...chunk.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((t) => t[1]).join("|");
+      return { prst, x, y, cx, cy, text, arrow: chunk.includes('<a:tailEnd type="triangle"/>'), x1: flipH ? x + cx : x, y1: flipV ? y + cy : y, x2: flipH ? x : x + cx, y2: flipV ? y : y + cy };
+    });
+  };
+  const hitsInterior = (line: { x1: number; y1: number; x2: number; y2: number }, box: { x: number; y: number; cx: number; cy: number }) => {
+    let low = 0;
+    let high = 1;
+    const dx = line.x2 - line.x1;
+    const dy = line.y2 - line.y1;
+    for (const [p, q] of [[-dx, line.x1 - (box.x + 2)], [dx, box.x + box.cx - 2 - line.x1], [-dy, line.y1 - (box.y + 2)], [dy, box.y + box.cy - 2 - line.y1]]) {
+      if (p === 0) { if (q! < 0) return false; continue; }
+      const t = q! / p!;
+      if (p! < 0) low = Math.max(low, t); else high = Math.min(high, t);
+      if (low > high) return false;
+    }
+    return true;
+  };
+  const touches = (px: number, py: number, box: { x: number; y: number; cx: number; cy: number }) => px >= box.x - 2 && px <= box.x + box.cx + 2 && py >= box.y - 2 && py <= box.y + box.cy + 2;
+  /**
+   * Layout problems on one slide: objects outside the margins (x within 457_200, y within 228_600 of the
+   * top / 137_160 of the bottom) and overlapping pairs. A line may touch the boxes its ends sit on; the
+   * timeline axis (a full-width horizontal line) runs through its markers by design.
+   */
+  const layoutProblems = (xml: string): string[] => {
+    const items = drawn(xml);
+    const problems: string[] = [];
+    for (const item of items) {
+      if (item.x < 457_200 || item.x + item.cx > 12_192_000 - 457_200 || item.y < 228_600 || item.y + item.cy > 6_858_000 - 137_160) problems.push(`outside margins: ${item.prst} ${item.text} ${JSON.stringify([item.x, item.y, item.cx, item.cy])}`);
+    }
+    const solids = items.filter((item) => item.prst !== "line");
+    solids.forEach((a, index) => {
+      for (const b of solids.slice(index + 1)) {
+        if (a.x < b.x + b.cx && b.x < a.x + a.cx && a.y < b.y + b.cy && b.y < a.y + a.cy) problems.push(`overlap: ${a.prst} "${a.text}" × ${b.prst} "${b.text}"`);
+      }
+    });
+    for (const line of items.filter((item) => item.prst === "line" && !(item.cy <= 1 && item.cx === 11_277_600))) {
+      for (const box of solids) {
+        if (touches(line.x1, line.y1, box) || touches(line.x2, line.y2, box)) continue;
+        if (hitsInterior(line, box)) problems.push(`line crosses ${box.prst} "${box.text}"`);
+      }
+    }
+    return problems;
+  };
+
+  it("draws branching / merging LR and top-down flowcharts as layered boxes joined by arrow lines", async () => {
+    const branching = 'flowchart LR\n  A["原料"] --> B["电池"]\n  A --> C["电机"]\n  B --> D["整车"]\n  C --> D';
+    const topDown = 'flowchart TD\n  A["研发"] --> B["生产"]\n  A --> C["采购"]\n  C --> B';
+    for (const [source, boxCount, arrows] of [[branching, 4, 4], [topDown, 3, 3]] as const) {
+      const files = readWorkBuddyZip(Buffer.from(await buildPptx({ slides: [{ title: "链", kicker: "产业链", blocks: [{ kind: "mermaid", source, caption: "分支" }, { kind: "paragraph", text: "结尾" }] }] })));
+      const [xml] = slideXml(files);
+      expect(xml, source).not.toContain("<a:tbl>");
+      expect(shapes(xml!, "rightArrow"), source).toBe(0);
+      const items = drawn(xml!);
+      const boxesOf = (label: string) => items.find((item) => item.prst === "roundRect" && item.text === label)!;
+      expect(items.filter((item) => item.prst === "roundRect"), source).toHaveLength(boxCount);
+      expect(items.filter((item) => item.prst === "line" && item.arrow), source).toHaveLength(arrows);
+      expect(xml).toContain("分支；图形在工作台预览中可交互");
+      // Every arrow ends on the left (LR) / top (TD) edge of a box.
+      for (const line of items.filter((item) => item.arrow)) {
+        const target = items.find((item) => item.prst === "roundRect" && (source === branching ? Math.abs(item.x - line.x2) <= 1 && line.y2 > item.y && line.y2 < item.y + item.cy : Math.abs(item.y - line.y2) <= 1 && line.x2 > item.x && line.x2 < item.x + item.cx));
+        expect(target, `${source}: ${JSON.stringify(line)}`).toBeDefined();
+      }
+      if (source === branching) {
+        expect(boxesOf("电池").x).toBeGreaterThan(boxesOf("原料").x);
+        expect(boxesOf("电池").x).toBe(boxesOf("电机").x);
+        expect(boxesOf("整车").x).toBeGreaterThan(boxesOf("电池").x);
+        // One of the two fan-out arrows goes up: encoded as flipV.
+        expect(xml).toContain('flipV="1"');
+      } else {
+        // 采购 sits one row above 生产 (longest path), 研发 on top.
+        expect(boxesOf("采购").y).toBeGreaterThan(boxesOf("研发").y);
+        expect(boxesOf("生产").y).toBeGreaterThan(boxesOf("采购").y);
+      }
+      expect(layoutProblems(xml!), source).toEqual([]);
+      wellFormed(files);
+    }
+  });
+
+  it("routes an edge that skips a layer through a bend instead of across the middle box", async () => {
+    const source = 'flowchart LR\n  A["上游"] --> B["中游"]\n  B --> C["下游"]\n  A --> C';
+    const [xml] = slideXml(readWorkBuddyZip(Buffer.from(await buildPptx({ slides: [{ title: "跨层", blocks: [{ kind: "mermaid", source }] }] }))));
+    const items = drawn(xml!);
+    expect(items.filter((item) => item.prst === "roundRect")).toHaveLength(3);
+    // A→B, B→C, and A→bend, bend pass, bend→C; arrows only where a line meets a real box.
+    expect(items.filter((item) => item.prst === "line")).toHaveLength(5);
+    expect(items.filter((item) => item.arrow)).toHaveLength(3);
+    expect(layoutProblems(xml!)).toEqual([]);
+  });
+
+  it("falls back to the data table for cyclic, oversized or unsupported-direction flowcharts", async () => {
+    const cyclic = "flowchart LR\n  A --> B\n  B --> C\n  C --> A";
+    const oversized = `flowchart LR\n  ${Array.from({ length: 11 }, (_, index) => `N${index}`).join(" --> ")}`;
+    const rightToLeft = "flowchart RL\n  A --> B\n  A --> C";
+    for (const source of [cyclic, oversized, rightToLeft]) {
+      const files = readWorkBuddyZip(Buffer.from(await buildPptx({ slides: [{ title: "链", blocks: [{ kind: "mermaid", source }] }] })));
+      const all = slideXml(files).join("\n");
+      expect(all, source).toContain("<a:tbl>");
+      expect(shapes(all, "rightArrow") + shapes(all, "roundRect") + shapes(all, "line"), source).toBe(0);
+      expect(all, source).toContain("PPTX 以数据表呈现");
+      wellFormed(files);
+    }
+    // A 7-node chain is beyond the arrow-chain limit but still drawn as a layered graph.
+    const seven = `flowchart LR\n  ${Array.from({ length: 7 }, (_, index) => `N${index}`).join(" --> ")}`;
+    const [xml] = slideXml(readWorkBuddyZip(Buffer.from(await buildPptx({ slides: [{ title: "链", blocks: [{ kind: "mermaid", source: seven }] }] }))));
+    expect(shapes(xml!, "roundRect")).toBe(7);
+    expect(xml).not.toContain("<a:tbl>");
+    expect(layoutProblems(xml!)).toEqual([]);
+  });
+
+  it("draws a sankey as proportional node columns joined by flow lines, followed by its exact data table", async () => {
+    const sankey = "sankey-beta\n营业收入,营业成本,1284639.23\n营业收入,毛利,624185.78\n毛利,期间费用,228594.78\n毛利,经营利润,395591\n经营利润,净利润,300000.10";
+    const files = readWorkBuddyZip(Buffer.from(await buildPptx({ slides: [{ title: "利润流向", kicker: "财务", blocks: [{ kind: "mermaid", source: sankey, caption: "桑基图" }] }] })));
+    const xmls = slideXml(files);
+    const all = xmls.join("\n");
+    const items = xmls.flatMap(drawn);
+    const nodes = items.filter((item) => item.prst === "rect" && item.text.includes("|") && /\d$/.test(item.text));
+    const node = (name: string) => nodes.find((item) => item.text.startsWith(`${name}|`))!;
+    expect(nodes).toHaveLength(6);
+    // Values as written; a node fed by several links shows their exact decimal sum.
+    expect(node("营业收入").text).toBe("营业收入|1908825.01");
+    expect(node("营业成本").text).toBe("营业成本|1284639.23");
+    expect(node("净利润").text).toBe("净利润|300000.10");
+    // Columns follow the flow; heights share one scale (above the readable minimum).
+    expect(node("营业成本").x).toBe(node("毛利").x);
+    expect(node("经营利润").x).toBeGreaterThan(node("毛利").x);
+    expect(node("营业成本").cy / node("毛利").cy).toBeCloseTo(1284639.23 / 624185.78, 1);
+    expect(node("营业收入").cy).toBeGreaterThan(node("营业成本").cy);
+    // One line per link, from the source's right edge to the target's left edge, no arrows.
+    const lines = items.filter((item) => item.prst === "line");
+    expect(lines).toHaveLength(5);
+    expect(lines.every((line) => !line.arrow)).toBe(true);
+    expect(lines.some((line) => line.x1 === node("营业收入").x + node("营业收入").cx && line.x2 === node("毛利").x)).toBe(true);
+    expect(all).toContain("桑基图；图形在工作台预览中可交互");
+    expect(all).toContain("<a:tbl>");
+    expect(all).toContain("桑基图数据");
+    expect(all).toContain("300000.10");
+    expect(all).not.toContain("PPTX 以数据表呈现");
+    for (const xml of xmls) expect(layoutProblems(xml)).toEqual([]);
+    wellFormed(files);
+  });
+
+  it("keeps sankeys with more than 12 nodes or non-positive values as a data table", async () => {
+    const many = `sankey-beta\n${Array.from({ length: 12 }, (_, index) => `源,去向${index + 1},${index + 1}`).join("\n")}`;
+    const negative = "sankey-beta\n收入,成本,100\n收入,亏损,-20";
+    const zero = "sankey-beta\n收入,成本,0";
+    for (const source of [many, negative, zero]) {
+      const all = slideXml(readWorkBuddyZip(Buffer.from(await buildPptx({ slides: [{ title: "流向", blocks: [{ kind: "mermaid", source }] }] })))).join("\n");
+      expect(all, source).toContain("<a:tbl>");
+      expect(shapes(all, "line"), source).toBe(0);
+      expect(all, source).toContain("PPTX 以数据表呈现");
+    }
+  });
+
+  it("keeps the kicker, title and body apart and every object inside the margins", async () => {
+    const spec: PptxSpec = {
+      slides: [
+        { title: "页眉", kicker: "第一章", blocks: [{ kind: "paragraph", text: "正文" }, { kind: "table", headers: ["a", "b"], rows: [["1", "2"]], caption: "表注" }, { kind: "note", text: "说明", tone: "assumption" }] },
+        { title: "时间轴", kicker: "历程", blocks: [{ kind: "mermaid", source: "timeline\n  2019 : 成立\n  2021 : 首店", caption: "里程碑" }] },
+      ],
+    };
+    const xmls = slideXml(readWorkBuddyZip(Buffer.from(await buildPptx(spec))));
+    const [first] = xmls;
+    const kicker = drawn(first!).find((item) => item.text === "第一章")!;
+    const title = drawn(first!).find((item) => item.text === "页眉")!;
+    expect(kicker.y + kicker.cy).toBeLessThanOrEqual(title.y);
+    expect(title.y + title.cy).toBeLessThanOrEqual(1_325_880);
+    for (const xml of xmls) expect(layoutProblems(xml)).toEqual([]);
+    const deck = slideXml(readWorkBuddyZip(Buffer.from(await buildPptx(industryDeck))));
+    for (const xml of deck) expect(layoutProblems(xml)).toEqual([]);
+  });
+
+  it("merges tables beyond the xlsx sheet limit into one sheet instead of dropping them", async () => {
+    const spec: PptxSpec = { slides: Array.from({ length: 24 }, (_, index) => ({ title: `表${index + 1}`, blocks: [{ kind: "table" as const, headers: ["a", "b"], rows: [[`r${index + 1}`, index + 1]] }] })) };
+    const sheets = deckSpecToXlsx(spec).sheets;
+    expect(sheets).toHaveLength(20);
+    expect(sheets[18]!.name).toBe("表19");
+    const merged = sheets[19]!;
+    expect(merged.name).toBe("其他表格与图表数据");
+    expect(merged.rows.map((row) => row[0]).filter(Boolean)).toEqual(["表20", "表21", "表22", "表23", "表24"]);
+    expect(merged.rows).toContainEqual(["", "r24", 24]);
+    const files = readWorkBuddyZip(Buffer.from(await buildXlsx({ sheets })));
+    expect(text(files, "xl/workbook.xml")).toContain("其他表格与图表数据");
   });
 
   it("exports the UpUp industry DeckSpec fixture as a well-formed deck", async () => {
@@ -195,6 +444,12 @@ describe("PPTX 版式块 (P2-1)", () => {
     const all = [...files.entries()].map(([, value]) => new TextDecoder().decode(value)).join("\n");
     expect(all).toContain(industryDeck.slides[0]!.title);
     expect(all).toContain("环节毛利率");
+    // The 上中下游 industry chain flowchart is drawn as native boxes and arrows, not a table.
+    const chain = slides.map((name) => text(files, name)).find((xml) => xml.includes("设备制造与打印服务"))!;
+    expect(chain).toBeDefined();
+    expect(chain.split('prst="rightArrow"').length - 1).toBe(2);
+    expect(chain).toContain("材料与核心零部件");
+    expect(chain).toContain("产业链上中下游；图形在工作台预览中可交互");
   });
 
   it("exports the same DeckSpec as an xlsx: tables merged across continuation pages, chart data and sources", async () => {

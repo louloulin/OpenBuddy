@@ -266,21 +266,216 @@ export function mermaidTable(source: string): { headers: string[]; rows: (string
     return rows.length ? { headers: ["时间", "事件"], rows: rows.slice(0, MERMAID_ROWS) } : null;
   }
   if (/^(flowchart|graph)\b/.test(head)) {
-    const labels = new Map<string, string>();
-    const node = /([A-Za-z_][\w-]*)\s*(?:\[\"?(.*?)\"?\]|\(\"?(.*?)\"?\)|\{\"?(.*?)\"?\})/g;
-    for (const line of lines.slice(1)) for (const match of line.matchAll(node)) {
-      const label = match[2] ?? match[3] ?? match[4];
-      if (label) labels.set(match[1]!, nodeText(label));
-    }
-    const rows: string[][] = [];
-    for (const line of lines.slice(1)) {
-      const ids = line.replace(/\[.*?\]|\(.*?\)|\{.*?\}/g, "").split(/\s*(?:-->|---|-\.->|==>)(?:\|[^|]*\|)?\s*/).map((id) => id.trim()).filter(Boolean);
-      for (let index = 1; index < ids.length; index += 1) rows.push([labels.get(ids[index - 1]!) ?? ids[index - 1]!, labels.get(ids[index]!) ?? ids[index]!]);
-    }
+    const { labels, edges } = flowchartGraph(lines);
+    const name = (id: string) => (labels.has(id) ? nodeText(labels.get(id)!) : id);
+    const rows = edges.map(([from, to]) => [name(from), name(to)]);
     return rows.length ? { headers: ["上游", "下游"], rows: rows.slice(0, MERMAID_ROWS) } : null;
   }
   return null;
 }
+
+/** Raw node labels (by id, `<br/>` kept) and edges (id pairs, in source order) of a mermaid flowchart. */
+const flowchartGraph = (lines: readonly string[]): { labels: Map<string, string>; edges: [string, string][] } => {
+  const labels = new Map<string, string>();
+  const node = /([A-Za-z_][\w-]*)\s*(?:\[\"?(.*?)\"?\]|\(\"?(.*?)\"?\)|\{\"?(.*?)\"?\})/g;
+  for (const line of lines.slice(1)) for (const match of line.matchAll(node)) {
+    const label = match[2] ?? match[3] ?? match[4];
+    if (label) labels.set(match[1]!, label);
+  }
+  const edges: [string, string][] = [];
+  for (const line of lines.slice(1)) {
+    const ids = line.replace(/\[.*?\]|\(.*?\)|\{.*?\}/g, "").split(/\s*(?:-->|---|-\.->|==>)(?:\|[^|]*\|)?\s*/).map((id) => id.trim()).filter(Boolean);
+    for (let index = 1; index < ids.length; index += 1) edges.push([ids[index - 1]!, ids[index]!]);
+  }
+  return { labels, edges };
+};
+
+const FLOW_NODES = 6;
+const TIMELINE_MILESTONES = 8;
+
+/**
+ * A left-to-right flowchart that is a single unbranched chain (A --> B --> C), as display labels
+ * (`<br/>` → newline). Returns null for other directions, branches / merges / cycles, isolated nodes,
+ * fewer than 2 or more than FLOW_NODES nodes: those stay a data table.
+ */
+const flowChain = (source: string): string[] | null => {
+  const lines = String(source ?? "").split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith("%%"));
+  if (!/^(flowchart|graph)\s+lr\b/i.test(lines[0] ?? "")) return null;
+  const { labels, edges } = flowchartGraph(lines);
+  const next = new Map<string, string>();
+  const incoming = new Map<string, number>();
+  for (const [from, to] of edges) {
+    if (from === to || (next.has(from) && next.get(from) !== to)) return null;
+    if (next.get(from) === to) continue;
+    next.set(from, to);
+    incoming.set(to, (incoming.get(to) ?? 0) + 1);
+  }
+  if ([...incoming.values()].some((count) => count > 1)) return null;
+  const ids = new Set([...labels.keys(), ...edges.flat()]);
+  if (ids.size < 2 || ids.size > FLOW_NODES) return null;
+  const starts = [...ids].filter((id) => !incoming.has(id));
+  if (starts.length !== 1) return null;
+  const chain: string[] = [];
+  for (let id: string | undefined = starts[0]; id !== undefined && chain.length <= ids.size; id = next.get(id)) chain.push(id);
+  if (chain.length !== ids.size) return null;
+  return chain.map((id) => flowLabel(labels, id));
+};
+
+/** Display label of a flowchart node: `<br/>` → newline, each line capped. */
+const flowLabel = (labels: ReadonlyMap<string, string>, id: string): string =>
+  (labels.get(id) ?? id).split(/<br\s*\/?>/i).map((part) => stringOf(part.replace(/\s+/g, " ").trim(), 40)).filter(Boolean).join("\n") || id;
+
+const mermaidLines = (source: string): string[] =>
+  String(source ?? "").split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith("%%"));
+
+/**
+ * Longest-path layering of an acyclic graph (Kahn). Returns null on a cycle or self-loop.
+ * `edges` must reference ids in `ids`.
+ */
+const longestPathLayers = (ids: readonly string[], edges: readonly (readonly [string, string])[]): Map<string, number> | null => {
+  const succ = new Map(ids.map((id) => [id, [] as string[]]));
+  const indegree = new Map(ids.map((id) => [id, 0]));
+  for (const [from, to] of edges) {
+    if (from === to) return null;
+    succ.get(from)!.push(to);
+    indegree.set(to, indegree.get(to)! + 1);
+  }
+  const layer = new Map(ids.map((id) => [id, 0]));
+  const queue = ids.filter((id) => indegree.get(id) === 0);
+  let visited = 0;
+  while (queue.length) {
+    const id = queue.shift()!;
+    visited += 1;
+    for (const to of succ.get(id)!) {
+      layer.set(to, Math.max(layer.get(to)!, layer.get(id)! + 1));
+      indegree.set(to, indegree.get(to)! - 1);
+      if (indegree.get(to) === 0) queue.push(to);
+    }
+  }
+  return visited === ids.length ? layer : null;
+};
+
+/** Reorders each layer by the mean position of its neighbours (down, up, down) to cut edge crossings. */
+const orderLayers = (layers: string[][], pairs: readonly (readonly [string, string])[]): void => {
+  const preds = new Map<string, string[]>();
+  const succs = new Map<string, string[]>();
+  for (const [from, to] of pairs) {
+    preds.set(to, [...(preds.get(to) ?? []), from]);
+    succs.set(from, [...(succs.get(from) ?? []), to]);
+  }
+  const sweep = (index: number, neighbours: Map<string, string[]>, ref: readonly string[]) => {
+    const position = new Map(ref.map((id, at) => [id, at]));
+    const key = (id: string, at: number) => {
+      const near = (neighbours.get(id) ?? []).map((other) => position.get(other)).filter((at): at is number => at !== undefined);
+      return near.length ? near.reduce((sum, at) => sum + at, 0) / near.length : at;
+    };
+    layers[index] = layers[index]!.map((id, at) => ({ id, at, key: key(id, at) })).sort((a, b) => a.key - b.key || a.at - b.at).map((entry) => entry.id);
+  };
+  for (let index = 1; index < layers.length; index += 1) sweep(index, preds, layers[index - 1]!);
+  for (let index = layers.length - 2; index >= 0; index -= 1) sweep(index, succs, layers[index + 1]!);
+  for (let index = 1; index < layers.length; index += 1) sweep(index, preds, layers[index - 1]!);
+};
+
+const FLOW_GRAPH_NODES = 10;
+/** Virtual pass-through points that carry an edge across skipped layers start with this prefix. */
+const DUMMY = "\u0000";
+
+interface FlowGraph {
+  readonly direction: "LR" | "TD";
+  /** Node ids per layer, in drawing order; ids starting with DUMMY are edge bends. */
+  readonly layers: string[][];
+  /** Each edge as the id sequence it passes (source, bends…, target). */
+  readonly paths: string[][];
+  readonly labels: ReadonlyMap<string, string>;
+}
+
+/**
+ * A left-to-right or top-down flowchart with branches / merges: acyclic, 2..FLOW_GRAPH_NODES nodes and at
+ * least one edge. Edges that skip layers get bend points so they never cross a box. Null otherwise.
+ */
+const flowGraph = (source: string): FlowGraph | null => {
+  const lines = mermaidLines(source);
+  const direction = lines[0]?.match(/^(?:flowchart|graph)\s+(LR|TD|TB)\b/i)?.[1]?.toUpperCase();
+  if (!direction) return null;
+  const { labels, edges: raw } = flowchartGraph(lines);
+  const seen = new Set<string>();
+  const edges = raw.filter(([from, to]) => {
+    const key = `${from}\u0001${to}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const ids = [...new Set([...labels.keys(), ...edges.flat()])];
+  if (!edges.length || ids.length < 2 || ids.length > FLOW_GRAPH_NODES) return null;
+  const layer = longestPathLayers(ids, edges);
+  if (!layer) return null;
+  const layers: string[][] = Array.from({ length: Math.max(...layer.values()) + 1 }, () => []);
+  for (const id of ids) layers[layer.get(id)!]!.push(id);
+  let bends = 0;
+  const paths = edges.map(([from, to]) => {
+    const path = [from];
+    for (let index = layer.get(from)! + 1; index < layer.get(to)!; index += 1) {
+      const bend = `${DUMMY}${bends++}`;
+      layers[index]!.push(bend);
+      path.push(bend);
+    }
+    path.push(to);
+    return path;
+  });
+  orderLayers(layers, paths.flatMap((path) => path.slice(1).map((to, at) => [path[at]!, to] as const)));
+  return { direction: direction === "LR" ? "LR" : "TD", layers, paths, labels: new Map(ids.map((id) => [id, flowLabel(labels, id)])) };
+};
+
+const SANKEY_NODES = 12;
+
+interface SankeyFlow {
+  readonly links: readonly { from: string; to: string; raw: string; value: number }[];
+  readonly layers: string[][];
+  /** Height weight of each node: max(inflow, outflow). */
+  readonly weight: ReadonlyMap<string, number>;
+  /** Value shown on each node, taken from the source text (exact decimal sum when several links meet). */
+  readonly shown: ReadonlyMap<string, string>;
+}
+
+/** Exact sum of decimal strings (no float rounding); a single value is returned as written. */
+const decimalSum = (values: readonly string[]): string => {
+  if (values.length === 1) return values[0]!;
+  const parts = values.map((value) => value.match(/^\+?(\d+)(?:\.(\d+))?$/));
+  if (parts.some((part) => !part)) return values.join(" + ");
+  const scale = Math.max(...parts.map((part) => part![2]?.length ?? 0));
+  const total = parts.reduce((sum, part) => sum + BigInt(`${part![1]}${(part![2] ?? "").padEnd(scale, "0")}`), 0n).toString().padStart(scale + 1, "0");
+  return scale ? `${total.slice(0, -scale)}.${total.slice(-scale)}` : total;
+};
+
+/**
+ * A `sankey-beta` diagram as layered nodes: null when a value is not a positive number, a link loops,
+ * or there are more than SANKEY_NODES nodes (those stay a data table).
+ */
+const sankeyFlow = (source: string): SankeyFlow | null => {
+  const lines = mermaidLines(source);
+  if (!lines[0]?.toLowerCase().startsWith("sankey")) return null;
+  const rows = lines.slice(1).map(csvCells).filter((cells) => cells.length === 3 && cells[0] && cells[1] && cells[2] !== "" && Number.isFinite(Number(cells[2])));
+  if (!rows.length) return null;
+  const links = rows.map(([from, to, raw]) => ({ from: from!, to: to!, raw: raw!, value: Number(raw) }));
+  if (links.some((link) => !(link.value > 0))) return null;
+  const ids = [...new Set(links.flatMap((link) => [link.from, link.to]))];
+  if (ids.length > SANKEY_NODES) return null;
+  const layer = longestPathLayers(ids, links.map((link) => [link.from, link.to] as const));
+  if (!layer) return null;
+  const layers: string[][] = Array.from({ length: Math.max(...layer.values()) + 1 }, () => []);
+  for (const id of ids) layers[layer.get(id)!]!.push(id);
+  orderLayers(layers, links.map((link) => [link.from, link.to] as const));
+  const weight = new Map<string, number>();
+  const shown = new Map<string, string>();
+  for (const id of ids) {
+    const incoming = links.filter((link) => link.to === id);
+    const outgoing = links.filter((link) => link.from === id);
+    const sum = (list: typeof links) => list.reduce((total, link) => total + link.value, 0);
+    weight.set(id, Math.max(sum(incoming), sum(outgoing)));
+    shown.set(id, decimalSum((incoming.length ? incoming : outgoing).map((link) => link.raw)));
+  }
+  return { links, layers, weight, shown };
+};
 
 /**
  * Same-source xlsx for a deck: every table becomes a sheet (continuation pages `（续 n/m）` are merged back),
@@ -320,7 +515,19 @@ export function deckSpecToXlsx(spec: PptxSpec): XlsxSpec {
   // 工作表上限内优先保留表格与来源，图表数据表排在最后。
   const all = [...sheets, ...charts];
   if (!all.length) bad("xlsx: 报告规格里没有可导出的表格或图表");
-  return { sheets: all.slice(0, LIMITS.sheets) };
+  if (all.length <= LIMITS.sheets) return { sheets: all };
+  // 超出上限的部分合并到最后一页：每张表依次写「表名行 + 原表头 + 原数据」，不丢数据。
+  const overflow = all.slice(LIMITS.sheets - 1);
+  const width = Math.max(1, ...overflow.map((sheet) => Math.max(sheet.columns?.length ?? 0, ...sheet.rows.map((row) => row.length))));
+  const pad = (cells: Array<string | number | null | undefined>) => ["", ...cells, ...Array<string>(Math.max(0, width - cells.length)).fill("")];
+  const rows: XlsxSheetSpec["rows"] = [];
+  for (const sheet of overflow) {
+    rows.push([sheet.name ?? "", ...Array<string>(width).fill("")]);
+    if (sheet.columns?.length) rows.push(pad(sheet.columns));
+    for (const row of sheet.rows) rows.push(pad(row));
+  }
+  const merged: XlsxSheetSpec = { name: "其他表格与图表数据", columns: ["表名", ...Array.from({ length: width }, (_, index) => `列${index + 1}`)], rows };
+  return { sheets: [...all.slice(0, LIMITS.sheets - 1), merged] };
 }
 
 const NOTE_PREFIX = { assumption: "【假设】", inference: "【推断】", disclaimer: "【声明】" } as const;
@@ -405,6 +612,8 @@ const BODY_W = SLIDE_W - MARGIN * 2;
 const BODY_TOP = 1_325_880;
 const BODY_BOTTOM = SLIDE_H - 502_920;
 const GAP = 137_160;
+const KICKER_Y = 228_600;
+const KICKER_H = 320_040;
 const FONT = "Microsoft YaHei";
 const COLOR = {
   ink: "1F2937",
@@ -416,6 +625,7 @@ const COLOR = {
   assumption: "FFF4E5",
   inference: "EAF2FB",
   disclaimer: "F3F4F6",
+  link: "A9BCD6",
 } as const;
 const NOTE_LABEL = { assumption: "假设", inference: "推断", disclaimer: "声明" } as const;
 
@@ -427,6 +637,7 @@ type SlideHandle = {
   addTable(rows: Array<Array<string | { val: string; opts?: Record<string, unknown> }>>, options: Record<string, unknown>): void;
   addChart(data: Record<string, unknown>, done: () => void, fail?: (error: unknown) => void): void;
   addImage(path: string, options: Record<string, unknown>): void;
+  addShape(shape: string, options: Record<string, unknown>): void;
   setSpeakerNote?: (text: string) => void;
 };
 
@@ -473,6 +684,186 @@ const blockHeight = (block: PptxBlock, rows?: number): number => {
   }
 };
 
+/** A native diagram: x is absolute (EMU), y is relative to the top of the reserved block. */
+interface DiagramPlan {
+  readonly height: number;
+  readonly boxes: { x: number; y: number; w: number; h: number; text: string; style: Record<string, unknown> }[];
+  readonly lines: { x1: number; y1: number; x2: number; y2: number; arrow?: boolean; size: number; color: string }[];
+}
+
+const PT = 12_700;
+const CAPTION_H = 274_320;
+/** Tallest diagram that still leaves room for its caption on an empty slide. */
+const DIAGRAM_MAX_H = BODY_BOTTOM - BODY_TOP - CAPTION_H;
+
+/** Whether the segment passes through the interior of the box (Liang–Barsky clipping). */
+const segmentHitsBox = (x1: number, y1: number, x2: number, y2: number, box: { x: number; y: number; w: number; h: number }): boolean => {
+  const [left, top, right, bottom] = [box.x + 1, box.y + 1, box.x + box.w - 1, box.y + box.h - 1];
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  let low = 0;
+  let high = 1;
+  for (const [p, q] of [[-dx, x1 - left], [dx, right - x1], [-dy, y1 - top], [dy, bottom - y1]] as const) {
+    if (p === 0) {
+      if (q < 0) return false;
+    } else {
+      const t = q / p;
+      if (p < 0) low = Math.max(low, t);
+      else high = Math.min(high, t);
+      if (low > high) return false;
+    }
+  }
+  return true;
+};
+
+/**
+ * Layered layout of a branching flowchart: LR puts layers in columns, TD in rows; boxes are centred in
+ * their layer. Edges leave a box mid-side and end with an arrow on the next box; bends cross a skipped
+ * layer in their own slot. Null when the boxes would be too narrow or the diagram taller than a slide.
+ */
+const layoutFlowGraph = (graph: FlowGraph): DiagramPlan | null => {
+  const { layers, direction } = graph;
+  const along = layers.length;
+  const across = Math.max(...layers.map((layer) => layer.length));
+  const fontSize = along > 4 || across > 3 ? 12 : 14;
+  const lineH = Math.round(fontSize * PT * 1.35);
+  const crossGap = 182_880;
+  let boxW: number;
+  let flowGap: number;
+  if (direction === "LR") {
+    boxW = Math.min(2_286_000, Math.floor((BODY_W - (along - 1) * 365_760) / along));
+    flowGap = along > 1 ? Math.min(1_097_280, Math.floor((BODY_W - along * boxW) / (along - 1))) : 0;
+  } else {
+    boxW = Math.min(2_286_000, Math.floor((BODY_W - (across - 1) * crossGap) / across));
+    flowGap = 320_040;
+  }
+  if (boxW < 731_520) return null;
+  const perLine = Math.max(2, Math.floor((boxW - 182_880) / (fontSize * PT)));
+  const boxH = Math.max(548_640, Math.max(...[...graph.labels.values()].map((label) => lineCount(label, perLine))) * lineH + 137_160);
+  const height = direction === "LR" ? across * boxH + (across - 1) * crossGap : along * boxH + (along - 1) * flowGap;
+  if (height > DIAGRAM_MAX_H) return null;
+  const slots = new Map<string, { x: number; y: number; w: number; h: number }>();
+  const lengthAlong = along * (direction === "LR" ? boxW : boxH) + (along - 1) * flowGap;
+  const x0 = direction === "LR" ? MARGIN + Math.floor((BODY_W - lengthAlong) / 2) : 0;
+  layers.forEach((layer, index) => {
+    const span = layer.length * (direction === "LR" ? boxH : boxW) + (layer.length - 1) * crossGap;
+    layer.forEach((id, at) => {
+      slots.set(id, direction === "LR"
+        ? { x: x0 + index * (boxW + flowGap), y: Math.floor((height - span) / 2) + at * (boxH + crossGap), w: boxW, h: boxH }
+        : { x: MARGIN + Math.floor((BODY_W - span) / 2) + at * (boxW + crossGap), y: index * (boxH + flowGap), w: boxW, h: boxH });
+    });
+  });
+  const boxes = [...graph.labels].map(([id, text]) => ({
+    ...slots.get(id)!,
+    text,
+    style: { shape: "roundRect", font_size: fontSize, fill: COLOR.kpiFill, line: COLOR.accent, line_size: 1, align: "center", bodyProp: { anchor: "ctr", autoFit: false } },
+  }));
+  const lines: DiagramPlan["lines"] = [];
+  const exit = (slot: { x: number; y: number; w: number; h: number }) => (direction === "LR" ? [slot.x + slot.w, slot.y + slot.h / 2] : [slot.x + slot.w / 2, slot.y + slot.h]) as const;
+  const entry = (slot: { x: number; y: number; w: number; h: number }) => (direction === "LR" ? [slot.x, slot.y + slot.h / 2] : [slot.x + slot.w / 2, slot.y]) as const;
+  for (const path of graph.paths) {
+    path.slice(1).forEach((to, at) => {
+      const from = slots.get(path[at]!)!;
+      const target = slots.get(to)!;
+      const bend = to.startsWith(DUMMY);
+      const [x1, y1] = exit(from);
+      const [x2, y2] = entry(target);
+      lines.push({ x1, y1, x2, y2, arrow: !bend, size: 1, color: COLOR.accent });
+      if (bend) {
+        const [x3, y3] = exit(target);
+        lines.push({ x1: x2, y1: y2, x2: x3, y2: y3, size: 1, color: COLOR.accent });
+      }
+    });
+  }
+  return { height, boxes, lines };
+};
+
+/**
+ * Sankey layout: one column per layer, node heights proportional to max(inflow, outflow) on one shared
+ * scale (with a minimum that keeps name and value readable), links as lines from the source's band to the
+ * target's band, thickness following the flow. Null when nodes would be too narrow, the diagram taller
+ * than a slide, or a link would cross another node.
+ */
+const layoutSankey = (flow: SankeyFlow): DiagramPlan | null => {
+  const { layers, weight, shown, links } = flow;
+  const along = layers.length;
+  const nodeW = Math.min(1_645_920, Math.floor((BODY_W - (along - 1) * 640_080) / along));
+  if (nodeW < 822_960) return null;
+  const gap = along > 1 ? Math.min(2_743_200, Math.floor((BODY_W - along * nodeW) / (along - 1))) : 0;
+  const x0 = MARGIN + Math.floor((BODY_W - (along * nodeW + (along - 1) * gap)) / 2);
+  const fontSize = 11;
+  const lineH = Math.round(fontSize * PT * 1.3);
+  const perLine = Math.max(2, Math.floor((nodeW - 91_440) / (fontSize * PT)));
+  const label = (id: string) => `${stringOf(id, 40)}\n${shown.get(id)}`;
+  const minH = new Map([...weight.keys()].map((id) => [id, lineCount(label(id), perLine) * lineH + 54_864]));
+  const gapY = 137_160;
+  const column = (layer: readonly string[], scale: number) => layer.reduce((sum, id) => sum + Math.max(minH.get(id)!, weight.get(id)! * scale), 0) + (layer.length - 1) * gapY;
+  const height = Math.max(2_286_000, ...layers.map((layer) => column(layer, 0)));
+  if (height > DIAGRAM_MAX_H) return null;
+  let low = 0;
+  let high = (height / Math.min(...weight.values())) * 2;
+  for (let step = 0; step < 60; step += 1) {
+    const mid = (low + high) / 2;
+    if (layers.every((layer) => column(layer, mid) <= height)) low = mid;
+    else high = mid;
+  }
+  const rect = new Map<string, { x: number; y: number; w: number; h: number }>();
+  layers.forEach((layer, index) => {
+    let y = Math.floor((height - column(layer, low)) / 2);
+    for (const id of layer) {
+      const h = Math.floor(Math.max(minH.get(id)!, weight.get(id)! * low));
+      rect.set(id, { x: x0 + index * (nodeW + gap), y, w: nodeW, h });
+      y += h + gapY;
+    }
+  });
+  const centre = (id: string) => rect.get(id)!.y + rect.get(id)!.h / 2;
+  const bands = new Map<(typeof links)[number], { y1: number; y2: number; thick: number }>();
+  const spread = (id: string, list: typeof links, side: "y1" | "y2", other: (link: (typeof links)[number]) => string) => {
+    const box = rect.get(id)!;
+    const total = list.reduce((sum, link) => sum + link.value, 0);
+    let top = box.y;
+    for (const link of [...list].sort((a, b) => centre(other(a)) - centre(other(b)))) {
+      const band = (box.h * link.value) / total;
+      const entry = bands.get(link) ?? { y1: 0, y2: 0, thick: Infinity };
+      bands.set(link, { ...entry, [side]: top + band / 2, thick: Math.min(entry.thick, band) });
+      top += band;
+    }
+  };
+  for (const id of rect.keys()) {
+    spread(id, links.filter((link) => link.from === id), "y1", (link) => link.to);
+    spread(id, links.filter((link) => link.to === id), "y2", (link) => link.from);
+  }
+  const lines = links.map((link) => {
+    const band = bands.get(link)!;
+    return { x1: rect.get(link.from)!.x + nodeW, y1: band.y1, x2: rect.get(link.to)!.x, y2: band.y2, size: Math.max(1, Math.min(36, Math.round((band.thick * 0.7) / PT))), color: COLOR.link };
+  });
+  for (const [index, line] of lines.entries()) {
+    const ends = [links[index]!.from, links[index]!.to];
+    for (const [id, box] of rect) if (!ends.includes(id) && segmentHitsBox(line.x1, line.y1, line.x2, line.y2, box)) return null;
+  }
+  const boxes = [...rect].map(([id, box]) => ({
+    ...box,
+    text: label(id),
+    style: { shape: "rect", font_size: fontSize, color: COLOR.headerText, fill: COLOR.accent, align: "center", bodyProp: { anchor: "ctr", lIns: "45720emu", rIns: "45720emu", tIns: "18288emu", bIns: "18288emu", autoFit: false } },
+  }));
+  return { height, boxes, lines };
+};
+
+/** Draws a straight line from (x1, y1) to (x2, y2); flips encode the direction, the arrow sits at the end. */
+const drawLine = (slide: SlideHandle, line: DiagramPlan["lines"][number], top: number): void => {
+  slide.addShape("line", {
+    x: emu(Math.min(line.x1, line.x2)),
+    y: emu(top + Math.min(line.y1, line.y2)),
+    cx: emu(Math.abs(line.x2 - line.x1)),
+    cy: emu(Math.abs(line.y2 - line.y1)),
+    line: line.color,
+    line_size: line.size,
+    ...(line.arrow ? { line_tail: "triangle" } : {}),
+    ...(line.x2 < line.x1 ? { flip_horizontal: true } : {}),
+    ...(line.y2 < line.y1 ? { flip_vertical: true } : {}),
+  });
+};
+
 class SlideCursor {
   private slide: SlideHandle | null = null;
   private y = BODY_TOP;
@@ -489,9 +880,10 @@ class SlideCursor {
     if (this.slide) return this.slide;
     const slide = this.state.doc.makeNewSlide();
     this.page += 1;
-    if (this.spec.kicker) textBox(slide, stringOf(this.spec.kicker, 60), MARGIN, 228_600, BODY_W, 320_040, { font_size: 12, color: COLOR.accent, bold: true });
+    if (this.spec.kicker) textBox(slide, stringOf(this.spec.kicker, 60), MARGIN, KICKER_Y, BODY_W, KICKER_H, { font_size: 12, color: COLOR.accent, bold: true });
     const title = stringOf(this.spec.title, 200) + (this.page > 1 ? "（续）" : "");
-    textBox(slide, title, MARGIN, 502_920, BODY_W, 731_520, { font_size: 26, bold: true });
+    // Kicker 228_600..548_640, title 548_640..1_280_160, body from BODY_TOP (1_325_880): no overlap.
+    textBox(slide, title, MARGIN, KICKER_Y + KICKER_H, BODY_W, 731_520, { font_size: 26, bold: true });
     if (this.page === 1 && this.spec.speakerNotes && typeof slide.setSpeakerNote === "function") slide.setSpeakerNote(stringOf(this.spec.speakerNotes, 8000));
     this.slide = slide;
     this.y = BODY_TOP;
@@ -522,7 +914,8 @@ class SlideCursor {
       }
     }
     const available = BODY_BOTTOM - this.y;
-    const used = flexible ? Math.max(Math.min(available, height * 1.4), Math.min(height, available)) : Math.min(height, available);
+    // Whole EMU: chart / table frames write these values verbatim, and OOXML coordinates are integers.
+    const used = Math.floor(flexible ? Math.max(Math.min(available, height * 1.4), Math.min(height, available)) : Math.min(height, available));
     const y = this.y;
     this.y += used + GAP;
     return { slide, y, height: used };
@@ -568,7 +961,7 @@ class SlideCursor {
         header.map((cell) => ({ val: cell, opts: { ...base, bold: "1", fill_color: COLOR.accent, font_color: COLOR.headerText } })),
         ...page.map((row, index) => row.map((cell) => (index % 2 === 1 ? { val: cell, opts: { ...base, fill_color: COLOR.rowAlt } } : { val: cell, opts: base }))),
       ];
-      slide.addTable(data, { ...base, x: MARGIN, y, cx: BODY_W, columnWidth, rowHeight: 338_328 });
+      slide.addTable(data, { ...base, x: MARGIN, y, cx: BODY_W, cy: data.length * 338_328, columnWidth, rowHeight: 338_328 });
       if (block.caption && start === 0) textBox(slide, stringOf(block.caption, 200), MARGIN, y + (page.length + 1) * 338_328 + 27_432, BODY_W, 246_888, { font_size: 11, color: COLOR.muted });
       this.noteSource(block.sourceId);
     }
@@ -636,8 +1029,85 @@ class SlideCursor {
     slide.addImage(resolved, { x: emu(MARGIN), y: emu(y), cx: emu(Math.min(BODY_W, height * 1.6)), cy: emu(height) });
   }
 
+  /** Caption under a native diagram, in the same spot and style as a table caption. */
+  private diagramCaption(slide: SlideHandle, caption: string | undefined, y: number): void {
+    const value = `${caption ? `${stringOf(caption, 120)}；` : ""}图形在工作台预览中可交互`;
+    textBox(slide, value, MARGIN, y + 27_432, BODY_W, 246_888, { font_size: 11, color: COLOR.muted });
+  }
+
+  /** Horizontal timeline: one axis line, a rounded marker per milestone, date above and event below. */
+  private timeline(rows: readonly (string | number)[][], caption: string | undefined): void {
+    const shown = rows.slice(0, TIMELINE_MILESTONES).map(([time, event]) => [stringOf(String(time ?? ""), 20), stringOf(String(event ?? ""), 48) || "—"] as const);
+    const slot = Math.floor(BODY_W / shown.length);
+    const dateH = 320_040;
+    const markerH = 228_600;
+    const perLine = Math.max(4, Math.floor((slot - 91_440 - 182_880) / 152_400));
+    const eventH = Math.max(...shown.map(([, event]) => lineCount(event, perLine))) * 228_600 + 91_440;
+    const total = dateH + markerH + 45_720 + eventH + 274_320;
+    const { slide, y } = this.reserve(total);
+    const axisY = y + dateH + markerH / 2;
+    slide.addShape("line", { x: emu(MARGIN), y: emu(axisY), cx: emu(BODY_W), cy: 0, line: COLOR.muted, line_size: 2 });
+    const markerW = Math.min(Math.floor(slot * 0.6), 1_097_280);
+    shown.forEach(([time, event], index) => {
+      const x = MARGIN + index * slot;
+      if (time) textBox(slide, time, x, y, slot, dateH, { font_size: 12, bold: true, color: COLOR.accent, align: "center" });
+      slide.addShape("roundRect", { x: emu(x + (slot - markerW) / 2), y: emu(y + dateH), cx: emu(markerW), cy: emu(markerH), fill: COLOR.accent, line: COLOR.accent });
+      textBox(slide, event, x + 45_720, y + dateH + markerH + 45_720, slot - 91_440, eventH, { font_size: 12, align: "center" });
+    });
+    this.diagramCaption(slide, caption, y + dateH + markerH + 45_720 + eventH);
+    const rest = rows.slice(TIMELINE_MILESTONES);
+    if (rest.length) this.table({ kind: "table", headers: ["时间", "事件"], rows: rest, caption: `时间轴其余 ${rest.length} 项；PPTX 以数据表呈现` });
+  }
+
+  /** Left-to-right chain: rounded boxes joined by right arrows. */
+  private flow(labels: readonly string[], caption: string | undefined): void {
+    const arrowW = 320_040;
+    const pad = 64_008;
+    const boxW = Math.floor((BODY_W - (labels.length - 1) * (arrowW + pad * 2)) / labels.length);
+    const perLine = Math.max(3, Math.floor((boxW - 182_880) / 177_800));
+    const boxH = Math.max(731_520, Math.max(...labels.map((label) => lineCount(label, perLine))) * 256_032 + 182_880);
+    const { slide, y } = this.reserve(boxH + 274_320);
+    labels.forEach((label, index) => {
+      const x = MARGIN + index * (boxW + arrowW + pad * 2);
+      textBox(slide, label, x, y, boxW, boxH, { shape: "roundRect", font_size: 14, fill: COLOR.kpiFill, line: COLOR.accent, line_size: 1, align: "center", bodyProp: { anchor: "ctr" } });
+      if (index < labels.length - 1) slide.addShape("rightArrow", { x: emu(x + boxW + pad), y: emu(y + boxH / 2 - 137_160), cx: emu(arrowW), cy: emu(274_320), fill: COLOR.accent });
+    });
+    this.diagramCaption(slide, caption, y + boxH);
+  }
+
+  /** Draws a laid-out diagram (lines under boxes) with the caption below it. */
+  private diagram(plan: DiagramPlan, caption: string | undefined): void {
+    const { slide, y } = this.reserve(plan.height + CAPTION_H);
+    for (const line of plan.lines) drawLine(slide, line, y);
+    for (const box of plan.boxes) textBox(slide, box.text, box.x, y + box.y, box.w, box.h, box.style);
+    this.diagramCaption(slide, caption, y + plan.height);
+  }
+
   mermaid(block: Extract<PptxBlock, { kind: "mermaid" }>): void {
+    const chain = flowChain(block.source);
+    if (chain) {
+      this.flow(chain, block.caption);
+      return;
+    }
+    const graph = flowGraph(block.source);
+    const graphPlan = graph && layoutFlowGraph(graph);
+    if (graphPlan) {
+      this.diagram(graphPlan, block.caption);
+      return;
+    }
+    const sankey = sankeyFlow(block.source);
+    const sankeyPlan = sankey && layoutSankey(sankey);
+    if (sankey && sankeyPlan) {
+      this.diagram(sankeyPlan, block.caption);
+      // The exact figures follow as a table, as written in the source.
+      this.table({ kind: "table", headers: ["来源", "去向", "数值"], rows: sankey.links.map((link) => [link.from, link.to, link.raw]), caption: "桑基图数据" });
+      return;
+    }
     const table = mermaidTable(block.source);
+    if (table && table.headers[0] === "时间") {
+      this.timeline(table.rows, block.caption);
+      return;
+    }
     if (table) {
       this.table({ kind: "table", headers: table.headers, rows: table.rows, caption: `${block.caption ? `${stringOf(block.caption, 120)}；` : ""}图形在工作台预览（DeckPreview）中渲染，PPTX 以数据表呈现` });
       return;

@@ -10,6 +10,7 @@ import { notifier } from './notifier.js';
 import { installMenu } from './menu.js';
 import { TrayController } from './tray.js';
 import { confirmQuit, external } from './window.js';
+import { loginShellPath } from './shell-path.js';
 import { isEvent } from '@openbuddy/protocol/contract';
 import { WorkspaceAccess } from '@openbuddy/host/security/workspace-access';
 import { createEngineHandlers } from '@openbuddy/host';
@@ -172,6 +173,12 @@ async function createWindow(route?: string): Promise<BrowserWindow | null> {
   return win;
 }
 
+// 访达启动的 PATH 不含 Homebrew/mise 等目录，应用安装 spawn npm 会 ENOENT（§1.13）。
+const fixedPath = loginShellPath();
+if (fixedPath) process.env.PATH = fixedPath;
+// 应用安装走 git：私有/需登录的源不能弹终端或凭据窗口把安装挂住，直接失败并给出可读原因（§1.14）。
+process.env.GIT_TERMINAL_PROMPT ??= '0';
+process.env.GCM_INTERACTIVE ??= 'never';
 app.setName('OpenBuddy');
 // Must be registered before ready: artifacts preview on their own standard, secure origin.
 protocol.registerSchemesAsPrivileged([{ scheme: PREVIEW_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);

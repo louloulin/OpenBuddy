@@ -143,11 +143,26 @@ describe("应用页 (UP-2.4)", () => {
     expect(card).toHaveTextContent("2 个工具 · 1 个命令 · 2 个技能 · 0 个提示词 · 3 个场景");
     expect(card).toHaveTextContent("禁止调用：place_trade_order");
     expect(screen.getByRole("alert")).toHaveTextContent("预演失败 2 项");
-    expect(screen.getByRole("alert")).toHaveTextContent("npm:missing：ETARGET");
+    expect(screen.getByRole("alert")).toHaveTextContent("ETARGET");
     expect(screen.getByRole("alert")).toHaveTextContent("broken/index.ts：Cannot find module");
     fireEvent.click(screen.getByRole("button", { name: "取消" }));
     expect(screen.queryByRole("dialog", { name: /安装确认/ })).toBeNull();
     expect(appsEnsureDefault).not.toHaveBeenCalled();
+  });
+
+  it("预演什么都解析不出来（如缺 npm）时确认按钮禁用，并给出可读原因 (§1.13)", async () => {
+    appsList.mockResolvedValue([]);
+    agentExtensionsPackages.mockResolvedValue([]);
+    agentExtensionsPreviewPackage.mockResolvedValue({
+      source: "https://gitcode.com/lumosaigroup/upup.git",
+      extensions: [], skills: [], prompts: [],
+      failures: [{ source: "https://gitcode.com/lumosaigroup/upup.git", message: "spawn npm ENOENT" }],
+    });
+    render(<AppsPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "检查并安装" }));
+    await screen.findByRole("dialog", { name: /安装确认/ });
+    expect(screen.getByRole("alert")).toHaveTextContent("找不到 Node.js / npm");
+    expect(screen.getByRole("button", { name: "确认安装" })).toBeDisabled();
   });
 
   it("已安装 UpUp 后不再显示 Git 安装入口", async () => {
