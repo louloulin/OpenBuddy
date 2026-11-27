@@ -19,6 +19,7 @@ import { UsageService } from "@openbuddy/services/usage/usage";
 import { BudgetService } from "@openbuddy/services/usage/budgets";
 import { ProjectsService } from "@openbuddy/services/projects/projects";
 import { buildAppPrompt } from "@openbuddy/services/apps/prompt";
+import { readAppEntry } from "@openbuddy/services/apps/manifest";
 import { collectApps, type InstalledPackage } from "@openbuddy/services/apps/catalog";
 import { AppUsageStore, usageKey } from "@openbuddy/services/apps/usage";
 import type { Settings } from "@openbuddy/services/settings/settings";
@@ -478,6 +479,10 @@ export class PiEngine {
     };
   }
   /** 扩展包 (W2.6 P2 / S14): Pi's DefaultPackageManager, one per cwd, progress on the event bus. */
+  /**
+   * 每个 cwd 一个包管理器；它持有的 SettingsManager 在创建时读一次设置，
+   * 所以安装/卸载/更新后整表清空，免得别的 cwd 读到旧包列表（UP-2.5 实测）。
+   */
   private packageManagers = new Map<string, DefaultPackageManager>();
   private packageManager(cwd = this.currentCwd) {
     let manager = this.packageManagers.get(cwd);
@@ -576,18 +581,21 @@ export class PiEngine {
       });
       manager.setPackages(next as never);
     } catch { /* 兼容性兜底：改不动就按 Pi 原样，至少记录存在 */ }
+    this.packageManagers.clear();
     this.extensionsDirty = true;
     await this.reload();
     return this.extensionPackages(cwd);
   }
   async removeExtensionPackage(source: string, cwd?: string) {
     await this.packageManager(cwd).removeAndPersist(source);
+    this.packageManagers.clear();
     this.extensionsDirty = true;
     await this.reload();
     return this.extensionPackages(cwd);
   }
   async updateExtensionPackages(source?: string, cwd?: string) {
     await this.packageManager(cwd).update(source);
+    this.packageManagers.clear();
     this.extensionsDirty = true;
     await this.reload();
     return this.extensionPackages(cwd);
@@ -597,7 +605,23 @@ export class PiEngine {
     const root = cwd ?? this.currentCwd;
     const resolved = await this.packageManager(root).resolveExtensionSources([source], { temporary: true });
     const reports = await features.inspectExtensions(this, resolved.extensions.map((entry) => entry.path), root);
+    // UP-2.5：预演目录里读 `pi.app`，确认卡据此展示应用名、分类与工具策略。
+    const first = [...resolved.extensions, ...resolved.skills, ...resolved.prompts][0]?.metadata;
+    const pkgRoot = first?.packageRoot ?? first?.baseDir;
+    const entry = pkgRoot ? readAppEntry(pkgRoot) : null;
+    const app = entry && entry.kind !== "extension"
+      ? {
+          name: entry.name,
+          ...(entry.version ? { version: entry.version } : {}),
+          kind: entry.kind,
+          ...(entry.tagline ? { tagline: entry.tagline } : {}),
+          ...(entry.category ? { category: entry.category } : {}),
+          ...(entry.toolPolicy ? { toolPolicy: entry.toolPolicy } : {}),
+          scenes: entry.sceneList?.length ?? 0,
+        }
+      : undefined;
     return {
+      ...(app ? { app } : {}),
       source,
       extensions: reports.map((report) => ({ path: report.path, tools: report.tools, commands: report.commands, shortcuts: report.shortcuts, error: report.error })),
       skills: resolved.skills.map((entry) => entry.path),

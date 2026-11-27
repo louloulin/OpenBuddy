@@ -80,6 +80,15 @@ describe("U5：数据卡 / 推荐 / 使用统计 / 投研专家（真实 Pi SDK�
     };
     const f = await sdkFixture(script, cleanups);
     const app = financeApp();
+    // UP-2.5：安装前预演（不落盘）带出 pi.app，确认卡据此展示应用名、场景数与工具策略。
+    const preview = (await f.call("agent_extensions_preview_package", { source: app })) as {
+      extensions: Array<{ tools: string[] }>;
+      app?: { name: string; version?: string; category?: string; toolPolicy?: { deny?: string[] }; scenes: number };
+    };
+    expect(preview.extensions.flatMap((e) => e.tools).sort()).toEqual(["market_data_quote", "place_trade_order"]);
+    expect(preview.app).toEqual({ name: "finapp", version: "1.0.0", kind: "app", tagline: "证券智能投研助手", category: "finance", toolPolicy: { deny: ["place_trade_order"] }, scenes: 1 });
+    // 预演不落盘；先按会话 cwd 读一次包列表，安装后同一 cwd 必须读到新包（包管理器缓存不能过期）。
+    expect(await f.call("agent_extensions_packages", { cwd: f.root })).toEqual([]);
     await f.call("agent_extensions_install_package", { source: app });
     await f.call("agent_extensions_set_enabled", { enabled: true });
     await f.call("folder_trust_respond", { cwd: f.root, trusted: true });

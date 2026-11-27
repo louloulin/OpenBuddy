@@ -8,9 +8,12 @@ import type { ExpertDraft } from "@openbuddy/protocol/experts";
  * 自选、持仓、提醒的工具（`add_*` / `remove_*` / `fund_follow` / `fund_alert_*` …）都不在名单里；
  * 平台红线（Permissions.decision）仍在最前面兜底。
  *
- * 白名单用 UpUp 2026.10.11 的真实工具名前缀；没装 UpUp 时这些名字不存在，专家只剩读写文件。
+ * 白名单用 UpUp 2026.10.11 的真实工具名；实测 UpUp 新名带 `upup_` 前缀、旧名保留为 Deprecated 别名，
+ * 两种都列上（`withUpupAliases`）。没装 UpUp 时这些名字不存在，专家只剩读写文件。
  */
 const FILES = ["read", "ls", "find", "grep"];
+/** UpUp 工具名同时给出 `upup_` 新名与旧名；文件工具不加前缀。 */
+const withUpupAliases = (names: string[]) => [...new Set(names.flatMap((name) => (FILES.includes(name) || name === "write" ? [name] : [name, `upup_${name}`])))];
 const QUOTES = ["market_data_quote", "market_data_history", "market_trading_day", "get_stock_price", "get_astock_price", "get_market_data", "get_technical_data", "compute_*"];
 
 export const FINANCE_SEEDS: ExpertDraft[] = [
@@ -21,7 +24,7 @@ export const FINANCE_SEEDS: ExpertDraft[] = [
     description: "读财报、算估值、看行业：用 UpUp 的真实数据给出带来源的基本面结论（需安装 UpUp 应用）。",
     category: "finance",
     thinking: "high",
-    tools: [...FILES, "write", ...QUOTES, "get_financials", "get_astock_financials", "get_key_ratios", "get_earnings", "get_analyst_estimates", "get_company_profile", "get_filings", "company_*", "industry_*", "valuation_ratios", "dcf_model", "calculate_target_price", "corporate_actions_*"],
+    tools: withUpupAliases([...FILES, "write", ...QUOTES, "get_financials", "get_astock_financials", "get_key_ratios", "get_earnings", "get_analyst_estimates", "get_company_profile", "get_filings", "company_*", "industry_*", "valuation_ratios", "dcf_model", "calculate_target_price", "corporate_actions_*"]),
     tags: ["财报", "估值", "行业"],
     examples: [
       "看一下贵州茅台最近四个季度的营收和净利润，算一下当前市盈率处在什么位置",
@@ -47,7 +50,7 @@ export const FINANCE_SEEDS: ExpertDraft[] = [
     description: "量化波动、回撤、VaR 与相关性，指出组合与个股的主要风险来源（需安装 UpUp 应用）。",
     category: "finance",
     thinking: "high",
-    tools: [...FILES, ...QUOTES, "get_risks", "track_risk", "calculate_var", "calculate_max_drawdown", "calculate_sharpe", "calculate_sortino", "calculate_correlation", "calculate_correlation_matrix", "calculate_risk_parity", "calculate_inverse_volatility", "calculate_implied_volatility", "calculate_mean_variance", "price_structure_risk_check", "get_portfolio", "get_portfolio_multi", "portfolio_*attribution"],
+    tools: withUpupAliases([...FILES, ...QUOTES, "get_risks", "track_risk", "calculate_var", "calculate_max_drawdown", "calculate_sharpe", "calculate_sortino", "calculate_correlation", "calculate_correlation_matrix", "calculate_risk_parity", "calculate_inverse_volatility", "calculate_implied_volatility", "calculate_mean_variance", "price_structure_risk_check", "get_portfolio", "get_portfolio_multi", "portfolio_*attribution"]),
     tags: ["风险", "回撤", "组合"],
     examples: [
       "算一下沪深 300 近一年的最大回撤和 95% VaR",
@@ -73,7 +76,7 @@ export const FINANCE_SEEDS: ExpertDraft[] = [
     description: "把行情、财务、新闻和行业数据串成一份结构化投研报告并保存到工作区（需安装 UpUp 应用）。",
     category: "finance",
     thinking: "high",
-    tools: [...FILES, "write", ...QUOTES, "get_financials", "get_astock_financials", "get_key_ratios", "get_company_profile", "get_astock_news", "get_sector_data", "get_sectors", "industry_*", "company_*", "valuation_ratios", "get_risks", "calculate_max_drawdown", "calculate_var", "analyze_symbol", "analyze_sentiment"],
+    tools: withUpupAliases([...FILES, "write", ...QUOTES, "get_financials", "get_astock_financials", "get_key_ratios", "get_company_profile", "get_astock_news", "get_sector_data", "get_sectors", "industry_*", "company_*", "valuation_ratios", "get_risks", "calculate_max_drawdown", "calculate_var", "analyze_symbol", "analyze_sentiment"]),
     tags: ["投研报告", "个股研究", "行业研究"],
     examples: [
       "给比亚迪写一份投研报告：业务、财务、估值、风险，保存成 Markdown",

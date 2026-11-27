@@ -222,6 +222,66 @@ export async function buildXlsx(spec: XlsxSpec): Promise<Uint8Array> {
 
 const CONTINUED = /（续 \d+\/\d+）$/;
 
+const MERMAID_ROWS = 40;
+const csvCells = (line: string): string[] => {
+  const cells: string[] = [];
+  let current = "";
+  let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index]!;
+    if (quoted) {
+      if (char === '"' && line[index + 1] === '"') { current += '"'; index += 1; }
+      else if (char === '"') quoted = false;
+      else current += char;
+    } else if (char === '"') quoted = true;
+    else if (char === ",") { cells.push(current); current = ""; }
+    else current += char;
+  }
+  cells.push(current);
+  return cells.map((cell) => cell.trim());
+};
+const nodeText = (label: string) => label.replace(/<br\s*\/?>/gi, " · ").replace(/\s+/g, " ").trim();
+
+/**
+ * Data behind a mermaid diagram as a table, for exports that cannot render mermaid (PPTX / Word / Excel).
+ * Supports `sankey-beta` (来源 / 去向 / 数值), `timeline` (时间 / 事件) and `flowchart` / `graph`
+ * edges (上游 / 下游, node labels resolved). Anything else returns null and the caller keeps a text note.
+ */
+export function mermaidTable(source: string): { headers: string[]; rows: (string | number)[][] } | null {
+  const lines = String(source ?? "").split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith("%%"));
+  const head = lines[0]?.toLowerCase() ?? "";
+  if (head.startsWith("sankey")) {
+    const rows = lines.slice(1).map(csvCells).filter((cells) => cells.length === 3 && cells[0] && cells[1] && Number.isFinite(Number(cells[2])))
+      .map(([from, to, value]) => [from!, to!, Number(value)]);
+    return rows.length ? { headers: ["来源", "去向", "数值"], rows: rows.slice(0, MERMAID_ROWS) } : null;
+  }
+  if (head.startsWith("timeline")) {
+    const rows: string[][] = [];
+    for (const line of lines.slice(1)) {
+      if (/^(title|section)\b/i.test(line)) continue;
+      const [time, ...events] = line.split(/\s+:\s+|\s*:\s*/);
+      if (!time || !events.length) continue;
+      rows.push([time === "·" ? "" : time, events.filter(Boolean).join("；")]);
+    }
+    return rows.length ? { headers: ["时间", "事件"], rows: rows.slice(0, MERMAID_ROWS) } : null;
+  }
+  if (/^(flowchart|graph)\b/.test(head)) {
+    const labels = new Map<string, string>();
+    const node = /([A-Za-z_][\w-]*)\s*(?:\[\"?(.*?)\"?\]|\(\"?(.*?)\"?\)|\{\"?(.*?)\"?\})/g;
+    for (const line of lines.slice(1)) for (const match of line.matchAll(node)) {
+      const label = match[2] ?? match[3] ?? match[4];
+      if (label) labels.set(match[1]!, nodeText(label));
+    }
+    const rows: string[][] = [];
+    for (const line of lines.slice(1)) {
+      const ids = line.replace(/\[.*?\]|\(.*?\)|\{.*?\}/g, "").split(/\s*(?:-->|---|-\.->|==>)(?:\|[^|]*\|)?\s*/).map((id) => id.trim()).filter(Boolean);
+      for (let index = 1; index < ids.length; index += 1) rows.push([labels.get(ids[index - 1]!) ?? ids[index - 1]!, labels.get(ids[index]!) ?? ids[index]!]);
+    }
+    return rows.length ? { headers: ["上游", "下游"], rows: rows.slice(0, MERMAID_ROWS) } : null;
+  }
+  return null;
+}
+
 /**
  * Same-source xlsx for a deck: every table becomes a sheet (continuation pages `（续 n/m）` are merged back),
  * every chart becomes a data sheet, and a 来源 sheet lists the sources. Only values already in the deck are
@@ -243,6 +303,9 @@ export function deckSpecToXlsx(spec: PptxSpec): XlsxSpec {
         const sheet: XlsxSheetSpec = { name: base, columns: [...(block.headers ?? [])], rows: [...block.rows] };
         byTitle.set(base, sheet);
         sheets.push(sheet);
+      } else if (block?.kind === "mermaid") {
+        const table = mermaidTable(block.source);
+        if (table) charts.push({ name: `图-${stringOf(base, 28)}`, columns: table.headers, rows: table.rows });
       } else if (block?.kind === "chart" && Array.isArray(block.categories) && block.categories.length && Array.isArray(block.series) && block.series.length) {
         const unit = block.unit ? `（${block.unit}）` : "";
         charts.push({
@@ -315,7 +378,12 @@ export function deckSpecToDocx(spec: PptxSpec): DocxSpec {
           if (source) blocks.push({ type: "paragraph", text: source });
           break;
         }
-        case "mermaid": blocks.push({ type: "paragraph", text: `图示：${stringOf(block.caption, 200) || "流程图"}（Word 中不渲染，见报告预览）` }); break;
+        case "mermaid": {
+          const table = mermaidTable(block.source);
+          blocks.push({ type: "paragraph", text: `图示：${stringOf(block.caption, 200) || "流程图"}（${table ? "Word 中以数据表呈现" : "Word 中不渲染"}，图形见报告预览）` });
+          if (table) blocks.push({ type: "table", headers: table.headers, rows: table.rows });
+          break;
+        }
         case "image": blocks.push({ type: "paragraph", text: `图片：${stringOf(block.alt ?? block.path, 200)}` }); break;
         default: break;
       }
@@ -569,6 +637,11 @@ class SlideCursor {
   }
 
   mermaid(block: Extract<PptxBlock, { kind: "mermaid" }>): void {
+    const table = mermaidTable(block.source);
+    if (table) {
+      this.table({ kind: "table", headers: table.headers, rows: table.rows, caption: `${block.caption ? `${stringOf(block.caption, 120)}；` : ""}图形在工作台预览（DeckPreview）中渲染，PPTX 以数据表呈现` });
+      return;
+    }
     this.note(`${block.caption ? `${stringOf(block.caption, 120)}：` : ""}流程图在工作台预览（DeckPreview）中渲染，PPTX 导出保留文字说明。`, "inference");
   }
 }

@@ -74,6 +74,13 @@ describe.skipIf(!enabled)("U5 对真实 UpUp (2026-11-27)", () => {
     await h.providers_save_provider({ provider: { id: "fixture", providerKind: "custom", baseUrl: `http://127.0.0.1:${port}/v1`, apiBackend: "chat_completions", authScheme: "bearer", apiKey: "fixture" } });
     await h.providers_save_model({ model: { modelId: "fixture", providerId: "fixture", contextWindow: 64000 } });
     await h.agent_init({ cwd: root });
+    // UP-2.5：安装确认卡的数据来自真实预演（临时目录解析，不落盘）。
+    const preview = await h.agent_extensions_preview_package({ source: repo });
+    const previewTools = preview.extensions.reduce((sum: number, e: { tools: string[] }) => sum + e.tools.length, 0);
+    console.log("UPUP_U5_PREVIEW", JSON.stringify({ tools: previewTools, skills: preview.skills.length, prompts: preview.prompts.length, failures: preview.failures.length, app: preview.app }));
+    expect(preview.app).toMatchObject({ name: "upup", kind: "app", category: "finance", toolPolicy: { deny: expect.arrayContaining(["place_trade_order", "cancel_trade_order"]) } });
+    expect(preview.app.scenes).toBeGreaterThan(0);
+    expect(previewTools).toBeGreaterThan(100);
     await h.agent_extensions_install_package({ source: repo });
     await h.agent_extensions_set_enabled({ enabled: true });
     await h.folder_trust_respond({ cwd: root, trusted: true });
@@ -123,7 +130,7 @@ describe.skipIf(!enabled)("U5 对真实 UpUp (2026-11-27)", () => {
     console.log("UPUP_U5_EXPERT", JSON.stringify({ before: before.length, after: after.length, sample: after.filter((t) => !t.startsWith("ob_")).slice(0, 12) }));
     expect(before.length).toBeGreaterThan(100);
     expect(after.length).toBeLessThan(before.length);
-    expect(after).toEqual(expect.arrayContaining(["market_data_quote", "get_financials", "dcf_model"]));
-    for (const banned of ["place_trade_order", "cancel_trade_order", "add_to_watchlist", "bash"]) expect(after).not.toContain(banned);
+    expect(after).toEqual(expect.arrayContaining(["market_data_quote", "get_financials", "dcf_model", "upup_market_data_quote", "upup_dcf_model"]));
+    for (const banned of ["place_trade_order", "cancel_trade_order", "add_to_watchlist", "upup_place_trade_order", "upup_cancel_trade_order", "upup_add_to_watchlist", "bash"]) expect(after).not.toContain(banned);
   });
 });

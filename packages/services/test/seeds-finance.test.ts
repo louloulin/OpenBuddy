@@ -7,6 +7,7 @@ import { toolFilter } from "@openbuddy/engine/builtin/persona";
 const UPUP_TOOLS = [
   "market_data_quote", "market_data_history", "get_financials", "get_key_ratios", "valuation_ratios", "dcf_model",
   "calculate_var", "calculate_max_drawdown", "industry_five_forces", "company_profile", "compute_macd",
+  "upup_market_data_quote", "upup_get_financials", "upup_dcf_model", "upup_place_trade_order", "upup_add_to_watchlist",
   "place_trade_order", "cancel_trade_order", "add_position", "add_to_watchlist", "remove_position", "fund_follow", "fund_alert_create",
 ];
 
@@ -24,7 +25,8 @@ describe("投研专家 (UP-5.3)", () => {
       const allowed = toolFilter(seed)!;
       const kept = UPUP_TOOLS.filter(allowed);
       expect(kept.length).toBeGreaterThan(3);
-      for (const name of ["place_trade_order", "cancel_trade_order", "add_position", "add_to_watchlist", "remove_position", "fund_follow", "fund_alert_create"]) {
+      expect(allowed("upup_market_data_quote"), `${seed.id} 应允许 UpUp 新名工具`).toBe(true);
+      for (const name of ["upup_place_trade_order", "upup_add_to_watchlist", "place_trade_order", "cancel_trade_order", "add_position", "add_to_watchlist", "remove_position", "fund_follow", "fund_alert_create"]) {
         expect(allowed(name), `${seed.id} 不应允许 ${name}`).toBe(false);
       }
     }

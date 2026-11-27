@@ -4,7 +4,7 @@ import { readWorkBuddyZip } from "../src/agents/workbuddy";
 import { readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildDocx, buildPptx, buildXlsx, deckSpecToDocx, deckSpecToXlsx, type PptxSpec } from "../src/office/index";
+import { buildDocx, buildPptx, buildXlsx, deckSpecToDocx, deckSpecToXlsx, mermaidTable, type PptxSpec } from "../src/office/index";
 
 // Same DeckSpec the UpUp industry pipeline produces (upup: packages/pi-investment-analysis/test/fixtures/industry-deck.json).
 const industryDeck = JSON.parse(readFileSync(join(__dirname, "fixtures", "industry-deck.json"), "utf8")) as PptxSpec;
@@ -149,7 +149,7 @@ describe("PPTX 版式块 (P2-1)", () => {
       slides: [{ title: "空", blocks: [
         { kind: "chart", chartType: "column", title: "空图", categories: [], series: [] },
         { kind: "image", path: "../secret.png", alt: "外部图片" },
-        { kind: "mermaid", source: "flowchart LR\n A-->B", caption: "产业链" },
+        { kind: "mermaid", source: "erDiagram\n A ||--o{ B : has", caption: "产业链" },
       ] }],
     }, { resolveImage: () => null });
     const files = readWorkBuddyZip(Buffer.from(bytes));
@@ -158,6 +158,27 @@ describe("PPTX 版式块 (P2-1)", () => {
     expect(all).toContain("缺少可绘制的数据");
     expect(all).toContain("未导出");
     expect(all).toContain("产业链：流程图在工作台预览");
+  });
+
+  it("exports sankey / timeline / flowchart diagrams as data tables in PPTX, Word and Excel", async () => {
+    const sankey = "sankey-beta\n\n营业收入,营业成本,1284639.23\n营业收入,毛利,624185.78\n\"毛利,含逗号\",经营利润,395591\n";
+    const timeline = "timeline\n  title 示例 发展历程\n  2020 : 成立\n  2023 : 首店 : 融资\n  · : 未注明时间";
+    const flowchart = 'flowchart LR\n  S0["上游<br/>原料"]\n  S1["中游"]\n  S0 --> S1';
+    expect(mermaidTable(sankey)).toEqual({ headers: ["来源", "去向", "数值"], rows: [["营业收入", "营业成本", 1284639.23], ["营业收入", "毛利", 624185.78], ["毛利,含逗号", "经营利润", 395591]] });
+    expect(mermaidTable(timeline)).toEqual({ headers: ["时间", "事件"], rows: [["2020", "成立"], ["2023", "首店；融资"], ["", "未注明时间"]] });
+    expect(mermaidTable(flowchart)).toEqual({ headers: ["上游", "下游"], rows: [["上游 · 原料", "中游"]] });
+    expect(mermaidTable("erDiagram\n A ||--o{ B : has")).toBeNull();
+    const spec: PptxSpec = { slides: [{ title: "利润流向（2024）", blocks: [{ kind: "mermaid", source: sankey, caption: "桑基图" }] }, { title: "发展历程", blocks: [{ kind: "mermaid", source: timeline, caption: "里程碑" }] }] };
+    const files = readWorkBuddyZip(Buffer.from(await buildPptx(spec)));
+    const all = [...files.entries()].map(([, value]) => new TextDecoder().decode(value)).join("\n");
+    expect(all).toContain("<a:tbl>");
+    expect(all).toContain("1284639.23");
+    expect(all).toContain("首店；融资");
+    expect(all).toContain("PPTX 以数据表呈现");
+    for (const name of xmlNames(files)) expect(new DOMParser().parseFromString(text(files, name), "application/xml").getElementsByTagName("parsererror").length, name).toBe(0);
+    const docx = deckSpecToDocx(spec);
+    expect(docx.blocks.some((block) => block.type === "table" && block.headers?.[0] === "来源")).toBe(true);
+    expect(deckSpecToXlsx(spec).sheets.map((sheet) => sheet.name)).toEqual(["图-利润流向（2024）", "图-发展历程"]);
   });
 
   it("exports the UpUp industry DeckSpec fixture as a well-formed deck", async () => {

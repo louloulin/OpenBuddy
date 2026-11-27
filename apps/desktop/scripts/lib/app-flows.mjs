@@ -59,6 +59,21 @@ export async function runAppFlows({ page, call, checkpoint, assert, profile }) {
     await page.getByRole('button', { name: /更多.*文件/ }).hover();
     await page.getByRole('menuitem', { name: '应用', exact: true }).click();
     await page.getByText('证券投研 fixture', { exact: true }).waitFor({ timeout: 20000 });
+
+    // UP-2.5 安装确认卡：真实预演 UpUp Git 源（需联网，OPENBUDDY_UI_UPUP_GIT=1 才跑）→ 卡片 → 取消不安装。
+    if (process.env.OPENBUDDY_UI_UPUP_GIT === '1') {
+      await page.getByRole('region', { name: '安装 UpUp' }).getByRole('button', { name: '检查并安装' }).click();
+      const confirm = page.getByRole('dialog', { name: /^安装确认 upup/ });
+      await confirm.waitFor({ timeout: 180000 });
+      const confirmText = await confirm.innerText();
+      assert.match(confirmText, /gitcode\.com\/lumosaigroup\/upup\.git/);
+      assert.match(confirmText, /\d{3} 个工具/);
+      assert.match(confirmText, /禁止调用：place_trade_order/);
+      await page.screenshot({ path: 'release/ui-app-install-confirm.png' });
+      await confirm.getByRole('button', { name: '取消' }).click();
+      await confirm.waitFor({ state: 'detached', timeout: 10000 });
+      checkpoint('the UpUp install confirm card shows source, resource counts and toolPolicy from a real Git preview (UP-2.5)', { lines: confirmText.split('\n').slice(0, 8) });
+    }
     await page.getByRole('button', { name: '场景 个股速览' }).click();
     await page.locator('.wb-composer__input').waitFor({ timeout: 15000 });
     await page.waitForFunction(() => document.querySelector('.wb-composer__input')?.value?.includes('600519'), undefined, { timeout: 10000 });

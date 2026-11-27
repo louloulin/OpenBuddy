@@ -39,6 +39,19 @@ export interface ExtensionPackagePreview {
   skills: string[];
   prompts: string[];
   failures: Array<{ source: string; message: string }>;
+  /**
+   * 安装确认卡 (20261126-upup UP-2.5)：包自带 `pi.app` 时，从预演目录读出的应用信息。
+   * 普通扩展包没有这一项。
+   */
+  app?: {
+    name: string;
+    version?: string;
+    kind: string;
+    tagline?: string;
+    category?: string;
+    toolPolicy?: { readonly?: string[]; deny?: string[] };
+    scenes: number;
+  };
 }
 
 /** `checkForAvailableUpdates()` result for the 扩展中心. */

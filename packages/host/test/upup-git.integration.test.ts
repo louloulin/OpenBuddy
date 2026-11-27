@@ -42,14 +42,19 @@ async function host() {
 describe.skipIf(!enabled)("UpUp Git 安装 (2026-11-27)", () => {
   it("预演 Git 源能解析出真实工具与技能", { timeout: 900_000 }, async () => {
     const { app } = await host();
+    const started = Date.now();
     const preview = (await app.handlers.agent_extensions_preview_package({ source })) as {
       extensions: Array<{ tools: string[]; error: string | null }>;
       skills: string[];
       failures: Array<{ message: string }>;
+      app?: { name: string; toolPolicy?: { deny?: string[] }; scenes: number };
     };
     const tools = preview.extensions.flatMap((entry) => entry.tools);
-    console.log("UPUP_GIT_PREVIEW", JSON.stringify({ source, tools: tools.length, skills: preview.skills.length, failures: preview.failures.length }));
+    // UP-0.3 对照：耗时与失败项（含 npm ERESOLVE）；UP-2.5：确认卡的应用信息来自预演目录。
+    console.log("UPUP_GIT_PREVIEW", JSON.stringify({ source, ms: Date.now() - started, tools: tools.length, skills: preview.skills.length, failures: preview.failures, extErrors: preview.extensions.filter((e) => e.error).length, app: preview.app }));
     expect(tools.length).toBeGreaterThan(0);
+    expect(JSON.stringify(preview.failures)).not.toMatch(/ERESOLVE/);
+    expect(preview.app).toMatchObject({ name: "upup", toolPolicy: { deny: expect.arrayContaining(["place_trade_order"]) } });
   });
 
   it("安装 Git 源后 apps_list 出现 upup，新会话能拿到它的工具", { timeout: 900_000 }, async () => {
@@ -63,12 +68,21 @@ describe.skipIf(!enabled)("UpUp Git 安装 (2026-11-27)", () => {
     expect(chosen).toBeTruthy();
     await app.handlers.providers_save_model({ model: { modelId: chosen.id, providerId: "magpie", displayName: chosen.id } });
 
+    const installStarted = Date.now();
     await app.handlers.agent_extensions_install_package({ source });
+    const installMs = Date.now() - installStarted;
     await app.handlers.agent_extensions_set_enabled({ enabled: true });
     await app.handlers.folder_trust_respond({ cwd: root, trusted: true });
 
-    const apps = (await app.handlers.apps_list({ cwd: root })) as Array<{ id: string; source: string }>;
+    const apps = (await app.handlers.apps_list({ cwd: root })) as Array<{ id: string; source: string; installedPath?: string }>;
     console.log("UPUP_GIT_APPS", JSON.stringify(apps));
+    // UP-0.3 对照：安装耗时与落盘体积（含 node_modules）。
+    const installed = apps.find((entry) => entry.id === "upup")?.installedPath;
+    if (installed) {
+      const { execFileSync } = await import("node:child_process");
+      const size = execFileSync("du", ["-sk", installed], { encoding: "utf8" }).split(/\s+/)[0];
+      console.log("UPUP_GIT_FOOTPRINT", JSON.stringify({ installMs, sizeMB: Math.round(Number(size) / 1024) }));
+    }
     expect(apps.map((entry) => entry.id)).toContain("upup");
     expect(apps[0]).toMatchObject({ id: "openbuddy", source: "builtin" });
 

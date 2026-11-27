@@ -116,8 +116,38 @@ describe("应用页 (UP-2.4)", () => {
     render(<AppsPanel />);
     fireEvent.click(await screen.findByRole("button", { name: "检查并安装" }));
     await waitFor(() => expect(agentExtensionsPreviewPackage).toHaveBeenCalledWith("https://gitcode.com/lumosaigroup/upup.git"));
-    fireEvent.click(await screen.findByRole("button", { name: /确认安装（436 个工具）/ }));
+    const card = await screen.findByRole("dialog", { name: /安装确认/ });
+    expect(card).toHaveTextContent("436 个工具");
+    fireEvent.click(screen.getByRole("button", { name: "确认安装" }));
     await waitFor(() => expect(appsEnsureDefault).toHaveBeenCalledWith("https://gitcode.com/lumosaigroup/upup.git"));
+  });
+
+  it("安装确认卡展示来源、应用信息、工具策略与预演失败项；取消不安装 (UP-2.5)", async () => {
+    appsList.mockResolvedValue([]);
+    agentExtensionsPackages.mockResolvedValue([]);
+    agentExtensionsPreviewPackage.mockResolvedValue({
+      source: "https://gitcode.com/lumosaigroup/upup.git",
+      extensions: [
+        { path: "extensions/index.ts", tools: ["market_data_quote", "place_trade_order"], commands: ["invest"], shortcuts: [], error: null },
+        { path: "extensions/broken/index.ts", tools: [], commands: [], shortcuts: [], error: "Cannot find module" },
+      ],
+      skills: ["skills/a/SKILL.md", "skills/b/SKILL.md"],
+      prompts: [],
+      failures: [{ source: "npm:missing", message: "ETARGET" }],
+      app: { name: "upup", version: "2026.10.11", kind: "app", tagline: "证券智能投研助手", category: "finance", toolPolicy: { deny: ["place_trade_order"] }, scenes: 3 },
+    });
+    render(<AppsPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "检查并安装" }));
+    const card = await screen.findByRole("dialog", { name: "安装确认 upup 2026.10.11" });
+    expect(card).toHaveTextContent("https://gitcode.com/lumosaigroup/upup.git");
+    expect(card).toHaveTextContent("2 个工具 · 1 个命令 · 2 个技能 · 0 个提示词 · 3 个场景");
+    expect(card).toHaveTextContent("禁止调用：place_trade_order");
+    expect(screen.getByRole("alert")).toHaveTextContent("预演失败 2 项");
+    expect(screen.getByRole("alert")).toHaveTextContent("npm:missing：ETARGET");
+    expect(screen.getByRole("alert")).toHaveTextContent("broken/index.ts：Cannot find module");
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(screen.queryByRole("dialog", { name: /安装确认/ })).toBeNull();
+    expect(appsEnsureDefault).not.toHaveBeenCalled();
   });
 
   it("已安装 UpUp 后不再显示 Git 安装入口", async () => {
@@ -131,7 +161,7 @@ describe("应用页 (UP-2.4)", () => {
     agentExtensionsPackages.mockResolvedValue([]);
     render(<AppsPanel />);
     fireEvent.click(await screen.findByRole("button", { name: "检查并安装" }));
-    fireEvent.click(await screen.findByRole("button", { name: /确认安装（436 个工具）/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "确认安装" }));
     await waitFor(() => expect(appsEnsureDefault).toHaveBeenCalledWith("https://gitcode.com/lumosaigroup/upup.git"));
   });
 

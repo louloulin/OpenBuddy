@@ -12,7 +12,7 @@
  *  - 因此本文件只断言"预演可见 + 开关读写"，会话加载用 skip 标注为阻塞项。
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createEngineHandlers } from "@openbuddy/host/handlers";
@@ -331,24 +331,25 @@ describe.skipIf(!enabled)("UpUp 作为 Pi 插件 (20261126-upup)", () => {
       const sessionId = (await app.handlers.agent_new_session({ cwd: root, modelId })) as string;
       await app.handlers.agent_send({
         sessionId,
-        text: "请调用 market_data_quote 工具查询贵州茅台（symbol=600519，market=cn）的最新行情，然后用一句话告诉我价格和数据截至时间。",
+        text: "请调用 upup_market_data_quote 工具查询贵州茅台（symbol=600519，market=cn）的最新行情，然后用一句话告诉我价格和数据截至时间。",
       });
 
       type Part = { type?: string; toolCallId?: string; toolName?: string; content?: Array<{ type: string; text?: string }>; details?: unknown; isError?: boolean };
-      const deadline = Date.now() + 60_000;
+      const deadline = Date.now() + 180_000;
       let result: Part | undefined;
       while (Date.now() < deadline && !result) {
         const loaded = (await app.handlers.agent_load_session({ sessionId, cwd: root })) as { messages?: Array<Part & { role?: string }> };
-        result = (loaded.messages ?? []).find((m) => m.role === "toolResult" && m.toolName === "market_data_quote" && !m.isError);
+        // UpUp 新版工具名带 `upup_` 前缀，旧名保留为 Deprecated 别名；两个都认。
+        result = (loaded.messages ?? []).find((m) => m.role === "toolResult" && /^(upup_)?market_data_quote$/.test(m.toolName ?? "") && !m.isError);
         if (!result) await new Promise((resolve) => setTimeout(resolve, 1500));
       }
       if (!result) {
-        const loaded = (await app.handlers.agent_load_session({ sessionId, cwd: root })) as { messages?: unknown[] };
-        console.log("UPUP_REAL_READONLY_DEBUG", JSON.stringify(loaded.messages ?? []).slice(0, 3000));
+        const loaded = (await app.handlers.agent_load_session({ sessionId, cwd: root })) as { messages?: Array<Part & { role?: string }> };
+        console.log("UPUP_REAL_READONLY_CALLS", JSON.stringify((loaded.messages ?? []).filter((m) => m.role === "toolResult").map((m) => ({ tool: m.toolName, isError: m.isError }))));
       }
       expect(result, "真实模型调用了 market_data_quote 且成功").toBeTruthy();
       const card = detectFinanceCard({
-        toolCallId: result!.toolCallId ?? "x", title: "market_data_quote", kind: "market_data_quote", status: "completed",
+        toolCallId: result!.toolCallId ?? "x", title: result!.toolName!, kind: result!.toolName!, status: "completed",
         content: (result!.content ?? []).filter((c): c is { type: "text"; text: string } => c.type === "text" && typeof c.text === "string"),
         details: result!.details,
       });
@@ -359,6 +360,84 @@ describe.skipIf(!enabled)("UpUp 作为 Pi 插件 (20261126-upup)", () => {
       app.dispose();
     }
   }, 300_000);
+
+  /**
+   * 20261127-upup 全链路（真实模型）：U4 根 prompt → U5 推荐（ob_app_recommend 只来自真实 apps_list）
+   * → 只读行情出数据卡 → 使用统计按安装目录记日 → 绑定基本面分析师后真实模型只用白名单工具。
+   */
+  it.skipIf(!realModel)("真实模型：应用根 prompt + 推荐 + 数据卡 + 使用统计 + 投研专家收窄（20261127 U4/U5）", async () => {
+    const { root, app } = await host();
+    try {
+      await app.handlers.agent_extensions_install_package({ source: repo });
+      await app.handlers.agent_extensions_set_enabled({ enabled: true });
+      await app.handlers.folder_trust_respond({ cwd: root, trusted: true });
+      const modelId = await configureMagpie(app);
+      const apps = (await app.handlers.apps_list({ cwd: root })) as Array<{ id: string; installedPath?: string }>;
+      const upup = apps.find((entry) => entry.id === "upup")!;
+      expect(upup).toBeTruthy();
+      // U4：选中 UpUp → 新会话的 system prompt 带上应用身份与禁用工具。
+      const current = (await app.handlers.apps_set_current({ appId: "upup", cwd: root })) as { prompt: string };
+      expect(current.prompt).toContain("place_trade_order");
+
+      type Part = { role?: string; type?: string; toolCallId?: string; toolName?: string; content?: Array<{ type: string; text?: string }>; details?: any; isError?: boolean };
+      const results = async (sessionId: string) =>
+        (((await app.handlers.agent_load_session({ sessionId, cwd: root })) as { messages?: Part[] }).messages ?? []).filter((m) => m.role === "toolResult");
+      const waitFor = async (sessionId: string, ok: (rs: Part[]) => boolean, ms = 240_000) => {
+        const deadline = Date.now() + ms;
+        let rs: Part[] = [];
+        while (Date.now() < deadline) {
+          rs = await results(sessionId);
+          if (ok(rs)) break;
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+        }
+        return rs;
+      };
+      const isQuote = (m: Part) => /^(upup_)?market_data_quote$/.test(m.toolName ?? "") && !m.isError;
+
+      const sessionId = (await app.handlers.agent_new_session({ cwd: root, modelId })) as string;
+      await app.handlers.agent_send({
+        sessionId,
+        text: "我想看看北向资金和贵州茅台的股价。先调用 ob_app_recommend 看看有没有合适的应用，再用 upup_market_data_quote（symbol=600519，market=cn）查行情，最后一句话告诉我价格和截至时间。",
+      });
+      const first = await waitFor(sessionId, (rs) => rs.some((m) => m.toolName === "ob_app_recommend") && rs.some(isQuote));
+      console.log("UPUP_REAL_E2E_CALLS", JSON.stringify(first.map((m) => ({ tool: m.toolName, isError: m.isError }))));
+      const rec = first.find((m) => m.toolName === "ob_app_recommend");
+      const recs = (rec?.details?.recommendations ?? []) as Array<{ appId: string; matched: string[] }>;
+      console.log("UPUP_REAL_E2E_RECOMMEND", JSON.stringify(recs));
+      expect(recs[0]?.appId).toBe("upup");
+
+      const quote = first.find(isQuote);
+      expect(quote, "真实模型调用了行情工具且成功").toBeTruthy();
+      const card = detectFinanceCard({
+        toolCallId: quote!.toolCallId ?? "x", title: quote!.toolName!, kind: quote!.toolName!, status: "completed",
+        content: (quote!.content ?? []).filter((c): c is { type: "text"; text: string } => c.type === "text" && typeof c.text === "string"),
+        details: quote!.details,
+      });
+      console.log("UPUP_REAL_E2E_CARD", JSON.stringify(card && { kind: card.kind, title: card.title, source: card.source, asOf: card.asOf, price: card.rows.find((r) => r.key === "price")?.value }));
+      expect(card).toMatchObject({ kind: "quote" });
+
+      // UP-6.4：成功的 UpUp 工具调用按安装目录记日。
+      const usage = JSON.parse(readFileSync(join(root, "pi", "app-usage.json"), "utf8")) as { lastUsed: Record<string, string> };
+      console.log("UPUP_REAL_E2E_USAGE", JSON.stringify(usage));
+      expect(Object.keys(usage.lastUsed)).toContain(upup.installedPath);
+
+      // UP-5.3：绑定基本面分析师后，真实模型能调用的只有白名单工具。
+      const before = ((await app.handlers.agent_session_tools({ sessionId })) as string[]).length;
+      await app.handlers.agent_set_session_expert({ sessionId, expertId: "fundamental-analyst" });
+      const narrowed = (await app.handlers.agent_session_tools({ sessionId })) as string[];
+      console.log("UPUP_REAL_E2E_EXPERT_TOOLS", JSON.stringify({ before, after: narrowed.length }));
+      expect(narrowed.length).toBeLessThan(before);
+      for (const banned of ["place_trade_order", "upup_place_trade_order", "add_to_watchlist", "upup_add_to_watchlist", "bash"]) expect(narrowed).not.toContain(banned);
+      const seen = first.length;
+      await app.handlers.agent_send({ sessionId, text: "从基本面角度，查一下贵州茅台（600519）的关键财务比率或估值，给出两条结论。" });
+      const second = (await waitFor(sessionId, (rs) => rs.length > seen && rs.slice(seen).some((m) => !m.isError))).slice(seen);
+      console.log("UPUP_REAL_E2E_EXPERT_CALLS", JSON.stringify(second.map((m) => ({ tool: m.toolName, isError: m.isError }))));
+      expect(second.length).toBeGreaterThan(0);
+      for (const call of second) expect(narrowed, `${call.toolName} 必须在专家白名单里`).toContain(call.toolName);
+    } finally {
+      app.dispose();
+    }
+  }, 600_000);
 
   it("upupPlugins 开关：写入/读回/恢复默认，且不动同目录其它键", async () => {
     const { root, app } = await host();

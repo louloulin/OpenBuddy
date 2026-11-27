@@ -13779,3 +13779,23 @@ button.diff__path {
 .apps-hygiene__btn { padding: 0.1875rem 0.625rem; border: 0.0625rem solid var(--wb-border-default); border-radius: var(--wb-radius-pill); background: var(--wb-bg-primary); color: var(--wb-text-medium); font-size: 0.75rem; cursor: pointer; }
 .apps-hygiene__btn:hover:not(:disabled) { background: var(--wb-bg-hover); color: var(--wb-text-strong); }
 .apps-hygiene__btn--ghost { border-color: transparent; color: var(--wb-text-tertiary); }
+
+/* 安装确认卡 (UP-2.5)：来源、资源数、工具策略、预演失败项。 */
+.app-install { border: 0.0625rem solid var(--wb-border-default); border-radius: 0.75rem; padding: 0.75rem 0.875rem; display: flex; flex-direction: column; gap: 0.625rem; background: var(--wb-bg-primary); }
+.app-install__head { display: flex; align-items: flex-start; gap: 0.5rem; }
+.app-install__head > div { display: flex; flex-direction: column; gap: 0.125rem; }
+.app-install__icon { color: var(--wb-brand); display: inline-flex; }
+.app-install__title { font-size: 0.875rem; color: var(--wb-text-strong); }
+.app-install__desc { font-size: 0.75rem; color: var(--wb-text-tertiary); }
+.app-install__facts { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 0.75rem; margin: 0; font-size: 0.75rem; }
+.app-install__facts dt { color: var(--wb-text-tertiary); }
+.app-install__facts dd { margin: 0; color: var(--wb-text-medium); display: flex; flex-direction: column; gap: 0.125rem; word-break: break-all; }
+.app-install__failures { border-radius: 0.5rem; padding: 0.5rem 0.625rem; background: var(--wb-status-error-soft); color: var(--wb-status-error); font-size: 0.75rem; }
+.app-install__failures ul { margin: 0.25rem 0 0; padding-left: 1rem; }
+.app-install__actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+.app-install__cancel,
+.app-install__confirm { padding: 0.25rem 0.875rem; border-radius: var(--wb-radius-pill); font-size: 0.75rem; cursor: pointer; border: 0.0625rem solid var(--wb-border-default); background: var(--wb-bg-primary); color: var(--wb-text-medium); }
+.app-install__confirm { border-color: var(--wb-brand); background: var(--wb-brand); color: var(--wb-bg-primary); }
+.app-install__cancel:hover:not(:disabled) { background: var(--wb-bg-hover); }
+.app-install__confirm:disabled,
+.app-install__cancel:disabled { opacity: 0.6; cursor: default; }

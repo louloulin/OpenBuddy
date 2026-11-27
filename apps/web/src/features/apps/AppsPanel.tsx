@@ -23,7 +23,8 @@ import {
   agentExtensionsSetEnabled,
 } from "@openbuddy/client/agent-client";
 import { describeAppInstallError } from "@openbuddy/protocol/apps";
-import type { ExtensionPackage } from "@openbuddy/protocol/extensions";
+import type { ExtensionPackage, ExtensionPackagePreview } from "@openbuddy/protocol/extensions";
+import { AppInstallConfirm } from "./AppInstallConfirm";
 
 /** UpUp 官方安装源（与 `pi install <url>` 等价；Pi 包管理器直接接受 https 仓库地址）。 */
 export const UPUP_GIT_SOURCE = "https://gitcode.com/lumosaigroup/upup.git";
@@ -52,7 +53,7 @@ export function AppsPanel({
   const [packages, setPackages] = useState<ExtensionPackage[]>([]);
   const [icons, setIcons] = useState<Record<string, string>>({});
   // UpUp Git 安装：先预演（工具/技能数），确认后再装。
-  const [gitPreview, setGitPreview] = useState<{ tools: number; skills: number } | null>(null);
+  const [gitPreview, setGitPreview] = useState<ExtensionPackagePreview | null>(null);
   const [gitBusy, setGitBusy] = useState("");
   const [busy, setBusy] = useState("");
   const [loaded, setLoaded] = useState(false);
@@ -194,9 +195,7 @@ export function AppsPanel({
     if (gitBusy) return;
     setGitBusy("preview");
     try {
-      const preview = await agentExtensionsPreviewPackage(UPUP_GIT_SOURCE);
-      const tools = preview.extensions.reduce((sum, entry) => sum + entry.tools.length, 0);
-      setGitPreview({ tools, skills: preview.skills?.length ?? 0 });
+      setGitPreview(await agentExtensionsPreviewPackage(UPUP_GIT_SOURCE));
     } catch (error) {
       onToast?.(`检查失败：${describeAppInstallError(error)}`);
     } finally {
@@ -270,16 +269,20 @@ export function AppsPanel({
               从 <code>{UPUP_GIT_SOURCE}</code> 安装（与 <code>pi install</code> 相同）。装完后它有卡片、场景与工具策略。
             </span>
           </div>
-          {gitPreview ? (
-            <button type="button" className="apps-bundled__action" disabled={gitBusy === "install"} onClick={() => void installUpup()}>
-              {gitBusy === "install" ? "安装中…" : `确认安装（${gitPreview.tools} 个工具）`}
-            </button>
-          ) : (
+          {!gitPreview && (
             <button type="button" className="apps-bundled__action" disabled={gitBusy === "preview"} onClick={() => void previewUpup()}>
               {gitBusy === "preview" ? "检查中…" : "检查并安装"}
             </button>
           )}
         </div>
+      )}
+      {loaded && !hasUpup && gitPreview && (
+        <AppInstallConfirm
+          preview={gitPreview}
+          busy={gitBusy === "install"}
+          onConfirm={() => void installUpup()}
+          onCancel={() => setGitPreview(null)}
+        />
       )}
 
       {loaded && (
