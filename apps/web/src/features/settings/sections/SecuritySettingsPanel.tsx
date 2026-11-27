@@ -418,13 +418,7 @@ export function SecuritySettingsPanel() {
           {t("security.rules.note.head")}<code>mcp</code>{t("security.rules.note.mcp")}<code>mcp__</code>{t("security.rules.note.tail")}
         </p>
       </div>
-      </div>
 
-      <div id="security-panel-sandbox" role="tabpanel" aria-labelledby="security-tab-sandbox" hidden={tab !== "sandbox"}>
-        {tab === "sandbox" && <SecuritySandboxTab />}
-      </div>
-
-      <div id="security-panel-skills" role="tabpanel" aria-labelledby="security-tab-skills" hidden={tab !== "skills"}>
       {/* 平台工具策略 (20261126-upup UP-3.2) */}
       {policy && (
         <div className="sec-card" aria-label="平台工具策略">
@@ -480,6 +474,13 @@ export function SecuritySettingsPanel() {
         </div>
       )}
 
+      </div>
+
+      <div id="security-panel-sandbox" role="tabpanel" aria-labelledby="security-tab-sandbox" hidden={tab !== "sandbox"}>
+        {tab === "sandbox" && <SecuritySandboxTab />}
+      </div>
+
+      <div id="security-panel-skills" role="tabpanel" aria-labelledby="security-tab-skills" hidden={tab !== "skills"}>
       {/* 技能安全审查 (G2-4) */}
       <div className="sec-card">
         <div className="sec-card__head">

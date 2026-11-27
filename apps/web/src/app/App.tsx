@@ -24,7 +24,7 @@ import { useArtifactsStore } from "../features/workbench/state/artifacts-store";
 import { useConnectorNeededStore } from "../features/composer/state/connector-needed-store";
 import { useSubagentStore } from "../features/chat/state/subagent-store";
 import { useQuickQaStore } from "../features/chat/state/quick-qa-store";
-import { useSessionsStore } from "../features/sessions/state/sessions-store";
+import { useSessionsStore, HOME_DRAFT_KEY } from "../features/sessions/state/sessions-store";
 import { usePermissionStore } from "../features/approvals/state/permission-store";
 import { useQuestionStore } from "../features/approvals/state/question-store";
 import { BoundExpertBadge } from "../features/experts";
@@ -970,6 +970,10 @@ function Shell() {
               onModelChange={handleModelChange}
               onStartProject={handleStartProject}
               onStartProjectConversation={handleStartProjectConversation}
+              onPickPrompt={(prompt) => {
+                useSessionsStore.getState().setDraft(HOME_DRAFT_KEY, prompt);
+                handleGoHome();
+              }}
             />
           ) : currentSessionId ? (
             <ChatView
@@ -1004,6 +1008,7 @@ function Shell() {
               onSelectWorkspace={handleSelectWorkspace}
               onSelectExpert={handleStartWithExpert}
               onNavigateConnectors={openConnectors}
+              onNavigate={handleNavigate}
               onOpenSession={(sessionId, sessionCwd) => { void handleSelectSession(sessionId, sessionCwd); }}
               onOpenSearch={() => setPalette("search")}
             />

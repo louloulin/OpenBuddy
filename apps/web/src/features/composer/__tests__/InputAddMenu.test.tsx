@@ -12,10 +12,37 @@ vi.mock("@openbuddy/client/agent-client", () => ({
   sessionMcpSet: vi.fn(),
 }));
 
+const appsListMock = vi.fn();
+const appsIconMock = vi.fn();
+vi.mock("@openbuddy/client/api/files", () => ({
+  appsList: (...args: unknown[]) => appsListMock(...args),
+  appsIcon: (...args: unknown[]) => appsIconMock(...args),
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
+  appsListMock.mockResolvedValue([]);
+  appsIconMock.mockResolvedValue({ dataUri: null });
   vi.mocked(sessionMcpGet).mockResolvedValue({ servers: [{ name: "filesystem", enabled: true }] });
   vi.mocked(sessionMcpSet).mockResolvedValue({ servers: [{ name: "filesystem", enabled: false }] });
+});
+
+describe("输入卡应用快捷图标 (WorkBuddy 对齐，gap E)", () => {
+  it("装了应用时 `+` 旁出现应用图标，点击填入首个场景 prompt", async () => {
+    appsListMock.mockResolvedValue([
+      { id: "upup", name: "upup", kind: "app", packageSource: "/repo/upup", sceneList: [{ id: "deep", name: "个股深研", prompt: "/invest 600519.SH" }] },
+    ]);
+    const onPickPrompt = vi.fn();
+    render(<InputAddMenu onPickFiles={vi.fn()} onPickPrompt={onPickPrompt} />);
+    fireEvent.click(await screen.findByRole("button", { name: "应用 upup" }));
+    expect(onPickPrompt).toHaveBeenCalledWith("/invest 600519.SH");
+  });
+
+  it("没有安装应用时不显示快捷图标", async () => {
+    render(<InputAddMenu onPickFiles={vi.fn()} />);
+    await waitFor(() => expect(appsListMock).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: /^应用 / })).toBeNull();
+  });
 });
 
 describe("“+” 菜单 · 本任务连接器开关 (pii W2.4 P2)", () => {

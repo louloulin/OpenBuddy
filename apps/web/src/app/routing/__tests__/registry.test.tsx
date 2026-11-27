@@ -20,7 +20,7 @@ describe("FeatureRegistry (pii W0.2)", () => {
     const primary = navItems(FEATURES, desktop, "primary");
     const more = navItems(FEATURES, desktop, "more");
     expect(labels(primary)).toEqual(["专家·技能·连接器", "自动化", "资料库", "项目"]); // 资料库 lights up: memory_list is a contract command since W5.1; 自动化 since W4
-    expect(labels(more)).toEqual(["我的文件", "知识库", "用量统计", "通知渠道", "灵感", "策略设置"]);
+    expect(labels(more)).toEqual(["应用", "我的文件", "知识库", "用量统计", "通知渠道", "灵感", "策略设置"]);
     const user = userEvent.setup();
     render(<Sidebar onNewSession={vi.fn()} onSelect={vi.fn()} onNavigate={vi.fn()} onOpenSettings={vi.fn()} onToggleCollapse={vi.fn()} onToggleWorkspace={vi.fn()} onOpenSearch={vi.fn()} onPlaceholder={vi.fn()} activeNav="" nav={primary} moreItems={more} />);
     for (const label of ["助理", "技能与 MCP"]) expect(screen.queryByText(label)).toBeNull();
@@ -71,7 +71,7 @@ describe("FeatureRegistry (pii W0.2)", () => {
     expect(navItems(FEATURES, loading, "primary")).toEqual([]);
     // 灵感 is online since W2.8 (static cards, no host command); 通知渠道 needs the host's
     // channel commands (W4.6), so it stays dark while the capabilities are still loading.
-    expect(labels(navItems(FEATURES, loading, "more"))).toEqual(["用量统计", "灵感", "策略设置"]);
+    expect(labels(navItems(FEATURES, loading, "more"))).toEqual(["应用", "用量统计", "灵感", "策略设置"]);
     const everything = snapshot([...COMMANDS, "inspiration_generate", "open_url"]);
     // settings-data is live since W6.5 (本地导出/导入/诊断), so it is no longer in this list.
     for (const id of ["cloud-storage", "assistant", "browser-preview"])

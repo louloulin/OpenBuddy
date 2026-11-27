@@ -336,7 +336,12 @@ export function TrustedExtensionsPanel({ sessionId }: { sessionId?: string } = {
           return (
             <div key={entry.source} className="ext-package">
               <div className="ext-package__text">
-                <code className="ext-package__source" title={entry.installedPath ?? entry.source}>{entry.source}</code>
+                <code className="ext-package__source" title={entry.installedPath ?? entry.source}>
+                  {/* 本地 checkout 的 source 是相对 agentDir 的路径，显示包目录名更好读。 */}
+                  {/^[\w.-]+\/[\w.-]+$|^[a-z]+:/i.test(entry.source)
+                    ? entry.source.replace(/^npm:/, "")
+                    : entry.source.split(/[\\/]/).filter(Boolean).pop() ?? entry.source}
+                </code>
                 <span className="ext-package__meta">{entry.scope === "project" ? "项目" : "用户"}{entry.filtered ? " · 有过滤" : ""}{entry.installedPath ? "" : " · 尚未安装"}{updates.some((update) => update.source === entry.source) ? " · 可更新" : ""}{summary ? ` · ${summary}` : ""}</span>
                 {failure && <span className="ext-package__meta ext-package__meta--bad" role="alert">{failure.message}</span>}
                 <div className="ext-package__filters" aria-label={`${entry.source} 资源开关`}>
@@ -571,7 +576,7 @@ export function TrustedExtensionsPanel({ sessionId }: { sessionId?: string } = {
         </div>
       </div>
     </div>}
-      {sessionId && <SessionToolHealthCard sessionId={sessionId} />}
+      <SessionToolHealthCard {...(sessionId ? { sessionId } : {})} />
 
     <UpupPluginsCard hasUpup={packages.some((entry) => /upup/i.test(entry.source))} />
 </section>;

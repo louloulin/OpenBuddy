@@ -95,8 +95,12 @@ export function ApplicationPicker({
     finally { setBusy(""); }
   };
 
+  // 内置通用应用（OpenBuddy 自己）不是"已安装的包"，不出现在这里的启停列表，
+  // 否则「还没装任何应用」的空态会永远不出现（2026-11-27）。
+  const installedApps = apps.filter((app) => app.kind !== "extension" && app.source !== "builtin");
+
   if (!loaded) return <div className="iam-sub-empty">正在读取已安装的应用…</div>;
-  if (!packs.length && !packages.length && !apps.length) {
+  if (!packs.length && !packages.length && !installedApps.length) {
     return (
       <>
         <div className="iam-sub-empty">还没有安装任何应用</div>
@@ -107,10 +111,10 @@ export function ApplicationPicker({
 
   return (
     <>
-      {apps.some((app) => app.kind !== "extension") && (
+      {installedApps.length > 0 && (
         <>
           <div className="iam-sub-heading">应用</div>
-          {apps.filter((app) => app.kind !== "extension").map((app) => {
+          {installedApps.map((app) => {
             const entry = packages.find((item) => item.source === app.packageSource);
             const on = entry ? entry.filtered === false : true;
             return (

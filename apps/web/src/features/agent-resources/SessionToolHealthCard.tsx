@@ -8,12 +8,13 @@ import { friendlyError } from "@openbuddy/chat-core/error-format";
  * 装完应用后，用真实读数核对本会话注册了哪些工具：数量与预期不符时，先看总开关、
  * 目录信任与包记录。抽成独立组件，免得扩展面板继续长大。
  */
-export function SessionToolHealthCard({ sessionId }: { sessionId: string }) {
+export function SessionToolHealthCard({ sessionId }: { sessionId?: string }) {
   const [health, setHealth] = useState<{ total: number; app: number; sample: string[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const check = async () => {
+    if (!sessionId) return;
     setBusy(true);
     setError("");
     try {
@@ -36,9 +37,10 @@ export function SessionToolHealthCard({ sessionId }: { sessionId: string }) {
       <p className="res-panel__muted">装完应用后看看本会话实际注册了哪些工具——数量与预期不符时，先确认总开关、目录信任与包记录。</p>
       {error && <p className="res-panel__error" role="alert">{error}</p>}
       <div className="ext-install">
-        <button type="button" className="res-panel__btn" disabled={busy} onClick={() => void check()}>
+        <button type="button" className="res-panel__btn" disabled={busy || !sessionId} onClick={() => void check()}>
           {busy ? "检查中…" : "检查本会话工具"}
         </button>
+        {!sessionId && <span className="res-panel__muted">先打开一个任务，再回来检查它的工具。</span>}
       </div>
       {health && (
         <p className="res-panel__muted" role="status">

@@ -9,8 +9,9 @@ import { LightbulbIcon, MoreIcon } from "@openbuddy/ui/icon/icons/index";
 import { useHorizontalScroll } from "../../shared/hooks/use-horizontal-scroll";
 import { useLocale } from "../../shared/i18n";
 import { useSessionsStore, HOME_DRAFT_KEY } from "@/features/sessions/state/sessions-store";
+import { appsList } from "@openbuddy/client/api/files";
+import { useAppsStore } from "@/features/apps";
 import { relativeTime } from "@/shared/lib/files/file-utils";
-import { EmptyStateArt } from "./EmptyStateArt";
 import { usePendingExpertStore } from "@/features/experts/state/pending-expert-store";
 import {
   COLLAPSED_VISIBLE_COUNT,
@@ -65,6 +66,7 @@ export function HomePage({
   onSelectMode,
   onSelectExpert,
   onNavigateConnectors,
+  onNavigate,
   onOpenSession,
   onOpenSearch,
 }: {
@@ -82,6 +84,8 @@ export function HomePage({
   onSelectMode?: (modeId: HomeModeId) => void;
   onSelectExpert?: (agent: AgentEntry) => void;
   onNavigateConnectors?: (tab?: "experts" | "connectors") => void;
+  /** 顶部导航（最近任务空态的「查看」→ 应用页）。 */
+  onNavigate?: (label: string) => void;
   /** Open an existing task from the 最近任务 list. */
   onOpenSession?: (sessionId: string, cwd?: string) => void;
   /** Open the full task search (「查看更多」). */
@@ -89,13 +93,49 @@ export function HomePage({
 }) {
   const { t, locale } = useLocale();
   const [modeId, setModeId] = useState<HomeModeId>("working");
+  // 侧栏切换器选中的应用；变化时重算标题与场景行。
+  const currentAppId = useAppsStore((s) => s.currentAppId);
   // G1-17: the scene decides whether the status chips show; a task started in the design
   // scene keeps them (WorkBuddy carries the design tab into the conversation).
   useEffect(() => { useStatusStore.getState().setScene(modeId); }, [modeId]);
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      void (async () => {
+        let apps: Awaited<ReturnType<typeof appsList>> = [];
+        try {
+          apps = (await appsList()) ?? [];
+        } catch {
+          return;
+        }
+        if (!alive) return;
+        const real = (Array.isArray(apps) ? apps : []).filter((app) => app.kind !== "extension");
+        // WorkBuddy 首页标题是「当前应用名 · 一句话定位」。优先用切换器选中的应用，
+        // 否则退回第一个带 tagline 的真实应用（默认即 upup）。
+        const chosen = real.find((app) => app.id === useAppsStore.getState().currentAppId);
+        const primary = chosen ?? real.find((app) => app.kind === "app" && app.tagline) ?? real.find((app) => app.tagline);
+        // 场景行只显示当前应用的场景；没显式选择时跟随默认应用（内置通用应用）。
+        const scoped = chosen ? [chosen] : primary ? [primary] : real;
+        const scenes = scoped.flatMap((app) =>
+          (app.sceneList ?? []).map((scene) => ({ key: `${app.id}:${scene.id}`, app: app.name, name: scene.name, prompt: scene.prompt })),
+        );
+        setAppScenes(scenes.slice(0, 8));
+        setCurrentApp(primary ? { name: primary.name, tagline: primary.tagline ?? "" } : null);
+      })();
+    };
+    load();
+    // 在别处装完应用回到首页时，场景行要能刷新出来。
+    window.addEventListener("focus", load);
+    return () => { alive = false; window.removeEventListener("focus", load); };
+  }, [currentAppId]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
   const [expanded, setExpanded] = useState(false);
   // 输入框内黑色"操作类型"标签。
   const [sceneTag, setSceneTag] = useState<{ label: string; icon: HomeCategory["icon"] } | null>(null);
+  // 应用场景 (20261126-upup / WorkBuddy 对齐)：装了带 scenes 的应用时，首页出现它的场景。
+  const [appScenes, setAppScenes] = useState<Array<{ key: string; app: string; name: string; prompt: string }>>([]);
+  // 当前应用 (WorkBuddy 对齐)：标题显示「应用名 · 一句话定位」，不再固定「你的职场超能力」。
+  const [currentApp, setCurrentApp] = useState<{ name: string; tagline: string } | null>(null);
   // 受控填充 Composer 的内容 + nonce(点模板时写入 prompt)。
   const [externalText, setExternalText] = useState("");
   const [externalTextNonce, setExternalTextNonce] = useState(0);
@@ -206,8 +246,9 @@ export function HomePage({
     <div className="home">
       <div className="home__inner">
         <header className="home__header">
-          <span className="home__brand">OpenBuddy</span>
-          <h1 className="home__title">{mode.subtitle}</h1>
+          {/* WorkBuddy 首页标题跟随当前应用；没有应用时退回品牌 + 场景副标题。 */}
+          {!currentApp && <span className="home__brand">OpenBuddy</span>}
+          <h1 className="home__title">{currentApp ? `${currentApp.name} · ${currentApp.tagline}` : mode.subtitle}</h1>
         </header>
 
         {!apiReady && !onboardingDismissed && (
@@ -224,21 +265,44 @@ export function HomePage({
           </section>
         )}
 
-        <div className="home__scenes" role="tablist" aria-label="场景">
-          {HOME_MODES.map((m) => (
-            <button
-              key={m.id}
-              role="tab"
-              aria-selected={modeId === m.id}
-              aria-label={m.label}
-              className={sceneCls(m.id)}
-              onClick={() => handleModeChange(m.id)}
-            >
-              <m.icon size={14} />
-              <span>{m.label}</span>
-            </button>
-          ))}
-        </div>
+        {appScenes.length > 0 ? (
+          <div className="home__scenes" role="tablist" aria-label="应用场景">
+            {appScenes.map((scene, index) => (
+              <button
+                key={scene.key}
+                type="button"
+                role="tab"
+                aria-selected={index === 0}
+                aria-label={`应用场景 ${scene.name}`}
+                title={scene.prompt}
+                className={"home__scene" + (index === 0 ? " home__scene--active" : "")}
+                onClick={() => fillComposer(scene.prompt)}
+              >
+                <span>{scene.name}</span>
+                {/* 单一应用时不重复标应用名（标题已经是应用）；多应用来源才用后缀区分。 */}
+                {new Set(appScenes.map((s) => s.app)).size > 1 && (
+                  <span className="home__scene-app">{scene.app}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="home__scenes" role="tablist" aria-label="场景">
+            {HOME_MODES.map((m) => (
+              <button
+                key={m.id}
+                role="tab"
+                aria-selected={modeId === m.id}
+                aria-label={m.label}
+                className={sceneCls(m.id)}
+                onClick={() => handleModeChange(m.id)}
+              >
+                <m.icon size={14} />
+                <span>{m.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         <section className="home__composer-area">
           {/* 二级:能力 chip 行(选中分类后隐藏,替换为三级模板行) */}
@@ -391,10 +455,15 @@ export function HomePage({
             )}
           </div>
           {recentSessions.length === 0 ? (
-            <div className="home__recent-empty">
-              <EmptyStateArt />
-              <p className="home__recent-empty-title">{t("home.recentEmptyTitle")}</p>
-              <p className="home__recent-empty-desc">{t("home.recentEmptyDesc")}</p>
+            <div className="home__guide">
+              <span className="home__guide-icon" aria-hidden="true"><LightbulbIcon size="md" /></span>
+              <div className="home__guide-body">
+                <strong className="home__guide-title">应用使用指南</strong>
+                <span className="home__guide-desc">了解已安装应用的场景与工具；从「应用」页可以启停应用、进入场景。</span>
+              </div>
+              <button type="button" className="home__guide-action" onClick={() => onNavigate?.("应用")}>
+                查看
+              </button>
             </div>
           ) : (
             <ul className="home__recent-list">

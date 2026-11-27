@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSettings } from "../src/settings/settings.js";
 import { Providers } from "../src/providers/providers.js";
+import { isKeylessProvider } from "../src/providers/auth-status.js";
 const roots: string[] = [];
 afterEach(async () => {
   for (const root of roots.splice(0))
@@ -166,4 +167,63 @@ it("finds the /v1 base of an OpenAI-style gateway with the saved key and tests t
   } finally {
     server.close();
   }
+});
+
+it("treats keyless loopback providers as ready (magpie / 本地网关)", async () => {
+  const p = await setup();
+  await p.saveProvider({
+    id: "magpie",
+    providerKind: "magpie",
+    baseUrl: "http://127.0.0.1:3425/v1",
+    apiBackend: "chat_completions",
+    authScheme: "bearer",
+  });
+  await p.saveModel({ providerId: "magpie", modelId: "auto/glm-5.3-flash" });
+
+  // 关键回归：没有保存 Key，但本机回环网关照样算已配置（首页不再卡「先连接模型」）。
+  const status = await p.authStatus();
+  expect(status.ready).toBe(true);
+  expect(status.reason).toBeUndefined();
+  // 界面上仍按「已配置」显示占位。
+  expect(p.list().providers[0].apiKey).toBe("••••");
+
+  // 自定义但指向回环地址的厂商同样免 Key。
+  await p.saveProvider({
+    id: "local-custom",
+    providerKind: "custom",
+    baseUrl: "http://localhost:8080/v1",
+    apiBackend: "chat_completions",
+    authScheme: "bearer",
+  });
+  await p.saveModel({ providerId: "local-custom", modelId: "qwen3" });
+  expect((await p.authStatus()).ready).toBe(true);
+
+  // 远端厂商没 Key 时仍如实报「请填写 API Key」。
+  await p.saveProvider({
+    id: "remote-custom",
+    providerKind: "custom",
+    baseUrl: "https://api.example.com/v1",
+    apiBackend: "chat_completions",
+    authScheme: "bearer",
+  });
+  await p.saveModel({ providerId: "remote-custom", modelId: "remote-1" });
+  const withMissing = await p.authStatus();
+  expect(withMissing.ready).toBe(true); // 前两个是本机回环，仍然已配置
+});
+
+it("reports a missing API key only when every model's provider needs one", async () => {
+  const p = await setup();
+  await p.saveProvider({
+    id: "remote-only",
+    providerKind: "custom",
+    baseUrl: "https://api.example.com/v1",
+    apiBackend: "chat_completions",
+    authScheme: "bearer",
+  });
+  await p.saveModel({ providerId: "remote-only", modelId: "remote-1" });
+  const status = await p.authStatus();
+  expect(status.ready).toBe(false);
+  expect(status.reason).toContain("API Key");
+  expect(isKeylessProvider({ providerKind: "magpie" })).toBe(true);
+  expect(isKeylessProvider({ providerKind: "custom", baseUrl: "https://api.example.com" })).toBe(false);
 });

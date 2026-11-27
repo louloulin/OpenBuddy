@@ -141,6 +141,8 @@ export async function runArtifactFlows({ page, app, call, checkpoint, writeFile,
   assert.ok(await localOpen.isEnabled() && await localReveal.isEnabled(), 'local share actions are real');
   await page.screenshot({ path: 'release/ui-share-visibility.png' });
   await page.keyboard.press('Escape');
+  // Escape 关闭分享弹窗有卸载动画：等遮罩真正消失再点顶栏，避免竞态抖动。
+  await page.locator('.ec-modal-overlay').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
   await page.getByRole('button', { name: '收起右侧栏' }).click();
   checkpoint('share shows local-only visibility with real local actions (G3-4)', { visibility: visibilityText.slice(0, 40) });
 

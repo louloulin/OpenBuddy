@@ -1,10 +1,21 @@
 import { readFile } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { readUpupPlugins, writeUpupPlugins } from "@openbuddy/services/apps/upup-settings";
+import { BUILTIN_APP_ID, builtinApp } from "@openbuddy/services/apps/builtin";
 import { PLATFORM_DENIED_PATTERNS } from "@openbuddy/engine/permissions/permissions";
 import { readAppEntry, type AppEntry } from "@openbuddy/services/apps/manifest";
 import { text } from "@openbuddy/services/settings/settings";
 import type { Handler, HostContext, HostModule } from "../module.js";
+
+/**
+ * 内置应用源目录 (2026-11-27)：打包后的 `resources/upup`（开发态 `vendor/upup`）。
+ * 有 package.json 才算可用；没有就返回 exists:false，界面不显示「安装内置应用」。
+ */
+function bundledAppsDir(ctx: HostContext): string | undefined {
+  const dir = ctx.options.bundledAppsDir;
+  return dir && existsSync(join(dir, "package.json")) ? dir : undefined;
+}
 
 /**
  * 应用平台 (20261126-upup)。
@@ -15,20 +26,21 @@ import type { Handler, HostContext, HostModule } from "../module.js";
 export function appsModule(ctx: HostContext): HostModule {
   const agentDir = ctx.settings.dir;
   const commands: Record<string, Handler> = {
-    // 应用列表 (UP-2.2)：从已配置的 Pi 包读 pi.app；没有 manifest 的记为普通扩展包。
+    // 应用列表 (UP-2.2)：内置通用应用永远排第一；其后是 pi.app 的 Pi 包，没有 manifest 的记为扩展包。
     apps_list: (p) => {
       const cwd = typeof p.cwd === "string" && p.cwd ? p.cwd : undefined;
-      const entries: AppEntry[] = [];
+      const entries: AppEntry[] = [builtinApp()];
       for (const pkg of ctx.engine.extensionPackages(cwd) as Array<{ source: string; installedPath?: string }>) {
         if (!pkg.installedPath) continue;
         const entry = readAppEntry(pkg.installedPath, "pi", pkg.source);
         if (entry) entries.push(entry);
       }
-      // 应用在前，扩展包在后；同 id 只留一条。
+      // 内置 → 应用 → 扩展包；同 id 只留一条。
+      const rank = (entry: AppEntry) => (entry.id === BUILTIN_APP_ID ? 0 : entry.kind === "extension" ? 2 : 1);
       const seen = new Set<string>();
       return entries
-        .sort((a, b) => (a.kind === "extension" ? 1 : 0) - (b.kind === "extension" ? 1 : 0))
-        .filter((entry) => (seen.has(`${entry.id}@${entry.installedPath}`) ? false : (seen.add(`${entry.id}@${entry.installedPath}`), true)));
+        .sort((a, b) => rank(a) - rank(b))
+        .filter((entry) => (seen.has(`${entry.id}@${entry.installedPath ?? entry.source}`) ? false : (seen.add(`${entry.id}@${entry.installedPath ?? entry.source}`), true)));
     },
     // 应用级开关 (UP-2.3)：整体启停一个 Pi 包的全部资源（扩展/技能/指令）。
     apps_set_enabled: async (p) => {
@@ -82,6 +94,31 @@ export function appsModule(ctx: HostContext): HostModule {
       const config = ctx.settings.config.read();
       ctx.settings.config.write({ ...config, deniedTools: list("denied"), readonlyTools: list("readonly") });
       return { platformDenied: PLATFORM_DENIED_PATTERNS.map((pattern) => pattern.source), denied: list("denied"), readonly: list("readonly") };
+    },
+    // 内置应用源 (2026-11-27)：打包时 resources/upup（开发态 vendor/upup）。界面据此显示「安装内置应用」。
+    apps_bundled_source: () => {
+      const dir = bundledAppsDir(ctx);
+      if (!dir) return { source: null, exists: false, installed: false };
+      let version: string | undefined;
+      let name: string | undefined;
+      try {
+        const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { name?: string; version?: string };
+        name = typeof pkg.name === "string" ? pkg.name : undefined;
+        version = typeof pkg.version === "string" ? pkg.version : undefined;
+      } catch {
+        /* 坏 manifest 当作没有应用元数据，仍可尝试安装。 */
+      }
+      const installed = (ctx.engine.extensionPackages() as Array<{ installedPath?: string }>)
+        .some((pkg) => pkg.installedPath === dir);
+      return { source: dir, exists: true, installed, ...(name ? { name } : {}), ...(version ? { version } : {}) };
+    },
+    // 一键安装内置 UpUp：装进 agentDir 的包记录，并把资源全开，让工具立即可用。
+    apps_install_bundled: async () => {
+      const dir = bundledAppsDir(ctx);
+      if (!dir) throw new Error("没有可用的内置应用资源（打包时未包含 resources/upup）");
+      const packages = await ctx.engine.installExtensionPackage(dir);
+      await ctx.engine.setExtensionPackageResources(dir, { extensions: true, skills: true, prompts: true, themes: false });
+      return { source: dir, packages };
     },
     upup_plugins_get: () => readUpupPlugins(agentDir),
     upup_plugins_set: (p) => {

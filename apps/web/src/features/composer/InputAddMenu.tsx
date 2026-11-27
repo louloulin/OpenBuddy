@@ -9,6 +9,7 @@ import {
 import { artifactsList, expertsLoad, listDir, skillsList, sessionMcpGet, sessionMcpSet, type AgentMode } from "@openbuddy/client/agent-client";
 import { HOME_MODES, type HomeModeId } from "../../shared/content/scenes";
 import { ApplicationPicker } from "./ApplicationPicker";
+import { useCurrentApp } from "@/features/apps";
 import type { AgentEntry, SkillInfo } from "@openbuddy/protocol/dto";
 
 interface InputAddMenuProps {
@@ -66,6 +67,8 @@ export function InputAddMenu({
   onAgentModeChange,
   sessionId,
 }: InputAddMenuProps) {
+  // 输入卡 `+` 旁的应用快捷图标 (WorkBuddy 对齐，gap E)：装了应用才出现。
+  const currentApp = useCurrentApp(workspaceCwd);
   const [open, setOpen] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<MenuItemId | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -438,6 +441,23 @@ export function InputAddMenu({
       >
         <AddIcon size="md" />
       </button>
+
+      {/* WorkBuddy：`+` 旁是当前应用的快捷图标，点一下把它的首个场景填进输入框。 */}
+      {currentApp && (
+        <button
+          type="button"
+          className="wb-composer__app-shortcut"
+          aria-label={`应用 ${currentApp.app.name}`}
+          title={currentApp.prompt ? `用「${currentApp.app.name}」的场景填入输入框` : currentApp.app.name}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!currentApp.prompt) return;
+            onPickPrompt?.(currentApp.prompt);
+          }}
+        >
+          {currentApp.icon ? <img src={currentApp.icon} alt="" /> : <Blocks size={16} aria-hidden />}
+        </button>
+      )}
 
       {open && (
         <div

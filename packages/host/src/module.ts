@@ -30,6 +30,11 @@ export interface EngineOptions {
    * headless runs drive `automation_tick` instead.
    */
   automationTickMs?: number;
+  /**
+   * 随安装包分发的内置应用源目录 (2026-11-27)：桌面端打包后是 `<resources>/upup`，
+   * 开发态是仓库里的 `vendor/upup`。没有这个目录时「安装内置应用」不可用。
+   */
+  bundledAppsDir?: string;
 }
 export type Handler = (
   payload: Record<string, unknown>,

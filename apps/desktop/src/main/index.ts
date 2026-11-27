@@ -203,6 +203,10 @@ app.whenReady().then(async () => {
     fetchImpl: ((input: string | URL | Request, init?: RequestInit) => net.fetch(input as string, init)) as typeof fetch,
     platform: { kind: 'desktop', commands: NATIVE_COMMANDS, events: DESKTOP_EVENTS },
     appVersion: app.getVersion(),
+    // 内置应用源 (2026-11-27)：打包后在 resources/upup，开发态用仓库里的 vendor/upup。
+    bundledAppsDir: app.isPackaged
+      ? join(process.resourcesPath, 'upup')
+      : join(root, '../../vendor/upup'),
     ...(process.env.OPENBUDDY_UPDATE_FEED ? { updateFeed: process.env.OPENBUDDY_UPDATE_FEED } : {}),
     emit: (event: string, payload: unknown) => {
       events.emit(event, payload);

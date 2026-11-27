@@ -160,6 +160,7 @@ body { letter-spacing: -0.006em; background: var(--grok-surface); }
 }
 /* First-run guide: quiet, inline, and dismissible without losing the draft. */
 .home__onboarding {
+  /* WorkBuddy 首页没有这种大卡：压成一行提示，只保留标题与两个动作。 */
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -192,6 +193,11 @@ body { letter-spacing: -0.006em; background: var(--grok-surface); }
   font-size: 0.8125rem;
   line-height: 1.5;
 }
+/* 压缩版：说明文字隐藏，整体一行高。 */
+.home__onboarding { padding: 0.5rem 0.75rem; border-radius: 0.75rem; }
+.home__onboarding-desc { display: none; }
+.home__onboarding-title { font-size: 0.8125rem; }
+
 .home__onboarding-actions { display: flex; flex: none; gap: 0.5rem; }
 .home__onboarding-action {
   height: 2.25rem;
@@ -416,37 +422,38 @@ body { letter-spacing: -0.006em; background: var(--grok-surface); }
   word-break: break-word;
 }
 
+/* WorkBuddy 实机：场景是一条灰色分段容器，选中项是白色药丸（不是一排描边 chip）。 */
 .home__scenes {
-  height: auto;
-  margin: 20px 0 32px;
-  padding: 0;
-  gap: 6px;
-  background: transparent;
-  border-radius: 0;
+  height: 2.25rem;
+  margin: 1.125rem 0 1.75rem;
+  padding: 0.125rem;
+  gap: 0.125rem;
+  background: var(--wb-palette-gray-4);
+  border-radius: 10px;
 }
 .home__scene {
-  height: 34px;
-  padding: 0 14px;
-  border: var(--wb-hairline) solid var(--grok-line);
-  border-radius: var(--wb-radius-pill);
-  background: var(--grok-card);
+  height: 2rem;
+  padding: 0 0.875rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: transparent;
   font-size: 13px;
   font-weight: 500;
   color: var(--wb-text-medium);
-  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+  transition: background 140ms ease, color 140ms ease;
 }
-.home__scene:hover { background: var(--grok-hover); color: var(--wb-text-strong); }
+.home__scene:hover { background: transparent; color: var(--wb-text-strong); }
 .home__scene--active {
-  background: var(--grok-selected);
-  border-color: transparent;
+  background: var(--wb-bg-primary);
   color: var(--wb-text-strong);
-  box-shadow: none;
+  box-shadow: 0 0.0625rem 0.125rem rgba(15, 13, 10, .08), 0 0 0 1px rgba(15, 13, 10, .04);
 }
 .home__scene--active:hover { background: var(--grok-selected-hover); color: var(--wb-text-strong); }
 .home__chip {
   height: 34px;
   border-radius: var(--wb-radius-pill);
-  border-color: var(--grok-line);
+  border-color: transparent;
+  background: var(--wb-bg-secondary);
   background: transparent;
   padding: 0 13px;
 }

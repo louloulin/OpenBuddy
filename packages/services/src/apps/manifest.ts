@@ -15,8 +15,11 @@ export interface AppEntry {
   name: string;
   version?: string;
   kind: AppKind;
-  /** `pi` = Pi 包；`pack` = 能力包（WorkBuddy 插件包导入）。 */
-  source: "pi" | "pack";
+  /**
+   * `pi` = Pi 包；`pack` = 能力包（WorkBuddy 插件包导入）；`builtin` = 宿主内置应用
+   * （OpenBuddy 自己，无安装路径、不可启停）。
+   */
+  source: "pi" | "pack" | "builtin";
   /** Where the package lives (Pi packages only). */
   installedPath?: string;
   /** The configured package source string (what `agent_extensions_*` commands take). */

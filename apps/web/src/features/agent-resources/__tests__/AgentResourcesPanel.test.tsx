@@ -145,12 +145,14 @@ describe("MCP explicit OAuth", () => {
     expect(await screen.findByText("pi-web-access")).toBeInTheDocument();
 
     // Capability filter comes from the packages' own categories.
+    // 只在市场卡片内断言：已安装列表里也可能出现同名包。
+    const market = screen.getByLabelText("Pi 包市场");
     fireEvent.change(screen.getByRole("combobox", { name: "按能力筛选" }), { target: { value: "mcp" } });
-    expect(screen.queryByText("pi-web-access")).toBeNull();
-    expect(screen.getByText("pi-mcp-bridge")).toBeInTheDocument();
+    expect(within(market).queryByText("pi-web-access")).toBeNull();
+    expect(within(market).getByText("pi-mcp-bridge")).toBeInTheDocument();
 
     fireEvent.change(screen.getByRole("combobox", { name: "按能力筛选" }), { target: { value: "all" } });
-    const webRow = screen.getByText("pi-web-access").closest(".ext-market__item") as HTMLElement;
+    const webRow = within(market).getByText("pi-web-access").closest(".ext-market__item") as HTMLElement;
     fireEvent.click(within(webRow).getByRole("button", { name: "详情" }));
     await waitFor(() => expect(agentExtensionsPackageDetails).toHaveBeenCalledWith("pi-web-access"));
     expect(await screen.findByText("sha512-abc==")).toBeInTheDocument();

@@ -13,6 +13,7 @@ import { AutomationPanel } from "../../features/automation/AutomationPanel";
 import { ResourcesPanel } from "../../features/library/ResourcesPanel";
 import { InspirationPanel } from "../../features/library/InspirationPanel";
 import { MyFilesPanel } from "../../features/library/MyFilesPanel";
+import { AppsPanel } from "../../features/apps/AppsPanel";
 import { KnowledgeBasePanel } from "../../features/library/KnowledgeBasePanel";
 import { CloudStoragePanel } from "../../features/library/CloudStoragePanel";
 import { DiscoverPanel } from "../../features/experts/DiscoverPanel";
@@ -54,6 +55,8 @@ export interface FeatureRouteProps {
   onModelChange?: (id: string) => void | Promise<void>;
   onStartProject?: (project: ProjectMeta) => void;
   onStartProjectConversation?: (projectId: string, message: string) => void;
+  /** 应用场景 → 填进首页输入框（应用页不直接依赖会话 store）。 */
+  onPickPrompt?: (prompt: string) => void;
 }
 
 const panel = (node: React.ReactNode) => <div className="placeholder-page placeholder-page--panel">{node}</div>;
@@ -105,6 +108,12 @@ export const FEATURES: FeatureEntry<FeatureRouteProps>[] = [
     offline: "§9-D3：先删除入口，W5 之后再评估常驻助理",
   },
   // ---- 更多 menu ----
+  {
+    id: "apps",
+    nav: { label: "应用", slot: "more", order: 5, icon: MyFilesIconV2 },
+    route: { view: "应用", render: (p) => <AppsPanel cwd={p.cwd} onPickPrompt={p.onPickPrompt} onToast={p.onToast} /> },
+    requires: [],
+  },
   {
     id: "my-files",
     nav: { label: "我的文件", slot: "more", order: 10, icon: MyFilesIconV2 },

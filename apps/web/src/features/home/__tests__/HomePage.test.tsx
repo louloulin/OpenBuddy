@@ -16,13 +16,11 @@ describe("HomePage", () => {
     useSessionsStore.setState({ independent: [], workspaceSessions: {} });
   });
 
-  it("没有任务时展示空态插画与提示", () => {
+  it("没有任务时展示应用使用指南（WorkBuddy 式指引卡）", () => {
     render(<HomePage {...base} />);
     expect(screen.getByRole("region", { name: "最近任务" })).toBeInTheDocument();
-    expect(screen.getByText("还没有任务")).toBeInTheDocument();
-    expect(screen.getByText(/完成后的任务会留在这里/)).toBeInTheDocument();
-    // 插画是纯装饰，语义上对读屏隐藏。
-    expect(document.querySelector(".home__empty-art")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByText("应用使用指南")).toBeInTheDocument();
+    expect(screen.getByText(/了解已安装应用的场景与工具/)).toBeInTheDocument();
   });
 
   it("按更新时间展示最近任务，点击可打开", () => {

@@ -35,6 +35,7 @@ import {
   AddIcon,
 } from "@openbuddy/ui/icon/icons/index";
 import { APP_VERSION } from "@/app/app-version";
+import { AppSwitcher } from "../apps";
 import { basename, relativeTime, sortPinnedFirst, ProjectNodeIcon } from "./sidebar-parts/helpers";
 import { filterSessions, TaskFilterMenu } from "./sidebar-parts/TaskFilterMenu";
 import { SessionContextMenu } from "./sidebar-parts/SessionContextMenu";
@@ -42,6 +43,9 @@ import { MoreDropdown } from "./sidebar-parts/MoreDropdown";
 import { useLocale } from "../../shared/i18n";
 import { ListChecks } from "lucide-react";
 import { TasksPanel } from "./TasksPanel";
+
+/** 「最近」列表一屏显示的条数；超出折叠为「查看更多」（WorkBuddy 对齐）。 */
+const RECENT_COLLAPSED = 8;
 
 /** A sidebar / 更多 entry. The app builds the lists from its FeatureRegistry (pii W0.2): the former
  *  fixed NAV (项目, 技能与 MCP) is now the registry's 项目 and 专家·技能·连接器 entries. */
@@ -159,6 +163,8 @@ export function Sidebar({
 
   // G1-30 批量选择：归档/删除多个任务；删除需要一次确认。
   const [selectionMode, setSelectionMode] = useState(false);
+  // WorkBuddy 的「最近」默认只显示一屏，超出折叠为「查看更多 (总数)」。
+  const [recentShowAll, setRecentShowAll] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const exitSelection = useCallback(() => { setSelectionMode(false); setSelected(new Set()); }, []);
@@ -407,6 +413,8 @@ export function Sidebar({
           </span>
           <span className="sidebar__version">v{APP_VERSION}</span>
         </div>
+        {/* WorkBuddy 顶栏：品牌块右侧是当前应用切换器（同一行）。 */}
+        <AppSwitcher cwd={homeCwd} onToast={onToast} />
         <div className="sidebar__logo-spacer" {...(IS_MACOS ? { "data-window-drag-region": true } : {})} />
         <button
           className="sidebar__icon-btn"
@@ -521,7 +529,18 @@ export function Sidebar({
             {filteredIndependent.length === 0 && independent.length === 0 && (
               <div className="sidebar__empty">暂无任务</div>
             )}
-            {sortPinnedFirst(filteredIndependent).map(renderConv)}
+            {sortPinnedFirst(filteredIndependent)
+              .slice(0, recentShowAll ? undefined : RECENT_COLLAPSED)
+              .map(renderConv)}
+            {!recentShowAll && filteredIndependent.length > RECENT_COLLAPSED && (
+              <button
+                type="button"
+                className="sidebar__see-more"
+                onClick={() => setRecentShowAll(true)}
+              >
+                查看更多 ({filteredIndependent.length})
+              </button>
+            )}
           </div>
         )}
 

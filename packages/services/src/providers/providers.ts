@@ -1,3 +1,4 @@
+import { computeAuthStatus, isKeylessProvider } from "./auth-status.js";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { join } from "node:path";
 import { JsonStore, object, text, type Settings } from "../settings/settings.js";
@@ -211,7 +212,7 @@ export class Providers {
         // magpie 的本机网关不需要 Key，界面按「已配置」显示（占位值，不落盘）。
         apiKey: this.settings.secrets.has(`provider:${p.id}`)
           ? "••••"
-          : p.providerKind === "magpie"
+          : isKeylessProvider(p)
             ? "••••"
             : undefined,
       })),
@@ -491,16 +492,13 @@ export class Providers {
   }
   async authStatus() {
     const list = this.list();
-    const ready = list.models.some((m) =>
-      this.settings.secrets.has(`provider:${m.providerId}`),
+    return computeAuthStatus(
+      list.providers,
+      list.models,
+      (id) => this.settings.secrets.has(`provider:${id}`),
     );
-    return {
-      ready,
-      hasAuthFile: false,
-      providers: list.models.map((m) => m.modelId),
-      reason: ready ? undefined : "请配置模型和 API Key",
-    };
   }
+
   /**
    * GET <baseUrl>/models. With `providerId` the saved connection (and key) is used unless
    * the caller passes a new key / URL — so 拉取模型 never asks for the key again.
@@ -514,8 +512,8 @@ export class Providers {
     const apiBackend = typeof p.apiBackend === "string" ? p.apiBackend : saved?.apiBackend ?? (kind.includes("anthropic") ? "messages" : "chat_completions");
     const base = endpoint(text(p.baseUrl || saved?.baseUrl || presets[kind]?.baseUrl, "baseUrl"));
     const typed = typeof p.apiKey === "string" && p.apiKey && p.apiKey !== "••••" ? p.apiKey : undefined;
-    // magpie (yetone) 是本机回环网关：它不做鉴权，Key 可以留空，用一个占位值走请求头。
-    const keyless = kind === "magpie";
+    // magpie (yetone) / 本地回环网关：不做鉴权，Key 可以留空，用一个占位值走请求头。
+    const keyless = kind === "magpie" || isKeylessProvider({ providerKind: kind, baseUrl: base });
     const key = typed ?? (saved ? this.settings.secrets.get(`provider:${saved.id}`) : undefined)
       ?? (keyless ? "magpie-local" : undefined);
     if (!key) throw new Error("请填写 API Key");
@@ -566,8 +564,11 @@ export class Providers {
     if (providerId && modelId) {
       const model = this.runtime.getModel(providerId, modelId);
       if (!model) throw new Error("model_not_found: 模型不存在");
-      const savedKind = this.catalog.read().providers.find((x) => x.id === providerId)?.providerKind;
-      if (!this.settings.secrets.has(`provider:${providerId}`) && savedKind !== "magpie")
+      const savedProvider = this.catalog.read().providers.find((x) => x.id === providerId);
+      if (
+        !this.settings.secrets.has(`provider:${providerId}`) &&
+        !(savedProvider && isKeylessProvider(savedProvider))
+      )
         throw new Error("该厂商还没有保存 API Key");
       const reply = await this.runtime.completeSimple(
         model,

@@ -22,6 +22,7 @@ import {
 } from "@/shared/lib/files/drop-utils";
 import type { HomeModeId } from "../../shared/content/scenes";
 import { StatusChips } from "./StatusChips";
+import { mergeComposerText } from "./composer-insert";
 import { useComposerFiles } from "./use-composer-files";
 import { statusPrefix, useStatusStore } from "@/shared/state/status-store";
 import type { AgentEntry } from "@openbuddy/protocol/dto";
@@ -559,22 +560,15 @@ export function Composer({
             onSelectSkill={(name) => {
               onSelectSkill?.(name);
               if (!onSelectSkill) {
-                updateText((prev) => {
-                  const prefix = prev.endsWith(" ") || prev === "" ? "" : " ";
-                  return prev + prefix + `/${name} `;
-                });
+                updateText((prev) => mergeComposerText(prev, `/${name} `, false));
                 requestAnimationFrame(() => ref.current?.focus());
               }
             }}
             onNavigateConnectors={onNavigateConnectors}
-            onPickPrompt={(prompt) => {
-              // UP-4.1: 应用场景只填入输入框，由用户确认后发送。
-              updateText((prev) => (prev.trim() ? `${prev.trimEnd()}\n${prompt}` : prompt));
-              requestAnimationFrame(() => ref.current?.focus());
-            }}
+            onPickPrompt={(prompt) => { updateText((prev) => mergeComposerText(prev, prompt)); requestAnimationFrame(() => ref.current?.focus()); }}
             onReferenceFile={(path) => {
               const rel = cwd && path.startsWith(cwd) ? path.slice(cwd.length).replace(/^[\\/]/, "") : path;
-              updateText((prev) => `${prev}${prev && !prev.endsWith(" ") ? " " : ""}\`${rel}\` `);
+              updateText((prev) => mergeComposerText(prev, `\`${rel}\` `, false));
               requestAnimationFrame(() => ref.current?.focus());
             }}
             workspaceCwd={cwd}

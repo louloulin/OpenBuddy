@@ -69,14 +69,16 @@ const LAYERS = [
 // Allowed feature → feature edges in apps/web (§5.2).
 const FEATURE_EDGES = {
   chat: ['composer', 'approvals', 'workbench', 'models'],
-  home: ['composer', 'models'],
-  composer: ['approvals', 'models'],
-  sessions: ['approvals'],
+  // 20261126-upup：应用平台（apps）是横切壳层。首页标题/场景跟随当前应用、侧栏有应用切换器，
+  // 因此 home 与 sessions 允许依赖 apps；apps 自身只依赖共享客户端层，不反向依赖其它 feature。
+  home: ['composer', 'models', 'apps'],
+  composer: ['approvals', 'models', 'apps'],
+  sessions: ['approvals', 'apps'],
   settings: ['models', 'agent-resources'],
   workbench: [],
   projects: ['composer', 'models'], experts: ['composer', 'models'], automation: ['composer', 'models'],
   library: ['composer', 'models'], assistant: ['composer', 'models'],
-  approvals: [], models: [], 'agent-resources': [],
+  approvals: [], models: [], 'agent-resources': [], apps: [],
 };
 const BRIDGE_OK = ['client', 'platform'];
 

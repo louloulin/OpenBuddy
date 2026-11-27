@@ -88,7 +88,8 @@ export interface AppEntry {
   name: string;
   version?: string;
   kind: "app" | "connector" | "skill-pack" | "extension";
-  source: "pi" | "pack";
+  /** `builtin` = OpenBuddy 内置通用应用（不可启停）。 */
+  source: "pi" | "pack" | "builtin";
   installedPath?: string;
   packageSource?: string;
   tagline?: string;
@@ -100,6 +101,21 @@ export interface AppEntry {
 }
 export const appsList = (cwd?: string) =>
   invoke<AppEntry[]>("apps_list", cwd ? { cwd } : {});
+
+/** 内置应用源 (2026-11-27)：安装包内随附的 UpUp 目录（`resources/upup`）。 */
+export interface BundledAppSource {
+  /** 可安装的目录；不存在时为 null。 */
+  source: string | null;
+  exists: boolean;
+  /** 该目录是否已经在 Pi 包记录里。 */
+  installed: boolean;
+  name?: string;
+  version?: string;
+}
+export const appsBundledSource = () => invoke<BundledAppSource>("apps_bundled_source");
+/** 一键安装随附应用（装进 agentDir 的包记录并打开资源）。 */
+export const appsInstallBundled = () =>
+  invoke<{ source: string; packages: unknown[] }>("apps_install_bundled");
 /** 升级一个应用（走 Pi 包管理器；本地路径通常无更新）。 */
 export const appsUpdate = (packageSource: string) =>
   invoke<{ packageSource: string; packages: unknown[] }>("apps_update", { packageSource });
