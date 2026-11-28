@@ -308,6 +308,52 @@ describe.skipIf(!enabled)("真实模型运行 (B3d smoke)", () => {
       app.dispose();
     }
   }, 300_000);
+
+  it("启动自检的模型连通项真实请求默认模型，报告不带 Key 与路径 (20261127-upup §1.18)", async () => {
+    const root = mkdtempSync(join(tmpdir(), "openbuddy-real-model-"));
+    dirs.push(root);
+    const app = await createEngineHandlers({
+      userDataDir: root,
+      safeStorage: {
+        isEncryptionAvailable: () => true,
+        encryptString: (value: string) => Buffer.from(value.split("").reverse().join("")),
+        decryptString: (buffer: Buffer) => buffer.toString().split("").reverse().join(""),
+      },
+      emit: () => {},
+      shell: { openPath: async () => "", showItemInFolder: () => {}, openExternal: async () => {} },
+    });
+    try {
+      await app.handlers.providers_save_provider({
+        provider: { id: "real-anthropic", providerKind: "custom_anthropic", label: "Anthropic (real)", baseUrl, apiBackend: "messages", authScheme: "x_api_key", apiKey },
+      });
+      await app.handlers.providers_save_model({ model: { modelId, providerId: "real-anthropic", displayName: modelId } });
+      const result = (await app.handlers.agent_self_check({ probeModel: true, save: true })) as {
+        results: Array<{ id: string; status: string; summary: string; costMs: number }>;
+        report: string;
+        file: string;
+      };
+      const byId = Object.fromEntries(result.results.map((r) => [r.id, r]));
+      console.log("REAL_SELF_CHECK", JSON.stringify(result.results.map((r) => ({ id: r.id, status: r.status, summary: r.summary, costMs: r.costMs }))));
+      expect(byId["model.config"].status).toBe("pass");
+      expect(byId["model.reachable"].status).toBe("pass");
+      expect(byId["model.reachable"].summary).toContain(modelId!);
+      expect(result.report).not.toContain(apiKey!);
+      expect(result.report).not.toContain(root);
+      expect(readFileSync(join(root, "diagnostics", result.file), "utf8")).toBe(result.report);
+
+      // 错的 Key：同一项明确失败，不会卡住。
+      await app.handlers.providers_save_provider({
+        provider: { id: "real-anthropic", providerKind: "custom_anthropic", label: "Anthropic (real)", baseUrl, apiBackend: "messages", authScheme: "x_api_key", apiKey: "sk-invalid-self-check-0000" },
+      });
+      const bad = (await app.handlers.agent_self_check({ probeModel: true })) as { results: Array<{ id: string; status: string; summary: string }>; report: string };
+      const reach = bad.results.find((r) => r.id === "model.reachable")!;
+      console.log("REAL_SELF_CHECK_BAD_KEY", JSON.stringify(reach));
+      expect(reach.status).toBe("fail");
+      expect(bad.report).not.toContain("sk-invalid-self-check-0000");
+    } finally {
+      app.dispose();
+    }
+  }, 300_000);
 });
 
 describe.skipIf(!magpieEnabled)("magpie 本机网关 (真实模型)", () => {

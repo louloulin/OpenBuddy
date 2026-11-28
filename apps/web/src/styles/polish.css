@@ -1537,3 +1537,13 @@ html[data-density="compact"] .pref-row { padding-top: 7px; padding-bottom: 7px; 
 .open-pref__opt:disabled { opacity: 0.5; cursor: default; }
 .open-pref__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
 .open-pref__hint { font-size: 0.6875rem; color: var(--wb-text-tertiary); }
+/* 启动自检 (20261127-upup §1.18) */
+.selfcheck-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.selfcheck-row { display: grid; grid-template-columns: 44px 96px 1fr; gap: 8px; align-items: baseline; font-size: 12px; line-height: 18px; color: var(--wb-text-strong); }
+.selfcheck-row__status { font-weight: 600; }
+.selfcheck-row__status[data-status="pass"] { color: var(--wb-color-text-success-default); }
+.selfcheck-row__status[data-status="warning"] { color: var(--wb-color-text-warning-default); }
+.selfcheck-row__status[data-status="fail"] { color: var(--wb-color-text-error-default); }
+.selfcheck-row__status[data-status="info"] { color: var(--wb-text-medium); }
+.selfcheck-row__title { color: var(--wb-text-medium); }
+.selfcheck-row__extra { display: block; color: var(--wb-text-medium); white-space: pre-wrap; word-break: break-word; }

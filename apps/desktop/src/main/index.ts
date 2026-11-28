@@ -3,6 +3,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { Session } from 'node:inspector';
 import { registerIpc } from '../ipc/register.js';
 import { createEngineEventHub, startMobileBridge, type MobileBridge } from './mobile-bridge.js';
 import { createMobileGateway, type MobileGateway } from './mobile-gateway.js';
@@ -11,7 +12,7 @@ import { installMenu } from './menu.js';
 import { TrayController } from './tray.js';
 import { confirmQuit, external } from './window.js';
 import { loginShellPath } from './shell-path.js';
-import { guardRenderer, startEventLoopMonitor, startMainHangWatchdog, startMemoryMonitor } from './stability.js';
+import { guardRenderer, schedulePostStartupHeapTrim, startEventLoopMonitor, startMainHangWatchdog, startMemoryMonitor } from './stability.js';
 import { pruneCrashDumps, reportNewCrashDumps } from './crash-dumps.js';
 import { isEvent } from '@openbuddy/protocol/contract';
 import { WorkspaceAccess } from '@openbuddy/host/security/workspace-access';
@@ -328,6 +329,18 @@ app.whenReady().then(async () => {
   }
   registerQuickShortcut(readQuickShortcut());
   await createWindow();
+  // 启动后堆回收 (§1.18)：引擎与内置应用的加载高峰过去后，把主进程堆里的临时对象还给系统。
+  schedulePostStartupHeapTrim(log(), { createSession: () => new Session() });
+  // 启动自检 (§1.18)：只做本机检查（不发模型请求），结果写日志与 <userData>/diagnostics。
+  const selfCheck = setTimeout(() => {
+    if (!engine) return;
+    void Promise.resolve(engine.handlers.agent_self_check({ save: true })).then((result: unknown) => {
+      const r = result as { counts: Record<string, number>; durationMs: number; file?: string; results: Array<{ id: string; status: string; summary: string }> };
+      const issues = r.results.filter(item => item.status === 'fail' || item.status === 'warning').map(item => ({ id: item.id, status: item.status, summary: item.summary }));
+      log()[r.counts.fail ? 'warn' : 'info']('main', 'self-check', { counts: r.counts, durationMs: r.durationMs, file: r.file, issues });
+    }).catch((error: unknown) => log().warn('main', 'self-check-failed', { message: error instanceof Error ? error.message : String(error) }));
+  }, Number(process.env.OPENBUDDY_SELF_CHECK_DELAY_MS) || 8_000);
+  selfCheck.unref();
   if (process.env.OPENBUDDY_SMOKE_TEST === '1') {
     console.log('OPENBUDDY_RUNTIME', JSON.stringify(process.versions));
     const win = mainWindow!;

@@ -3,6 +3,13 @@ import { EVENTS } from "@openbuddy/protocol/events";
 import { PROTOCOL_VERSION } from "@openbuddy/protocol/version";
 import type { HostCapabilities } from "@openbuddy/protocol/host";
 import { buildDiagnostics, sanitizeDiagnostics } from "@openbuddy/services/support/diagnostics";
+import {
+  bundledAppsCheck, crashLogCheck, diskSpaceCheck, formatSelfCheckReport, runSelfCheck, saveSelfCheckReport,
+  systemInfoCheck, writableCheck, type SelfCheckItem,
+} from "@openbuddy/services/support/self-check";
+import { readBundleMarker } from "@openbuddy/services/apps/manifest";
+import { readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { text } from "@openbuddy/services/settings/settings";
 import { getQuotaProviderForProvider } from "@openbuddy/services/usage/quota";
 import { QuotaUnavailableError } from "@openbuddy/services/usage/quota";
@@ -116,6 +123,72 @@ export function hostModule(ctx: HostContext): HostModule {
           }
         }
         return { diagnostics, ...(summary ? { summary } : {}) };
+      },
+      /**
+       * 启动自检 (20261127-upup §1.18): local checks only. `probeModel` additionally sends one
+       * tiny request ("Reply with: OK") to the default model; `save` writes the redacted report
+       * to <userData>/diagnostics (latest 10 kept). Nothing is uploaded.
+       */
+      agent_self_check: async (p) => {
+        const { engine, options } = ctx;
+        const dataDir = options.userDataDir;
+        const items: SelfCheckItem[] = [
+          diskSpaceCheck(dataDir),
+          writableCheck(dataDir),
+          bundledAppsCheck((options.bundledApps ?? []).map((dir) => resolve(dir)), (dir) => {
+            const marker = readBundleMarker(dir);
+            let version: string | undefined;
+            try { version = (JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { version?: string }).version; } catch { /* missing */ }
+            return marker ? { ...marker, ...(version ? { version } : {}) } : undefined;
+          }),
+          crashLogCheck(join(dataDir, "logs")),
+          {
+            id: "model.config", title: "模型配置",
+            async run() {
+              const auth = await engine.providers.authStatus();
+              if (!auth.ready) return { status: "fail", summary: auth.reason ?? "没有可用的模型", advice: "到「设置 → 模型」添加模型并填写 API Key" };
+              const entry = engine.providers.entry();
+              return { status: "pass", summary: `可用模型 ${auth.providers.length} 个${entry ? `，默认 ${entry.providerId}/${entry.modelId}` : ""}` };
+            },
+          },
+          {
+            id: "extensions.load", title: "扩展加载",
+            async run() {
+              const errors = engine.extensionErrors;
+              if (errors.length === 0) return { status: "pass", summary: "没有加载失败的扩展" };
+              return {
+                status: "warning", summary: `${errors.length} 个扩展加载失败`,
+                detail: errors.slice(0, 5).map((e) => `${e.path.split(/[\\/]/).pop() || e.path}：${e.error.slice(0, 200)}`).join("\n"),
+                advice: "到「扩展中心」停用或重装失败的扩展",
+              };
+            },
+          },
+          systemInfoCheck({ node: process.versions.node, electron: process.versions.electron, ...(options.appVersion ? { app: options.appVersion } : {}) }),
+        ];
+        if (p.probeModel === true) {
+          items.push({
+            id: "model.reachable", title: "模型连通", timeoutMs: 70_000,
+            async run() {
+              const entry = engine.providers.entry();
+              if (!entry) return { status: "fail", summary: "没有默认模型可测" };
+              try {
+                const result = await engine.providers.test({ providerId: entry.providerId, modelId: entry.modelId }) as { ok: boolean; latencyMs: number; reply?: string; error?: string };
+                if (!result.ok) return { status: "fail", summary: `${entry.modelId} 请求失败：${(result.error ?? "").slice(0, 200)}`, advice: "检查网络、API Key 与服务商地址" };
+                return { status: "pass", summary: `${entry.modelId} 正常，${result.latencyMs} ms${result.reply ? `，回复「${result.reply.slice(0, 40)}」` : ""}` };
+              } catch (error) {
+                return { status: "fail", summary: `${entry.modelId}：${error instanceof Error ? error.message : String(error)}`, advice: "检查网络、API Key 与服务商地址" };
+              }
+            },
+          });
+        }
+        const report = await runSelfCheck(items);
+        const text = formatSelfCheckReport(report, options.appVersion ? `OpenBuddy ${options.appVersion}` : "OpenBuddy");
+        const results = report.results.map((r) => ({
+          ...r, summary: sanitizeDiagnostics(r.summary),
+          ...(r.detail ? { detail: sanitizeDiagnostics(r.detail) } : {}),
+        }));
+        const file = p.save === true ? await saveSelfCheckReport(join(dataDir, "diagnostics"), text) : undefined;
+        return { ...report, results, report: text, ...(file ? { file } : {}) };
       },
       host_capabilities: () => {
         const platform = ctx.options.platform;

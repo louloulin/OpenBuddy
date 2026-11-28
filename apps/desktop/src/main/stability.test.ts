@@ -3,7 +3,8 @@ import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { createRendererRecovery, guardRenderer, startEventLoopMonitor, startMainHangWatchdog, startMemoryMonitor } from './stability';
+import { Session } from 'node:inspector';
+import { createRendererRecovery, guardRenderer, runHeapTrim, schedulePostStartupHeapTrim, startEventLoopMonitor, startMainHangWatchdog, startMemoryMonitor } from './stability';
 
 const log = () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() });
 
@@ -133,5 +134,61 @@ describe('事件循环延迟摘要', () => {
     m.stop();
     expect(s.maxMs).toBeGreaterThanOrEqual(100);
     expect(l.warn).toHaveBeenCalledWith('main', 'event-loop-lag', s);
+  });
+});
+
+describe('启动后堆回收', () => {
+  const MB = 1024 * 1024;
+  it('真实 inspector：collectGarbage 执行并记录前后读数', async () => {
+    const l = log();
+    let garbage: unknown[] | null = Array.from({ length: 2e5 }, (_, i) => ({ i, s: `x${i}` }));
+    expect(garbage.length).toBe(2e5);
+    garbage = null;
+    const heap = await runHeapTrim(l, 'test', { createSession: () => new Session(), memoryUsage: () => process.memoryUsage() });
+    expect(heap).toBeGreaterThan(0);
+    const [, , data] = l.info.mock.calls.find(c => c[1] === 'heap-trim')!;
+    expect(data).toMatchObject({ reason: 'test' });
+    expect((data as { heapUsedMb: number[] }).heapUsedMb).toHaveLength(2);
+  });
+
+  it('inspector 不可用时跳过，不抛错', async () => {
+    const l = log();
+    expect(await runHeapTrim(l, 'x', { createSession: () => { throw new Error('no'); }, memoryUsage: () => process.memoryUsage() })).toBeUndefined();
+    expect(l.info).toHaveBeenCalledWith('main', 'heap-trim-skipped', { reason: 'x', cause: 'inspector-unavailable' });
+  });
+
+  it('堆涨到阈值且平稳后回收一次；反弹再回收；最多 2 次；没触发时窗口结束补一次', async () => {
+    vi.useFakeTimers();
+    try {
+      const posts: string[] = [];
+      const session = () => ({ connect() {}, disconnect() {}, post(method: string, cb: (e: Error | null) => void) { posts.push(method); cb(null); } });
+      let heapTotal = 10 * MB;
+      const l = log();
+      const t = schedulePostStartupHeapTrim(l, { createSession: session, memoryUsage: () => ({ rss: heapTotal * 2, heapTotal, heapUsed: heapTotal / 2 }) }, { pollMs: 100, windowMs: 10_000 });
+      await vi.advanceTimersByTimeAsync(500);
+      expect(t.trims).toBe(0);
+      heapTotal = 80 * MB;               // 加载高峰
+      await vi.advanceTimersByTimeAsync(100);
+      expect(t.trims).toBe(0);           // 还在涨，不回收
+      await vi.advanceTimersByTimeAsync(200);
+      expect(t.trims).toBe(1);
+      expect(l.info).toHaveBeenCalledWith('main', 'heap-trim', expect.objectContaining({ reason: 'burst-settled' }));
+      heapTotal = 120 * MB;              // 反弹 ≥ 16 MB
+      await vi.advanceTimersByTimeAsync(400);
+      expect(t.trims).toBe(2);
+      expect(l.info).toHaveBeenLastCalledWith('main', 'heap-trim', expect.objectContaining({ reason: 'rebound' }));
+      heapTotal = 300 * MB;
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(t.trims).toBe(2);
+      expect(posts.filter(m => m === 'HeapProfiler.collectGarbage')).toHaveLength(2);
+
+      const quiet = log();
+      const q = schedulePostStartupHeapTrim(quiet, { createSession: session, memoryUsage: () => ({ rss: MB, heapTotal: MB, heapUsed: MB }) }, { pollMs: 100, windowMs: 1_000 });
+      await vi.advanceTimersByTimeAsync(1_100);
+      expect(q.trims).toBe(1);
+      expect(quiet.info).toHaveBeenCalledWith('main', 'heap-trim', expect.objectContaining({ reason: 'window-end' }));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

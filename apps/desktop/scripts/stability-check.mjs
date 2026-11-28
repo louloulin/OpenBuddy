@@ -1,5 +1,6 @@
 // 稳定性守护真机检查 (§1.16)：在真实 Electron 里加载构建好的 main，
 // 强制崩溃渲染进程看能否自愈、超预算是否停手，阻塞主线程看卡顿是否写进 main-hang.log。
+// §1.18 增加：启动自检、启动后堆回收。
 // 用法：node apps/desktop/scripts/stability-check.mjs [--main=dist-electron/main.js]
 import { _electron as electron } from 'playwright-core';
 import { mkdtemp, mkdir, writeFile, readFile } from 'node:fs/promises';
@@ -48,12 +49,28 @@ const readLogs = async () => {
   return (await Promise.all(files.map(f => readFile(join(dir, f), 'utf8')))).join('').trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
 };
 
-const env = { ...process.env, OPENBUDDY_SMOKE_TEST: '0', OPENBUDDY_DEFAULT_APPS: 'off', OPENBUDDY_UNRESPONSIVE_GRACE_MS: '3000', OPENBUDDY_MEMORY_WARN_MB: '1', OPENBUDDY_MEMORY_INTERVAL_MS: '2000' };
+const env = { ...process.env, OPENBUDDY_SMOKE_TEST: '0', OPENBUDDY_DEFAULT_APPS: 'off', OPENBUDDY_UNRESPONSIVE_GRACE_MS: '3000', OPENBUDDY_MEMORY_WARN_MB: '1', OPENBUDDY_MEMORY_INTERVAL_MS: '2000', OPENBUDDY_SELF_CHECK_DELAY_MS: '1500' };
 let app = await electron.launch({ executablePath: require('electron'), args: [harness], env });
 try {
   const page = await app.firstWindow();
   await page.waitForLoadState('domcontentloaded');
   await waitFor(() => page.evaluate(() => typeof window.openbuddy?.invoke === 'function'), 30_000, 'preload bridge');
+
+  // 0a) 启动自检 (§1.18)：启动后自动跑本机检查，结果写日志、报告存 <userData>/diagnostics，不含路径。
+  const selfCheck = await waitFor(async () => (await readLogs()).find(r => r.message === 'self-check'), 30_000, 'self-check log');
+  const { readdir: listDir } = await import('node:fs/promises');
+  const reports = (await listDir(join(profile, 'diagnostics'))).filter(f => f.startsWith('self-check-'));
+  const reportText = await readFile(join(profile, 'diagnostics', selfCheck.data.file), 'utf8');
+  assert.ok(reports.includes(selfCheck.data.file));
+  assert.ok(!reportText.includes(profile) && !reportText.includes(temp), 'report must not leak paths');
+  assert.equal(selfCheck.data.counts.pass + selfCheck.data.counts.warning + selfCheck.data.counts.fail + selfCheck.data.counts.info, 7);
+  // 渲染进程经 IPC 调同一个命令（设置 → 帮助与反馈 → 运行自检）。
+  const viaIpc = await inPage("window.openbuddy.invoke('agent_self_check', {}).then(r => r.results.map(x => x.id + ':' + x.status))");
+  checkpoint('startup-self-check', { level: selfCheck.level, counts: selfCheck.data.counts, issues: selfCheck.data.issues, durationMs: selfCheck.data.durationMs, file: selfCheck.data.file, viaIpc });
+
+  // 0b) 启动后堆回收 (§1.18)：加载高峰过后经 inspector 回收主进程堆，记前后读数。
+  const trims = await waitFor(async () => { const l = (await readLogs()).filter(r => r.message === 'heap-trim'); return l.length ? l : null; }, 30_000, 'heap-trim log');
+  checkpoint('post-startup-heap-trim', trims.map(r => ({ reason: r.data.reason.split(' ')[0], elapsedMs: r.data.elapsedMs, rssMb: r.data.rssMb, heapTotalMb: r.data.heapTotalMb, heapUsedMb: r.data.heapUsedMb })));
 
   // 1) 渲染进程崩溃 → 自动重载，页面恢复可用。
   await inPage('window.__beforeCrash = true');

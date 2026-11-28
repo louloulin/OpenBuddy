@@ -727,9 +727,25 @@ const TEXT_INSET = 182_880;
 const wrappedLines = (value: string, width: number, fontPt: number): number => {
   const perLine = Math.max(1, (width - TEXT_INSET) / (fontPt * PT));
   return value.split("\n").reduce((sum, line) => {
-    let ems = 0;
-    for (const char of line) ems += (char.codePointAt(0) ?? 0) >= 0x2e80 ? 1 : 0.55;
-    return sum + Math.max(1, Math.ceil(ems / perLine));
+    // Fill lines greedily the way renderers do: a CJK glyph may break anywhere, a Latin/digit run moves
+    // to the next line whole, so the slack at each line end is counted instead of averaged away.
+    let lines = 1;
+    let used = 0;
+    for (const token of line.match(/[\u2e80-\u{10ffff}]|[^\u2e80-\u{10ffff}\s]+|\s+/gu) ?? []) {
+      const ems = (token.codePointAt(0) ?? 0) >= 0x2e80 ? 1 : token.length * 0.55;
+      if (/^\s+$/.test(token)) {
+        used = Math.min(perLine, used + ems);
+        continue;
+      }
+      if (used > 0 && used + ems > perLine) {
+        lines += 1;
+        used = 0;
+      }
+      const extra = Math.max(0, Math.ceil(ems / perLine) - 1);
+      lines += extra;
+      used += ems - extra * perLine;
+    }
+    return sum + lines;
   }, 0);
 };
 

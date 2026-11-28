@@ -166,6 +166,24 @@ describe("PPTX 版式块 (P2-1)", () => {
     }
   });
 
+  it("wraps Latin runs as whole words when estimating cell height, not as averaged glyph widths", async () => {
+    const tableHeight = async (cell: string) => {
+      const files = readWorkBuddyZip(Buffer.from(await buildPptx({ slides: [{ title: "表", blocks: [{ kind: "table", headers: ["甲", "乙", "丙"], rows: [["一", cell, "三"]] }] }] })));
+      return Number(/<p:graphicFrame>[\s\S]*?<a:ext cx="\d+" cy="(\d+)"/.exec(text(files, slideNames(files)[0]!))?.[1]);
+    };
+    // A Latin run cannot split, so near a line end it moves down whole and leaves the slack unused: the mixed
+    // cell can need more lines than an all-CJK cell of the same average width. Averaging never shows that.
+    let pushed = false;
+    for (const run of ["2022-09-30", "Pre-B-round-2024"]) {
+      for (let count = 1; count <= 40 && !pushed; count += 1) {
+        const mixed = `${"产".repeat(count)}${run}${"产".repeat(count)}`;
+        const average = "产".repeat(Math.ceil(2 * count + run.length * 0.55));
+        pushed = (await tableHeight(mixed)) > (await tableHeight(average));
+      }
+    }
+    expect(pushed).toBe(true);
+  });
+
   it("skips charts without data and images outside the workspace instead of inventing content", async () => {
     const bytes = await buildPptx({
       slides: [{ title: "空", blocks: [

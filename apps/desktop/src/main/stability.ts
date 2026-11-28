@@ -248,3 +248,107 @@ export function startEventLoopMonitor(log: StabilityLog, options: { intervalMs?:
     stop() { clearInterval(timer); histogram.disable(); },
   };
 }
+
+/** The bit of node:inspector's Session the heap trim needs (tests pass a fake). */
+export interface InspectorSessionLike {
+  connect(): void;
+  post(method: string, callback: (error: Error | null) => void): void;
+  disconnect(): void;
+}
+export interface HeapUsage { rss: number; heapTotal: number; heapUsed: number }
+
+const toMb = (bytes: number) => Math.round(bytes / 1024 / 1024);
+
+function post(session: InspectorSessionLike, method: string, timeoutMs: number): Promise<Error | null> {
+  return new Promise(resolveCall => {
+    let done = false;
+    const finish = (error: Error | null) => { if (!done) { done = true; clearTimeout(timer); resolveCall(error); } };
+    const timer = setTimeout(() => finish(new Error(`${method} timed out`)), timeoutMs);
+    timer.unref?.();
+    try { session.post(method, error => finish(error ?? null)); } catch (error) { finish(error instanceof Error ? error : new Error(String(error))); }
+  });
+}
+
+/**
+ * 一次“归还内存”的 GC：经 inspector 调 HeapProfiler.collectGarbage，比 V8 的增量 GC 更积极地
+ * 压缩堆、把空页还给系统。返回回收后的 heapTotal；inspector 不可用时只记日志不抛错。
+ */
+export async function runHeapTrim(log: StabilityLog, reason: string, deps: { createSession: () => InspectorSessionLike; memoryUsage: () => HeapUsage; timeoutMs?: number }): Promise<number | undefined> {
+  const timeoutMs = deps.timeoutMs ?? 3_000;
+  let session: InspectorSessionLike;
+  try { session = deps.createSession(); session.connect(); } catch {
+    log.info('main', 'heap-trim-skipped', { reason, cause: 'inspector-unavailable' });
+    return undefined;
+  }
+  try {
+    const enabled = await post(session, 'HeapProfiler.enable', timeoutMs);
+    if (enabled) { log.info('main', 'heap-trim-skipped', { reason, cause: enabled.message }); return undefined; }
+    const before = deps.memoryUsage();
+    const started = Date.now();
+    const failed = await post(session, 'HeapProfiler.collectGarbage', timeoutMs);
+    const elapsedMs = Date.now() - started;
+    await post(session, 'HeapProfiler.disable', timeoutMs);
+    if (failed) { log.warn('main', 'heap-trim-failed', { reason, message: failed.message }); return undefined; }
+    const after = deps.memoryUsage();
+    log.info('main', 'heap-trim', {
+      reason, elapsedMs,
+      rssMb: [toMb(before.rss), toMb(after.rss)],
+      heapTotalMb: [toMb(before.heapTotal), toMb(after.heapTotal)],
+      heapUsedMb: [toMb(before.heapUsed), toMb(after.heapUsed)],
+    });
+    return after.heapTotal;
+  } finally {
+    try { session.disconnect(); } catch { /* ignore */ }
+  }
+}
+
+/**
+ * 启动后堆回收（对标 WorkBuddy post-startup-heap-trim）：启动后 windowMs 内每 pollMs 看一次主进程堆，
+ * 堆涨到 minHeapTotalMb 以上且连续 flatPolls 次不再增长（加载高峰过去）时回收一次；之后堆又反弹
+ * reboundMb 以上再回收，最多 maxTrims 次。窗口结束还一次都没回收就补一次。主进程同时跑着引擎
+ * （Pi SDK + 内置 UpUp 的几百个工具），加载期的临时对象不回收会一直占着 RSS。
+ */
+export function schedulePostStartupHeapTrim(log: StabilityLog, deps: { createSession: () => InspectorSessionLike; memoryUsage?: () => HeapUsage }, options: {
+  pollMs?: number; windowMs?: number; minHeapTotalMb?: number; maxGrowthMb?: number; flatPolls?: number; reboundMb?: number; maxTrims?: number;
+} = {}) {
+  const pollMs = options.pollMs ?? 400;
+  const windowMs = options.windowMs ?? 20_000;
+  const minHeapTotal = (options.minHeapTotalMb ?? 60) * 1024 * 1024;
+  const maxGrowth = (options.maxGrowthMb ?? 1) * 1024 * 1024;
+  const flatPolls = options.flatPolls ?? 2;
+  const rebound = (options.reboundMb ?? 16) * 1024 * 1024;
+  const maxTrims = options.maxTrims ?? 2;
+  const memoryUsage = deps.memoryUsage ?? (() => process.memoryUsage());
+  let elapsed = 0, trims = 0, flat = 0, lastHeap = 0, baseline = 0;
+  let busy = false, stopped = false;
+  const trim = (reason: string) => {
+    if (busy || stopped || trims >= maxTrims) return;
+    trims += 1; busy = true;
+    void runHeapTrim(log, reason, { createSession: deps.createSession, memoryUsage })
+      .then(heap => { if (heap !== undefined) baseline = heap; })
+      .catch(() => undefined)
+      .finally(() => { busy = false; });
+  };
+  const stop = () => { stopped = true; clearInterval(timer); };
+  const timer = setInterval(() => {
+    elapsed += pollMs;
+    if (elapsed >= windowMs) {
+      clearInterval(timer);
+      if (trims === 0) trim('window-end');
+      stopped = true;
+      return;
+    }
+    if (busy) return;
+    const heap = memoryUsage().heapTotal;
+    flat = heap - lastHeap <= maxGrowth ? flat + 1 : 0;
+    lastHeap = heap;
+    const due = baseline > 0 ? heap - baseline >= rebound : heap >= minHeapTotal;
+    if (due && flat >= flatPolls) {
+      flat = 0;
+      trim(baseline > 0 ? 'rebound' : 'burst-settled');
+      if (trims >= maxTrims) clearInterval(timer);
+    }
+  }, pollMs);
+  timer.unref();
+  return { stop, get trims() { return trims; } };
+}

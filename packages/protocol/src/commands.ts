@@ -87,6 +87,8 @@ export const COMMANDS = [
   'host_capabilities', 'session_search',
   // 反馈诊断 (20261116-pii W6.5): local preview only, never uploaded.
   'agent_diagnose',
+  // 启动自检 (20261127-upup §1.18): local checks, optional one-request model probe; never uploaded.
+  'agent_self_check',
   // 20261116-pii W1.1 branch switcher, W1.2 `!command`, W1.3 `@` file mention.
   'agent_tree', 'agent_navigate', 'agent_bash', 'agent_bash_abort', 'files_search',
   // 20261116-pii W1.7 交接到新任务: builds a self-contained draft, never auto-sends.

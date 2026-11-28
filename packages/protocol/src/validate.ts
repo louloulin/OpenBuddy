@@ -80,6 +80,11 @@ export function validateCommandPayload(command: CommandName, input: unknown): Pa
     if (payload.feedback !== undefined && (typeof payload.feedback !== 'string' || payload.feedback.length > 4000)) throw new Error('invalid_payload: feedback');
     if (payload.app !== undefined && (typeof payload.app !== 'string' || payload.app.length > 100)) throw new Error('invalid_payload: app');
   }
+  if (command === 'agent_self_check') {
+    for (const key of ['probeModel', 'save'] as const) {
+      if (payload[key] !== undefined && typeof payload[key] !== 'boolean') throw new Error(`invalid_payload: ${key}`);
+    }
+  }
   if (command === 'notification_prefs_set' && typeof payload.system !== 'boolean') throw new Error('invalid_payload: system');
   // 托盘常驻 (W4.4).
   if (command === 'tray_set' && typeof payload.enabled !== 'boolean') throw new Error('invalid_payload: enabled');

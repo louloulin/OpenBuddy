@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { HelpSettingsPanel } from "../sections/HelpSettingsPanel";
 
-const { diagnose, exportTextFile, saveDialog, copyText, logsList, logsRead, openPath } = vi.hoisted(() => ({
+const { diagnose, selfCheck, exportTextFile, saveDialog, copyText, logsList, logsRead, openPath } = vi.hoisted(() => ({
   diagnose: vi.fn(),
+  selfCheck: vi.fn(),
   exportTextFile: vi.fn(),
   saveDialog: vi.fn(),
   copyText: vi.fn(),
@@ -13,6 +14,7 @@ const { diagnose, exportTextFile, saveDialog, copyText, logsList, logsRead, open
 }));
 vi.mock("@openbuddy/client/agent-client", () => ({
   agentDiagnose: diagnose,
+  agentSelfCheck: selfCheck,
   exportTextFile,
   saveFileDialog: saveDialog,
 }));
@@ -22,6 +24,7 @@ vi.mock("@openbuddy/platform/clipboard", () => ({ copyText }));
 
 beforeEach(() => {
   diagnose.mockReset();
+  selfCheck.mockReset();
   exportTextFile.mockReset();
   saveDialog.mockReset();
   copyText.mockReset();
@@ -46,7 +49,7 @@ describe("帮助与反馈 · 诊断 (pii W6.5)", () => {
     diagnose.mockResolvedValue({ diagnostics: "# OpenBuddy 诊断报告\n- 平台：darwin", summary: "导出按钮无响应" });
     render(<HelpSettingsPanel />);
     fireEvent.change(screen.getByPlaceholderText("复现步骤、期望结果……"), { target: { value: "点击导出无反应" } });
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("checkbox", { name: /问题摘要/ }));
     fireEvent.click(screen.getByRole("button", { name: /生成诊断报告/ }));
     await waitFor(() => expect(diagnose).toHaveBeenCalled());
     expect(diagnose.mock.calls[0][0]).toMatchObject({
@@ -64,8 +67,8 @@ describe("帮助与反馈 · 诊断 (pii W6.5)", () => {
     exportTextFile.mockResolvedValue(undefined);
     render(<HelpSettingsPanel />);
     fireEvent.click(screen.getByRole("button", { name: /生成诊断报告/ }));
-    await waitFor(() => expect(screen.getByRole("button", { name: /复制/ })).not.toBeDisabled());
-    fireEvent.click(screen.getByRole("button", { name: /复制/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /^复制$/ })).not.toBeDisabled());
+    fireEvent.click(screen.getByRole("button", { name: /^复制$/ }));
     await waitFor(() => expect(copyText).toHaveBeenCalledWith(expect.stringContaining("诊断报告")));
     expect(screen.getByText("已复制到剪贴板")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /保存为 \.txt/ }));
@@ -123,5 +126,31 @@ describe("帮助与反馈 · 诊断 (pii W6.5)", () => {
     fireEvent.click(screen.getByRole("button", { name: /导出 \.txt/ }));
     await waitFor(() => expect(exportTextFile).toHaveBeenCalledWith("/tmp/openbuddy-logs.txt", expect.stringContaining("boom")));
     expect(screen.getByText(/日志已导出到/)).toBeInTheDocument();
+  });
+});
+
+describe("帮助与反馈 · 启动自检 (§1.18)", () => {
+  it("运行自检：默认带模型连通测试并保存，逐项显示状态与建议", async () => {
+    selfCheck.mockResolvedValue({
+      results: [
+        { id: "system.disk", title: "磁盘空间", status: "pass", summary: "数据目录所在磁盘剩余 120.0 GB", costMs: 1 },
+        { id: "model.reachable", title: "模型连通", status: "fail", summary: "MiniMax-M2.5 请求失败：401", advice: "检查网络、API Key 与服务商地址", costMs: 300 },
+      ],
+      counts: { pass: 1, warning: 0, fail: 1, info: 0 },
+      durationMs: 1200,
+      checkedAt: "2026-11-28T00:00:00.000Z",
+      report: "# OpenBuddy 启动自检",
+      file: "self-check-x.txt",
+    });
+    render(<HelpSettingsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: /运行自检/ }));
+    await waitFor(() => expect(screen.getByText("1 通过 / 0 警告 / 1 失败 · 耗时 1.2 s · 已保存 self-check-x.txt")).toBeTruthy());
+    expect(selfCheck).toHaveBeenCalledWith({ probeModel: true, save: true });
+    const rows = screen.getByRole("list", { name: "自检结果" }).querySelectorAll("li");
+    expect(rows).toHaveLength(2);
+    expect(rows[1].querySelector("[data-status]")?.textContent).toBe("失败");
+    expect(rows[1].textContent).toContain("建议：检查网络、API Key 与服务商地址");
+    fireEvent.click(screen.getByRole("button", { name: /复制结果/ }));
+    expect(copyText).toHaveBeenCalledWith("# OpenBuddy 启动自检");
   });
 });

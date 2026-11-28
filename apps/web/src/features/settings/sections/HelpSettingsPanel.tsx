@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { ClipboardCopy, Download, ExternalLink, FolderOpen, RefreshCw, ScrollText, Stethoscope } from "lucide-react";
-import { agentDiagnose, exportTextFile, saveFileDialog } from "@openbuddy/client/agent-client";
+import { ActivitySquare, ClipboardCopy, Download, ExternalLink, FolderOpen, RefreshCw, ScrollText, Stethoscope } from "lucide-react";
+import { agentDiagnose, agentSelfCheck, exportTextFile, saveFileDialog, type SelfCheckResponse } from "@openbuddy/client/agent-client";
 import { openPath } from "@openbuddy/client/api/files";
 import { logsList, logsRead, type LogEntry, type LogLevel, type LogList } from "@openbuddy/client/api/logs";
 import { copyText } from "@openbuddy/platform/clipboard";
@@ -13,6 +13,8 @@ import { SectionShell } from "./shared";
  * 诊断在本地生成、本地脱敏（无 API Key、无绝对路径），先预览再由用户复制或保存，
  * 不会自动上传；「让模型写一段问题摘要」会把当前会话交给模型，摘要之外的内容留在本机。
  */
+const STATUS_LABEL = { pass: "通过", warning: "警告", fail: "失败", info: "信息" } as const;
+
 export function HelpSettingsPanel() {
   const [hint, setHint] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -30,6 +32,23 @@ export function HelpSettingsPanel() {
   const [logBusy, setLogBusy] = useState(false);
   const [logError, setLogError] = useState<string | null>(null);
   const [logSaved, setLogSaved] = useState<string | null>(null);
+  const [probeModel, setProbeModel] = useState(true);
+  const [checkBusy, setCheckBusy] = useState(false);
+  const [checkError, setCheckError] = useState<string | null>(null);
+  const [check, setCheck] = useState<SelfCheckResponse | null>(null);
+
+  /** 启动自检 (§1.18)：本机检查 + 可选的默认模型连通测试，报告保存在数据目录的 diagnostics 下。 */
+  const runCheck = async () => {
+    setCheckBusy(true);
+    setCheckError(null);
+    try {
+      setCheck(await agentSelfCheck({ probeModel, save: true }));
+    } catch (e) {
+      setCheckError(String(e).replace(/^Error:\s*/, ""));
+    } finally {
+      setCheckBusy(false);
+    }
+  };
 
   const readLog = async (name: string, level: LogLevel | "all" = logLevel, query = logQuery) => {
     if (!name) { setLogEntries([]); setLogMeta(""); return; }
@@ -169,6 +188,52 @@ export function HelpSettingsPanel() {
           </span>
         </li>
       </ul>
+
+      <div className="diag-card">
+        <div className="diag-card__head">
+          <div className="sec-card__title">
+            <ActivitySquare size={15} />
+            <span>启动自检</span>
+          </div>
+          <div className="sec-card__hint">
+            检查磁盘、数据目录、内置应用、最近崩溃、模型配置与扩展。每次启动会自动跑一遍本机检查并写进日志；结果只留在本机。
+          </div>
+        </div>
+        <div className="diag-card__body">
+          <label className="diag-check">
+            <input type="checkbox" checked={probeModel} onChange={(e) => setProbeModel(e.target.checked)} />
+            <span>同时测试默认模型是否可用（会发一条很短的请求）</span>
+          </label>
+          <div className="diag-actions">
+            <button type="button" className="sec-btn sec-btn--ink" onClick={() => void runCheck()} disabled={checkBusy}>
+              <ActivitySquare size={14} /> {checkBusy ? "检查中…" : "运行自检"}
+            </button>
+            <button type="button" className="sec-btn" onClick={() => { if (check) void copyText(check.report); }} disabled={!check}>
+              <ClipboardCopy size={14} /> 复制结果
+            </button>
+          </div>
+          {checkError && <div className="sec-error" role="alert">{checkError}</div>}
+          {check && <>
+            <p className="diag-status">
+              {check.counts.pass} 通过 / {check.counts.warning} 警告 / {check.counts.fail} 失败 · 耗时 {(check.durationMs / 1000).toFixed(1)} s
+              {check.file ? ` · 已保存 ${check.file}` : ""}
+            </p>
+            <ul className="selfcheck-list" aria-label="自检结果">
+              {check.results.map((r) => (
+                <li key={r.id} className="selfcheck-row" data-check={r.id}>
+                  <span className="selfcheck-row__status" data-status={r.status}>{STATUS_LABEL[r.status]}</span>
+                  <span className="selfcheck-row__title">{r.title}</span>
+                  <span>
+                    {r.summary}
+                    {r.detail && <span className="selfcheck-row__extra">{r.detail}</span>}
+                    {r.advice && <span className="selfcheck-row__extra">建议：{r.advice}</span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>}
+        </div>
+      </div>
 
       <div className="diag-card">
         <div className="diag-card__head">
