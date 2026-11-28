@@ -1,11 +1,13 @@
 import { useEffect, useId, useState } from "react";
 import { useTheme } from "@openbuddy/ui/ThemeProvider";
+import { mermaidSourceForRender } from "./mermaid-source";
 
 /**
  * Mermaid 产物预览 (G3-1)：把 .mmd/.mermaid 文件渲染成图。
  *
  * 与 Markdown 里的代码块不同，这里是**完整文件**，所以总是按完整源码渲染；
  * mermaid 只在真正需要时懒加载，不进主包。渲染失败就退回源码，并给出可读原因。
+ * 桑基图数值先经 mermaidSourceForRender 整理，与 PPTX 导出读出同一组数。
  */
 export function MermaidView({ source }: { source: string }) {
   const reactId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
@@ -18,6 +20,11 @@ export function MermaidView({ source }: { source: string }) {
     setSvg("");
     setError(null);
     const run = async () => {
+      const prepared = mermaidSourceForRender(source);
+      if ("error" in prepared) {
+        if (alive) setError(prepared.error);
+        return;
+      }
       try {
         const mermaid = (await import("mermaid")).default;
         mermaid.initialize({
@@ -26,7 +33,7 @@ export function MermaidView({ source }: { source: string }) {
           theme: theme === "dark" ? "dark" : "default",
           fontFamily: "inherit",
         });
-        const { svg: rendered } = await mermaid.render(`af-mermaid-${reactId}`, source);
+        const { svg: rendered } = await mermaid.render(`af-mermaid-${reactId}`, prepared.source);
         if (alive) setSvg(rendered);
       } catch (e) {
         if (alive) setError(String(e instanceof Error ? e.message : e));

@@ -1,7 +1,7 @@
 {
   "name": "openbuddy",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "dist-electron/main.js",
   "packageManager": "pnpm@10.29.3",
   "engines": {

@@ -40,6 +40,27 @@ describe("apps_list 的内置通用应用 (2026-11-27)", () => {
     const list = appsModule(context([{ source: dir, installedPath: dir }])).commands.apps_list({}) as Array<{ id: string }>;
     expect(list.map((entry) => entry.id)).toEqual(["openbuddy", "upup"]);
   });
+
+  it("每个 Pi 应用带上真实使用日、安装时间和启用状态 (§8.5)", () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "ob-agent-"));
+    const dir = mkdtempSync(join(tmpdir(), "ob-apps-"));
+    const off = mkdtempSync(join(tmpdir(), "ob-apps-off-"));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "upup", pi: { app: { kind: "app" } } }));
+    writeFileSync(join(off, "package.json"), JSON.stringify({ name: "quiet", pi: { app: { kind: "app" } } }));
+    writeFileSync(join(agentDir, "app-usage.json"), JSON.stringify({ lastUsed: { [dir]: "2026-11-27" }, kept: {} }));
+    const ctx = context(
+      [{ source: dir, installedPath: dir }, { source: off, installedPath: off, filters: { extensions: false } } as never],
+      {},
+      { appInstalls: { [dir]: { current: { source: dir, at: "2026-11-01T00:00:00.000Z" } } } },
+    );
+    (ctx.settings as { dir: string }).dir = agentDir;
+    const list = appsModule(ctx).commands.apps_list({}) as Array<Record<string, unknown>>;
+    expect(list[0]).not.toHaveProperty("lastUsedAt");
+    expect(list.find((app) => app.id === "upup")).toMatchObject({ enabled: true, lastUsedAt: "2026-11-27", installedAt: "2026-11-01T00:00:00.000Z" });
+    const quiet = list.find((app) => app.id === "quiet");
+    expect(quiet).toMatchObject({ enabled: false });
+    expect(quiet).not.toHaveProperty("lastUsedAt");
+  });
 });
 
 describe("默认安装 UpUp (2026-11-27)", () => {

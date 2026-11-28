@@ -184,6 +184,20 @@ describe("PPTX 版式块 (P2-1)", () => {
     expect(pushed).toBe(true);
   });
 
+  it("keeps closing punctuation off the start of a line when estimating cell height", async () => {
+    const tableHeight = async (cell: string) => {
+      const files = readWorkBuddyZip(Buffer.from(await buildPptx({ slides: [{ title: "表", blocks: [{ kind: "table", headers: ["甲", "乙", "丙"], rows: [["一", cell, "三"]] }] }] })));
+      return Number(/<p:graphicFrame>[\s\S]*?<a:ext cx="\d+" cy="(\d+)"/.exec(text(files, slideNames(files)[0]!))?.[1]);
+    };
+    // A comma that would open line 2 drags the glyph before it down, so the same number of ems can need one
+    // more line than plain text. Counting the comma as an ordinary glyph never shows that.
+    let pushed = false;
+    for (let count = 2; count <= 40 && !pushed; count += 1) {
+      pushed = (await tableHeight(`${"产".repeat(count)}，${"产".repeat(count - 1)}`)) > (await tableHeight("产".repeat(2 * count)));
+    }
+    expect(pushed).toBe(true);
+  });
+
   it("skips charts without data and images outside the workspace instead of inventing content", async () => {
     const bytes = await buildPptx({
       slides: [{ title: "空", blocks: [

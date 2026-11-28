@@ -100,6 +100,12 @@ export interface AppEntry {
   sceneList?: Array<{ id: string; name: string; group?: string; prompt: string }>;
   /** 随安装包内置 (§1.15)：跟 OpenBuddy 一起升级，不可卸载/单独更新。 */
   bundled?: { commit?: string; bundledAt?: string };
+  /** 最近使用日 YYYY-MM-DD（宿主 `app-usage.json`；内置应用与从未用过的没有）。§8.5 */
+  lastUsedAt?: string;
+  /** 安装时间 ISO（`appInstalls[...].current.at`）。 */
+  installedAt?: string;
+  /** Pi 应用是否启用；内置应用省略（永远启用）。 */
+  enabled?: boolean;
 }
 export const appsList = (cwd?: string) =>
   invoke<AppEntry[]>("apps_list", cwd ? { cwd } : {});

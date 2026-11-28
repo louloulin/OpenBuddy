@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { Worker } from 'node:worker_threads';
@@ -128,50 +128,104 @@ export function guardRenderer(win: GuardedWindow, log: StabilityLog, options: {
   return recovery;
 }
 
+/** Worker-side state of the hang watchdog (kept as plain numbers so it crosses into the worker source). */
+export interface HangTickState { lastTick: number; resumedAt: number; hungSince: number }
+export type HangRecord =
+  | { event: 'main-hang'; lagMs: number }
+  | { event: 'main-recovered'; hungMs: number }
+  | { event: 'suspend-gap'; gapMs: number };
+
+/**
+ * 看门狗每次检查的判定（纯函数，worker 线程里跑的就是它的源码）：
+ * - pausedAt > 0：主进程收到 powerMonitor suspend，整段休眠不计；
+ * - 本次检查距上次超过 suspendGapMs：worker 自己也被冻住了（系统休眠、进程被挂起），
+ *   视为挂起恢复，从现在重新计时，只在缺口 ≥ thresholdMs 时记一条 suspend-gap，不记卡死；
+ * - 否则心跳年龄（从 max(心跳, 恢复时刻) 起算）≥ thresholdMs 记 main-hang，回落后记 main-recovered。
+ */
+export function evaluateHangTick(state: HangTickState, now: number, beat: number, pausedAt: number, thresholdMs: number, suspendGapMs: number): { state: HangTickState; record?: HangRecord } {
+  const gap = state.lastTick > 0 ? now - state.lastTick : 0;
+  if (pausedAt > 0) return { state: { lastTick: now, resumedAt: now, hungSince: 0 } };
+  if (gap > suspendGapMs) {
+    const next = { lastTick: now, resumedAt: now, hungSince: 0 };
+    return gap >= thresholdMs ? { state: next, record: { event: 'suspend-gap', gapMs: gap } } : { state: next };
+  }
+  const base = Math.max(beat, state.resumedAt);
+  const age = now - base;
+  if (age >= thresholdMs) {
+    if (state.hungSince) return { state: { ...state, lastTick: now } };
+    return { state: { ...state, lastTick: now, hungSince: base }, record: { event: 'main-hang', lagMs: age } };
+  }
+  if (state.hungSince) return { state: { ...state, lastTick: now, hungSince: 0 }, record: { event: 'main-recovered', hungMs: base - state.hungSince } };
+  return { state: { ...state, lastTick: now } };
+}
+
 // The watchdog runs on its own thread so it keeps ticking while the main thread is blocked.
+// The decision is evaluateHangTick's own source, so the unit-tested function is what runs.
 const WATCHDOG_SOURCE = `
 const { workerData } = require('node:worker_threads');
-const { appendFileSync } = require('node:fs');
-const beat = new Float64Array(workerData.buffer);
-let hungSince = 0;
+const { appendFileSync, statSync, renameSync } = require('node:fs');
+const { loadavg } = require('node:os');
+const evaluate = (${evaluateHangTick.toString()});
+const shared = new Float64Array(workerData.buffer);
+let state = { lastTick: 0, resumedAt: 0, hungSince: 0 };
 const write = (record) => { try { appendFileSync(workerData.file, JSON.stringify({ ts: new Date().toISOString(), ...record }) + '\\n'); } catch {} };
-const { statSync, renameSync } = require('node:fs');
 // Keep main-hang.log bounded: one 1 MB generation plus the previous one.
 try { if (statSync(workerData.file).size > 1048576) renameSync(workerData.file, workerData.file + '.1'); } catch {}
 setInterval(() => {
-  const last = beat[0];
-  const lag = Date.now() - last;
-  if (lag >= workerData.thresholdMs) {
-    if (!hungSince) { hungSince = last; write({ event: 'main-hang', lagMs: lag }); }
-  } else if (hungSince) {
-    write({ event: 'main-recovered', hungMs: last - hungSince });
-    hungSince = 0;
-  }
+  const out = evaluate(state, Date.now(), shared[0], shared[1], workerData.thresholdMs, workerData.suspendGapMs);
+  state = out.state;
+  if (out.record) write({ ...out.record, rssMb: Math.round(process.memoryUsage.rss() / 1048576), load1: Math.round(loadavg()[0] * 100) / 100 });
 }, workerData.checkMs);
 `;
+
+export interface HangLogRecord { ts: string; event: string; lagMs?: number; hungMs?: number; gapMs?: number }
+
+/** main-hang.log 的最近 limit 条（诊断摘要用）；文件不存在时为空。 */
+export function readHangLog(file: string, limit = 5): HangLogRecord[] {
+  let text = '';
+  try { text = readFileSync(file, 'utf8'); } catch { return []; }
+  const out: HangLogRecord[] = [];
+  for (const line of text.trim().split('\n').slice(-limit)) {
+    try { const r = JSON.parse(line) as HangLogRecord; out.push({ ts: r.ts, event: r.event, ...(r.lagMs !== undefined ? { lagMs: r.lagMs } : {}), ...(r.hungMs !== undefined ? { hungMs: r.hungMs } : {}), ...(r.gapMs !== undefined ? { gapMs: r.gapMs } : {}) }); } catch { /* partial line */ }
+  }
+  return out;
+}
 
 /**
  * 主进程卡死看门狗：主线程每 heartbeatMs 写一次心跳，worker 线程发现心跳超过 thresholdMs
  * 没更新就把卡顿写进 <logDir>/main-hang.log，恢复时再写一条持续时长。
+ * pause()/resume() 给休眠/唤醒用（power.ts）：暂停期间不判卡死，恢复时重置心跳。
+ * 万一漏了 resume 事件，主线程心跳在暂停超过 maxPauseMs 后自己解除暂停。
  */
-export function startMainHangWatchdog(logDir: string, options: { thresholdMs?: number; heartbeatMs?: number; checkMs?: number } = {}) {
+export function startMainHangWatchdog(logDir: string, options: { thresholdMs?: number; heartbeatMs?: number; checkMs?: number; suspendGapMs?: number; maxPauseMs?: number } = {}) {
   const thresholdMs = options.thresholdMs ?? 5_000;
   const heartbeatMs = options.heartbeatMs ?? 500;
   const checkMs = options.checkMs ?? 1_000;
+  const suspendGapMs = options.suspendGapMs ?? Math.max(2_000, checkMs * 3);
+  const maxPauseMs = options.maxPauseMs ?? 6 * 3_600_000;
   mkdirSync(logDir, { recursive: true });
   const file = join(logDir, 'main-hang.log');
-  const buffer = new SharedArrayBuffer(8);
-  const beat = new Float64Array(buffer);
-  beat[0] = Date.now();
-  const timer = setInterval(() => { beat[0] = Date.now(); }, heartbeatMs);
+  // [0] heartbeat (ms since epoch), [1] pausedAt (0 = running).
+  const buffer = new SharedArrayBuffer(16);
+  const shared = new Float64Array(buffer);
+  shared[0] = Date.now();
+  const timer = setInterval(() => {
+    const now = Date.now();
+    shared[0] = now;
+    if (shared[1] > 0 && now - shared[1] > maxPauseMs) shared[1] = 0;
+  }, heartbeatMs);
   timer.unref();
-  const worker = new Worker(WATCHDOG_SOURCE, { eval: true, workerData: { buffer, file, thresholdMs, checkMs } });
+  const worker = new Worker(WATCHDOG_SOURCE, { eval: true, workerData: { buffer, file, thresholdMs, checkMs, suspendGapMs } });
   worker.unref();
   worker.on('error', error => {
     try { appendFileSync(file, `${JSON.stringify({ ts: new Date().toISOString(), event: 'watchdog-error', message: error.message })}\n`); } catch { /* ignore */ }
   });
   return {
     file,
+    pause() { if (!shared[1]) shared[1] = Date.now(); },
+    resume() { shared[0] = Date.now(); shared[1] = 0; },
+    get paused() { return shared[1] > 0; },
+    recent(limit?: number) { return readHangLog(file, limit); },
     async stop() { clearInterval(timer); await worker.terminate(); },
   };
 }
@@ -223,14 +277,17 @@ function summarizeByType(list: ProcessMetricLike[], mb: (p: ProcessMetricLike) =
   return out;
 }
 
-/** 事件循环延迟摘要：每 intervalMs 汇总一次，p99 超过 warnMs 记 warn，否则不刷日志。 */
+/** 事件循环延迟摘要：每 intervalMs 汇总一次，p99 超过 warnMs 记 warn，否则不刷日志。pause/resume 给休眠唤醒用。 */
 export function startEventLoopMonitor(log: StabilityLog, options: { intervalMs?: number; warnMs?: number } = {}) {
   const intervalMs = options.intervalMs ?? 60_000;
   const warnMs = options.warnMs ?? 200;
   const histogram = monitorEventLoopDelay({ resolution: 20 });
   histogram.enable();
   let last = { p50Ms: 0, p99Ms: 0, maxMs: 0 };
+  let paused = false;
   const sample = () => {
+    // 休眠期间计时器停摆，唤醒后第一个样本是整段休眠时长，不是事件循环卡顿。
+    if (paused) { histogram.reset(); return last; }
     last = {
       p50Ms: Math.round(histogram.percentile(50) / 1e6),
       p99Ms: Math.round(histogram.percentile(99) / 1e6),
@@ -245,6 +302,8 @@ export function startEventLoopMonitor(log: StabilityLog, options: { intervalMs?:
   return {
     sample,
     get last() { return last; },
+    pause() { paused = true; },
+    resume() { histogram.reset(); paused = false; },
     stop() { clearInterval(timer); histogram.disable(); },
   };
 }
@@ -269,11 +328,13 @@ function post(session: InspectorSessionLike, method: string, timeoutMs: number):
   });
 }
 
+export interface HeapTrimResult { at: number; reason: string; elapsedMs: number; rssMb: [number, number]; heapTotalMb: [number, number]; heapUsedMb: [number, number] }
+
 /**
  * 一次“归还内存”的 GC：经 inspector 调 HeapProfiler.collectGarbage，比 V8 的增量 GC 更积极地
  * 压缩堆、把空页还给系统。返回回收后的 heapTotal；inspector 不可用时只记日志不抛错。
  */
-export async function runHeapTrim(log: StabilityLog, reason: string, deps: { createSession: () => InspectorSessionLike; memoryUsage: () => HeapUsage; timeoutMs?: number }): Promise<number | undefined> {
+export async function runHeapTrim(log: StabilityLog, reason: string, deps: { createSession: () => InspectorSessionLike; memoryUsage: () => HeapUsage; timeoutMs?: number; onResult?: (result: HeapTrimResult) => void }): Promise<number | undefined> {
   const timeoutMs = deps.timeoutMs ?? 3_000;
   let session: InspectorSessionLike;
   try { session = deps.createSession(); session.connect(); } catch {
@@ -290,12 +351,14 @@ export async function runHeapTrim(log: StabilityLog, reason: string, deps: { cre
     await post(session, 'HeapProfiler.disable', timeoutMs);
     if (failed) { log.warn('main', 'heap-trim-failed', { reason, message: failed.message }); return undefined; }
     const after = deps.memoryUsage();
-    log.info('main', 'heap-trim', {
-      reason, elapsedMs,
+    const result: HeapTrimResult = {
+      at: Date.now(), reason, elapsedMs,
       rssMb: [toMb(before.rss), toMb(after.rss)],
       heapTotalMb: [toMb(before.heapTotal), toMb(after.heapTotal)],
       heapUsedMb: [toMb(before.heapUsed), toMb(after.heapUsed)],
-    });
+    };
+    log.info('main', 'heap-trim', { reason, elapsedMs, rssMb: result.rssMb, heapTotalMb: result.heapTotalMb, heapUsedMb: result.heapUsedMb });
+    deps.onResult?.(result);
     return after.heapTotal;
   } finally {
     try { session.disconnect(); } catch { /* ignore */ }
@@ -308,7 +371,7 @@ export async function runHeapTrim(log: StabilityLog, reason: string, deps: { cre
  * reboundMb 以上再回收，最多 maxTrims 次。窗口结束还一次都没回收就补一次。主进程同时跑着引擎
  * （Pi SDK + 内置 UpUp 的几百个工具），加载期的临时对象不回收会一直占着 RSS。
  */
-export function schedulePostStartupHeapTrim(log: StabilityLog, deps: { createSession: () => InspectorSessionLike; memoryUsage?: () => HeapUsage }, options: {
+export function schedulePostStartupHeapTrim(log: StabilityLog, deps: { createSession: () => InspectorSessionLike; memoryUsage?: () => HeapUsage; onResult?: (result: HeapTrimResult) => void }, options: {
   pollMs?: number; windowMs?: number; minHeapTotalMb?: number; maxGrowthMb?: number; flatPolls?: number; reboundMb?: number; maxTrims?: number;
 } = {}) {
   const pollMs = options.pollMs ?? 400;
@@ -324,7 +387,7 @@ export function schedulePostStartupHeapTrim(log: StabilityLog, deps: { createSes
   const trim = (reason: string) => {
     if (busy || stopped || trims >= maxTrims) return;
     trims += 1; busy = true;
-    void runHeapTrim(log, reason, { createSession: deps.createSession, memoryUsage })
+    void runHeapTrim(log, reason, { createSession: deps.createSession, memoryUsage, ...(deps.onResult ? { onResult: deps.onResult } : {}) })
       .then(heap => { if (heap !== undefined) baseline = heap; })
       .catch(() => undefined)
       .finally(() => { busy = false; });

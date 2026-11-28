@@ -720,6 +720,9 @@ const lineCount = (value: string, perLine: number): number =>
 /** Text-box / table-cell inset on both sides (0.1" each, the OOXML default). */
 const TEXT_INSET = 182_880;
 
+/** CJK punctuation that renderers never place at the start of a line. */
+const NO_LINE_START = /^[，。、；：！？）》」』】〕…—％]$/u;
+
 /**
  * Wrapped line count for text set in a box `width` EMU wide: CJK and full-width glyphs take a full em,
  * other glyphs about half. Character-count limits underestimate Chinese text, which then overflows.
@@ -731,16 +734,21 @@ const wrappedLines = (value: string, width: number, fontPt: number): number => {
     // to the next line whole, so the slack at each line end is counted instead of averaged away.
     let lines = 1;
     let used = 0;
+    let previous = 0;
     for (const token of line.match(/[\u2e80-\u{10ffff}]|[^\u2e80-\u{10ffff}\s]+|\s+/gu) ?? []) {
       const ems = (token.codePointAt(0) ?? 0) >= 0x2e80 ? 1 : token.length * 0.55;
       if (/^\s+$/.test(token)) {
         used = Math.min(perLine, used + ems);
+        previous = 0;
         continue;
       }
       if (used > 0 && used + ems > perLine) {
         lines += 1;
-        used = 0;
+        // Line-start rule (kinsoku): closing punctuation may not begin a line, so the glyph before it
+        // moves down with it.
+        used = NO_LINE_START.test(token) && previous <= perLine - ems ? previous : 0;
       }
+      previous = ems;
       const extra = Math.max(0, Math.ceil(ems / perLine) - 1);
       lines += extra;
       used += ems - extra * perLine;

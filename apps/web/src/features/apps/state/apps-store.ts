@@ -9,8 +9,10 @@ import { appsSetCurrent } from "@openbuddy/client/api/files";
  */
 const CURRENT_APP_KEY = "openbuddy.current-app.v1";
 const RECENT_APPS_KEY = "openbuddy.recent-apps.v1";
+const RECENT_AT_KEY = "openbuddy.recent-apps-at.v1";
 const DISMISSED_RECS_KEY = "openbuddy.dismissed-app-recs.v1";
-const MAX_RECENT = 6;
+/** 面板只显示前 6 个，多出来的进「更多」全量子页（WorkBuddy `applications.slice(0,6)`）。 */
+const MAX_RECENT = 12;
 
 function readString(key: string): string | null {
   try {
@@ -30,6 +32,17 @@ function readList(key: string): string[] {
   }
 }
 
+function readTimes(key: string): Record<string, string> {
+  try {
+    const raw = window.localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  } catch {
+    return {};
+  }
+}
+
 function write(key: string, value: string) {
   try {
     window.localStorage.setItem(key, value);
@@ -41,6 +54,8 @@ function write(key: string, value: string) {
 interface AppsState {
   currentAppId: string | null;
   recentAppIds: string[];
+  /** 每个应用最近一次被切换为当前应用的时间（ISO），和宿主的使用日合并排序。 */
+  recentAppAt: Record<string, string>;
   setCurrentApp: (id: string | null) => void;
   /** 推荐卡点过「不用了」的应用 (U5 / UP-6.2)：宿主那边也记了，这里让历史会话里的旧卡片同样收起。 */
   dismissedRecommendations: string[];
@@ -50,11 +65,15 @@ interface AppsState {
 export const useAppsStore = create<AppsState>((set, get) => ({
   currentAppId: readString(CURRENT_APP_KEY),
   recentAppIds: readList(RECENT_APPS_KEY),
+  recentAppAt: readTimes(RECENT_AT_KEY),
   setCurrentApp: (id) => {
     write(CURRENT_APP_KEY, id ?? "");
     const recent = [id, ...get().recentAppIds.filter((x) => x !== id)].filter((x): x is string => !!x).slice(0, MAX_RECENT);
+    const at = id ? { ...get().recentAppAt, [id]: new Date().toISOString() } : get().recentAppAt;
+    const recentAppAt = Object.fromEntries(Object.entries(at).filter(([key]) => recent.includes(key)));
     write(RECENT_APPS_KEY, JSON.stringify(recent));
-    set({ currentAppId: id, recentAppIds: recent });
+    write(RECENT_AT_KEY, JSON.stringify(recentAppAt));
+    set({ currentAppId: id, recentAppIds: recent, recentAppAt });
     // 宿主侧持久化 (U4)：新会话的 system prompt 要跟随当前应用。
     // 没有宿主桥（单测/浏览器预览）时 invoke 会抛错，异步吞掉，不影响 UI。
     if (id) void Promise.resolve().then(() => appsSetCurrent(id)).catch(() => {});

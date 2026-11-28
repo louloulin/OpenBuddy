@@ -84,7 +84,22 @@ export function appsModule(ctx: HostContext): HostModule {
     });
   const commands: Record<string, Handler> = {
     // 应用列表 (UP-2.2)：内置通用应用永远排第一；其后是 pi.app 的 Pi 包，没有 manifest 的记为扩展包。
-    apps_list: (p) => collect(typeof p.cwd === "string" && p.cwd ? p.cwd : undefined),
+    // 20261127-upup2 §8.5：每项再带上真实使用日 / 安装时间 / 是否启用，应用面板的「最近使用」按
+    // 使用日排序、「推荐」排除停用项（WorkBuddy 的两组都来自真实数据，不是前端自己猜）。
+    apps_list: (p) => {
+      const packages = installed(typeof p.cwd === "string" && p.cwd ? p.cwd : undefined);
+      const lastUsed = usageStore().read().lastUsed;
+      const installs = ctx.settings.config.read().appInstalls ?? {};
+      return collectApps(packages).map((app) => {
+        if (!app.packageSource) return app;
+        return {
+          ...app,
+          enabled: appEnabled(app, packages),
+          ...(lastUsed[usageKey(app)] ? { lastUsedAt: lastUsed[usageKey(app)] } : {}),
+          ...(installs[installKey(app.packageSource)]?.current.at ? { installedAt: installs[installKey(app.packageSource)]!.current.at } : {}),
+        };
+      });
+    },
     // 当前应用 (20261127-upup U4)：持久化到设置，会话打开时注入它的身份/边界。
     apps_set_current: (p) => {
       const id = text(p.appId, "appId");
