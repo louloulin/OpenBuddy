@@ -251,8 +251,8 @@ export function mermaidTable(source: string): { headers: string[]; rows: (string
   const lines = String(source ?? "").split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith("%%"));
   const head = lines[0]?.toLowerCase() ?? "";
   if (head.startsWith("sankey")) {
-    const rows = lines.slice(1).map(csvCells).filter((cells) => cells.length === 3 && cells[0] && cells[1] && Number.isFinite(Number(cells[2])))
-      .map(([from, to, value]) => [from!, to!, Number(value)]);
+    // Unparseable rows keep their text (value cell as written) instead of disappearing.
+    const rows = sankeyRows(lines).map(({ cells, link }) => (link ? [link.from, link.to, link.value] : [cells[0] ?? "", cells[1] ?? "", cells.slice(2).join(",")]));
     return rows.length ? { headers: ["来源", "去向", "数值"], rows: rows.slice(0, MERMAID_ROWS) } : null;
   }
   if (head.startsWith("timeline")) {
@@ -428,35 +428,92 @@ const flowGraph = (source: string): FlowGraph | null => {
 
 const SANKEY_NODES = 12;
 
+/** Merged into officegen's column / line chart XML: category axis at the bottom, value axis on the left. */
+const VERTICAL_AXES = {
+  "c:chart": { "c:plotArea": { "c:catAx": { "c:axPos": { "@val": "b" } }, "c:valAx": { "c:axPos": { "@val": "l" } } } },
+};
+
 interface SankeyFlow {
-  readonly links: readonly { from: string; to: string; raw: string; value: number }[];
+  readonly links: readonly SankeyLink[];
   readonly layers: string[][];
   /** Height weight of each node: max(inflow, outflow). */
   readonly weight: ReadonlyMap<string, number>;
-  /** Value shown on each node, taken from the source text (exact decimal sum when several links meet). */
-  readonly shown: ReadonlyMap<string, string>;
+  /** Value printed on each node (see sankeyNodeValue); null prints the name only. */
+  readonly shown: ReadonlyMap<string, string | null>;
 }
 
-/** Exact sum of decimal strings (no float rounding); a single value is returned as written. */
-const decimalSum = (values: readonly string[]): string => {
-  if (values.length === 1) return values[0]!;
-  const parts = values.map((value) => value.match(/^\+?(\d+)(?:\.(\d+))?$/));
-  if (parts.some((part) => !part)) return values.join(" + ");
-  const scale = Math.max(...parts.map((part) => part![2]?.length ?? 0));
-  const total = parts.reduce((sum, part) => sum + BigInt(`${part![1]}${(part![2] ?? "").padEnd(scale, "0")}`), 0n).toString().padStart(scale + 1, "0");
-  return scale ? `${total.slice(0, -scale)}.${total.slice(-scale)}` : total;
+/** A sankey value as a plain number string: trimmed, thousands separators (`1,000`) removed. Null if not a number. */
+const sankeyNumber = (raw: string): string | null => {
+  let text = raw.trim();
+  if (/^[+-]?\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(text)) text = text.replace(/,/g, "");
+  return /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.test(text) && Number.isFinite(Number(text)) ? text : null;
+};
+
+interface SankeyRow {
+  readonly cells: readonly string[];
+  /** The link, when the row is `来源,去向,数值` with a numeric value. */
+  readonly link: { from: string; to: string; raw: string; number: string; value: number } | null;
+}
+
+/** Every data row of a `sankey-beta` source, parsed or not: nothing is dropped silently. */
+const sankeyRows = (lines: readonly string[]): SankeyRow[] =>
+  lines.slice(1).map(csvCells).map((cells) => {
+    const number = cells.length === 3 && cells[0] && cells[1] ? sankeyNumber(cells[2]!) : null;
+    return { cells, link: number === null ? null : { from: cells[0]!, to: cells[1]!, raw: cells[2]!, number, value: Number(number) } };
+  });
+
+/** Exact fixed-point form of a plain number string (exponent applied), for sums without float rounding. */
+const exactDecimal = (text: string): { digits: bigint; scale: number } => {
+  const match = text.replace(/^\+/, "").match(/^(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/)!;
+  const fraction = match[2] ?? "";
+  let digits = BigInt(`${match[1] ?? ""}${fraction}` || "0");
+  let scale = fraction.length - Number(match[3] ?? 0);
+  if (scale < 0) {
+    digits *= 10n ** BigInt(-scale);
+    scale = 0;
+  }
+  return { digits, scale };
+};
+const exactSum = (texts: readonly string[]): { digits: bigint; scale: number } => {
+  const parts = texts.map(exactDecimal);
+  const scale = Math.max(0, ...parts.map((part) => part.scale));
+  return { digits: parts.reduce((sum, part) => sum + part.digits * 10n ** BigInt(scale - part.scale), 0n), scale };
+};
+const exactCompare = (a: { digits: bigint; scale: number }, b: { digits: bigint; scale: number }): number => {
+  const scale = Math.max(a.scale, b.scale);
+  const left = a.digits * 10n ** BigInt(scale - a.scale);
+  const right = b.digits * 10n ** BigInt(scale - b.scale);
+  return left === right ? 0 : left > right ? 1 : -1;
 };
 
 /**
- * A `sankey-beta` diagram as layered nodes: null when a value is not a positive number, a link loops,
- * or there are more than SANKEY_NODES nodes (those stay a data table).
+ * Value printed on a sankey node: only a figure written in the source. A side with one link gives that
+ * link's value as written. When the node has both sides and their exact sums differ, the larger side's
+ * single value is used. A node whose only figure would be a sum of several links shows its name only; the
+ * data table after the diagram keeps every value.
+ */
+const sankeyNodeValue = (incoming: readonly SankeyLink[], outgoing: readonly SankeyLink[]): string | null => {
+  const sides = [incoming, outgoing].filter((side) => side.length).map((side) => ({ side, total: exactSum(side.map((link) => link.number)) }));
+  const single = (entry: (typeof sides)[number]) => (entry.side.length === 1 ? entry.side[0]!.raw : null);
+  if (sides.length === 1) return single(sides[0]!);
+  const [into, out] = sides as [(typeof sides)[number], (typeof sides)[number]];
+  const order = exactCompare(into.total, out.total);
+  if (order === 0) return single(into) ?? single(out);
+  return single(order > 0 ? into : out);
+};
+
+type SankeyLink = NonNullable<SankeyRow["link"]>;
+
+/**
+ * A `sankey-beta` diagram as layered nodes: null when a row is not `来源,去向,数值`, a value is not a positive
+ * number, a link loops, or there are more than SANKEY_NODES nodes (those stay a data table).
  */
 const sankeyFlow = (source: string): SankeyFlow | null => {
   const lines = mermaidLines(source);
   if (!lines[0]?.toLowerCase().startsWith("sankey")) return null;
-  const rows = lines.slice(1).map(csvCells).filter((cells) => cells.length === 3 && cells[0] && cells[1] && cells[2] !== "" && Number.isFinite(Number(cells[2])));
-  if (!rows.length) return null;
-  const links = rows.map(([from, to, raw]) => ({ from: from!, to: to!, raw: raw!, value: Number(raw) }));
+  const rows = sankeyRows(lines);
+  if (!rows.length || rows.some((row) => !row.link)) return null;
+  const links = rows.map((row) => row.link!);
   if (links.some((link) => !(link.value > 0))) return null;
   const ids = [...new Set(links.flatMap((link) => [link.from, link.to]))];
   if (ids.length > SANKEY_NODES) return null;
@@ -466,13 +523,13 @@ const sankeyFlow = (source: string): SankeyFlow | null => {
   for (const id of ids) layers[layer.get(id)!]!.push(id);
   orderLayers(layers, links.map((link) => [link.from, link.to] as const));
   const weight = new Map<string, number>();
-  const shown = new Map<string, string>();
+  const shown = new Map<string, string | null>();
   for (const id of ids) {
     const incoming = links.filter((link) => link.to === id);
     const outgoing = links.filter((link) => link.from === id);
     const sum = (list: typeof links) => list.reduce((total, link) => total + link.value, 0);
     weight.set(id, Math.max(sum(incoming), sum(outgoing)));
-    shown.set(id, decimalSum((incoming.length ? incoming : outgoing).map((link) => link.raw)));
+    shown.set(id, sankeyNodeValue(incoming, outgoing));
   }
   return { links, layers, weight, shown };
 };
@@ -660,19 +717,41 @@ const cellText = (value: unknown): string => {
 const lineCount = (value: string, perLine: number): number =>
   value.split("\n").reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / perLine)), 0);
 
+/** Text-box / table-cell inset on both sides (0.1" each, the OOXML default). */
+const TEXT_INSET = 182_880;
+
+/**
+ * Wrapped line count for text set in a box `width` EMU wide: CJK and full-width glyphs take a full em,
+ * other glyphs about half. Character-count limits underestimate Chinese text, which then overflows.
+ */
+const wrappedLines = (value: string, width: number, fontPt: number): number => {
+  const perLine = Math.max(1, (width - TEXT_INSET) / (fontPt * PT));
+  return value.split("\n").reduce((sum, line) => {
+    let ems = 0;
+    for (const char of line) ems += (char.codePointAt(0) ?? 0) >= 0x2e80 ? 1 : 0.55;
+    return sum + Math.max(1, Math.ceil(ems / perLine));
+  }, 0);
+};
+
+/**
+ * Minimum table row height; rows with wrapped cells grow by one line each. Keynote renders CJK table text
+ * at about 1.5x the font size per line (measured on a 14pt calibration table), so estimate with that.
+ */
+const TABLE_ROW_H = 338_328;
+const tableRowHeight = (cells: string[], columnWidth: number, fontPt: number): number =>
+  Math.max(TABLE_ROW_H, Math.max(...cells.map((cell) => wrappedLines(cell, columnWidth, fontPt))) * Math.round(fontPt * PT * 1.5) + 91_440);
+
 /** Estimated height (EMU) a block needs; charts and images take what is left. */
-const blockHeight = (block: PptxBlock, rows?: number): number => {
+const blockHeight = (block: PptxBlock): number => {
   switch (block.kind) {
     case "bullets":
-      return block.items.reduce((sum, item) => sum + lineCount(String(item), 58) * 320_040, 0) + 91_440;
+      return block.items.reduce((sum, item) => sum + wrappedLines(`• ${String(item)}`, BODY_W, 16) * 320_040, 0) + 91_440;
     case "paragraph":
-      return lineCount(block.text, 64) * 320_040 + 91_440;
-    case "table":
-      return ((rows ?? block.rows.length) + 1) * 338_328 + (block.caption ? 274_320 : 0);
+      return wrappedLines(block.text, BODY_W, 16) * 320_040 + 91_440;
     case "kpi":
       return 1_097_280;
     case "note":
-      return lineCount(block.text, 80) * 274_320 + 137_160;
+      return wrappedLines(block.text, BODY_W, 12) * 274_320 + 137_160;
     case "mermaid":
       return 548_640;
     case "chart":
@@ -759,8 +838,9 @@ const layoutFlowGraph = (graph: FlowGraph): DiagramPlan | null => {
     style: { shape: "roundRect", font_size: fontSize, fill: COLOR.kpiFill, line: COLOR.accent, line_size: 1, align: "center", bodyProp: { anchor: "ctr", autoFit: false } },
   }));
   const lines: DiagramPlan["lines"] = [];
-  const exit = (slot: { x: number; y: number; w: number; h: number }) => (direction === "LR" ? [slot.x + slot.w, slot.y + slot.h / 2] : [slot.x + slot.w / 2, slot.y + slot.h]) as const;
-  const entry = (slot: { x: number; y: number; w: number; h: number }) => (direction === "LR" ? [slot.x, slot.y + slot.h / 2] : [slot.x + slot.w / 2, slot.y]) as const;
+  type Slot = { x: number; y: number; w: number; h: number };
+  const exit = (slot: Slot): readonly [number, number] => (direction === "LR" ? [slot.x + slot.w, slot.y + slot.h / 2] : [slot.x + slot.w / 2, slot.y + slot.h]);
+  const entry = (slot: Slot): readonly [number, number] => (direction === "LR" ? [slot.x, slot.y + slot.h / 2] : [slot.x + slot.w / 2, slot.y]);
   for (const path of graph.paths) {
     path.slice(1).forEach((to, at) => {
       const from = slots.get(path[at]!)!;
@@ -794,7 +874,7 @@ const layoutSankey = (flow: SankeyFlow): DiagramPlan | null => {
   const fontSize = 11;
   const lineH = Math.round(fontSize * PT * 1.3);
   const perLine = Math.max(2, Math.floor((nodeW - 91_440) / (fontSize * PT)));
-  const label = (id: string) => `${stringOf(id, 40)}\n${shown.get(id)}`;
+  const label = (id: string) => [stringOf(id, 40), shown.get(id)].filter(Boolean).join("\n");
   const minH = new Map([...weight.keys()].map((id) => [id, lineCount(label(id), perLine) * lineH + 54_864]));
   const gapY = 137_160;
   const column = (layer: readonly string[], scale: number) => layer.reduce((sum, id) => sum + Math.max(minH.get(id)!, weight.get(id)! * scale), 0) + (layer.length - 1) * gapY;
@@ -953,18 +1033,39 @@ class SlideCursor {
     const fontSize = width > 8 ? 10 : width > 5 ? 12 : 14;
     const columnWidth = Math.floor(BODY_W / width);
     const base = { font_size: fontSize, font_face: FONT, align: "l" };
-    for (let start = 0; start < Math.max(rows.length, 1); start += LIMITS.slideTableRows) {
-      const page = rows.slice(start, start + LIMITS.slideTableRows);
-      const { slide, y } = this.reserve(blockHeight(block, page.length));
-      const header = (headers.length ? headers : Array.from({ length: width }, () => "")).concat(Array.from({ length: Math.max(0, width - headers.length) }, () => ""));
+    const header = (headers.length ? headers : Array.from({ length: width }, () => "")).concat(Array.from({ length: Math.max(0, width - headers.length) }, () => ""));
+    const headerH = tableRowHeight(header, columnWidth, fontSize);
+    const rowH = rows.map((row) => tableRowHeight(row, columnWidth, fontSize));
+    const captionH = block.caption ? CAPTION_H : 0;
+    // Viewers grow rows to fit wrapped cells, so pages are cut by estimated height, not by a fixed row count.
+    let start = 0;
+    do {
+      const caption = start === 0 ? captionH : 0;
+      const fits = (room: number): number => {
+        let used = headerH + caption;
+        let count = 0;
+        while (start + count < rows.length && count < LIMITS.slideTableRows && used + rowH[start + count] <= room) used += rowH[start + count++];
+        return count;
+      };
+      let count = fits(BODY_BOTTOM - this.y);
+      if (!count && rows.length && this.y > BODY_TOP) {
+        this.close();
+        count = fits(BODY_BOTTOM - BODY_TOP);
+      }
+      // A single row taller than a slide still gets its own page rather than being dropped.
+      if (!count && rows.length) count = 1;
+      const page = rows.slice(start, start + count);
+      const tableH = headerH + rowH.slice(start, start + count).reduce((sum, h) => sum + h, 0);
+      const { slide, y } = this.reserve(tableH + caption);
       const data = [
         header.map((cell) => ({ val: cell, opts: { ...base, bold: "1", fill_color: COLOR.accent, font_color: COLOR.headerText } })),
         ...page.map((row, index) => row.map((cell) => (index % 2 === 1 ? { val: cell, opts: { ...base, fill_color: COLOR.rowAlt } } : { val: cell, opts: base }))),
       ];
-      slide.addTable(data, { ...base, x: MARGIN, y, cx: BODY_W, cy: data.length * 338_328, columnWidth, rowHeight: 338_328 });
-      if (block.caption && start === 0) textBox(slide, stringOf(block.caption, 200), MARGIN, y + (page.length + 1) * 338_328 + 27_432, BODY_W, 246_888, { font_size: 11, color: COLOR.muted });
+      slide.addTable(data, { ...base, x: MARGIN, y, cx: BODY_W, cy: tableH, columnWidth, rowHeight: TABLE_ROW_H });
+      if (caption) textBox(slide, stringOf(block.caption, 200), MARGIN, y + tableH + 27_432, BODY_W, 246_888, { font_size: 11, color: COLOR.muted });
       this.noteSource(block.sourceId);
-    }
+      start += count;
+    } while (start < rows.length);
   }
 
   kpi(items: Extract<PptxBlock, { kind: "kpi" }>["items"]): void {
@@ -1014,6 +1115,9 @@ class SlideCursor {
         cx: BODY_W,
         cy: height,
         data: series.map((entry) => ({ name: entry.name, labels: categories, values: entry.values })),
+        // officegen's column / line templates put the category axis on the left and the value axis at the
+        // bottom (copied from its horizontal bar template); Keynote refuses to open such files.
+        ...(renderType === "pie" ? {} : { xml: VERTICAL_AXES }),
       }, done, fail);
     }));
     this.noteSource(block.sourceId);

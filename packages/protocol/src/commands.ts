@@ -27,6 +27,7 @@ export const COMMANDS = [
   'apps_list', 'apps_icon', 'apps_set_enabled', 'apps_update', 'apps_uninstall', 'upup_plugins_get', 'upup_plugins_set', 'agent_session_tools', 'agent_check_tool', 'apps_tool_policy_get', 'apps_tool_policy_set',
   // 默认应用 (2026-11-27)：首次启动从官方 Git 源安装 UpUp（幂等）。
   'apps_ensure_default',
+  'apps_ensure_bundled',
   // 当前应用 (2026-11-27 U4)：持久化到设置，会话打开时注入身份/边界。
   'apps_set_current',
   // 安装来源与回滚 (2026-11-27 U6)：读 {source,version,commit} 记录；按上一份记录重装。

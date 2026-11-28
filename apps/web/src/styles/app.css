@@ -13649,6 +13649,7 @@ button.diff__path {
 .home__guide-action:hover { opacity: 0.9; }
 
 /* Buddy 应用切换器 (20261126-upup / WorkBuddy 1:1)。品牌行后的当前应用药丸 + 面板。 */
+.sidebar__app-row { display: flex; align-items: center; flex: none; padding: 2px 12px 10px 22px; }
 .app-switcher { position: relative; display: inline-flex; }
 .app-switcher__pill {
   display: inline-flex; align-items: center; gap: 0.375rem; max-width: 9.5rem;

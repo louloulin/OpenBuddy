@@ -141,7 +141,29 @@ describe("PPTX 版式块 (P2-1)", () => {
     const chartXml = [...files.keys()].filter((name) => /^ppt\/charts\/chart\d+\.xml$/.test(name)).map((name) => text(files, name));
     expect(chartXml.filter((xml) => xml.includes("<c:lineChart"))).toHaveLength(1);
     expect(chartXml.filter((xml) => xml.includes("<c:barChart"))).toHaveLength(1);
+    // Vertical charts need the category axis at the bottom and the value axis on the left (Keynote rejects the swap).
+    for (const xml of chartXml) {
+      expect(xml).toMatch(/<c:catAx>[\s\S]*?<c:axPos val="b"\/>[\s\S]*?<\/c:catAx>/);
+      expect(xml).toMatch(/<c:valAx>[\s\S]*?<c:axPos val="l"\/>[\s\S]*?<\/c:valAx>/);
+    }
     expect(all).not.toContain("b · 走势");
+  });
+
+  it("cuts tables with wrapped Chinese cells by estimated height so no frame runs off the slide", async () => {
+    const long = "生猪养殖由散户向规模化集中，环保政策推动产能向优势区域转移，龙头企业资本开支扩张。".repeat(2);
+    const rows = Array.from({ length: 8 }, (_, index) => [`政策${index + 1}`, long, "转引未核验"]);
+    const bytes = await buildPptx({ slides: [{ title: "政策矩阵", blocks: [{ kind: "table", headers: ["阶段", "要点", "来源"], rows, caption: "表注" }] }] });
+    const files = readWorkBuddyZip(Buffer.from(bytes));
+    const slides = slideNames(files).map((name) => text(files, name));
+    expect(slides.length).toBeGreaterThan(1);
+    expect(slides.join("\n")).toContain("政策8");
+    const frames = slides.flatMap((xml) => xml.match(/<p:graphicFrame>[\s\S]*?<\/p:graphicFrame>/g) ?? []);
+    expect(frames.length).toBe(slides.length);
+    for (const frame of frames) {
+      const y = Number(/<a:off x="\d+" y="(\d+)"/.exec(frame)?.[1]);
+      const cy = Number(/<a:ext cx="\d+" cy="(\d+)"/.exec(frame)?.[1]);
+      expect(y + cy).toBeLessThanOrEqual(6_858_000 - 502_920);
+    }
   });
 
   it("skips charts without data and images outside the workspace instead of inventing content", async () => {
@@ -361,11 +383,14 @@ describe("PPTX 版式块 (P2-1)", () => {
     const xmls = slideXml(files);
     const all = xmls.join("\n");
     const items = xmls.flatMap(drawn);
-    const nodes = items.filter((item) => item.prst === "rect" && item.text.includes("|") && /\d$/.test(item.text));
-    const node = (name: string) => nodes.find((item) => item.text.startsWith(`${name}|`))!;
+    const names = ["营业收入", "营业成本", "毛利", "期间费用", "经营利润", "净利润"];
+    const nodes = items.filter((item) => item.prst === "rect" && names.includes(item.text.split("|")[0]!));
+    const node = (name: string) => nodes.find((item) => item.text.split("|")[0] === name)!;
     expect(nodes).toHaveLength(6);
-    // Values as written; a node fed by several links shows their exact decimal sum.
-    expect(node("营业收入").text).toBe("营业收入|1908825.01");
+    // Values as written; a node whose only figure would be a sum of several links shows its name only.
+    expect(node("营业收入").text).toBe("营业收入");
+    expect(node("毛利").text).toBe("毛利|624185.78");
+    expect(all).not.toContain("1908825.01");
     expect(node("营业成本").text).toBe("营业成本|1284639.23");
     expect(node("净利润").text).toBe("净利润|300000.10");
     // Columns follow the flow; heights share one scale (above the readable minimum).
@@ -385,6 +410,49 @@ describe("PPTX 版式块 (P2-1)", () => {
     expect(all).not.toContain("PPTX 以数据表呈现");
     for (const xml of xmls) expect(layoutProblems(xml)).toEqual([]);
     wellFormed(files);
+  });
+
+  /** Text of every sankey node rectangle (name|value) on the first slide of a one-diagram deck. */
+  const sankeyLabels = async (source: string) => {
+    const [xml] = slideXml(readWorkBuddyZip(Buffer.from(await buildPptx({ slides: [{ title: "流向", blocks: [{ kind: "mermaid", source }] }] }))));
+    return { xml: xml!, labels: drawn(xml!).filter((item) => item.prst === "rect" && item.text && !["流向", "桑基图数据"].includes(item.text) && !item.text.includes("图形在工作台")).map((item) => item.text) };
+  };
+
+  it("parses quoted thousands and exponent values; unparseable rows keep their text and the sankey stays a table", async () => {
+    const quoted = 'sankey-beta\nA,B,"1,000"\nA,C,500';
+    expect(mermaidTable(quoted)).toEqual({ headers: ["来源", "去向", "数值"], rows: [["A", "B", 1000], ["A", "C", 500]] });
+    const drawnQuoted = await sankeyLabels(quoted);
+    expect(drawnQuoted.labels.sort()).toEqual(["A", "B|1,000", "C|500"]);
+    expect(drawnQuoted.xml).not.toContain("PPTX 以数据表呈现");
+    const exponent = await sankeyLabels("sankey-beta\nA,B,1e3\nA,C,500");
+    expect(exponent.labels.sort()).toEqual(["A", "B|1e3", "C|500"]);
+    expect(exponent.xml).not.toContain(" + ");
+    expect(exponent.xml).not.toContain("1500");
+    // Inflow 1e3 equals outflow 400 + 600 exactly: the single written value.
+    expect((await sankeyLabels("sankey-beta\nA,M,1e3\nM,X,400\nM,Y,600")).labels).toContain("M|1e3");
+    for (const [source, kept] of [["sankey-beta\nA,B,abc\nA,C,500", ["A", "B", "abc"]], ["sankey-beta\nA,B,1,000\nA,C,500", ["A", "B", "1,000"]], ["sankey-beta\nA,B\nA,C,500", ["A", "B", ""]]] as const) {
+      expect(mermaidTable(source)!.rows, source).toEqual([kept, ["A", "C", 500]]);
+      const all = slideXml(readWorkBuddyZip(Buffer.from(await buildPptx({ slides: [{ title: "流向", blocks: [{ kind: "mermaid", source }] }] })))).join("\n");
+      expect(shapes(all, "line"), source).toBe(0);
+      expect(all, source).toContain("PPTX 以数据表呈现");
+      if (kept[2]) expect(all, source).toContain(`<a:t>${kept[2]}</a:t>`);
+    }
+    expect(deckSpecToXlsx({ slides: [{ title: "流向", blocks: [{ kind: "mermaid", source: "sankey-beta\nA,B,abc" }] }] }).sheets[0]!.rows).toEqual([["A", "B", "abc"]]);
+  });
+
+  it("labels a sankey node with a value from the source, never a sum that is not in the source", async () => {
+    // Inflow 100 ≠ outflow 30 + 50: the larger side's own value.
+    expect((await sankeyLabels("sankey-beta\n收入,毛利,100\n毛利,费用,30\n毛利,利润,50")).labels).toContain("毛利|100");
+    // Outflow 30 + 40 > inflow 10 and is itself a sum: name only.
+    expect((await sankeyLabels("sankey-beta\nA,M,10\nM,X,30\nM,Y,40")).labels).toContain("M");
+    // Both sides agree but each is a sum (10 + 20.5 = 15.25 + 15.25): name only, no figure absent from the source.
+    const both = await sankeyLabels("sankey-beta\nA,M,10\nB,M,20.5\nM,X,15.25\nM,Y,15.25");
+    expect(both.labels).toContain("M");
+    expect(both.xml).not.toContain("30.5");
+    // A source node with several outflows: name only; the data table keeps the exact values.
+    const source = await sankeyLabels("sankey-beta\n收入,成本,60.1\n收入,毛利,39.9");
+    expect(source.labels).toContain("收入");
+    expect(source.xml).not.toContain(">100<");
   });
 
   it("keeps sankeys with more than 12 nodes or non-positive values as a data table", async () => {

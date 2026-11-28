@@ -413,8 +413,6 @@ export function Sidebar({
           </span>
           <span className="sidebar__version">v{APP_VERSION}</span>
         </div>
-        {/* WorkBuddy 顶栏：品牌块右侧是当前应用切换器（同一行）。 */}
-        <AppSwitcher cwd={homeCwd} onToast={onToast} />
         <div className="sidebar__logo-spacer" {...(IS_MACOS ? { "data-window-drag-region": true } : {})} />
         <button
           className="sidebar__icon-btn"
@@ -460,6 +458,11 @@ export function Sidebar({
             </div>
           )}
         </div>
+      </div>
+
+      {/* 当前应用切换器单独占一行，避免与品牌块、顶栏图标挤在一起。 */}
+      <div className="sidebar__app-row">
+        <AppSwitcher cwd={homeCwd} onToast={onToast} />
       </div>
 
       <nav className="sidebar__nav">

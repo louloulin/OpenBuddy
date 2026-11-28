@@ -33,7 +33,28 @@ export interface AppEntry {
   scenes?: string;
   /** 解析后的场景卡（没有 scenes.json 或文件坏掉时为空数组）。 */
   sceneList?: AppScene[];
+  /**
+   * 随安装包内置 (20261127-upup §1.15)：包目录里有 `scripts/bundle-upup.mjs` 写的
+   * `.openbuddy-bundle.json`。内置应用跟着 OpenBuddy 升级，不走 git/npm 更新、不可卸载。
+   */
+  bundled?: { commit?: string; bundledAt?: string };
 }
+
+/** 读内置标记；没有或坏掉时返回 undefined。 */
+export function readBundleMarker(pkgRoot: string): AppEntry["bundled"] {
+  const path = join(pkgRoot, BUNDLE_MARKER);
+  if (!existsSync(path)) return undefined;
+  try {
+    const raw = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+    return {
+      ...(typeof raw.commit === "string" ? { commit: raw.commit } : {}),
+      ...(typeof raw.bundledAt === "string" ? { bundledAt: raw.bundledAt } : {}),
+    };
+  } catch {
+    return undefined;
+  }
+}
+export const BUNDLE_MARKER = ".openbuddy-bundle.json";
 
 /** 应用自带场景 (UP-4.1)：选中即把 prompt 填进输入框，由用户确认后发送。 */
 export interface AppScene {
@@ -116,5 +137,6 @@ export function readAppEntry(pkgRoot: string, source = "pi", packageSource?: str
       ? { scenes: app.scenes.trim(), sceneList: readAppScenes(pkgRoot, app.scenes.trim()) }
       : {}),
     ...(app && policyOf(app.toolPolicy) ? { toolPolicy: policyOf(app.toolPolicy) } : {}),
+    ...(readBundleMarker(pkgRoot) ? { bundled: readBundleMarker(pkgRoot) } : {}),
   };
 }

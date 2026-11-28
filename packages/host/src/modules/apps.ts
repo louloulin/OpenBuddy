@@ -19,7 +19,8 @@ import {
 } from "@openbuddy/services/apps/install-state";
 import { describeAppInstallError } from "@openbuddy/protocol/apps";
 import { PLATFORM_DENIED_PATTERNS } from "@openbuddy/engine/permissions/permissions";
-import type { AppEntry } from "@openbuddy/services/apps/manifest";
+import { readAppEntry, readBundleMarker, type AppEntry } from "@openbuddy/services/apps/manifest";
+import { existsSync } from "node:fs";
 import { text } from "@openbuddy/services/settings/settings";
 import type { Handler, HostContext, HostModule } from "../module.js";
 
@@ -38,6 +39,16 @@ export function appsModule(ctx: HostContext): HostModule {
   let usage: AppUsageStore | undefined;
   const usageStore = () => (usage ??= new AppUsageStore(agentDir));
   const run = promisify(execFile);
+  /** 内置应用目录（§1.15）：只认真实存在、带 package.json 的目录。 */
+  const bundledDirs = () => (ctx.options.bundledApps ?? []).map((dir) => resolve(dir)).filter((dir) => existsSync(join(dir, "package.json")));
+  const isBundled = (source: string) => {
+    const dir = packageFor(source)?.installedPath ?? source;
+    return !!readBundleMarker(dir) || bundledDirs().includes(resolve(dir));
+  };
+  /** 内置应用跟着 OpenBuddy 升级：不走 git/npm 更新、回滚，也不能卸载（可以停用）。 */
+  const refuseBundled = (source: string, action: string) => {
+    if (isBundled(source)) throw new Error(`bundled_app: 内置应用随 OpenBuddy 一起${action}，不能单独操作；不想用可以在卡片上停用`);
+  };
   /** 读 Git HEAD；非 Git 目录或缺少 git 时返回 undefined（不阻塞安装/更新）。 */
   const gitCommit = async (dir: string): Promise<string | undefined> => {
     try {
@@ -99,6 +110,7 @@ export function appsModule(ctx: HostContext): HostModule {
     // U6：升级前保留当前 {source,version,commit}，升级后记录新状态，回滚才有目标。
     apps_update: async (p) => {
       const source = text(p.packageSource, "packageSource");
+      refuseBundled(source, "升级");
       // U6：升级前先拍一次快照，第一次更新后就能回滚（previous = 升级前状态）。
       const before = await snapshot(source);
       const packages = await ctx.engine.updateExtensionPackages(source);
@@ -114,6 +126,7 @@ export function appsModule(ctx: HostContext): HostModule {
     },
     apps_uninstall: async (p) => {
       const source = text(p.packageSource, "packageSource");
+      refuseBundled(source, "安装与卸载");
       const key = usageKey({ packageSource: source, installedPath: packageFor(source)?.installedPath });
       const packages = await ctx.engine.removeExtensionPackage(source);
       const cleared = writeUpupPlugins(agentDir, { disabled: [], enabled: [] });
@@ -129,6 +142,7 @@ export function appsModule(ctx: HostContext): HostModule {
     apps_install_state: () => ctx.settings.config.read().appInstalls ?? {},
     apps_rollback: async (p) => {
       const source = text(p.packageSource, "packageSource");
+      refuseBundled(source, "升级");
       const history = historyOf(source);
       const target = rollbackSource(history);
       if (!history || !target) throw new Error("rollback_unavailable: 没有可用的上一版本记录");
@@ -182,6 +196,49 @@ export function appsModule(ctx: HostContext): HostModule {
     // 失败不抛错——离线/私有网络时界面仍可用，只是应用页保留「安装 UpUp」入口。
     // U1 (2026-11-27)：真正安装时同时打开全局扩展开关，否则包记录在、会话仍不加载扩展。
     // 已经安装过的不改开关（尊重用户后来在扩展中心做的关闭）。
+    /**
+     * 内置应用登记 (20261127-upup §1.15)，启动时调用，幂等：
+     * 1. 上次登记、这次已不在的内置目录（OpenBuddy 换了位置或升级）→ 去掉登记；
+     * 2. 同 id 的动态安装副本（以前从 Git/npm 装的 UpUp）→ 移除，免得同名工具注册两遍；
+     * 3. 当前内置目录还没登记 → 按本地 Pi 包登记（Pi 对本地包只记路径，不跑 git/npm）。
+     * 用户对内置应用的「停用」是包过滤，第 3 步不会覆盖。
+     */
+    apps_ensure_bundled: async () => {
+      const dirs = bundledDirs();
+      const list = () => ctx.engine.extensionPackages() as Array<{ source: string; installedPath?: string }>;
+      const removed: string[] = [];
+      const replaced: string[] = [];
+      const registered: string[] = [];
+      for (const old of ctx.settings.config.read().bundledAppPaths ?? []) {
+        if (dirs.includes(old)) continue;
+        if (list().some((pkg) => pkg.source === old)) {
+          await ctx.engine.removeExtensionPackage(old);
+          removed.push(old);
+        }
+      }
+      const apps: Array<{ id: string; version?: string; path: string; commit?: string }> = [];
+      for (const dir of dirs) {
+        const entry = readAppEntry(dir);
+        if (!entry) continue;
+        for (const pkg of list()) {
+          if (pkg.source === dir || !pkg.installedPath || resolve(pkg.installedPath) === dir) continue;
+          if (readAppEntry(pkg.installedPath)?.id !== entry.id) continue;
+          await ctx.engine.removeExtensionPackage(pkg.source);
+          replaced.push(pkg.source);
+        }
+        if (!list().some((pkg) => pkg.source === dir || (pkg.installedPath && resolve(pkg.installedPath) === dir))) {
+          await ctx.engine.installExtensionPackage(dir);
+          await ctx.engine.setExtensionPackageResources(dir, { extensions: true, skills: true, prompts: true, themes: false });
+          registered.push(dir);
+        }
+        apps.push({ id: entry.id, ...(entry.version ? { version: entry.version } : {}), path: dir, ...(entry.bundled?.commit ? { commit: entry.bundled.commit } : {}) });
+      }
+      ctx.update((config) => {
+        config.bundledAppPaths = dirs;
+        if (registered.length) config.extensionsEnabled = true;
+      });
+      return { apps, registered, replaced, removed, extensionsEnabled: ctx.settings.config.read().extensionsEnabled === true };
+    },
     apps_ensure_default: async (p) => {
       const source = typeof p.source === "string" && p.source.trim() ? p.source.trim() : DEFAULT_APP_SOURCE;
       const installed = (ctx.engine.extensionPackages() as Array<{ source: string; installedPath?: string }>)

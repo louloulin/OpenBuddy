@@ -21,6 +21,6 @@ export default defineConfig({
     // Agent worktrees live under .claude/worktrees; their copies are not this checkout's tests.
     // `packages/gateway` and `packages/pi-bridge` are Bun-targeted packages: their suites import
     // `bun:test` and run with `bun test` in those packages, not under vitest.
-    exclude: [...configDefaults.exclude, ".claude/**", "packages/gateway/**", "packages/pi-bridge/**", "scripts/generate-desktop-icons.test.mjs"],
+    exclude: [...configDefaults.exclude, ".claude/**", "vendor/**", "release/**", "packages/gateway/**", "packages/pi-bridge/**", "scripts/generate-desktop-icons.test.mjs"],
   },
 });

@@ -53,11 +53,15 @@ describe("结构化日志 (O1)", () => {
   it("prunes files older than the retention window", () => {
     const dir = tempDir();
     const old = join(dir, "openbuddy-2026-01-01.log");
-    writeFileSync(old, "{}\n");
+    const rotated = join(dir, "openbuddy-2026-01-01.log.1767225600000");
     const tenDaysAgo = new Date(Date.now() - 10 * 86_400_000);
-    utimesSync(old, tenDaysAgo, tenDaysAgo);
+    for (const file of [old, rotated]) {
+      writeFileSync(file, "{}\n");
+      utimesSync(file, tenDaysAgo, tenDaysAgo);
+    }
     const logger = new StructuredLogger(dir, { retainDays: 7 });
     expect(existsSyncSafe(old)).toBe(false);
+    expect(existsSyncSafe(rotated)).toBe(false);
     logger.info("retention", "still writes");
     expect(logger.files().length).toBe(1);
   });

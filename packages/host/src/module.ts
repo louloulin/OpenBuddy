@@ -30,6 +30,11 @@ export interface EngineOptions {
    * headless runs drive `automation_tick` instead.
    */
   automationTickMs?: number;
+  /**
+   * 内置应用目录 (20261127-upup §1.15)：随安装包分发的 Pi 包（桌面：`<resources>/upup`）。
+   * `apps_ensure_bundled` 把它们登记为本地 Pi 包，运行时不需要 git / npm。
+   */
+  bundledApps?: string[];
 }
 export type Handler = (
   payload: Record<string, unknown>,

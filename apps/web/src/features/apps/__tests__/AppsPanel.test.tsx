@@ -165,6 +165,23 @@ describe("应用页 (UP-2.4)", () => {
     expect(screen.getByRole("button", { name: "确认安装" })).toBeDisabled();
   });
 
+  it("内置 UpUp：显示「内置」与版本，可停用，没有更新/回滚入口 (§1.15)", async () => {
+    appsList.mockResolvedValue([
+      { id: "upup", name: "upup", version: "2026.10.11", kind: "app", source: "pi", packageSource: "/Applications/OpenBuddy.app/Contents/Resources/upup", installedPath: "/Applications/OpenBuddy.app/Contents/Resources/upup", tagline: "证券智能投研助手", bundled: { commit: "690500427869ea1f" } },
+    ]);
+    agentExtensionsPackages.mockResolvedValue([{ source: "/Applications/OpenBuddy.app/Contents/Resources/upup", scope: "user", filtered: false }]);
+    appsInstallState.mockResolvedValue({ "/Applications/OpenBuddy.app/Contents/Resources/upup": { current: { source: "x", version: "1" }, previous: { source: "y", version: "0" } } });
+    agentExtensionsCheckUpdates.mockResolvedValue([{ source: "/Applications/OpenBuddy.app/Contents/Resources/upup" }]);
+    render(<AppsPanel />);
+    expect(await screen.findByText("内置")).toBeInTheDocument();
+    expect(screen.getByText("当前版本 2026.10.11 · 6905004")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: /upup/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "检查更新" }));
+    await waitFor(() => expect(agentExtensionsCheckUpdates).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: /更新 upup|回滚 upup/ })).toBeNull();
+    expect(screen.queryByRole("region", { name: "安装 UpUp" })).toBeNull();
+  });
+
   it("已安装 UpUp 后不再显示 Git 安装入口", async () => {
     render(<AppsPanel />);
     await screen.findByText("upup");

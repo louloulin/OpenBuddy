@@ -22,8 +22,8 @@ const magpieUrl = process.env.MAGPIE_URL ?? 'http://127.0.0.1:3425/v1';
 const rounds = Number(process.env.OPENBUDDY_PACKAGED_ROUNDS ?? 3);
 /**
  * `fresh`：模拟一台新电脑（空 HOME + `/bin/sh`）：没有 Node.js/npm（本机 npm 只在 mise 里），
- * 也没有 gitcode 登录凭据（实测 UpUp 仓库需要登录才能克隆）。
- * 期望：默认安装很快失败并记日志、应用页确认卡给出**可读原因**且禁用安装、对话照常可用、不卡住。
+ * 也没有 gitcode 登录凭据（UpUp 仓库需要登录才能克隆）。UpUp 内置后（§1.15）这台电脑上也必须
+ * 开箱即用：流程与默认场景完全相同。
  */
 const scenario = process.env.OPENBUDDY_PACKAGED_SCENARIO ?? 'default';
 const work = realpathSync(mkdtempSync(join(tmpdir(), 'openbuddy-packaged-')));
@@ -38,46 +38,7 @@ const mainLog = () => {
   return existsSync(dir) ? readdirSync(dir).flatMap((name) => readFileSync(join(dir, name), 'utf8').split('\n')) : [];
 };
 
-async function freshMachine(call, info, rss) {
-  // a) 默认安装：失败要快、要记日志，不能挂着。
-  const started = Date.now();
-  let line;
-  while (Date.now() - started < 5 * 60_000 && !(line = mainLog().find((l) => /default-app/.test(l)))) await page.waitForTimeout(2000);
-  if (!line) throw new Error('5 分钟内没有默认安装的结果日志');
-  const apps = await call('apps_list', {});
-  if (apps.some((entry) => entry.id === 'upup')) throw new Error('没有 npm 却装上了 UpUp（场景没模拟成功）');
-  step('fresh: default install fails fast and is logged', { ms: Date.now() - started, log: line.slice(0, 400) });
-  // b) 应用页：检查并安装 → 确认卡给出可读原因，确认按钮禁用。
-  await page.getByRole('button', { name: /更多.*文件/ }).hover();
-  await page.getByRole('menuitem', { name: '应用', exact: true }).click();
-  await page.getByRole('region', { name: '安装 UpUp' }).getByRole('button', { name: '检查并安装' }).click();
-  const confirm = page.getByRole('dialog', { name: /^安装确认/ });
-  await confirm.waitFor({ timeout: 240_000 });
-  const text = await confirm.innerText();
-  const disabled = await confirm.getByRole('button', { name: '确认安装' }).isDisabled();
-  await page.screenshot({ path: 'release/packaged-fresh-confirm.png' });
-  // 可读原因 = 命中了具体分类（缺 npm / 需要认证 / 网络…），不是兜底的「安装失败。请查看原始信息」。
-  if (!/找不到 Node\.js|需要认证|无法连接|缺少 Git/.test(text) || !disabled) throw new Error(`确认卡没有给出可读原因或没禁用：${text}`);
-  step('fresh: confirm card explains why and blocks install', { lines: text.split('\n').slice(0, 10), disabled });
-  await confirm.getByRole('button', { name: '取消' }).click();
-  // c) 没有应用也要能正常对话（内置应用 + 真实模型）。
-  await call('providers_save_provider', { provider: { id: 'magpie', providerKind: 'magpie', label: 'magpie', baseUrl: magpieUrl, apiBackend: 'chat_completions', authScheme: 'bearer' } });
-  const models = await call('providers_fetch_models', { providerId: 'magpie' });
-  const chosen = models.find((m) => /minimax-m3\.1-flash$/i.test(m.id)) ?? models[0];
-  await call('providers_save_model', { model: { modelId: chosen.id, providerId: 'magpie', displayName: chosen.id } });
-  await call('agents_defaults_save', { defaults: { defaultModel: chosen.id, defaultProviderId: 'magpie', defaultPermission: 'always-approve' } });
-  await page.getByRole('button', { name: '新建任务' }).first().click();
-  await page.locator('.wb-composer__input').waitFor({ state: 'visible', timeout: 60_000 });
-  const turnStarted = Date.now();
-  await page.locator('.wb-composer__input').fill('一句话介绍一下你自己。');
-  await page.getByRole('button', { name: '发送', exact: true }).click();
-  await page.getByRole('button', { name: /停止/ }).first().waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
-  await page.getByRole('button', { name: /停止/ }).first().waitFor({ state: 'hidden', timeout: 180_000 });
-  step('fresh: chat with the built-in app still works', { ms: Date.now() - turnStarted, modelId: chosen.id });
-  await rss('fresh chat');
-  report.mainLogErrors = mainLog().filter((l) => /"level":"error"/.test(l)).slice(-5);
-  step('finished', { pageErrors: report.pageErrors.length, consoleErrors: report.consoleErrors.length, mainLogErrors: report.mainLogErrors.length });
-}
+
 const watchdog = setTimeout(() => { report.error = 'watchdog: 整体超过 25 分钟'; save(); console.error('PACKAGED_WATCHDOG'); process.exit(2); }, 25 * 60_000);
 
 let app;
@@ -95,21 +56,25 @@ try {
 
   // 2) 用访达式的精简环境启动；userData 隔离到临时目录。
   const started = Date.now();
-  app = await electron.launch({
-    executablePath: executable,
-    args: [`--user-data-dir=${userData}`],
-    env: {
-      HOME: scenario === 'fresh' ? mkdirFake(join(work, 'home')) : process.env.HOME,
-      ...(scenario === 'fresh' ? { SHELL: '/bin/sh' } : {}),
-      USER: process.env.USER, TMPDIR: process.env.TMPDIR, LANG: 'zh_CN.UTF-8', PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
-    },
-    timeout: 120_000,
-  });
-  page = await app.firstWindow({ timeout: 120_000 });
-  page.on('pageerror', (error) => report.pageErrors.push(String(error).slice(0, 300)));
-  page.on('console', (message) => { if (message.type() === 'error') report.consoleErrors.push(message.text().slice(0, 300)); });
-  await page.locator('.wb-composer__input').waitFor({ state: 'visible', timeout: 120_000 });
-  const info = await app.evaluate(({ app: electronApp }) => ({ packaged: electronApp.isPackaged, version: electronApp.getVersion(), userData: electronApp.getPath('userData'), pid: process.pid }));
+  const home = scenario === 'fresh' ? mkdirFake(join(work, 'home')) : process.env.HOME;
+  const launch = async () => {
+    app = await electron.launch({
+      executablePath: executable,
+      args: [`--user-data-dir=${userData}`],
+      env: {
+        HOME: home,
+        ...(scenario === 'fresh' ? { SHELL: '/bin/sh' } : {}),
+        USER: process.env.USER, TMPDIR: process.env.TMPDIR, LANG: 'zh_CN.UTF-8', PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
+      },
+      timeout: 120_000,
+    });
+    page = await app.firstWindow({ timeout: 120_000 });
+    page.on('pageerror', (error) => report.pageErrors.push(String(error).slice(0, 300)));
+    page.on('console', (message) => { if (message.type() === 'error') report.consoleErrors.push(message.text().slice(0, 300)); });
+    await page.locator('.wb-composer__input').waitFor({ state: 'visible', timeout: 120_000 });
+  };
+  await launch();
+  let info = await app.evaluate(({ app: electronApp }) => ({ packaged: electronApp.isPackaged, version: electronApp.getVersion(), userData: electronApp.getPath('userData'), pid: process.pid }));
   if (info.userData !== userData) throw new Error(`userData 未隔离：${info.userData}`);
   step('packaged app launched with a Finder-like PATH', { ms: Date.now() - started, ...info });
   const call = (command, payload = {}) => page.evaluate(({ command, payload }) => window.openbuddy.invoke(command, payload), { command, payload });
@@ -119,29 +84,28 @@ try {
   };
   await rss('launched');
 
-  if (scenario === 'fresh') {
-    await freshMachine(call, info, rss);
-    throw Object.assign(new Error('done'), { done: true });
-  }
-  // 3) 首次启动的默认应用：后台从 Git 装 UpUp，最多等 8 分钟。
-  const installStarted = Date.now();
-  let apps = [];
-  while (Date.now() - installStarted < 8 * 60_000) {
-    apps = await call('apps_list', {});
-    if (apps.some((entry) => entry.id === 'upup')) break;
-    // 默认安装失败会写进主进程日志：立刻失败，不干等。
-    const logDir = join(userData, 'logs');
-    const failed = existsSync(logDir) && readdirSync(logDir).some((name) => /default-app-failed|"installed":false/.test(readFileSync(join(logDir, name), 'utf8')));
-    if (failed) break;
-    await page.waitForTimeout(3000);
-  }
+  // 3) 内置 UpUp（§1.15）：启动时登记 <Resources>/upup，不跑 git/npm；开窗口前就完成。
+  const resources = join(work, bundle, 'Contents', 'Resources', 'upup');
+  const apps = await call('apps_list', {});
   const upup = apps.find((entry) => entry.id === 'upup');
-  if (!upup) {
-    const log = (() => { try { return readdirSync(join(userData, 'logs')).flatMap((name) => readFileSync(join(userData, 'logs', name), 'utf8').split('\n')).filter((line) => /default-app/.test(line)).slice(-3); } catch { return []; } })();
-    throw new Error(`默认应用 UpUp 没有装上：${JSON.stringify(log)}`);
-  }
-  step('default UpUp app installed from Git inside the packaged app', { ms: Date.now() - installStarted, packageSource: upup.packageSource, version: upup.version, scenes: upup.sceneList?.length ?? 0 });
-  await rss('upup installed');
+  const registered = mainLog().find((line) => /bundled-apps/.test(line));
+  if (!upup) throw new Error(`内置 UpUp 没有出现在应用列表：${registered ?? '没有 bundled-apps 日志'}`);
+  if (!upup.bundled || realpathSync(upup.installedPath) !== realpathSync(resources)) throw new Error(`UpUp 不是内置副本：${JSON.stringify(upup)}`);
+  if (mainLog().some((line) => /git clone|npm install|default-app/.test(line))) throw new Error('启动时仍在动态安装');
+  step('bundled UpUp registered from Resources at startup (no git/npm)', { installedPath: upup.installedPath, version: upup.version, commit: upup.bundled.commit?.slice(0, 8), scenes: upup.sceneList?.length ?? 0, log: registered?.slice(0, 300) });
+  await rss('upup registered');
+  // 应用页：UpUp 卡片标「内置」、带版本，没有「安装 UpUp」入口。
+  await page.getByRole('button', { name: /更多.*文件/ }).hover();
+  await page.getByRole('menuitem', { name: '应用', exact: true }).click();
+  const upupCard = page.locator('article.app-card').filter({ hasText: '证券智能投研助手' });
+  await upupCard.waitFor({ timeout: 30_000 });
+  const cardText = await upupCard.innerText();
+  if (!/内置/.test(cardText) || !/当前版本 2026/.test(cardText)) throw new Error(`应用页 UpUp 卡片不对：${cardText}`);
+  if (await page.getByRole('region', { name: '安装 UpUp' }).count()) throw new Error('内置后仍显示「安装 UpUp」');
+  await page.screenshot({ path: 'release/packaged-apps-bundled.png' });
+  step('apps page shows UpUp as 内置 with its version and no install card', { card: cardText.split('\n').slice(0, 6) });
+  await page.getByRole('button', { name: '新建任务' }).first().click();
+  await page.locator('.wb-composer__input').waitFor({ state: 'visible', timeout: 60_000 });
 
   // 4) 真实模型：magpie 本机网关（免 Key）。
   await call('providers_save_provider', { provider: { id: 'magpie', providerKind: 'magpie', label: 'magpie', baseUrl: magpieUrl, apiBackend: 'chat_completions', authScheme: 'bearer' } });
@@ -185,6 +149,25 @@ try {
   }
   await page.screenshot({ path: 'release/packaged-final.png' });
 
+  // 6) 同一 userData 重启：内置登记幂等（只有一条 UpUp），重启后照常对话。
+  await Promise.race([app.close().catch(() => {}), new Promise((r) => setTimeout(r, 15_000))]);
+  try { app.process().kill('SIGKILL'); } catch { /* 已退出 */ }
+  const restarted = Date.now();
+  await launch();
+  info = await app.evaluate(({ app: electronApp }) => ({ pid: process.pid, userData: electronApp.getPath('userData') }));
+  const pkgs = await call('agent_extensions_packages', {});
+  const upups = (await call('apps_list', {})).filter((entry) => entry.id === 'upup');
+  if (upups.length !== 1 || pkgs.filter((pkg) => /upup/i.test(pkg.installedPath ?? pkg.source)).length !== 1) throw new Error(`重启后 UpUp 登记不唯一：${JSON.stringify(pkgs.map((pkg) => pkg.source))}`);
+  await page.getByRole('button', { name: '新建任务' }).first().click();
+  await page.locator('.wb-composer__input').waitFor({ state: 'visible', timeout: 60_000 });
+  await page.locator('.wb-composer__input').fill(questions[0]);
+  await page.getByRole('button', { name: '发送', exact: true }).click();
+  await page.getByRole('button', { name: /停止/ }).first().waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {});
+  await page.getByRole('button', { name: /停止/ }).first().waitFor({ state: 'hidden', timeout: 240_000 });
+  await page.locator('article.finance-card').first().waitFor({ timeout: 30_000 });
+  step('restart with the same userData: one UpUp registration, real-model quote card again', { ms: Date.now() - restarted, packages: pkgs.length });
+  await rss('after restart');
+
   // 6) 主进程日志里的错误。
   const logDir = join(userData, 'logs');
   const logLines = existsSync(logDir) ? readdirSync(logDir).flatMap((name) => readFileSync(join(logDir, name), 'utf8').split('\n')) : [];
@@ -192,14 +175,10 @@ try {
   step('finished', { pageErrors: report.pageErrors.length, consoleErrors: report.consoleErrors.length, mainLogErrors: report.mainLogErrors.length });
   report.ok = true;
 } catch (error) {
-  if (error?.done) {
-    report.ok = true;
-  } else {
   report.ok = false;
   report.error = error instanceof Error ? error.message : String(error);
   console.error('PACKAGED_FAIL', report.error);
   await page?.screenshot({ path: 'release/packaged-failed.png' }).catch(() => {});
-  }
 } finally {
   clearTimeout(watchdog);
   save();

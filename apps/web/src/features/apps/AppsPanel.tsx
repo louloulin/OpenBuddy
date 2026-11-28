@@ -322,8 +322,12 @@ export function AppsPanel({
                   const on = isOn(app);
                   const icon = icons[app.packageSource ?? ""];
                   const builtin = app.source === "builtin";
-                  const history = app.packageSource ? installs[sourceKey(app.packageSource)] : undefined;
-                  const version = history?.current.version ?? history?.current.commit?.slice(0, 7);
+                  // 内置 UpUp (§1.15)：随 OpenBuddy 一起升级，没有单独的更新/回滚；仍可停用。
+                  const bundled = !!app.bundled;
+                  const history = app.packageSource && !bundled ? installs[sourceKey(app.packageSource)] : undefined;
+                  const version = bundled
+                    ? [app.version, app.bundled?.commit?.slice(0, 7)].filter(Boolean).join(" · ")
+                    : history?.current.version ?? history?.current.commit?.slice(0, 7);
                   const canRollback = !!history?.previous;
                   return (
                     <article key={`${app.id}@${app.packageSource ?? app.installedPath ?? app.source}`} className={"app-card" + (on ? "" : " app-card--off")}>
@@ -337,6 +341,7 @@ export function AppsPanel({
                             {app.tagline ?? (app.kind === "skill-pack" ? "技能包" : app.kind === "connector" ? "连接器" : "应用")}
                           </span>
                         </div>
+                        {bundled && <span className="app-card__builtin" title="随 OpenBuddy 安装包内置">内置</span>}
                         {builtin ? (
                           <span className="app-card__builtin">内置</span>
                         ) : (
@@ -359,7 +364,7 @@ export function AppsPanel({
                           当前版本 {version}
                         </span>
                       )}
-                      {app.packageSource && updates[sourceKey(app.packageSource)] && (
+                      {!bundled && app.packageSource && updates[sourceKey(app.packageSource)] && (
                         <button
                           type="button"
                           className="app-card__scene"

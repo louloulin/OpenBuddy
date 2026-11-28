@@ -63,3 +63,6 @@ screenshot.png
 
 # Plan iteration screenshots (dev artifacts, ~1.3GB)
 docs/plan/shots-*/
+
+# 内置 UpUp（scripts/bundle-upup.mjs 生成，随安装包分发）
+/vendor/

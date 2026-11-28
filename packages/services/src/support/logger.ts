@@ -118,7 +118,8 @@ export class StructuredLogger {
     const cutoff = now - this.retainDays * 86_400_000;
     try {
       for (const name of readdirSync(this.dir)) {
-        if (!name.startsWith("openbuddy-") || !name.endsWith(".log")) continue;
+        // Rotated files are `openbuddy-<day>.log.<ms>`; they age out with the day files.
+        if (!name.startsWith("openbuddy-") || !/\.log(?:\.\d+)?$/.test(name)) continue;
         const path = join(this.dir, name);
         if (statSync(path).mtimeMs < cutoff) rmSync(path, { force: true });
       }

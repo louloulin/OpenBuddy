@@ -98,6 +98,8 @@ export interface AppEntry {
   toolPolicy?: { readonly?: string[]; deny?: string[] };
   scenes?: string;
   sceneList?: Array<{ id: string; name: string; group?: string; prompt: string }>;
+  /** 随安装包内置 (§1.15)：跟 OpenBuddy 一起升级，不可卸载/单独更新。 */
+  bundled?: { commit?: string; bundledAt?: string };
 }
 export const appsList = (cwd?: string) =>
   invoke<AppEntry[]>("apps_list", cwd ? { cwd } : {});

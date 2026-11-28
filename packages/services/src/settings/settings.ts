@@ -275,6 +275,8 @@ export interface AppSettings {
   appInstalls?: Record<string, AppInstallHistory>;
   /** 会话内应用推荐 (U5 / UP-6.2)：用户点过「不用了」的应用 id，不再推荐。 */
   dismissedAppRecommendations?: string[];
+  /** 上次登记的内置应用目录 (§1.15)：OpenBuddy 换了安装位置/版本时，用来清掉旧目录的登记。 */
+  bundledAppPaths?: string[];
   /** 默认打开方式 (G1-6): per file type, "embedded" (预览面板) or "system" (系统关联应用). */
   defaultOpen?: Record<string, "embedded" | "system">;
   /** System notifications while the window is in the background (20261115-ui U6.1); on by default. */
